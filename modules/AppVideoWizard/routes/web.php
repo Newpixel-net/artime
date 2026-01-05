@@ -5,25 +5,21 @@ use Modules\AppVideoWizard\Http\Controllers\AppVideoWizardController;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes - Matching AppProfile pattern exactly (permission: false module)
+| Web Routes
 |--------------------------------------------------------------------------
 */
-
-// DEBUG: Test closure route without controller
-Route::middleware(['web', 'auth'])->get('app/video-wizard-test-closure', function() {
-    return 'Closure route works at app/video-wizard-test-closure!';
-})->name('app.video-wizard.test-closure');
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::group(["prefix" => "app"], function () {
         Route::group(["prefix" => "video-wizard"], function () {
-            // DEBUG: Test closure at root of group
-            Route::get('test', function() {
-                return 'Closure at /app/video-wizard/test works!';
-            })->name('app.video-wizard.test');
+            // Redirect base path to /create (workaround for module URI blocking)
+            Route::get('/', function() {
+                return redirect()->route('app.video-wizard.create');
+            });
 
-            // Main wizard page - using Route::get('/') like AppProfile
-            Route::get('/', [AppVideoWizardController::class, 'index'])->name('app.video-wizard.index');
+            // Main wizard page at /create
+            Route::get('create', [AppVideoWizardController::class, 'index'])->name('app.video-wizard.create');
+            Route::get('index', [AppVideoWizardController::class, 'index'])->name('app.video-wizard.index');
 
             // Project management
             Route::get('projects', [AppVideoWizardController::class, 'projects'])->name('app.video-wizard.projects');
