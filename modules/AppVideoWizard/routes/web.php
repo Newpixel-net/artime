@@ -9,9 +9,19 @@ use Modules\AppVideoWizard\Http\Controllers\AppVideoWizardController;
 |--------------------------------------------------------------------------
 */
 
+// DEBUG: Test closure route without controller
+Route::middleware(['web', 'auth'])->get('app/video-wizard-test-closure', function() {
+    return 'Closure route works at app/video-wizard-test-closure!';
+})->name('app.video-wizard.test-closure');
+
 Route::middleware(['web', 'auth'])->group(function () {
     Route::group(["prefix" => "app"], function () {
         Route::group(["prefix" => "video-wizard"], function () {
+            // DEBUG: Test closure at root of group
+            Route::get('test', function() {
+                return 'Closure at /app/video-wizard/test works!';
+            })->name('app.video-wizard.test');
+
             // Main wizard page - using Route::get('/') like AppProfile
             Route::get('/', [AppVideoWizardController::class, 'index'])->name('app.video-wizard.index');
 
