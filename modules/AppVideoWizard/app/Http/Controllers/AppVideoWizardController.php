@@ -12,7 +12,7 @@ use Modules\AppVideoWizard\Services\ScriptGenerationService;
 use Modules\AppVideoWizard\Services\ImageGenerationService;
 use Modules\AppVideoWizard\Services\VoiceoverService;
 
-class VideoWizardController extends Controller
+class AppVideoWizardController extends Controller
 {
     /**
      * Display the video wizard.
@@ -60,7 +60,7 @@ class VideoWizardController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
-        return redirect()->route('app.video-wizard.index', ['project' => $project->id]);
+        return redirect()->route('app.video-wizard.studio', ['project' => $project->id]);
     }
 
     /**
