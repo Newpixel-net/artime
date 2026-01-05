@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/appvideowizard",
+    "description": "AI-powered video creation wizard",
+    "authors": [
+        {
+            "name": "ArTime",
+            "email": "newpixel.net1@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AppVideoWizard\\": "app/",
+            "Modules\\AppVideoWizard\\Database\\Factories\\": "database/factories/",
+            "Modules\\AppVideoWizard\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AppVideoWizard\\Tests\\": "tests/"
+        }
+    }
+}
