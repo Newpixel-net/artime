@@ -12,7 +12,7 @@ use Modules\AppVideoWizard\Services\ScriptGenerationService;
 use Modules\AppVideoWizard\Services\ImageGenerationService;
 use Modules\AppVideoWizard\Services\VoiceoverService;
 
-class VideoWizardController extends Controller
+class AppVideoWizardController extends Controller
 {
     /**
      * Display the video wizard.

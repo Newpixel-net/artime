@@ -22,17 +22,6 @@ class AppVideoWizardServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Pricing::add([
-            [
-                "sort"      => 130,
-                "key"       => "appvideowizard",
-                "label"     => __("Video Creator"),
-                "check"     => true,
-                "type"      => "group",
-                "raw"       => null
-            ]
-        ]);
-
         $this->registerCommands();
         $this->registerCommandSchedules();
         $this->registerTranslations();
@@ -40,6 +29,12 @@ class AppVideoWizardServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerLivewireComponents();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
+
+        // Add permissions like working modules do
+        \Plan::addPermissions($this->name, [
+            "sort" => 4000,
+            "view" => "permissions",
+        ]);
     }
 
     /**
@@ -49,6 +44,19 @@ class AppVideoWizardServiceProvider extends ServiceProvider
     {
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
+
+        // Register pricing features like working modules
+        \Pricing::addSubFeatures([
+            "sort"      => 130,
+            "parent"    => "features",
+            "tab_id"    => 'video-wizard',
+            "tab_name"  => __("Video Creator"),
+            "key"       => "appvideowizard",
+            "label"     => __("AI Video Creator"),
+            "check"     => true,
+            "type"      => "boolean",
+            "raw"       => 0,
+        ]);
     }
 
     /**
