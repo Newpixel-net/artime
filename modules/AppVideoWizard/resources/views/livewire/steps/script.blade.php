@@ -289,13 +289,11 @@
         to { transform: rotate(360deg); }
     }
 
-    /* Loading content - use flex ONLY when visible */
-    .vw-loading-content {
+    /* Loading content inner wrapper */
+    .vw-loading-inner {
+        display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-    }
-    [wire\:loading].vw-loading-content {
-        display: inline-flex !important;
     }
 
     /* Script Results Section */
@@ -506,12 +504,14 @@
                 wire:loading.attr="disabled"
                 wire:target="generateScript">
             <span wire:loading.remove wire:target="generateScript">🚀 {{ __('Generate Script with AI') }}</span>
-            <span wire:loading wire:target="generateScript" class="vw-loading-content">
-                <svg style="width: 18px; height: 18px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
-                    <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-                </svg>
-                {{ __('Generating...') }}
+            <span wire:loading wire:target="generateScript">
+                <span class="vw-loading-inner">
+                    <svg style="width: 18px; height: 18px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                    </svg>
+                    {{ __('Generating...') }}
+                </span>
             </span>
         </button>
 
