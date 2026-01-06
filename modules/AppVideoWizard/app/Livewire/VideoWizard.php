@@ -53,7 +53,7 @@ class VideoWizard extends Component
     public array $storyboard = [
         'scenes' => [],
         'styleBible' => null,
-        'imageModel' => 'hidream',
+        'imageModel' => 'nanobanana', // Default to NanoBanana (Gemini) - HiDream requires RunPod setup
         'visualStyle' => [
             'mood' => '',
             'lighting' => '',
@@ -611,6 +611,7 @@ class VideoWizard extends Component
             $result = $imageService->generateSceneImage($project, $scene, [
                 'sceneIndex' => $sceneIndex,
                 'teamId' => session('current_team_id', 0),
+                'model' => $this->storyboard['imageModel'] ?? 'nanobanana', // Use UI-selected model
             ]);
 
             // Update storyboard with the generated image or set generating state
@@ -689,6 +690,7 @@ class VideoWizard extends Component
                     $result = $imageService->generateSceneImage($project, $scene, [
                         'sceneIndex' => $index,
                         'teamId' => session('current_team_id', 0),
+                        'model' => $this->storyboard['imageModel'] ?? 'nanobanana', // Use UI-selected model
                     ]);
 
                     if ($result['async'] ?? false) {
