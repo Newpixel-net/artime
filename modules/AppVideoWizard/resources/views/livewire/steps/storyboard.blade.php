@@ -440,57 +440,33 @@
         position: relative;
         aspect-ratio: 16/9;
         background: rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        border-radius: 0.5rem 0.5rem 0 0;
     }
 
     .vw-scene-image {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        display: block;
     }
 
-    .vw-scene-status-badge {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
-        padding: 0.25rem 0.6rem;
-        border-radius: 0.35rem;
-        font-size: 0.65rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-
-    .vw-scene-status-badge.ai {
-        background: rgba(139, 92, 246, 0.9);
-        color: white;
-    }
-
-    .vw-scene-status-badge.stock {
-        background: rgba(16, 185, 129, 0.9);
-        color: white;
-    }
-
-    .vw-scene-status-badge.generating {
-        background: rgba(251, 191, 36, 0.9);
-        color: white;
-    }
-
-    /* Empty State */
+    /* Empty State - Full height within image container */
     .vw-scene-empty {
-        height: 160px;
+        height: 100%;
+        min-height: 160px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: 1rem;
-        border: 2px dashed rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px dashed rgba(255, 255, 255, 0.2);
         border-radius: 0.5rem;
-        margin: 0.5rem;
     }
 
     .vw-scene-empty-text {
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.6);
         font-size: 0.75rem;
         margin-bottom: 0.75rem;
     }
@@ -517,21 +493,23 @@
     }
 
     .vw-scene-empty-btn.ai {
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(6, 182, 212, 0.25));
-        border-color: rgba(139, 92, 246, 0.35);
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(6, 182, 212, 0.3));
+        border-color: rgba(139, 92, 246, 0.4);
     }
 
     .vw-scene-empty-btn.ai:hover {
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(6, 182, 212, 0.35));
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.4));
+        transform: translateY(-1px);
     }
 
     .vw-scene-empty-btn.stock {
-        background: rgba(16, 185, 129, 0.15);
-        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.2);
+        border-color: rgba(16, 185, 129, 0.4);
     }
 
     .vw-scene-empty-btn.stock:hover {
-        background: rgba(16, 185, 129, 0.25);
+        background: rgba(16, 185, 129, 0.3);
+        transform: translateY(-1px);
     }
 
     .vw-scene-empty-btn-icon {
@@ -574,109 +552,6 @@
     .vw-generating-text {
         color: rgba(255, 255, 255, 0.6);
         font-size: 0.8rem;
-    }
-
-    /* Scene Info */
-    .vw-scene-info {
-        padding: 0.75rem 1rem;
-    }
-
-    .vw-scene-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .vw-scene-number {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-        border-radius: 50%;
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: white;
-    }
-
-    .vw-scene-title {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: white;
-    }
-
-    .vw-scene-desc {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.5);
-        margin-top: 0.35rem;
-        line-height: 1.4;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .vw-scene-meta {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .vw-scene-duration {
-        font-size: 0.65rem;
-        padding: 0.2rem 0.4rem;
-        background: rgba(6, 182, 212, 0.2);
-        color: #67e8f9;
-        border-radius: 0.25rem;
-    }
-
-    .vw-scene-transition {
-        font-size: 0.65rem;
-        color: rgba(255, 255, 255, 0.4);
-    }
-
-    /* Scene Actions */
-    .vw-scene-actions {
-        padding: 0.5rem 1rem 1rem;
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .vw-scene-action-btn {
-        flex: 1;
-        padding: 0.4rem 0.5rem;
-        border-radius: 0.35rem;
-        font-size: 0.7rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.25rem;
-        transition: all 0.2s;
-    }
-
-    .vw-scene-action-btn.regenerate {
-        background: rgba(139, 92, 246, 0.12);
-        border: 1px solid rgba(139, 92, 246, 0.25);
-        color: #c4b5fd;
-    }
-
-    .vw-scene-action-btn.regenerate:hover {
-        background: rgba(139, 92, 246, 0.2);
-    }
-
-    .vw-scene-action-btn.edit {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        color: rgba(255, 255, 255, 0.7);
-    }
-
-    .vw-scene-action-btn.edit:hover {
-        background: rgba(255, 255, 255, 0.08);
     }
 
     /* Alert */
@@ -892,7 +767,7 @@
                             <div class="vw-memory-desc">{{ __('Consistent faces') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$dispatch('open-character-bible-modal')">
+                            <button type="button" class="vw-edit-btn" wire:click="openCharacterBibleModal">
                                 {{ __('Edit') }}
                             </button>
                             <input type="checkbox"
@@ -910,7 +785,7 @@
                             <div class="vw-memory-desc">{{ __('Consistent environments') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$dispatch('open-location-bible-modal')">
+                            <button type="button" class="vw-edit-btn" wire:click="openLocationBibleModal">
                                 {{ __('Edit') }}
                             </button>
                             <input type="checkbox"
@@ -1018,132 +893,179 @@
                     $imageUrl = $storyboardScene['imageUrl'] ?? null;
                     $status = $storyboardScene['status'] ?? 'pending';
                     $source = $storyboardScene['source'] ?? 'ai';
+                    $prompt = $storyboardScene['prompt'] ?? $scene['visualDescription'] ?? $scene['visual'] ?? $scene['narration'] ?? '';
+                    $hasMultiShot = isset($multiShotMode['decomposedScenes'][$index]);
+                    $decomposed = $hasMultiShot ? $multiShotMode['decomposedScenes'][$index] : null;
                 @endphp
                 <div class="vw-scene-card">
-                    {{-- Image Container --}}
-                    <div class="vw-scene-image-container">
-                        @if($status === 'generating')
-                            {{-- Generating State --}}
-                            <div class="vw-scene-generating">
-                                <div class="vw-spinner"></div>
-                                <span class="vw-generating-text">{{ __('Generating...') }}</span>
+                    {{-- Image Container with Overlays --}}
+                    <div style="position: relative;">
+                        {{-- Scene Number Badge - Always visible, top-left --}}
+                        <div style="position: absolute; top: 0.5rem; left: 0.5rem; background: rgba(0,0,0,0.75); color: white; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; z-index: 10;">
+                            {{ __('Scene') }} {{ $index + 1 }}
+                        </div>
+
+                        {{-- Multi-Shot Badge - Top right if decomposed --}}
+                        @if($hasMultiShot && !empty($decomposed['shots']))
+                            <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 10;">
+                                <span style="background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600;">
+                                    📽️ {{ count($decomposed['shots']) }} {{ __('shots') }}
+                                </span>
                             </div>
-                        @elseif($imageUrl)
-                            {{-- Image Ready --}}
-                            <img src="{{ $imageUrl }}" alt="{{ $scene['title'] ?? 'Scene ' . ($index + 1) }}" class="vw-scene-image">
-                            <div class="vw-scene-status-badge {{ $source === 'stock' ? 'stock' : 'ai' }}">
-                                @if($source === 'stock')
-                                    📷 {{ __('Stock') }}
-                                @else
-                                    🎨 {{ __('AI') }}
-                                @endif
-                            </div>
-                        @else
-                            {{-- Empty State --}}
-                            <div class="vw-scene-empty">
-                                <div class="vw-scene-empty-text">{{ __('Choose image source:') }}</div>
-                                <div class="vw-scene-empty-buttons">
+                        @endif
+
+                        {{-- Main Image Content Area --}}
+                        <div class="vw-scene-image-container">
+                            @if($status === 'generating')
+                                {{-- Generating State --}}
+                                <div class="vw-scene-generating">
+                                    <div class="vw-spinner"></div>
+                                    <span class="vw-generating-text">{{ __('Generating...') }}</span>
+                                </div>
+                            @elseif($imageUrl)
+                                {{-- Image Ready --}}
+                                <img src="{{ $imageUrl }}" alt="Scene {{ $index + 1 }}" class="vw-scene-image">
+
+                                {{-- Source Badge - Below scene number --}}
+                                <div style="position: absolute; top: 2rem; left: 0.5rem; background: {{ $source === 'stock' ? 'rgba(16,185,129,0.9)' : 'rgba(139,92,246,0.9)' }}; color: white; padding: 0.15rem 0.4rem; border-radius: 0.2rem; font-size: 0.55rem; z-index: 10;">
+                                    @if($source === 'stock')
+                                        📷 {{ __('Stock') }}
+                                    @else
+                                        🎨 {{ __('AI') }}
+                                    @endif
+                                </div>
+
+                                {{-- Action Buttons Overlay - Bottom of image --}}
+                                <div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 0.5rem; display: flex; gap: 0.3rem; z-index: 10;">
                                     <button type="button"
-                                            class="vw-scene-empty-btn ai"
+                                            wire:click="openAIEditModal({{ $index }})"
+                                            style="flex: 1; padding: 0.35rem; border-radius: 0.4rem; border: 1px solid rgba(236,72,153,0.5); background: linear-gradient(135deg, rgba(236,72,153,0.3), rgba(139,92,246,0.3)); color: white; cursor: pointer; font-size: 0.65rem;"
+                                            title="{{ __('Edit with AI') }}">
+                                        ✨ {{ __('Edit') }}
+                                    </button>
+                                    <button type="button"
+                                            wire:click="openEditPromptModal({{ $index }})"
+                                            style="padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; cursor: pointer; font-size: 0.65rem;"
+                                            title="{{ __('Modify prompt') }}">
+                                        ✏️
+                                    </button>
+                                    <button type="button"
+                                            wire:click="openStockBrowser({{ $index }})"
+                                            style="padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(16,185,129,0.5); background: rgba(16,185,129,0.2); color: white; cursor: pointer; font-size: 0.65rem;"
+                                            title="{{ __('Browse stock media') }}">
+                                        📷
+                                    </button>
+                                    <button type="button"
                                             wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
-                                            wire:loading.attr="disabled">
-                                        <span class="vw-scene-empty-btn-icon">🎨</span>
-                                        <span>{{ __('AI Generate') }}</span>
-                                        <span class="vw-scene-empty-btn-cost">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
+                                            wire:loading.attr="disabled"
+                                            style="padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; cursor: pointer; font-size: 0.65rem;"
+                                            title="{{ __('Regenerate with AI') }}">
+                                        🔄
                                     </button>
                                     <button type="button"
-                                            class="vw-scene-empty-btn stock"
-                                            wire:click="openStockBrowser({{ $index }})">
-                                        <span class="vw-scene-empty-btn-icon">📷</span>
-                                        <span>{{ __('Stock Media') }}</span>
-                                        <span class="vw-scene-empty-btn-cost">{{ __('FREE') }}</span>
+                                            wire:click="openUpscaleModal({{ $index }})"
+                                            style="padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(251,191,36,0.5); background: rgba(251,191,36,0.2); color: white; cursor: pointer; font-size: 0.65rem;"
+                                            title="{{ __('Upscale to HD/4K') }}">
+                                        ⬆️
+                                    </button>
+                                    <button type="button"
+                                            wire:click="openMultiShotModal({{ $index }})"
+                                            style="padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid rgba(139,92,246,0.6); background: linear-gradient(135deg, rgba(139,92,246,0.4), rgba(6,182,212,0.3)); color: white; cursor: pointer; font-size: 0.65rem; font-weight: 600;"
+                                            title="{{ __('Multi-shot decomposition') }}">
+                                        ✂️
                                     </button>
                                 </div>
-                            </div>
-                        @endif
+                            @elseif($status === 'error')
+                                {{-- Error State --}}
+                                <div style="height: 160px; background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.3); border-radius: 0.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem;">
+                                        <span style="font-size: 1rem;">⚠️</span>
+                                        <span style="color: #ef4444; font-size: 0.75rem;">{{ Str::limit($storyboardScene['error'] ?? __('Generation failed'), 40) }}</span>
+                                    </div>
+                                    <div style="color: rgba(255,255,255,0.6); font-size: 0.7rem; margin-bottom: 0.5rem;">{{ __('Choose to retry:') }}</div>
+                                    <div style="display: flex; gap: 0.5rem; width: 100%;">
+                                        <button type="button"
+                                                wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
+                                                wire:loading.attr="disabled"
+                                                style="flex: 1; padding: 0.5rem 0.4rem; background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(6,182,212,0.3)); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.5rem; color: white; cursor: pointer; font-size: 0.7rem; display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
+                                            <span style="font-size: 1rem;">🎨</span>
+                                            <span>{{ __('Retry AI') }}</span>
+                                        </button>
+                                        <button type="button"
+                                                wire:click="openStockBrowser({{ $index }})"
+                                                style="flex: 1; padding: 0.5rem 0.4rem; background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); border-radius: 0.5rem; color: white; cursor: pointer; font-size: 0.7rem; display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
+                                            <span style="font-size: 1rem;">📷</span>
+                                            <span>{{ __('Use Stock') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @else
+                                {{-- Empty/Pending State --}}
+                                <div class="vw-scene-empty">
+                                    <div class="vw-scene-empty-text">{{ __('Choose image source:') }}</div>
+                                    <div class="vw-scene-empty-buttons">
+                                        <button type="button"
+                                                class="vw-scene-empty-btn ai"
+                                                wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
+                                                wire:loading.attr="disabled">
+                                            <span class="vw-scene-empty-btn-icon">🎨</span>
+                                            <span>{{ __('AI Generate') }}</span>
+                                            <span class="vw-scene-empty-btn-cost">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
+                                        </button>
+                                        <button type="button"
+                                                class="vw-scene-empty-btn stock"
+                                                wire:click="openStockBrowser({{ $index }})">
+                                            <span class="vw-scene-empty-btn-icon">📷</span>
+                                            <span>{{ __('Stock Media') }}</span>
+                                            <span class="vw-scene-empty-btn-cost">{{ __('FREE') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
-                    {{-- Scene Info --}}
-                    <div class="vw-scene-info">
-                        <div class="vw-scene-header">
-                            <span class="vw-scene-number">{{ $index + 1 }}</span>
-                            <span class="vw-scene-title">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</span>
-                        </div>
-                        <p class="vw-scene-desc">{{ Str::limit($scene['visualDescription'] ?? $scene['narration'] ?? '', 80) }}</p>
-                        <div class="vw-scene-meta">
-                            <span class="vw-scene-duration">{{ $scene['duration'] ?? 8 }}s</span>
-                            <span class="vw-scene-transition">{{ $scene['transition'] ?? 'cut' }}</span>
-                        </div>
-                    </div>
-
-                    {{-- Actions (only show if image exists) --}}
-                    @if($imageUrl)
-                        <div class="vw-scene-actions">
-                            {{-- AI Edit Button --}}
-                            <button type="button"
-                                    class="vw-scene-action-btn"
-                                    style="background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(236,72,153,0.4); color: #f9a8d4;"
-                                    wire:click="openAIEditModal({{ $index }})"
-                                    title="{{ __('Edit with AI') }}">
-                                ✨ {{ __('Edit') }}
-                            </button>
-                            {{-- Upscale Button --}}
-                            <button type="button"
-                                    class="vw-scene-action-btn"
-                                    style="background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); color: #fcd34d;"
-                                    wire:click="openUpscaleModal({{ $index }})"
-                                    title="{{ __('Upscale to HD/4K') }}">
-                                ⬆️
-                            </button>
-                            {{-- Multi-Shot Button --}}
-                            <button type="button"
-                                    class="vw-scene-action-btn"
-                                    style="background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(6,182,212,0.15)); border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd;"
-                                    wire:click="openMultiShotModal({{ $index }})"
-                                    title="{{ __('Multi-shot decomposition') }}">
-                                ✂️
-                            </button>
-                            {{-- Regenerate Button --}}
-                            <button type="button"
-                                    class="vw-scene-action-btn regenerate"
-                                    wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
-                                    wire:loading.attr="disabled"
-                                    title="{{ __('Regenerate') }}">
-                                🔄
-                            </button>
-                            {{-- Edit Prompt Button --}}
-                            <button type="button"
-                                    class="vw-scene-action-btn edit"
-                                    wire:click="openEditPromptModal({{ $index }})"
-                                    title="{{ __('Edit prompt') }}">
-                                ✏️
-                            </button>
-                        </div>
-
-                        {{-- Multi-Shot Timeline (if decomposed) --}}
-                        @if(isset($multiShotMode['decomposedScenes'][$index]))
-                            @php $decomposed = $multiShotMode['decomposedScenes'][$index]; @endphp
-                            <div style="padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(139,92,246,0.05);">
-                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
-                                    <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5);">📽️ {{ count($decomposed['shots']) }} {{ __('shots') }}</span>
-                                </div>
-                                <div style="display: flex; gap: 0.25rem; overflow-x: auto;">
-                                    @foreach($decomposed['shots'] as $shotIdx => $shot)
-                                        <div style="width: 40px; height: 24px; border-radius: 0.2rem; overflow: hidden; border: 1px solid {{ ($decomposed['selectedShot'] ?? 0) === $shotIdx ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.1)' }}; cursor: pointer; flex-shrink: 0;"
-                                             wire:click="selectShot({{ $index }}, {{ $shotIdx }})">
-                                            @if($shot['status'] === 'ready' && !empty($shot['imageUrl']))
-                                                <img src="{{ $shot['imageUrl'] }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                            @else
-                                                <div style="width: 100%; height: 100%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
-                                                    <span style="font-size: 0.5rem; color: rgba(255,255,255,0.3);">{{ $shotIdx + 1 }}</span>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
+                    {{-- Multi-Shot Timeline (if decomposed) --}}
+                    @if($hasMultiShot && !empty($decomposed['shots']))
+                        <div style="padding: 0.5rem 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(139,92,246,0.05);">
+                            <div style="display: flex; gap: 0.25rem; overflow-x: auto;">
+                                @foreach($decomposed['shots'] as $shotIdx => $shot)
+                                    <div style="width: 40px; height: 24px; border-radius: 0.2rem; overflow: hidden; border: 2px solid {{ ($decomposed['selectedShot'] ?? 0) === $shotIdx ? '#8b5cf6' : 'rgba(255,255,255,0.1)' }}; cursor: pointer; flex-shrink: 0; position: relative;"
+                                         wire:click="selectShot({{ $index }}, {{ $shotIdx }})">
+                                        @if(($shot['status'] ?? '') === 'ready' && !empty($shot['imageUrl']))
+                                            <img src="{{ $shot['imageUrl'] }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                        @else
+                                            <div style="width: 100%; height: 100%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
+                                                <span style="font-size: 0.5rem; color: rgba(255,255,255,0.4);">{{ $shotIdx + 1 }}</span>
+                                            </div>
+                                        @endif
+                                        @if(($decomposed['selectedShot'] ?? 0) === $shotIdx)
+                                            <div style="position: absolute; bottom: 1px; right: 1px; width: 8px; height: 8px; background: #8b5cf6; border-radius: 50%;"></div>
+                                        @endif
+                                    </div>
+                                @endforeach
                             </div>
-                        @endif
+                        </div>
                     @endif
+
+                    {{-- Prompt Section --}}
+                    <div style="padding: 0.75rem;">
+                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            {{ __('PROMPT') }}
+                        </div>
+                        <div style="font-size: 0.8rem; color: rgba(255,255,255,0.75); line-height: 1.4; max-height: 3.2em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                            {{ Str::limit($prompt, 120) }}
+                        </div>
+                        {{-- Duration & Transition --}}
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.6rem; padding: 0.15rem 0.4rem; background: rgba(6,182,212,0.15); color: #67e8f9; border-radius: 0.2rem;">
+                                ⏱️ {{ $scene['duration'] ?? 8 }}s
+                            </span>
+                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">
+                                ↔️ {{ $scene['transition'] ?? 'cut' }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             @endforeach
         </div>
