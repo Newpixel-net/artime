@@ -39,15 +39,40 @@ class ScriptGenerationService
         ]);
 
         // Use ArTime's existing AI service
+        \Log::info('VideoWizard: Generating script', [
+            'teamId' => $teamId,
+            'topic' => substr($topic, 0, 100),
+            'duration' => $duration,
+        ]);
+
         $result = AI::process($prompt, 'text', [
             'maxResult' => 1
         ], $teamId);
 
+        \Log::info('VideoWizard: AI response received', [
+            'hasError' => !empty($result['error']),
+            'dataCount' => count($result['data'] ?? []),
+            'model' => $result['model'] ?? 'unknown',
+        ]);
+
         if (!empty($result['error'])) {
+            \Log::error('VideoWizard: AI error', ['error' => $result['error']]);
             throw new \Exception($result['error']);
         }
 
         $response = $result['data'][0] ?? '';
+
+        if (empty($response)) {
+            \Log::error('VideoWizard: Empty AI response', [
+                'result' => $result,
+            ]);
+            throw new \Exception('AI returned an empty response. Please try again.');
+        }
+
+        \Log::info('VideoWizard: Parsing response', [
+            'responseLength' => strlen($response),
+            'responsePreview' => substr($response, 0, 200),
+        ]);
 
         // Parse the response
         $script = $this->parseScriptResponse($response);
@@ -135,12 +160,15 @@ PROMPT;
      */
     protected function parseScriptResponse(string $response): array
     {
+        $originalResponse = $response;
+
         // Clean up response - extract JSON
         $response = trim($response);
 
         // Remove markdown code blocks
         $response = preg_replace('/```json\s*/i', '', $response);
         $response = preg_replace('/```\s*/', '', $response);
+        $response = trim($response);
 
         // Remove any text before the first {
         if (($pos = strpos($response, '{')) !== false) {
@@ -156,10 +184,19 @@ PROMPT;
         $response = preg_replace('/,\s*}/', '}', $response); // trailing commas in objects
         $response = preg_replace('/,\s*]/', ']', $response); // trailing commas in arrays
 
+        // Fix unescaped newlines in strings
+        $response = preg_replace('/([^\\\\])"([^"]*)\n([^"]*)"/', '$1"$2\\n$3"', $response);
+
         // Try to parse JSON
         $script = json_decode($response, true);
+        $jsonError = json_last_error();
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if ($jsonError !== JSON_ERROR_NONE) {
+            \Log::warning('VideoWizard: Initial JSON parse failed', [
+                'error' => json_last_error_msg(),
+                'responsePreview' => substr($response, 0, 300),
+            ]);
+
             // Try to extract JSON from the response using different patterns
             $patterns = [
                 '/\{[^{}]*"scenes"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/s',
@@ -175,18 +212,26 @@ PROMPT;
                     $extracted = preg_replace('/,\s*]/', ']', $extracted);
                     $script = json_decode($extracted, true);
                     if (json_last_error() === JSON_ERROR_NONE && isset($script['scenes'])) {
+                        \Log::info('VideoWizard: JSON extracted with pattern');
                         break;
                     }
                 }
             }
         }
 
-        // If still no valid script, try to build a minimal one from the response
+        // If still no valid script, try to create a fallback from the raw text
         if (!$script || !isset($script['scenes']) || !is_array($script['scenes'])) {
-            \Log::warning('Script parsing failed. Raw response: ' . substr($response, 0, 500));
+            \Log::warning('VideoWizard: Script parsing failed, attempting text fallback', [
+                'responseLength' => strlen($originalResponse),
+                'response' => substr($originalResponse, 0, 1000),
+            ]);
 
-            // Create a fallback script structure
-            throw new \Exception('Failed to parse script response. The AI returned an invalid format.');
+            // Try to create a basic script from the text content
+            $script = $this->createFallbackScript($originalResponse);
+
+            if (!$script) {
+                throw new \Exception('Failed to parse script response. The AI returned an invalid format.');
+            }
         }
 
         // Validate and fix scenes
@@ -229,7 +274,87 @@ PROMPT;
             $script['cta'] = '';
         }
 
+        \Log::info('VideoWizard: Script parsed successfully', [
+            'sceneCount' => count($script['scenes']),
+            'title' => $script['title'],
+        ]);
+
         return $script;
+    }
+
+    /**
+     * Create a fallback script from raw text when JSON parsing fails.
+     */
+    protected function createFallbackScript(string $response): ?array
+    {
+        // Try to extract meaningful content from the response
+        $lines = array_filter(array_map('trim', explode("\n", $response)));
+
+        if (count($lines) < 3) {
+            return null;
+        }
+
+        // Look for scene markers or numbered sections
+        $scenes = [];
+        $currentScene = null;
+        $sceneNumber = 0;
+
+        foreach ($lines as $line) {
+            // Check for scene markers like "Scene 1:", "1.", "[Scene 1]", etc.
+            if (preg_match('/^(?:scene\s*)?(\d+)[\.:)\]]/i', $line, $matches)) {
+                if ($currentScene) {
+                    $scenes[] = $currentScene;
+                }
+                $sceneNumber = (int) $matches[1];
+                $currentScene = [
+                    'id' => 'scene-' . $sceneNumber,
+                    'title' => 'Scene ' . $sceneNumber,
+                    'narration' => '',
+                    'visualDescription' => '',
+                    'duration' => 15,
+                ];
+                // Rest of line might be the title
+                $rest = trim(preg_replace('/^(?:scene\s*)?(\d+)[\.:)\]]\s*/i', '', $line));
+                if ($rest) {
+                    $currentScene['title'] = $rest;
+                }
+            } elseif ($currentScene) {
+                // Add to current scene narration
+                if (stripos($line, 'visual') !== false || stripos($line, 'show') !== false) {
+                    $currentScene['visualDescription'] .= ' ' . preg_replace('/^visual[s]?:?\s*/i', '', $line);
+                } else {
+                    $currentScene['narration'] .= ' ' . $line;
+                }
+            }
+        }
+
+        if ($currentScene) {
+            $scenes[] = $currentScene;
+        }
+
+        // Clean up scenes
+        foreach ($scenes as &$scene) {
+            $scene['narration'] = trim($scene['narration']);
+            $scene['visualDescription'] = trim($scene['visualDescription']) ?: $scene['narration'];
+        }
+
+        if (empty($scenes)) {
+            // Last resort: create a single scene with all content
+            $scenes = [[
+                'id' => 'scene-1',
+                'title' => 'Main Content',
+                'narration' => implode(' ', array_slice($lines, 0, 10)),
+                'visualDescription' => 'Visual representation of the content',
+                'duration' => 30,
+            ]];
+        }
+
+        return [
+            'title' => 'Generated Script',
+            'hook' => $scenes[0]['narration'] ?? '',
+            'scenes' => $scenes,
+            'cta' => '',
+        ];
     }
 
     /**

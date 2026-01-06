@@ -500,7 +500,7 @@
 
         {{-- Generate Button --}}
         <button class="vw-generate-script-btn"
-                wire:click="$dispatch('generate-script')"
+                wire:click="generateScript"
                 wire:loading.attr="disabled"
                 wire:target="generateScript">
             <span wire:loading.remove wire:target="generateScript">🚀 {{ __('Generate Script with AI') }}</span>
