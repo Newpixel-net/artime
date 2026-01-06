@@ -2,48 +2,305 @@
 
 namespace Modules\AppVideoWizard\Services;
 
-use App\Facades\AI;
+use App\Services\GeminiService;
+use App\Services\RunPodService;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\WizardAsset;
+use Modules\AppVideoWizard\Models\WizardProcessingJob;
 
 class ImageGenerationService
 {
+    protected GeminiService $geminiService;
+    protected RunPodService $runPodService;
+
+    /**
+     * Model configurations with token costs matching reference implementation.
+     */
+    public const IMAGE_MODELS = [
+        'hidream' => [
+            'name' => 'HiDream',
+            'description' => 'Artistic & cinematic style',
+            'tokenCost' => 2,
+            'provider' => 'runpod',
+            'async' => true,
+        ],
+        'nanobanana-pro' => [
+            'name' => 'NanoBanana Pro',
+            'description' => 'High quality, fast generation',
+            'tokenCost' => 3,
+            'provider' => 'gemini',
+            'model' => 'gemini-2.0-flash-exp-image-generation',
+            'quality' => 'hd',
+            'async' => false,
+        ],
+        'nanobanana' => [
+            'name' => 'NanoBanana',
+            'description' => 'Quick drafts, lower cost',
+            'tokenCost' => 1,
+            'provider' => 'gemini',
+            'model' => 'gemini-2.0-flash-exp-image-generation',
+            'quality' => 'basic',
+            'async' => false,
+        ],
+    ];
+
+    public function __construct(GeminiService $geminiService, RunPodService $runPodService)
+    {
+        $this->geminiService = $geminiService;
+        $this->runPodService = $runPodService;
+    }
+
+    /**
+     * Get available image models.
+     */
+    public function getModels(): array
+    {
+        return self::IMAGE_MODELS;
+    }
+
     /**
      * Generate an image for a scene.
      */
     public function generateSceneImage(WizardProject $project, array $scene, array $options = []): array
     {
-        $visualDescription = $scene['visualDescription'] ?? '';
+        $modelId = $options['model'] ?? $project->storyboard['imageModel'] ?? 'nanobanana';
+        $modelConfig = self::IMAGE_MODELS[$modelId] ?? self::IMAGE_MODELS['nanobanana'];
+
+        $visualDescription = $scene['visualDescription'] ?? $scene['visual'] ?? '';
         $styleBible = $project->storyboard['styleBible'] ?? null;
+        $visualStyle = $project->storyboard['visualStyle'] ?? null;
         $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
 
-        // Build the image prompt
-        $prompt = $this->buildImagePrompt($visualDescription, $styleBible, $project->aspect_ratio);
+        // Build the image prompt with visual style enhancements
+        $prompt = $this->buildImagePrompt($visualDescription, $styleBible, $visualStyle, $project);
 
         // Get resolution based on aspect ratio
         $resolution = $this->getResolution($project->aspect_ratio);
 
-        // Generate image using ArTime's AI service
-        $result = AI::process($prompt, 'image', [
-            'size' => $resolution['size'],
-        ], $teamId);
+        // Check credits
+        $quota = \Credit::checkQuota($teamId);
+        if (!$quota['can_use']) {
+            throw new \Exception($quota['message']);
+        }
+
+        // Route to appropriate provider
+        if ($modelConfig['provider'] === 'runpod') {
+            return $this->generateWithHiDream($project, $scene, $prompt, $resolution, $options);
+        } else {
+            return $this->generateWithGemini($project, $scene, $prompt, $resolution, $modelId, $modelConfig, $options);
+        }
+    }
+
+    /**
+     * Generate image using HiDream via RunPod (async).
+     */
+    protected function generateWithHiDream(
+        WizardProject $project,
+        array $scene,
+        string $prompt,
+        array $resolution,
+        array $options = []
+    ): array {
+        $endpointId = get_option('runpod_hidream_endpoint', '');
+
+        if (empty($endpointId)) {
+            throw new \Exception('HiDream endpoint not configured. Please set runpod_hidream_endpoint in settings.');
+        }
+
+        // HiDream generation settings
+        $input = [
+            'prompt' => $prompt,
+            'width' => $resolution['width'],
+            'height' => $resolution['height'],
+            'num_inference_steps' => 35,
+            'guidance_scale' => 5,
+            'seed' => -1, // Random seed
+        ];
+
+        // Start async job
+        $result = $this->runPodService->runAsync($endpointId, $input);
+
+        if (!$result['success']) {
+            throw new \Exception($result['error'] ?? 'Failed to start HiDream generation');
+        }
+
+        // Create processing job record for polling
+        $job = WizardProcessingJob::create([
+            'project_id' => $project->id,
+            'user_id' => $project->user_id ?? auth()->id(),
+            'type' => WizardProcessingJob::TYPE_IMAGE_GENERATION,
+            'external_provider' => 'runpod',
+            'external_job_id' => $result['id'],
+            'status' => WizardProcessingJob::STATUS_PROCESSING,
+            'input_data' => [
+                'sceneId' => $scene['id'],
+                'sceneIndex' => $options['sceneIndex'] ?? null,
+                'model' => 'hidream',
+                'endpointId' => $endpointId,
+                'prompt' => $prompt,
+            ],
+        ]);
+
+        return [
+            'success' => true,
+            'status' => 'generating',
+            'jobId' => $result['id'],
+            'processingJobId' => $job->id,
+            'imageUrl' => null,
+            'prompt' => $prompt,
+            'model' => 'hidream',
+            'async' => true,
+        ];
+    }
+
+    /**
+     * Poll for HiDream job completion.
+     */
+    public function pollHiDreamJob(WizardProcessingJob $job): array
+    {
+        $inputData = $job->input_data ?? [];
+        $endpointId = $inputData['endpointId'] ?? get_option('runpod_hidream_endpoint', '');
+
+        $status = $this->runPodService->getStatus($endpointId, $job->external_job_id);
+
+        if (!$status['success']) {
+            return [
+                'success' => false,
+                'status' => 'error',
+                'error' => $status['error'],
+            ];
+        }
+
+        if ($status['status'] === 'COMPLETED') {
+            $output = $status['output'] ?? [];
+            $imageUrl = $output['image'] ?? $output['image_url'] ?? null;
+
+            if ($imageUrl) {
+                // Download and store the image
+                $project = WizardProject::find($job->project_id);
+                $sceneId = $inputData['sceneId'] ?? 'scene';
+
+                $storedPath = $this->storeImage($imageUrl, $project, $sceneId);
+                $publicUrl = Storage::disk('public')->url($storedPath);
+
+                // Create asset record
+                $asset = WizardAsset::create([
+                    'project_id' => $project->id,
+                    'user_id' => $project->user_id,
+                    'type' => WizardAsset::TYPE_IMAGE,
+                    'name' => $sceneId,
+                    'path' => $storedPath,
+                    'url' => $publicUrl,
+                    'mime_type' => 'image/png',
+                    'scene_index' => $inputData['sceneIndex'] ?? null,
+                    'scene_id' => $sceneId,
+                    'metadata' => [
+                        'prompt' => $inputData['prompt'] ?? '',
+                        'model' => 'hidream',
+                        'jobId' => $job->external_job_id,
+                    ],
+                ]);
+
+                // Update job status
+                $job->markAsCompleted([
+                    'imageUrl' => $publicUrl,
+                    'assetId' => $asset->id,
+                ]);
+
+                return [
+                    'success' => true,
+                    'status' => 'ready',
+                    'imageUrl' => $publicUrl,
+                    'assetId' => $asset->id,
+                    'sceneIndex' => $inputData['sceneIndex'] ?? null,
+                ];
+            }
+        }
+
+        if (in_array($status['status'], ['FAILED', 'CANCELLED', 'TIMED_OUT'])) {
+            $job->markAsFailed($status['error'] ?? $status['status']);
+
+            return [
+                'success' => false,
+                'status' => 'error',
+                'error' => $status['error'] ?? 'Job failed: ' . $status['status'],
+            ];
+        }
+
+        // Still processing
+        return [
+            'success' => true,
+            'status' => 'generating',
+            'runpodStatus' => $status['status'],
+        ];
+    }
+
+    /**
+     * Generate image using Gemini (NanoBanana).
+     */
+    protected function generateWithGemini(
+        WizardProject $project,
+        array $scene,
+        string $prompt,
+        array $resolution,
+        string $modelId,
+        array $modelConfig,
+        array $options = []
+    ): array {
+        // Map aspect ratio for Gemini
+        $aspectRatioMap = [
+            '16:9' => '16:9',
+            '9:16' => '9:16',
+            '1:1' => '1:1',
+            '4:3' => '4:3',
+            '4:5' => '3:4',
+        ];
+
+        $aspectRatio = $aspectRatioMap[$project->aspect_ratio] ?? '16:9';
+
+        // Generate using Gemini service
+        $result = $this->geminiService->generateImage($prompt, [
+            'model' => $modelConfig['model'] ?? 'gemini-2.0-flash-exp-image-generation',
+            'aspectRatio' => $aspectRatio,
+            'count' => 1,
+            'style' => $this->getStyleFromVisualStyle($project->storyboard['visualStyle'] ?? null),
+            'tone' => $this->getToneFromVisualStyle($project->storyboard['visualStyle'] ?? null),
+        ]);
 
         if (!empty($result['error'])) {
             throw new \Exception($result['error']);
         }
 
-        // Extract image URL from result
+        // Extract image from result
         $imageData = $result['data'][0] ?? null;
         if (!$imageData) {
             throw new \Exception('No image generated');
         }
 
-        $imageUrl = is_array($imageData) ? ($imageData['url'] ?? null) : $imageData;
+        // Handle base64 or URL response
+        $imageUrl = null;
+        $storedPath = null;
 
-        // Download and store the image
-        $storedPath = $this->storeImage($imageUrl, $project, $scene['id']);
+        if (isset($imageData['b64_json'])) {
+            // Base64 image - decode and store
+            $storedPath = $this->storeBase64Image(
+                $imageData['b64_json'],
+                $imageData['mimeType'] ?? 'image/png',
+                $project,
+                $scene['id']
+            );
+            $imageUrl = Storage::disk('public')->url($storedPath);
+        } elseif (isset($imageData['url'])) {
+            $imageUrl = $imageData['url'];
+            $storedPath = $this->storeImage($imageUrl, $project, $scene['id']);
+            $imageUrl = Storage::disk('public')->url($storedPath);
+        } else {
+            throw new \Exception('Invalid image response format');
+        }
 
         // Create asset record
         $asset = WizardAsset::create([
@@ -52,12 +309,13 @@ class ImageGenerationService
             'type' => WizardAsset::TYPE_IMAGE,
             'name' => $scene['title'] ?? $scene['id'],
             'path' => $storedPath,
-            'url' => Storage::disk('public')->url($storedPath),
+            'url' => $imageUrl,
             'mime_type' => 'image/png',
             'scene_index' => $options['sceneIndex'] ?? null,
             'scene_id' => $scene['id'],
             'metadata' => [
                 'prompt' => $prompt,
+                'model' => $modelId,
                 'width' => $resolution['width'],
                 'height' => $resolution['height'],
                 'aspectRatio' => $project->aspect_ratio,
@@ -66,58 +324,193 @@ class ImageGenerationService
 
         return [
             'success' => true,
+            'status' => 'ready',
             'imageUrl' => $asset->url,
             'assetId' => $asset->id,
             'prompt' => $prompt,
+            'model' => $modelId,
+            'async' => false,
         ];
     }
 
     /**
-     * Build the image generation prompt.
+     * Build the image generation prompt with visual style enhancements.
      */
-    protected function buildImagePrompt(string $visualDescription, ?array $styleBible, string $aspectRatio): string
-    {
+    protected function buildImagePrompt(
+        string $visualDescription,
+        ?array $styleBible,
+        ?array $visualStyle,
+        WizardProject $project
+    ): string {
         $parts = [];
 
-        // Add style bible if available
-        if ($styleBible && $styleBible['enabled']) {
+        // Layer 1: Style Bible (if enabled)
+        if ($styleBible && ($styleBible['enabled'] ?? false)) {
+            $styleParts = [];
             if (!empty($styleBible['style'])) {
-                $parts[] = $styleBible['style'];
+                $styleParts[] = $styleBible['style'];
             }
             if (!empty($styleBible['colorGrade'])) {
-                $parts[] = $styleBible['colorGrade'];
+                $styleParts[] = $styleBible['colorGrade'];
             }
             if (!empty($styleBible['lighting'])) {
-                $parts[] = $styleBible['lighting'];
+                $styleParts[] = $styleBible['lighting'];
             }
             if (!empty($styleBible['atmosphere'])) {
-                $parts[] = $styleBible['atmosphere'];
+                $styleParts[] = $styleBible['atmosphere'];
+            }
+            if (!empty($styleParts)) {
+                $parts[] = 'STYLE: ' . implode(', ', $styleParts);
             }
         }
 
-        // Add visual description
-        $parts[] = $visualDescription;
+        // Layer 2: Visual Style parameters
+        if ($visualStyle) {
+            $visualParts = [];
 
-        // Add technical specs
-        $parts[] = '4K, ultra detailed, cinematic, professional lighting';
+            // Mood
+            if (!empty($visualStyle['mood'])) {
+                $moodDescriptions = [
+                    'epic' => 'epic, grand scale, dramatic atmosphere',
+                    'intimate' => 'intimate, personal, close emotional connection',
+                    'mysterious' => 'mysterious, atmospheric, enigmatic',
+                    'energetic' => 'energetic, dynamic, high energy',
+                    'contemplative' => 'contemplative, reflective, calm',
+                    'tense' => 'tense, suspenseful, high stakes',
+                    'hopeful' => 'hopeful, optimistic, warm',
+                    'professional' => 'professional, polished, business-like',
+                ];
+                $visualParts[] = $moodDescriptions[$visualStyle['mood']] ?? $visualStyle['mood'];
+            }
+
+            // Lighting
+            if (!empty($visualStyle['lighting'])) {
+                $lightingDescriptions = [
+                    'natural' => 'natural daylight, soft shadows',
+                    'golden-hour' => 'golden hour lighting, warm sunset tones',
+                    'blue-hour' => 'blue hour, twilight, cool ambient light',
+                    'high-key' => 'high-key lighting, bright and minimal shadows',
+                    'low-key' => 'low-key lighting, dramatic shadows, noir style',
+                    'neon' => 'neon lighting, cyberpunk, vibrant colored lights',
+                ];
+                $visualParts[] = $lightingDescriptions[$visualStyle['lighting']] ?? $visualStyle['lighting'];
+            }
+
+            // Color Palette
+            if (!empty($visualStyle['colorPalette'])) {
+                $colorDescriptions = [
+                    'teal-orange' => 'cinematic teal and orange color grading',
+                    'warm-tones' => 'warm color palette, reds and oranges',
+                    'cool-tones' => 'cool color palette, blues and greens',
+                    'desaturated' => 'desaturated colors, muted tones',
+                    'vibrant' => 'vibrant, saturated, bold colors',
+                    'pastel' => 'pastel colors, soft and gentle tones',
+                ];
+                $visualParts[] = $colorDescriptions[$visualStyle['colorPalette']] ?? $visualStyle['colorPalette'];
+            }
+
+            // Composition/Shot
+            if (!empty($visualStyle['composition'])) {
+                $shotDescriptions = [
+                    'wide' => 'wide shot, establishing shot',
+                    'medium' => 'medium shot, character framing',
+                    'close-up' => 'close-up shot, facial detail',
+                    'extreme-close-up' => 'extreme close-up, detail focus',
+                    'low-angle' => 'low angle shot, powerful perspective',
+                    'birds-eye' => 'bird\'s eye view, overhead perspective',
+                ];
+                $visualParts[] = $shotDescriptions[$visualStyle['composition']] ?? $visualStyle['composition'];
+            }
+
+            if (!empty($visualParts)) {
+                $parts[] = 'VISUAL STYLE: ' . implode(', ', $visualParts);
+            }
+        }
+
+        // Layer 3: Main visual description (the scene content)
+        if (!empty($visualDescription)) {
+            $parts[] = $visualDescription;
+        }
+
+        // Layer 4: Technical quality specs
+        $parts[] = '4K, ultra detailed, cinematic, professional composition';
 
         // Combine all parts
-        $prompt = implode('. ', array_filter($parts));
+        return implode('. ', array_filter($parts));
+    }
 
-        // Add negative prompt handling if supported
-        return $prompt;
+    /**
+     * Get style string from visual style settings.
+     */
+    protected function getStyleFromVisualStyle(?array $visualStyle): string
+    {
+        if (!$visualStyle) {
+            return 'photorealistic, 8k professional photograph, cinematic lighting';
+        }
+
+        $parts = ['photorealistic, cinematic'];
+
+        if (!empty($visualStyle['lighting'])) {
+            $lightingMap = [
+                'golden-hour' => 'golden hour lighting',
+                'blue-hour' => 'blue hour, twilight',
+                'neon' => 'neon lighting',
+                'low-key' => 'noir lighting',
+            ];
+            $parts[] = $lightingMap[$visualStyle['lighting']] ?? '';
+        }
+
+        return implode(', ', array_filter($parts));
+    }
+
+    /**
+     * Get tone string from visual style settings.
+     */
+    protected function getToneFromVisualStyle(?array $visualStyle): string
+    {
+        if (!$visualStyle) {
+            return 'professional, high-quality, sharp focus';
+        }
+
+        $parts = [];
+
+        if (!empty($visualStyle['mood'])) {
+            $moodMap = [
+                'epic' => 'dramatic, high contrast',
+                'intimate' => 'cozy, warm',
+                'mysterious' => 'moody, atmospheric',
+                'energetic' => 'energetic, dynamic',
+                'contemplative' => 'minimalistic, clean',
+            ];
+            $parts[] = $moodMap[$visualStyle['mood']] ?? '';
+        }
+
+        if (!empty($visualStyle['colorPalette'])) {
+            $colorMap = [
+                'teal-orange' => 'teal and orange color grading',
+                'warm-tones' => 'warm colors',
+                'cool-tones' => 'cool colors',
+                'vibrant' => 'vibrant colors',
+                'pastel' => 'soft pastel palette',
+            ];
+            $parts[] = $colorMap[$visualStyle['colorPalette']] ?? '';
+        }
+
+        return implode(', ', array_filter($parts)) ?: 'professional, high-quality';
     }
 
     /**
      * Get resolution configuration for aspect ratio.
+     * Note: API supports: '1024x1024', '1024x1536', '1536x1024', and 'auto'
      */
     protected function getResolution(string $aspectRatio): array
     {
         $resolutions = [
-            '16:9' => ['width' => 1920, 'height' => 1080, 'size' => '1792x1024'],
-            '9:16' => ['width' => 1080, 'height' => 1920, 'size' => '1024x1792'],
-            '1:1' => ['width' => 1080, 'height' => 1080, 'size' => '1024x1024'],
-            '4:5' => ['width' => 1080, 'height' => 1350, 'size' => '1024x1024'],
+            '16:9' => ['width' => 1536, 'height' => 1024, 'size' => '1536x1024'],
+            '9:16' => ['width' => 1024, 'height' => 1536, 'size' => '1024x1536'],
+            '1:1' => ['width' => 1024, 'height' => 1024, 'size' => '1024x1024'],
+            '4:5' => ['width' => 1024, 'height' => 1280, 'size' => '1024x1536'],
+            '4:3' => ['width' => 1024, 'height' => 1024, 'size' => '1024x1024'],
         ];
 
         return $resolutions[$aspectRatio] ?? $resolutions['16:9'];
@@ -128,7 +521,11 @@ class ImageGenerationService
      */
     protected function storeImage(string $imageUrl, WizardProject $project, string $sceneId): string
     {
-        $contents = file_get_contents($imageUrl);
+        try {
+            $contents = Http::timeout(60)->get($imageUrl)->body();
+        } catch (\Exception $e) {
+            $contents = file_get_contents($imageUrl);
+        }
 
         $filename = Str::slug($sceneId) . '-' . time() . '.png';
         $path = "wizard-projects/{$project->id}/images/{$filename}";
@@ -139,9 +536,30 @@ class ImageGenerationService
     }
 
     /**
+     * Store base64 image to local storage.
+     */
+    protected function storeBase64Image(string $base64Data, string $mimeType, WizardProject $project, string $sceneId): string
+    {
+        $contents = base64_decode($base64Data);
+
+        $extension = match ($mimeType) {
+            'image/jpeg' => 'jpg',
+            'image/webp' => 'webp',
+            default => 'png',
+        };
+
+        $filename = Str::slug($sceneId) . '-' . time() . '.' . $extension;
+        $path = "wizard-projects/{$project->id}/images/{$filename}";
+
+        Storage::disk('public')->put($path, $contents);
+
+        return $path;
+    }
+
+    /**
      * Regenerate an image with modifications.
      */
-    public function regenerateImage(WizardProject $project, array $scene, string $modification): array
+    public function regenerateImage(WizardProject $project, array $scene, string $modification, array $options = []): array
     {
         $originalPrompt = $scene['prompt'] ?? $scene['visualDescription'] ?? '';
 
@@ -149,33 +567,84 @@ class ImageGenerationService
 
         return $this->generateSceneImage($project, array_merge($scene, [
             'visualDescription' => $modifiedPrompt,
-        ]));
+        ]), $options);
     }
 
     /**
      * Generate images for all scenes in batch.
      */
-    public function generateAllSceneImages(WizardProject $project, callable $progressCallback = null): array
+    public function generateAllSceneImages(WizardProject $project, callable $progressCallback = null, array $options = []): array
     {
         $scenes = $project->getScenes();
         $results = [];
+        $modelId = $options['model'] ?? $project->storyboard['imageModel'] ?? 'nanobanana';
+        $modelConfig = self::IMAGE_MODELS[$modelId] ?? self::IMAGE_MODELS['nanobanana'];
 
+        // For async models (HiDream), start all jobs first
+        if ($modelConfig['async'] ?? false) {
+            foreach ($scenes as $index => $scene) {
+                try {
+                    $result = $this->generateSceneImage($project, $scene, array_merge($options, [
+                        'sceneIndex' => $index,
+                    ]));
+                    $results[$scene['id']] = $result;
+
+                    if ($progressCallback) {
+                        $progressCallback($index + 1, count($scenes), $scene['id'], 'started');
+                    }
+                } catch (\Exception $e) {
+                    $results[$scene['id']] = [
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+            return $results;
+        }
+
+        // For sync models (NanoBanana), generate sequentially with rate limiting
         foreach ($scenes as $index => $scene) {
             try {
-                $result = $this->generateSceneImage($project, $scene, ['sceneIndex' => $index]);
+                $result = $this->generateSceneImage($project, $scene, array_merge($options, [
+                    'sceneIndex' => $index,
+                ]));
                 $results[$scene['id']] = $result;
 
                 if ($progressCallback) {
-                    $progressCallback($index + 1, count($scenes), $scene['id']);
+                    $progressCallback($index + 1, count($scenes), $scene['id'], 'completed');
+                }
+
+                // Rate limiting - wait between requests to avoid 429 errors
+                if ($index < count($scenes) - 1) {
+                    usleep(500000); // 500ms between requests
                 }
             } catch (\Exception $e) {
                 $results[$scene['id']] = [
                     'success' => false,
                     'error' => $e->getMessage(),
                 ];
+
+                Log::warning("Failed to generate image for scene {$index}: " . $e->getMessage());
+
+                // On rate limit, wait longer before retrying
+                if (str_contains($e->getMessage(), '429') || str_contains($e->getMessage(), 'rate')) {
+                    sleep(5);
+                }
             }
         }
 
         return $results;
+    }
+
+    /**
+     * Get pending/processing image jobs for a project.
+     */
+    public function getPendingJobs(WizardProject $project): array
+    {
+        return WizardProcessingJob::where('project_id', $project->id)
+            ->where('type', 'image_generation')
+            ->whereIn('status', ['pending', 'processing'])
+            ->get()
+            ->toArray();
     }
 }

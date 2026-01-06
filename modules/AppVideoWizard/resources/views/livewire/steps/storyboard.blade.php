@@ -554,17 +554,17 @@
                 <div class="vw-model-buttons">
                     @php
                         $imageModels = [
-                            'flux' => ['name' => 'Flux', 'cost' => 2],
-                            'dalle3' => ['name' => 'DALL-E 3', 'cost' => 3],
-                            'sdxl' => ['name' => 'SDXL', 'cost' => 1],
-                            'midjourney' => ['name' => 'Midjourney', 'cost' => 4],
+                            'hidream' => ['name' => 'HiDream', 'cost' => 2, 'desc' => 'Artistic & cinematic'],
+                            'nanobanana-pro' => ['name' => 'NanoBanana Pro', 'cost' => 3, 'desc' => 'High quality, fast'],
+                            'nanobanana' => ['name' => 'NanoBanana', 'cost' => 1, 'desc' => 'Quick drafts'],
                         ];
-                        $selectedModel = $storyboard['imageModel'] ?? 'flux';
+                        $selectedModel = $storyboard['imageModel'] ?? 'hidream';
                     @endphp
                     @foreach($imageModels as $modelId => $model)
                         <button type="button"
                                 class="vw-model-btn {{ $selectedModel === $modelId ? 'selected' : '' }}"
-                                wire:click="$set('storyboard.imageModel', '{{ $modelId }}')">
+                                wire:click="$set('storyboard.imageModel', '{{ $modelId }}')"
+                                title="{{ $model['desc'] }}">
                             <span class="vw-model-btn-name">{{ $model['name'] }}</span>
                             <span class="vw-model-btn-cost">{{ $model['cost'] }} {{ __('tokens') }}</span>
                         </button>
@@ -717,7 +717,7 @@
                                     </button>
                                     <button type="button"
                                             class="vw-scene-empty-btn stock"
-                                            onclick="alert('Stock media browser coming soon!')">
+                                            @click="$dispatch('open-stock-browser', { sceneIndex: {{ $index }}, sceneDesc: '{{ addslashes(Str::limit($scene['visualDescription'] ?? $scene['narration'] ?? '', 100)) }}' })">
                                         <span class="vw-scene-empty-btn-icon">📷</span>
                                         <span>{{ __('Stock Media') }}</span>
                                         <span class="vw-scene-empty-btn-cost">{{ __('FREE') }}</span>
@@ -760,4 +760,429 @@
             @endforeach
         </div>
     @endif
+
+    {{-- Stock Media Browser Modal --}}
+    <div x-data="{
+        isOpen: false,
+        sceneIndex: 0,
+        searchQuery: '',
+        mediaType: 'image',
+        results: [],
+        isSearching: false,
+        selectedMedia: null,
+
+        open(sceneIndex, sceneDesc) {
+            this.sceneIndex = sceneIndex;
+            this.searchQuery = sceneDesc || '';
+            this.results = [];
+            this.selectedMedia = null;
+            this.isOpen = true;
+            if (this.searchQuery) {
+                this.search();
+            }
+        },
+
+        close() {
+            this.isOpen = false;
+            this.results = [];
+            this.selectedMedia = null;
+        },
+
+        async search() {
+            if (!this.searchQuery.trim()) return;
+            this.isSearching = true;
+            this.results = [];
+
+            $wire.dispatch('search-stock-media', {
+                query: this.searchQuery,
+                type: this.mediaType,
+                sceneIndex: this.sceneIndex
+            });
+        },
+
+        selectMedia(media) {
+            this.selectedMedia = media;
+            this.isSearching = true;
+
+            $wire.dispatch('select-stock-media', {
+                sceneIndex: this.sceneIndex,
+                mediaUrl: media.url,
+                mediaId: media.id,
+                type: media.type
+            });
+        }
+    }"
+    @open-stock-browser.window="open($event.detail.sceneIndex, $event.detail.sceneDesc)"
+    @stock-media-results.window="results = $event.detail.results; isSearching = false;"
+    @stock-media-selected.window="close(); isSearching = false;"
+    x-show="isOpen"
+    x-cloak
+    class="vw-stock-modal-overlay">
+        <div class="vw-stock-modal" @click.away="close()">
+            {{-- Header --}}
+            <div class="vw-stock-modal-header">
+                <div>
+                    <h3 class="vw-stock-modal-title">📷 {{ __('Stock Media Browser') }}</h3>
+                    <p class="vw-stock-modal-subtitle">{{ __('Free royalty-free media from Pexels') }}</p>
+                </div>
+                <button type="button" @click="close()" class="vw-stock-modal-close">&times;</button>
+            </div>
+
+            {{-- Search --}}
+            <div class="vw-stock-search">
+                <div class="vw-stock-search-row">
+                    <input type="text"
+                           x-model="searchQuery"
+                           @keydown.enter="search()"
+                           placeholder="{{ __('Search for images or videos...') }}"
+                           class="vw-stock-search-input">
+                    <select x-model="mediaType" class="vw-stock-type-select">
+                        <option value="image">📷 {{ __('Images') }}</option>
+                        <option value="video">🎬 {{ __('Videos') }}</option>
+                    </select>
+                    <button type="button" @click="search()" :disabled="isSearching" class="vw-stock-search-btn">
+                        <span x-show="!isSearching">🔍 {{ __('Search') }}</span>
+                        <span x-show="isSearching" class="vw-stock-spinner"></span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Results Grid --}}
+            <div class="vw-stock-results">
+                <template x-if="isSearching && results.length === 0">
+                    <div class="vw-stock-loading">
+                        <div class="vw-spinner"></div>
+                        <span>{{ __('Searching...') }}</span>
+                    </div>
+                </template>
+
+                <template x-if="!isSearching && results.length === 0 && searchQuery">
+                    <div class="vw-stock-empty">
+                        <span>🔍</span>
+                        <p>{{ __('No results found. Try a different search term.') }}</p>
+                    </div>
+                </template>
+
+                <div class="vw-stock-grid" x-show="results.length > 0">
+                    <template x-for="media in results" :key="media.id">
+                        <div class="vw-stock-item" @click="selectMedia(media)" :class="{ 'selected': selectedMedia?.id === media.id }">
+                            <div class="vw-stock-item-image">
+                                <img :src="media.thumbnail || media.preview" :alt="media.id" loading="lazy">
+                                <template x-if="media.type === 'video'">
+                                    <div class="vw-stock-video-badge">
+                                        <span>▶</span>
+                                        <span x-text="media.duration ? Math.round(media.duration) + 's' : ''"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="vw-stock-item-info">
+                                <span class="vw-stock-item-source" x-text="media.source"></span>
+                                <span class="vw-stock-item-author" x-text="'by ' + media.author"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+    /* Stock Media Modal Styles */
+    .vw-stock-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+    }
+
+    .vw-stock-modal {
+        background: linear-gradient(135deg, rgba(30, 30, 45, 0.98) 0%, rgba(20, 20, 35, 0.99) 100%);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 1rem;
+        width: 100%;
+        max-width: 900px;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .vw-stock-modal-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .vw-stock-modal-title {
+        margin: 0;
+        color: white;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .vw-stock-modal-subtitle {
+        margin: 0.25rem 0 0 0;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.8rem;
+    }
+
+    .vw-stock-modal-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+    }
+
+    .vw-stock-search {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .vw-stock-search-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .vw-stock-search-input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.5rem;
+        color: white;
+        font-size: 0.9rem;
+    }
+
+    .vw-stock-search-input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .vw-stock-type-select {
+        padding: 0.75rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.5rem;
+        color: white;
+        font-size: 0.85rem;
+    }
+
+    .vw-stock-search-btn {
+        padding: 0.75rem 1.25rem;
+        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+        border: none;
+        border-radius: 0.5rem;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .vw-stock-search-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .vw-stock-results {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+    }
+
+    .vw-stock-loading,
+    .vw-stock-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        color: rgba(255, 255, 255, 0.6);
+        gap: 1rem;
+    }
+
+    .vw-stock-empty span {
+        font-size: 3rem;
+    }
+
+    .vw-stock-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .vw-stock-item {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-stock-item:hover {
+        border-color: rgba(139, 92, 246, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .vw-stock-item.selected {
+        border-color: #8b5cf6;
+        box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+    }
+
+    .vw-stock-item-image {
+        position: relative;
+        aspect-ratio: 16/10;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .vw-stock-item-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .vw-stock-video-badge {
+        position: absolute;
+        bottom: 0.5rem;
+        right: 0.5rem;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .vw-stock-item-info {
+        padding: 0.5rem 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .vw-stock-item-source {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: capitalize;
+    }
+
+    .vw-stock-item-author {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.4);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100px;
+    }
+
+    .vw-stock-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: vw-spin 0.8s linear infinite;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    /* Generating state indicator */
+    .vw-scene-generating {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .vw-scene-generating .vw-spinner {
+        width: 32px;
+        height: 32px;
+    }
+
+    .vw-scene-generating-text {
+        font-size: 0.8rem;
+    }
+</style>
+
+<script>
+    document.addEventListener('livewire:init', () => {
+        let pollInterval = null;
+        let pendingJobs = 0;
+
+        // Start polling when HiDream images are being generated
+        Livewire.on('image-generation-started', (data) => {
+            if (data.async) {
+                pendingJobs++;
+                startPolling();
+            }
+        });
+
+        // Listen for poll status updates
+        Livewire.on('poll-status', (data) => {
+            pendingJobs = data.pendingJobs || 0;
+            if (pendingJobs === 0) {
+                stopPolling();
+            }
+        });
+
+        // Listen for image ready events
+        Livewire.on('image-ready', (data) => {
+            console.log('Image ready for scene:', data.sceneIndex);
+        });
+
+        // Listen for image errors
+        Livewire.on('image-error', (data) => {
+            console.error('Image generation error:', data.error);
+        });
+
+        function startPolling() {
+            if (pollInterval) return;
+            pollInterval = setInterval(() => {
+                if (pendingJobs > 0) {
+                    Livewire.dispatch('poll-image-jobs');
+                } else {
+                    stopPolling();
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        // Check for pending jobs on page load
+        setTimeout(() => {
+            const component = Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+            if (component) {
+                const count = component.getPendingJobsCount?.() || 0;
+                if (count > 0) {
+                    pendingJobs = count;
+                    startPolling();
+                }
+            }
+        }, 1000);
+    });
+</script>
