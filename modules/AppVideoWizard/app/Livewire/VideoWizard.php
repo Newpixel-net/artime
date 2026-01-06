@@ -5,6 +5,7 @@ namespace Modules\AppVideoWizard\Livewire;
 use Livewire\Component;
 use Livewire\Attributes\On;
 use Modules\AppVideoWizard\Models\WizardProject;
+use Modules\AppVideoWizard\Models\WizardProcessingJob;
 use Modules\AppVideoWizard\Services\ConceptService;
 use Modules\AppVideoWizard\Services\ScriptGenerationService;
 use Modules\AppVideoWizard\Services\ImageGenerationService;
@@ -196,6 +197,54 @@ class VideoWizard extends Component
         // Handle both WizardProject instance and null
         if ($project instanceof WizardProject && $project->exists) {
             $this->loadProject($project);
+            $this->recoverPendingJobs($project);
+        }
+    }
+
+    /**
+     * Recover pending async jobs from database.
+     * This restores job tracking after page refresh.
+     */
+    protected function recoverPendingJobs(WizardProject $project): void
+    {
+        $pendingJobs = WizardProcessingJob::where('project_id', $project->id)
+            ->whereIn('status', [
+                WizardProcessingJob::STATUS_PENDING,
+                WizardProcessingJob::STATUS_PROCESSING
+            ])
+            ->get();
+
+        if ($pendingJobs->isEmpty()) {
+            return;
+        }
+
+        // Restore pending jobs to component state
+        foreach ($pendingJobs as $job) {
+            $inputData = $job->input_data ?? [];
+            $sceneIndex = $inputData['sceneIndex'] ?? null;
+
+            if ($sceneIndex !== null && $job->type === WizardProcessingJob::TYPE_IMAGE_GENERATION) {
+                // Mark scene as generating in storyboard
+                if (!isset($this->storyboard['scenes'][$sceneIndex])) {
+                    $this->storyboard['scenes'][$sceneIndex] = [];
+                }
+                $this->storyboard['scenes'][$sceneIndex]['status'] = 'generating';
+                $this->storyboard['scenes'][$sceneIndex]['jobId'] = $job->external_job_id;
+                $this->storyboard['scenes'][$sceneIndex]['processingJobId'] = $job->id;
+
+                // Add to pendingJobs array for polling
+                $this->pendingJobs[$sceneIndex] = [
+                    'jobId' => $job->external_job_id,
+                    'processingJobId' => $job->id,
+                    'type' => $job->type,
+                    'sceneIndex' => $sceneIndex,
+                ];
+            }
+        }
+
+        // Dispatch event to start polling if we have pending jobs
+        if (!empty($this->pendingJobs)) {
+            $this->dispatch('resume-job-polling', count: count($this->pendingJobs));
         }
     }
 
