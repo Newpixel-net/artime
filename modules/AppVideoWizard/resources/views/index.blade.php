@@ -4,10 +4,7 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-6">
-    @livewire(\Modules\AppVideoWizard\Livewire\VideoWizard::class, ['project' => $project ?? null])
+    <h1>TEST: Controller and View are working!</h1>
+    <p>If you see this, the route and view work. The issue is Livewire.</p>
 </div>
 @endsection
-
-@push('scripts')
-<script src="{{ Module::asset('appvideowizard:js/video-preview-engine.js') }}"></script>
-@endpush
