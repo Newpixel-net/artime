@@ -173,7 +173,7 @@
     }
 </style>
 
-<div class="video-wizard min-h-screen" x-data="{ showPreview: false }">
+<div wire:id="{{ $this->getId() }}" class="video-wizard min-h-screen" x-data="{ showPreview: false }">
     {{-- Wizard Header --}}
     <div style="text-align: center; padding: 2rem 1rem 1rem;">
         <h1 style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 50%, #10b981 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
