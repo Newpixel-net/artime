@@ -369,13 +369,55 @@
                 <div class="border rounded p-3 mb-3">
                     <h6 class="fw-bold mb-3">
                         <i class="fas fa-microchip me-2"></i>{{ __('RunPod GPU Processing') }}
-                        <small class="text-muted fw-normal">- {{ __('Serverless GPU for video generation') }}</small>
+                        <small class="text-muted fw-normal">- {{ __('Serverless GPU for AI generation') }}</small>
                     </h6>
+                    <p class="text-muted small mb-3">{{ __('RunPod provides serverless GPU endpoints for image/video generation. Add your API key and configure endpoint IDs for each service.') }}</p>
+
                     <div class="mb-3">
-                        <label class="form-label">{{ __('API Key') }}</label>
+                        <label class="form-label">{{ __('API Key') }} <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="runpod_api_key"
                                value="{{ get_option('runpod_api_key', '') }}"
-                               placeholder="{{ __('Enter RunPod API Key') }}">
+                               placeholder="{{ __('Enter RunPod API Key (starts with rpa_...)') }}">
+                        <small class="text-muted">{{ __('Get your API key from RunPod dashboard → Settings → API Keys') }}</small>
+                    </div>
+
+                    <hr class="my-3">
+                    <h6 class="mb-3"><i class="fas fa-server me-2"></i>{{ __('Endpoint Configuration') }}</h6>
+
+                    {{-- HiDream Endpoint --}}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <span class="badge bg-purple me-2">Image</span>
+                            {{ __('HiDream (Text-to-Image)') }}
+                        </label>
+                        <input type="text" class="form-control" name="runpod_hidream_endpoint"
+                               value="{{ get_option('runpod_hidream_endpoint', '') }}"
+                               placeholder="{{ __('e.g., rgq0go2nkcfx4h') }}">
+                        <small class="text-muted">{{ __('Endpoint ID for HiDream image generation. Used in Video Wizard storyboard.') }}</small>
+                    </div>
+
+                    {{-- Multitalk Endpoint --}}
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <span class="badge bg-info me-2">Video</span>
+                            {{ __('Multitalk (Lip-Sync Video)') }}
+                        </label>
+                        <input type="text" class="form-control" name="runpod_multitalk_endpoint"
+                               value="{{ get_option('runpod_multitalk_endpoint', '') }}"
+                               placeholder="{{ __('Enter Multitalk endpoint ID') }}">
+                        <small class="text-muted">{{ __('Endpoint ID for Multitalk lip-sync video generation.') }}</small>
+                    </div>
+
+                    {{-- Generic GPU Endpoint (future use) --}}
+                    <div class="mb-0">
+                        <label class="form-label">
+                            <span class="badge bg-secondary me-2">Custom</span>
+                            {{ __('Custom GPU Endpoint') }}
+                        </label>
+                        <input type="text" class="form-control" name="runpod_custom_endpoint"
+                               value="{{ get_option('runpod_custom_endpoint', '') }}"
+                               placeholder="{{ __('Enter custom endpoint ID') }}">
+                        <small class="text-muted">{{ __('Additional custom endpoint for other GPU workloads.') }}</small>
                     </div>
                 </div>
 

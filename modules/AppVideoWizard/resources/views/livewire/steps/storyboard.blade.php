@@ -645,7 +645,7 @@
                             'nanobanana-pro' => ['name' => 'NanoBanana Pro', 'cost' => 3, 'desc' => 'High quality, fast generation'],
                             'nanobanana' => ['name' => 'NanoBanana', 'cost' => 1, 'desc' => 'Quick drafts, lower cost'],
                         ];
-                        $selectedModel = $storyboard['imageModel'] ?? 'hidream';
+                        $selectedModel = $storyboard['imageModel'] ?? 'nanobanana';
                     @endphp
                     @foreach($imageModels as $modelId => $model)
                         <button type="button"
