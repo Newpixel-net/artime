@@ -306,9 +306,9 @@
 
         <div class="vw-format-grid">
             @foreach($formats as $id => $formatConfig)
-                <div @click="console.log('Alpine click: {{ $id }}'); $wire.selectFormat('{{ $id }}')"
+                <div @click="$wire.selectFormat('{{ $id }}')"
                      class="vw-format-card {{ $format === $id ? 'selected' : '' }}"
-                     style="cursor: pointer; position: relative; z-index: 10;">
+                     style="cursor: pointer;">
                     <span class="vw-format-icon" style="pointer-events: none;">
                         @switch($id)
                             @case('widescreen') 🖥️ @break
@@ -338,9 +338,9 @@
 
         <div class="vw-production-grid">
             @foreach($productionTypes as $typeId => $type)
-                <div @click="console.log('Alpine click: {{ $typeId }}'); $wire.selectProductionType('{{ $typeId }}')"
+                <div @click="$wire.selectProductionType('{{ $typeId }}')"
                      class="vw-production-card {{ $productionType === $typeId ? 'selected' : '' }}"
-                     style="cursor: pointer; position: relative; z-index: 10;">
+                     style="cursor: pointer;">
                     <span class="vw-production-icon" style="pointer-events: none;">
                         @switch($typeId)
                             @case('social') 📱 @break
