@@ -647,4 +647,125 @@ class ImageGenerationService
             ->get()
             ->toArray();
     }
+
+    /**
+     * Upscale an image to HD or 4K quality.
+     */
+    public function upscaleImage(string $imageUrl, string $quality = 'hd'): array
+    {
+        try {
+            // Download the original image
+            $response = Http::timeout(30)->get($imageUrl);
+            if (!$response->successful()) {
+                throw new \Exception('Failed to download image for upscaling');
+            }
+
+            $imageData = $response->body();
+            $base64Image = base64_encode($imageData);
+
+            // Determine target resolution based on quality
+            $targetResolution = $quality === '4k' ? '3840x2160' : '1920x1080';
+
+            // Use Gemini for upscaling with image generation
+            $prompt = "Upscale this image to {$targetResolution} resolution while maintaining perfect quality, details, and sharpness. Enhance clarity and detail. Do not change the content, composition, or style - only improve resolution and quality.";
+
+            $result = $this->geminiService->generateImageFromImage($base64Image, $prompt, [
+                'model' => 'gemini-2.0-flash-exp-image-generation',
+                'responseType' => 'image',
+            ]);
+
+            if (!empty($result['imageData'])) {
+                // Save upscaled image
+                $filename = 'wizard/upscaled/' . Str::uuid() . '.png';
+                Storage::disk('public')->put($filename, base64_decode($result['imageData']));
+                $upscaledUrl = Storage::disk('public')->url($filename);
+
+                return [
+                    'success' => true,
+                    'imageUrl' => $upscaledUrl,
+                    'quality' => $quality,
+                    'resolution' => $targetResolution,
+                ];
+            }
+
+            throw new \Exception('Upscaling did not return an image');
+
+        } catch (\Exception $e) {
+            Log::error('Image upscale failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Edit an image using AI with a mask.
+     */
+    public function editImageWithMask(string $imageUrl, string $maskData, string $editPrompt): array
+    {
+        try {
+            // Download the original image
+            $response = Http::timeout(30)->get($imageUrl);
+            if (!$response->successful()) {
+                throw new \Exception('Failed to download image for editing');
+            }
+
+            $imageData = $response->body();
+            $base64Image = base64_encode($imageData);
+
+            // The maskData is a base64 encoded PNG from the canvas
+            // Remove data URL prefix if present
+            $cleanMaskData = $maskData;
+            if (str_starts_with($maskData, 'data:')) {
+                $cleanMaskData = preg_replace('/^data:image\/\w+;base64,/', '', $maskData);
+            }
+
+            // Build edit prompt with mask context
+            $fullPrompt = "Edit the marked/highlighted areas of this image. The white areas in the mask indicate regions to edit. Edit instruction: {$editPrompt}. Keep the unmasked areas unchanged. Maintain consistent style and lighting with the original image.";
+
+            // Use Gemini for inpainting/editing
+            $result = $this->geminiService->editImageWithMask($base64Image, $cleanMaskData, $fullPrompt, [
+                'model' => 'gemini-2.0-flash-exp-image-generation',
+            ]);
+
+            if (!empty($result['imageData'])) {
+                // Save edited image
+                $filename = 'wizard/edited/' . Str::uuid() . '.png';
+                Storage::disk('public')->put($filename, base64_decode($result['imageData']));
+                $editedUrl = Storage::disk('public')->url($filename);
+
+                return [
+                    'success' => true,
+                    'imageUrl' => $editedUrl,
+                ];
+            }
+
+            // Fallback: If mask editing not supported, try image-to-image generation
+            $fallbackResult = $this->geminiService->generateImageFromImage($base64Image, $editPrompt, [
+                'model' => 'gemini-2.0-flash-exp-image-generation',
+                'responseType' => 'image',
+            ]);
+
+            if (!empty($fallbackResult['imageData'])) {
+                $filename = 'wizard/edited/' . Str::uuid() . '.png';
+                Storage::disk('public')->put($filename, base64_decode($fallbackResult['imageData']));
+                $editedUrl = Storage::disk('public')->url($filename);
+
+                return [
+                    'success' => true,
+                    'imageUrl' => $editedUrl,
+                ];
+            }
+
+            throw new \Exception('Image editing did not return a result');
+
+        } catch (\Exception $e) {
+            Log::error('Image edit failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
 }

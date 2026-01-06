@@ -151,6 +151,31 @@ class VideoWizard extends Component
     public string $contentDepth = 'detailed';
     public string $additionalInstructions = '';
 
+    // Multi-Shot Mode state
+    public array $multiShotMode = [
+        'enabled' => false,
+        'defaultShotCount' => 3,
+        'decomposedScenes' => [],
+        'batchStatus' => null,
+        'globalVisualProfile' => null,
+    ];
+    public bool $showMultiShotModal = false;
+    public int $multiShotSceneIndex = 0;
+    public int $multiShotCount = 3;
+
+    // Upscale Modal state
+    public bool $showUpscaleModal = false;
+    public int $upscaleSceneIndex = 0;
+    public string $upscaleQuality = 'hd'; // 'hd' or '4k'
+    public bool $isUpscaling = false;
+
+    // AI Edit Modal state
+    public bool $showAIEditModal = false;
+    public int $aiEditSceneIndex = 0;
+    public string $aiEditPrompt = '';
+    public int $aiEditBrushSize = 30;
+    public bool $isApplyingEdit = false;
+
     /**
      * Mount the component.
      * Note: We accept mixed $project to avoid Livewire's implicit model binding
@@ -1757,6 +1782,403 @@ class VideoWizard extends Component
             $this->error = __('Failed to generate location reference: ') . $e->getMessage();
         } finally {
             $this->isLoading = false;
+        }
+    }
+
+    // =========================================================================
+    // MULTI-SHOT MODE METHODS
+    // =========================================================================
+
+    /**
+     * Toggle multi-shot mode.
+     */
+    public function toggleMultiShotMode(): void
+    {
+        $this->multiShotMode['enabled'] = !$this->multiShotMode['enabled'];
+        $this->saveProject();
+    }
+
+    /**
+     * Set default shot count for multi-shot mode.
+     */
+    public function setMultiShotCount(int $count): void
+    {
+        $this->multiShotMode['defaultShotCount'] = max(2, min(6, $count));
+        $this->multiShotCount = $this->multiShotMode['defaultShotCount'];
+        $this->saveProject();
+    }
+
+    /**
+     * Open multi-shot decomposition modal.
+     */
+    public function openMultiShotModal(int $sceneIndex): void
+    {
+        $this->multiShotSceneIndex = $sceneIndex;
+        $this->multiShotCount = $this->multiShotMode['defaultShotCount'];
+        $this->showMultiShotModal = true;
+    }
+
+    /**
+     * Close multi-shot modal.
+     */
+    public function closeMultiShotModal(): void
+    {
+        $this->showMultiShotModal = false;
+    }
+
+    /**
+     * Decompose scene into multiple shots.
+     */
+    public function decomposeScene(int $sceneIndex): void
+    {
+        $this->isLoading = true;
+        $this->error = null;
+
+        try {
+            $scene = $this->script['scenes'][$sceneIndex] ?? null;
+            if (!$scene) {
+                throw new \Exception(__('Scene not found'));
+            }
+
+            // Get visual description for decomposition
+            $visualDescription = $scene['visualDescription'] ?? $scene['narration'] ?? '';
+
+            // Use Gemini to decompose scene into shots
+            $imageService = app(ImageGenerationService::class);
+
+            $shots = [];
+            for ($i = 0; $i < $this->multiShotCount; $i++) {
+                $shotType = $this->getShotTypeForIndex($i, $this->multiShotCount);
+                $shots[] = [
+                    'id' => uniqid('shot_'),
+                    'index' => $i,
+                    'type' => $shotType['type'],
+                    'description' => $shotType['description'],
+                    'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+                    'imageUrl' => null,
+                    'status' => 'pending',
+                    'fromSceneImage' => $i === 0, // First shot can use scene image
+                ];
+            }
+
+            // Store decomposed scene
+            $this->multiShotMode['decomposedScenes'][$sceneIndex] = [
+                'sceneId' => $scene['id'] ?? $sceneIndex,
+                'shots' => $shots,
+                'selectedShot' => 0,
+                'status' => 'ready',
+                'consistencyAnchors' => [
+                    'style' => $this->sceneMemory['styleBible']['style'] ?? '',
+                    'characters' => $this->getCharactersForScene($sceneIndex),
+                    'location' => $this->getLocationForScene($sceneIndex),
+                ],
+            ];
+
+            // If scene already has an image, use it for first shot
+            $storyboardScene = $this->storyboard['scenes'][$sceneIndex] ?? null;
+            if ($storyboardScene && !empty($storyboardScene['imageUrl'])) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['imageUrl'] = $storyboardScene['imageUrl'];
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['status'] = 'ready';
+            }
+
+            $this->saveProject();
+            $this->showMultiShotModal = false;
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to decompose scene: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Get shot type configuration based on index and total count.
+     */
+    protected function getShotTypeForIndex(int $index, int $total): array
+    {
+        $shotTypes = [
+            ['type' => 'establishing', 'description' => 'Wide establishing shot showing the environment'],
+            ['type' => 'medium', 'description' => 'Medium shot focusing on the main subject'],
+            ['type' => 'close-up', 'description' => 'Close-up shot emphasizing details'],
+            ['type' => 'reaction', 'description' => 'Reaction shot or cutaway'],
+            ['type' => 'detail', 'description' => 'Detail shot of important elements'],
+            ['type' => 'wide', 'description' => 'Wide shot showing full context'],
+        ];
+
+        return $shotTypes[$index % count($shotTypes)];
+    }
+
+    /**
+     * Build prompt for a specific shot.
+     */
+    protected function buildShotPrompt(string $baseDescription, array $shotType, int $index): string
+    {
+        $prompt = $baseDescription;
+        $prompt .= ", " . $shotType['type'] . " shot";
+        $prompt .= ", " . $shotType['description'];
+
+        // Add style from Style Bible if enabled
+        if ($this->sceneMemory['styleBible']['enabled'] && !empty($this->sceneMemory['styleBible']['style'])) {
+            $prompt .= ", " . $this->sceneMemory['styleBible']['style'];
+        }
+
+        // Add technical specs
+        if ($this->storyboard['technicalSpecs']['enabled']) {
+            $prompt .= ", " . $this->storyboard['technicalSpecs']['positive'];
+        }
+
+        return $prompt;
+    }
+
+    /**
+     * Get characters applied to a scene.
+     */
+    protected function getCharactersForScene(int $sceneIndex): array
+    {
+        $characters = [];
+        foreach ($this->sceneMemory['characterBible']['characters'] as $character) {
+            if (in_array($sceneIndex, $character['appliedScenes'] ?? [])) {
+                $characters[] = $character;
+            }
+        }
+        return $characters;
+    }
+
+    /**
+     * Get location for a scene.
+     */
+    protected function getLocationForScene(int $sceneIndex): ?array
+    {
+        foreach ($this->sceneMemory['locationBible']['locations'] as $location) {
+            if (in_array($sceneIndex, $location['appliedScenes'] ?? [])) {
+                return $location;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Generate image for a specific shot.
+     */
+    public function generateShotImage(int $sceneIndex, int $shotIndex): void
+    {
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        if (!$decomposed || !isset($decomposed['shots'][$shotIndex])) {
+            $this->error = __('Shot not found');
+            return;
+        }
+
+        $shot = $decomposed['shots'][$shotIndex];
+        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'generating';
+
+        $this->isLoading = true;
+        $this->error = null;
+
+        try {
+            $imageService = app(ImageGenerationService::class);
+
+            if ($this->projectId) {
+                $project = WizardProject::find($this->projectId);
+                if ($project) {
+                    $result = $imageService->generateSceneImage($project, [
+                        'id' => $shot['id'],
+                        'visualDescription' => $shot['prompt'],
+                    ], [
+                        'model' => $this->storyboard['imageModel'] ?? 'hidream',
+                        'sceneIndex' => "shot_{$sceneIndex}_{$shotIndex}",
+                    ]);
+
+                    if ($result['success']) {
+                        if (isset($result['imageUrl'])) {
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageUrl'] = $result['imageUrl'];
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'ready';
+                        } elseif (isset($result['jobId'])) {
+                            // Async job - store for polling
+                            $this->pendingJobs["shot_{$sceneIndex}_{$shotIndex}"] = [
+                                'jobId' => $result['jobId'],
+                                'type' => 'shot',
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                            ];
+                        }
+                        $this->saveProject();
+                    } else {
+                        throw new \Exception($result['error'] ?? __('Generation failed'));
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'error';
+            $this->error = __('Failed to generate shot image: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Generate all shots for a scene.
+     */
+    public function generateAllShots(int $sceneIndex): void
+    {
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        if (!$decomposed) {
+            $this->error = __('Scene not decomposed');
+            return;
+        }
+
+        foreach ($decomposed['shots'] as $shotIndex => $shot) {
+            if ($shot['status'] !== 'ready') {
+                $this->generateShotImage($sceneIndex, $shotIndex);
+            }
+        }
+    }
+
+    /**
+     * Select a shot for the scene.
+     */
+    public function selectShot(int $sceneIndex, int $shotIndex): void
+    {
+        if (isset($this->multiShotMode['decomposedScenes'][$sceneIndex])) {
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['selectedShot'] = $shotIndex;
+            $this->saveProject();
+        }
+    }
+
+    // =========================================================================
+    // UPSCALE METHODS
+    // =========================================================================
+
+    /**
+     * Open upscale quality modal.
+     */
+    public function openUpscaleModal(int $sceneIndex): void
+    {
+        $this->upscaleSceneIndex = $sceneIndex;
+        $this->upscaleQuality = 'hd';
+        $this->showUpscaleModal = true;
+    }
+
+    /**
+     * Close upscale modal.
+     */
+    public function closeUpscaleModal(): void
+    {
+        $this->showUpscaleModal = false;
+    }
+
+    /**
+     * Upscale scene image.
+     */
+    public function upscaleImage(): void
+    {
+        $storyboardScene = $this->storyboard['scenes'][$this->upscaleSceneIndex] ?? null;
+        if (!$storyboardScene || empty($storyboardScene['imageUrl'])) {
+            $this->error = __('No image to upscale');
+            return;
+        }
+
+        $this->isUpscaling = true;
+        $this->error = null;
+
+        try {
+            $imageService = app(ImageGenerationService::class);
+
+            $result = $imageService->upscaleImage(
+                $storyboardScene['imageUrl'],
+                $this->upscaleQuality
+            );
+
+            if ($result['success'] && isset($result['imageUrl'])) {
+                $this->storyboard['scenes'][$this->upscaleSceneIndex]['imageUrl'] = $result['imageUrl'];
+                $this->storyboard['scenes'][$this->upscaleSceneIndex]['upscaled'] = true;
+                $this->storyboard['scenes'][$this->upscaleSceneIndex]['upscaleQuality'] = $this->upscaleQuality;
+                $this->saveProject();
+                $this->showUpscaleModal = false;
+            } else {
+                throw new \Exception($result['error'] ?? __('Upscale failed'));
+            }
+        } catch (\Exception $e) {
+            $this->error = __('Failed to upscale image: ') . $e->getMessage();
+        } finally {
+            $this->isUpscaling = false;
+        }
+    }
+
+    // =========================================================================
+    // AI EDIT WITH MASK METHODS
+    // =========================================================================
+
+    /**
+     * Open AI edit modal.
+     */
+    public function openAIEditModal(int $sceneIndex): void
+    {
+        $this->aiEditSceneIndex = $sceneIndex;
+        $this->aiEditPrompt = '';
+        $this->aiEditBrushSize = 30;
+        $this->showAIEditModal = true;
+    }
+
+    /**
+     * Close AI edit modal.
+     */
+    public function closeAIEditModal(): void
+    {
+        $this->showAIEditModal = false;
+    }
+
+    /**
+     * Set AI edit brush size.
+     */
+    public function setAIEditBrushSize(int $size): void
+    {
+        $this->aiEditBrushSize = max(10, min(100, $size));
+    }
+
+    /**
+     * Apply AI edit with mask.
+     */
+    public function applyAIEdit(string $maskData): void
+    {
+        $storyboardScene = $this->storyboard['scenes'][$this->aiEditSceneIndex] ?? null;
+        if (!$storyboardScene || empty($storyboardScene['imageUrl'])) {
+            $this->error = __('No image to edit');
+            return;
+        }
+
+        if (empty($this->aiEditPrompt)) {
+            $this->error = __('Please describe what you want to change');
+            return;
+        }
+
+        $this->isApplyingEdit = true;
+        $this->error = null;
+
+        try {
+            $imageService = app(ImageGenerationService::class);
+
+            $result = $imageService->editImageWithMask(
+                $storyboardScene['imageUrl'],
+                $maskData,
+                $this->aiEditPrompt
+            );
+
+            if ($result['success'] && isset($result['imageUrl'])) {
+                $this->storyboard['scenes'][$this->aiEditSceneIndex]['imageUrl'] = $result['imageUrl'];
+                $this->storyboard['scenes'][$this->aiEditSceneIndex]['edited'] = true;
+                $this->storyboard['scenes'][$this->aiEditSceneIndex]['editHistory'][] = [
+                    'prompt' => $this->aiEditPrompt,
+                    'timestamp' => now()->toIso8601String(),
+                ];
+                $this->saveProject();
+                $this->showAIEditModal = false;
+            } else {
+                throw new \Exception($result['error'] ?? __('Edit failed'));
+            }
+        } catch (\Exception $e) {
+            $this->error = __('Failed to apply AI edit: ') . $e->getMessage();
+        } finally {
+            $this->isApplyingEdit = false;
         }
     }
 

@@ -1079,18 +1079,70 @@
                     {{-- Actions (only show if image exists) --}}
                     @if($imageUrl)
                         <div class="vw-scene-actions">
+                            {{-- AI Edit Button --}}
+                            <button type="button"
+                                    class="vw-scene-action-btn"
+                                    style="background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(236,72,153,0.4); color: #f9a8d4;"
+                                    wire:click="openAIEditModal({{ $index }})"
+                                    title="{{ __('Edit with AI') }}">
+                                ✨ {{ __('Edit') }}
+                            </button>
+                            {{-- Upscale Button --}}
+                            <button type="button"
+                                    class="vw-scene-action-btn"
+                                    style="background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); color: #fcd34d;"
+                                    wire:click="openUpscaleModal({{ $index }})"
+                                    title="{{ __('Upscale to HD/4K') }}">
+                                ⬆️
+                            </button>
+                            {{-- Multi-Shot Button --}}
+                            <button type="button"
+                                    class="vw-scene-action-btn"
+                                    style="background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(6,182,212,0.15)); border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd;"
+                                    wire:click="openMultiShotModal({{ $index }})"
+                                    title="{{ __('Multi-shot decomposition') }}">
+                                ✂️
+                            </button>
+                            {{-- Regenerate Button --}}
                             <button type="button"
                                     class="vw-scene-action-btn regenerate"
                                     wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
-                                    wire:loading.attr="disabled">
-                                🔄 {{ __('Regenerate') }}
+                                    wire:loading.attr="disabled"
+                                    title="{{ __('Regenerate') }}">
+                                🔄
                             </button>
+                            {{-- Edit Prompt Button --}}
                             <button type="button"
                                     class="vw-scene-action-btn edit"
-                                    wire:click="openEditPromptModal({{ $index }})">
-                                ✏️ {{ __('Edit Prompt') }}
+                                    wire:click="openEditPromptModal({{ $index }})"
+                                    title="{{ __('Edit prompt') }}">
+                                ✏️
                             </button>
                         </div>
+
+                        {{-- Multi-Shot Timeline (if decomposed) --}}
+                        @if(isset($multiShotMode['decomposedScenes'][$index]))
+                            @php $decomposed = $multiShotMode['decomposedScenes'][$index]; @endphp
+                            <div style="padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(139,92,246,0.05);">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                                    <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5);">📽️ {{ count($decomposed['shots']) }} {{ __('shots') }}</span>
+                                </div>
+                                <div style="display: flex; gap: 0.25rem; overflow-x: auto;">
+                                    @foreach($decomposed['shots'] as $shotIdx => $shot)
+                                        <div style="width: 40px; height: 24px; border-radius: 0.2rem; overflow: hidden; border: 1px solid {{ ($decomposed['selectedShot'] ?? 0) === $shotIdx ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.1)' }}; cursor: pointer; flex-shrink: 0;"
+                                             wire:click="selectShot({{ $index }}, {{ $shotIdx }})">
+                                            @if($shot['status'] === 'ready' && !empty($shot['imageUrl']))
+                                                <img src="{{ $shot['imageUrl'] }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            @else
+                                                <div style="width: 100%; height: 100%; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
+                                                    <span style="font-size: 0.5rem; color: rgba(255,255,255,0.3);">{{ $shotIdx + 1 }}</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endif
                 </div>
             @endforeach
@@ -1111,6 +1163,15 @@
 
     {{-- Edit Prompt Modal --}}
     @include('appvideowizard::livewire.modals.edit-prompt')
+
+    {{-- Multi-Shot Decomposition Modal --}}
+    @include('appvideowizard::livewire.modals.multi-shot')
+
+    {{-- Upscale Modal --}}
+    @include('appvideowizard::livewire.modals.upscale')
+
+    {{-- AI Edit Modal --}}
+    @include('appvideowizard::livewire.modals.ai-edit')
 </div>
 
 <script>
