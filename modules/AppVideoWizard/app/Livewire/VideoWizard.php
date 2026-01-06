@@ -9,6 +9,7 @@ use Modules\AppVideoWizard\Services\ConceptService;
 use Modules\AppVideoWizard\Services\ScriptGenerationService;
 use Modules\AppVideoWizard\Services\ImageGenerationService;
 use Modules\AppVideoWizard\Services\VoiceoverService;
+use Modules\AppVideoWizard\Services\StockMediaService;
 
 class VideoWizard extends Component
 {
@@ -87,6 +88,47 @@ class VideoWizard extends Component
     public bool $isLoading = false;
     public bool $isSaving = false;
     public ?string $error = null;
+
+    // Stock Media Browser state
+    public bool $showStockBrowser = false;
+    public int $stockBrowserSceneIndex = 0;
+    public string $stockSearchQuery = '';
+    public string $stockMediaType = 'image';
+    public string $stockOrientation = 'landscape';
+    public array $stockSearchResults = [];
+    public bool $stockSearching = false;
+
+    // Edit Prompt Modal state
+    public bool $showEditPromptModal = false;
+    public int $editPromptSceneIndex = 0;
+    public string $editPromptText = '';
+
+    // Scene Memory state (Style Bible, Character Bible, Location Bible)
+    public array $sceneMemory = [
+        'styleBible' => [
+            'enabled' => false,
+            'style' => '',
+            'colorGrade' => '',
+            'atmosphere' => '',
+            'visualDNA' => '',
+        ],
+        'characterBible' => [
+            'enabled' => false,
+            'characters' => [],
+        ],
+        'locationBible' => [
+            'enabled' => false,
+            'locations' => [],
+        ],
+    ];
+
+    // RunPod job polling state
+    public array $pendingJobs = [];
+
+    // Generation progress tracking
+    public int $generationProgress = 0;
+    public int $generationTotal = 0;
+    public ?string $generationCurrentScene = null;
 
     // Concept variations state
     public array $conceptVariations = [];
@@ -787,6 +829,377 @@ class VideoWizard extends Component
             }
         }
         return false;
+    }
+
+    // =========================================================================
+    // STOCK MEDIA BROWSER METHODS
+    // =========================================================================
+
+    /**
+     * Open stock media browser for a scene.
+     */
+    #[On('open-stock-browser')]
+    public function openStockBrowser(int $sceneIndex): void
+    {
+        $this->stockBrowserSceneIndex = $sceneIndex;
+        $this->showStockBrowser = true;
+        $this->stockSearchQuery = '';
+        $this->stockSearchResults = [];
+
+        // Set default search query based on scene description
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        if ($scene) {
+            // Extract keywords from visual description
+            $description = $scene['visualDescription'] ?? $scene['title'] ?? '';
+            $this->stockSearchQuery = $this->extractSearchKeywords($description);
+        }
+
+        // Set orientation based on aspect ratio
+        $this->stockOrientation = match ($this->aspectRatio) {
+            '9:16', '4:5' => 'portrait',
+            '1:1' => 'square',
+            default => 'landscape',
+        };
+    }
+
+    /**
+     * Close stock media browser.
+     */
+    public function closeStockBrowser(): void
+    {
+        $this->showStockBrowser = false;
+        $this->stockSearchResults = [];
+    }
+
+    /**
+     * Search stock media.
+     */
+    public function searchStockMedia(): void
+    {
+        if (empty($this->stockSearchQuery)) {
+            $this->error = __('Please enter a search query');
+            return;
+        }
+
+        $this->stockSearching = true;
+        $this->error = null;
+
+        try {
+            $stockService = app(StockMediaService::class);
+            $results = $stockService->search($this->stockSearchQuery, $this->stockMediaType, [
+                'orientation' => $this->stockOrientation,
+                'page' => 1,
+                'perPage' => 20,
+            ]);
+
+            $this->stockSearchResults = $results['items'] ?? [];
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to search stock media: ') . $e->getMessage();
+        } finally {
+            $this->stockSearching = false;
+        }
+    }
+
+    /**
+     * Select stock media for a scene.
+     */
+    public function selectStockMedia(int $mediaIndex): void
+    {
+        $mediaItem = $this->stockSearchResults[$mediaIndex] ?? null;
+
+        if (!$mediaItem) {
+            $this->error = __('Media item not found');
+            return;
+        }
+
+        $this->isLoading = true;
+        $this->error = null;
+
+        try {
+            if (!$this->projectId) {
+                $this->saveProject();
+            }
+
+            $project = WizardProject::findOrFail($this->projectId);
+            $scene = $this->script['scenes'][$this->stockBrowserSceneIndex] ?? null;
+
+            if (!$scene) {
+                throw new \Exception(__('Scene not found'));
+            }
+
+            $stockService = app(StockMediaService::class);
+            $result = $stockService->assignToScene($project, $scene, $mediaItem, [
+                'sceneIndex' => $this->stockBrowserSceneIndex,
+            ]);
+
+            // Update storyboard with the stock media
+            if (!isset($this->storyboard['scenes'])) {
+                $this->storyboard['scenes'] = [];
+            }
+            $this->storyboard['scenes'][$this->stockBrowserSceneIndex] = [
+                'sceneId' => $scene['id'],
+                'imageUrl' => $result['imageUrl'],
+                'assetId' => $result['assetId'] ?? null,
+                'source' => 'stock',
+                'status' => 'ready',
+            ];
+
+            $this->saveProject();
+            $this->closeStockBrowser();
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to select stock media: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Extract search keywords from text.
+     */
+    protected function extractSearchKeywords(string $text): string
+    {
+        // Remove common words and keep meaningful keywords
+        $stopWords = ['the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'is', 'are', 'was', 'were'];
+        $words = preg_split('/\s+/', strtolower($text));
+        $keywords = array_filter($words, fn($w) => strlen($w) > 2 && !in_array($w, $stopWords));
+        return implode(' ', array_slice($keywords, 0, 4));
+    }
+
+    // =========================================================================
+    // EDIT PROMPT METHODS
+    // =========================================================================
+
+    /**
+     * Open edit prompt modal for a scene.
+     */
+    #[On('open-edit-prompt')]
+    public function openEditPrompt(int $sceneIndex): void
+    {
+        $this->editPromptSceneIndex = $sceneIndex;
+        $this->showEditPromptModal = true;
+
+        // Load existing prompt or visual description
+        $storyboardScene = $this->storyboard['scenes'][$sceneIndex] ?? null;
+        $scriptScene = $this->script['scenes'][$sceneIndex] ?? null;
+
+        $this->editPromptText = $storyboardScene['prompt']
+            ?? $scriptScene['visualDescription']
+            ?? $scriptScene['narration']
+            ?? '';
+    }
+
+    /**
+     * Close edit prompt modal.
+     */
+    public function closeEditPrompt(): void
+    {
+        $this->showEditPromptModal = false;
+        $this->editPromptText = '';
+    }
+
+    /**
+     * Save edited prompt and regenerate image.
+     */
+    public function saveAndRegeneratePrompt(): void
+    {
+        if (empty($this->editPromptText)) {
+            $this->error = __('Prompt cannot be empty');
+            return;
+        }
+
+        // Update the script scene's visual description
+        if (isset($this->script['scenes'][$this->editPromptSceneIndex])) {
+            $this->script['scenes'][$this->editPromptSceneIndex]['visualDescription'] = $this->editPromptText;
+        }
+
+        // Store the custom prompt in storyboard
+        if (!isset($this->storyboard['scenes'])) {
+            $this->storyboard['scenes'] = [];
+        }
+        if (!isset($this->storyboard['scenes'][$this->editPromptSceneIndex])) {
+            $this->storyboard['scenes'][$this->editPromptSceneIndex] = [];
+        }
+        $this->storyboard['scenes'][$this->editPromptSceneIndex]['prompt'] = $this->editPromptText;
+
+        $this->closeEditPrompt();
+
+        // Regenerate the image with the new prompt
+        $scene = $this->script['scenes'][$this->editPromptSceneIndex] ?? null;
+        if ($scene) {
+            $this->generateImage($this->editPromptSceneIndex, $scene['id']);
+        }
+    }
+
+    // =========================================================================
+    // SCENE MEMORY METHODS (Style Bible, Character Bible, Location Bible)
+    // =========================================================================
+
+    /**
+     * Toggle Style Bible.
+     */
+    public function toggleStyleBible(): void
+    {
+        $this->sceneMemory['styleBible']['enabled'] = !$this->sceneMemory['styleBible']['enabled'];
+
+        // Sync to storyboard
+        $this->storyboard['styleBible'] = $this->sceneMemory['styleBible'];
+        $this->saveProject();
+    }
+
+    /**
+     * Update Style Bible settings.
+     */
+    public function updateStyleBible(string $field, string $value): void
+    {
+        if (isset($this->sceneMemory['styleBible'][$field])) {
+            $this->sceneMemory['styleBible'][$field] = $value;
+            $this->storyboard['styleBible'] = $this->sceneMemory['styleBible'];
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Toggle Character Bible.
+     */
+    public function toggleCharacterBible(): void
+    {
+        $this->sceneMemory['characterBible']['enabled'] = !$this->sceneMemory['characterBible']['enabled'];
+        $this->saveProject();
+    }
+
+    /**
+     * Add character to Character Bible.
+     */
+    public function addCharacter(string $name, string $description): void
+    {
+        $this->sceneMemory['characterBible']['characters'][] = [
+            'id' => uniqid('char_'),
+            'name' => $name,
+            'description' => $description,
+            'referenceImage' => null,
+        ];
+        $this->saveProject();
+    }
+
+    /**
+     * Remove character from Character Bible.
+     */
+    public function removeCharacter(int $index): void
+    {
+        if (isset($this->sceneMemory['characterBible']['characters'][$index])) {
+            unset($this->sceneMemory['characterBible']['characters'][$index]);
+            $this->sceneMemory['characterBible']['characters'] = array_values($this->sceneMemory['characterBible']['characters']);
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Toggle Location Bible.
+     */
+    public function toggleLocationBible(): void
+    {
+        $this->sceneMemory['locationBible']['enabled'] = !$this->sceneMemory['locationBible']['enabled'];
+        $this->saveProject();
+    }
+
+    /**
+     * Add location to Location Bible.
+     */
+    public function addLocation(string $name, string $description): void
+    {
+        $this->sceneMemory['locationBible']['locations'][] = [
+            'id' => uniqid('loc_'),
+            'name' => $name,
+            'description' => $description,
+            'referenceImage' => null,
+        ];
+        $this->saveProject();
+    }
+
+    /**
+     * Remove location from Location Bible.
+     */
+    public function removeLocation(int $index): void
+    {
+        if (isset($this->sceneMemory['locationBible']['locations'][$index])) {
+            unset($this->sceneMemory['locationBible']['locations'][$index]);
+            $this->sceneMemory['locationBible']['locations'] = array_values($this->sceneMemory['locationBible']['locations']);
+            $this->saveProject();
+        }
+    }
+
+    // =========================================================================
+    // RUNPOD POLLING METHODS
+    // =========================================================================
+
+    /**
+     * Check status of pending RunPod jobs.
+     */
+    public function pollPendingJobs(): void
+    {
+        if (empty($this->pendingJobs)) {
+            return;
+        }
+
+        $imageService = app(ImageGenerationService::class);
+
+        foreach ($this->pendingJobs as $sceneIndex => $job) {
+            try {
+                $result = $imageService->checkRunPodJobStatus($job['jobId']);
+
+                if ($result['status'] === 'COMPLETED') {
+                    // Update storyboard scene with completed image
+                    if (isset($this->storyboard['scenes'][$sceneIndex])) {
+                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
+                        // Image URL should already be set
+                    }
+
+                    // Remove from pending
+                    unset($this->pendingJobs[$sceneIndex]);
+                    $this->saveProject();
+
+                } elseif ($result['status'] === 'FAILED') {
+                    // Mark as error
+                    if (isset($this->storyboard['scenes'][$sceneIndex])) {
+                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'error';
+                        $this->storyboard['scenes'][$sceneIndex]['error'] = $result['error'] ?? 'Generation failed';
+                    }
+
+                    unset($this->pendingJobs[$sceneIndex]);
+                    $this->saveProject();
+                }
+                // If IN_QUEUE or IN_PROGRESS, keep polling
+
+            } catch (\Exception $e) {
+                \Log::error("Failed to poll job status: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Get image models for display.
+     */
+    public function getImageModels(): array
+    {
+        return [
+            'hidream' => [
+                'name' => 'HiDream',
+                'description' => 'Artistic & cinematic style',
+                'tokenCost' => 2,
+            ],
+            'nanobanana-pro' => [
+                'name' => 'NanoBanana Pro',
+                'description' => 'High quality, fast generation',
+                'tokenCost' => 3,
+            ],
+            'nanobanana' => [
+                'name' => 'NanoBanana',
+                'description' => 'Quick drafts, lower cost',
+                'tokenCost' => 1,
+            ],
+        ];
     }
 
     /**
