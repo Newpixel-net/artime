@@ -176,6 +176,16 @@ class VideoWizard extends Component
     public int $aiEditBrushSize = 30;
     public bool $isApplyingEdit = false;
 
+    // Character Bible Modal state
+    public bool $showCharacterBibleModal = false;
+    public int $editingCharacterIndex = 0;
+    public bool $isGeneratingPortrait = false;
+
+    // Location Bible Modal state
+    public bool $showLocationBibleModal = false;
+    public int $editingLocationIndex = 0;
+    public bool $isGeneratingLocationRef = false;
+
     /**
      * Mount the component.
      * Note: We accept mixed $project to avoid Livewire's implicit model binding
@@ -739,6 +749,76 @@ class VideoWizard extends Component
     }
 
     /**
+     * Generate AI-powered stock search suggestions based on scene content.
+     */
+    public function generateStockSuggestions(int $sceneIndex): array
+    {
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        if (!$scene) {
+            return ['primaryQuery' => '', 'alternatives' => []];
+        }
+
+        $visual = $scene['visual'] ?? '';
+        $narration = $scene['narration'] ?? '';
+        $combined = trim($visual . ' ' . $narration);
+
+        if (empty($combined)) {
+            return ['primaryQuery' => '', 'alternatives' => []];
+        }
+
+        // Extract keywords from scene description
+        $stopWords = ['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'to', 'of',
+            'in', 'for', 'on', 'with', 'at', 'by', 'this', 'that', 'it', 'and', 'or',
+            'but', 'if', 'then', 'else', 'when', 'where', 'why', 'how', 'all', 'each',
+            'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
+            'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just',
+            'show', 'showing', 'shows', 'scene', 'shot', 'shots', 'frame', 'frames'];
+
+        // Clean and extract meaningful words
+        $words = preg_split('/\s+/', strtolower($combined));
+        $keywords = array_filter($words, function($word) use ($stopWords) {
+            $word = preg_replace('/[^a-z]/', '', $word);
+            return strlen($word) > 3 && !in_array($word, $stopWords);
+        });
+
+        $keywords = array_values(array_unique($keywords));
+        $primaryWords = array_slice($keywords, 0, 3);
+        $primaryQuery = implode(' ', $primaryWords);
+
+        // Generate alternative queries
+        $alternatives = [];
+        if (count($keywords) > 3) {
+            $alternatives[] = implode(' ', array_slice($keywords, 1, 3));
+        }
+        if (count($keywords) > 4) {
+            $alternatives[] = implode(' ', array_slice($keywords, 2, 3));
+        }
+
+        // Add context-based alternatives
+        $contextKeywords = [
+            'office' => ['business office', 'corporate workspace', 'professional meeting'],
+            'nature' => ['natural landscape', 'outdoor scenery', 'forest trees'],
+            'technology' => ['tech devices', 'digital innovation', 'computer screen'],
+            'people' => ['diverse team', 'professional people', 'lifestyle portrait'],
+            'city' => ['urban skyline', 'city streets', 'metropolitan view'],
+        ];
+
+        foreach ($contextKeywords as $context => $suggestions) {
+            if (stripos($combined, $context) !== false) {
+                $alternatives = array_merge($alternatives, array_slice($suggestions, 0, 2));
+                break;
+            }
+        }
+
+        return [
+            'primaryQuery' => $primaryQuery,
+            'alternatives' => array_slice(array_unique($alternatives), 0, 4),
+        ];
+    }
+
+    /**
      * Search stock media.
      */
     #[On('search-stock-media')]
@@ -1282,6 +1362,13 @@ class VideoWizard extends Component
         if (isset($this->sceneMemory['characterBible']['characters'][$index])) {
             unset($this->sceneMemory['characterBible']['characters'][$index]);
             $this->sceneMemory['characterBible']['characters'] = array_values($this->sceneMemory['characterBible']['characters']);
+
+            // Reset editing index if needed
+            $count = count($this->sceneMemory['characterBible']['characters']);
+            if ($this->editingCharacterIndex >= $count) {
+                $this->editingCharacterIndex = max(0, $count - 1);
+            }
+
             $this->saveProject();
         }
     }
@@ -1320,6 +1407,13 @@ class VideoWizard extends Component
         if (isset($this->sceneMemory['locationBible']['locations'][$index])) {
             unset($this->sceneMemory['locationBible']['locations'][$index]);
             $this->sceneMemory['locationBible']['locations'] = array_values($this->sceneMemory['locationBible']['locations']);
+
+            // Reset editing index if needed
+            $count = count($this->sceneMemory['locationBible']['locations']);
+            if ($this->editingLocationIndex >= $count) {
+                $this->editingLocationIndex = max(0, $count - 1);
+            }
+
             $this->saveProject();
         }
     }
@@ -1606,7 +1700,79 @@ class VideoWizard extends Component
      */
     public function editCharacter(int $index): void
     {
-        // Handled by Alpine.js x-data
+        $this->editingCharacterIndex = $index;
+    }
+
+    /**
+     * Open Character Bible modal.
+     */
+    public function openCharacterBibleModal(): void
+    {
+        $this->showCharacterBibleModal = true;
+        $this->editingCharacterIndex = 0;
+    }
+
+    /**
+     * Close Character Bible modal.
+     */
+    public function closeCharacterBibleModal(): void
+    {
+        $this->showCharacterBibleModal = false;
+    }
+
+    /**
+     * Toggle character scene assignment.
+     */
+    public function toggleCharacterScene(int $charIndex, int $sceneIndex): void
+    {
+        $appliedScenes = $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] ?? [];
+
+        if (in_array($sceneIndex, $appliedScenes)) {
+            $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = array_values(
+                array_diff($appliedScenes, [$sceneIndex])
+            );
+        } else {
+            $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'][] = $sceneIndex;
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Apply character to all scenes.
+     */
+    public function applyCharacterToAllScenes(int $charIndex): void
+    {
+        $sceneCount = count($this->script['scenes'] ?? []);
+        $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = range(0, $sceneCount - 1);
+        $this->saveProject();
+    }
+
+    /**
+     * Remove character portrait.
+     */
+    public function removeCharacterPortrait(int $index): void
+    {
+        $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = null;
+        $this->saveProject();
+    }
+
+    /**
+     * Apply character template.
+     */
+    public function applyCharacterTemplate(int $index, string $template): void
+    {
+        $templates = [
+            'action-hero' => 'Athletic build, confident stance, determined expression, wearing practical tactical clothing, strong jawline, focused eyes',
+            'tech-pro' => 'Smart casual attire, clean-cut appearance, glasses optional, modern hairstyle, professional demeanor, laptop or tablet nearby',
+            'mysterious' => 'Dark clothing, partially obscured face, enigmatic expression, shadows across features, subtle accessories, intriguing presence',
+            'narrator' => 'Friendly approachable appearance, warm smile, neutral professional clothing, trustworthy expression, good lighting on face',
+        ];
+
+        if (isset($templates[$template])) {
+            $this->sceneMemory['characterBible']['characters'][$index]['description'] = $templates[$template];
+            $this->saveProject();
+        }
     }
 
     /**
@@ -1736,7 +1902,72 @@ class VideoWizard extends Component
      */
     public function editLocation(int $index): void
     {
-        // Handled by Alpine.js x-data
+        $this->editingLocationIndex = $index;
+    }
+
+    /**
+     * Open Location Bible modal.
+     */
+    public function openLocationBibleModal(): void
+    {
+        $this->showLocationBibleModal = true;
+        if (empty($this->sceneMemory['locationBible']['locations'])) {
+            $this->addLocation('New Location', '');
+        }
+        $this->editingLocationIndex = 0;
+    }
+
+    /**
+     * Close Location Bible modal.
+     */
+    public function closeLocationBibleModal(): void
+    {
+        $this->showLocationBibleModal = false;
+        $this->saveProject();
+    }
+
+    /**
+     * Toggle location assignment to a scene.
+     */
+    public function toggleLocationScene(int $locIndex, int $sceneIndex): void
+    {
+        if (!isset($this->sceneMemory['locationBible']['locations'][$locIndex])) {
+            return;
+        }
+
+        $scenes = $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] ?? [];
+
+        if (in_array($sceneIndex, $scenes)) {
+            $scenes = array_values(array_filter($scenes, fn($s) => $s !== $sceneIndex));
+        } else {
+            $scenes[] = $sceneIndex;
+        }
+
+        $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] = $scenes;
+    }
+
+    /**
+     * Apply location to all scenes.
+     */
+    public function applyLocationToAllScenes(int $locIndex): void
+    {
+        if (!isset($this->sceneMemory['locationBible']['locations'][$locIndex])) {
+            return;
+        }
+
+        $sceneCount = count($this->storyboard['scenes'] ?? []);
+        $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] = range(0, $sceneCount - 1);
+    }
+
+    /**
+     * Remove location reference image.
+     */
+    public function removeLocationReference(int $index): void
+    {
+        if (isset($this->sceneMemory['locationBible']['locations'][$index])) {
+            $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = null;
+            $this->saveProject();
+        }
     }
 
     /**

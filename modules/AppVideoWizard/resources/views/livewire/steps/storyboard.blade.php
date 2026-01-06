@@ -767,7 +767,7 @@
                             <div class="vw-memory-desc">{{ __('Consistent faces') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$dispatch('open-character-bible-modal')">
+                            <button type="button" class="vw-edit-btn" wire:click="openCharacterBibleModal">
                                 {{ __('Edit') }}
                             </button>
                             <input type="checkbox"
@@ -785,7 +785,7 @@
                             <div class="vw-memory-desc">{{ __('Consistent environments') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$dispatch('open-location-bible-modal')">
+                            <button type="button" class="vw-edit-btn" wire:click="openLocationBibleModal">
                                 {{ __('Edit') }}
                             </button>
                             <input type="checkbox"
