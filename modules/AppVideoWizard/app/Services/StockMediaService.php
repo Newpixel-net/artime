@@ -3,7 +3,6 @@
 namespace Modules\AppVideoWizard\Services;
 
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -12,261 +11,200 @@ use Modules\AppVideoWizard\Models\WizardAsset;
 
 class StockMediaService
 {
+    protected string $pexelsApiKey;
+
+    public function __construct()
+    {
+        $this->pexelsApiKey = (string) get_option('pexels_api_key', '');
+    }
+
     /**
-     * Cache duration for search results (15 minutes).
+     * Check if Pexels API is configured.
      */
-    protected int $cacheDuration = 900;
+    public function isConfigured(): bool
+    {
+        return !empty($this->pexelsApiKey);
+    }
 
     /**
      * Search stock media from Pexels.
+     *
+     * @param string $query Search query
+     * @param string $type 'image' | 'video'
+     * @param array $filters ['orientation' => 'landscape'|'portrait'|'square', 'page' => 1, 'perPage' => 20]
+     * @return array
      */
-    public function search(
-        string $query,
-        string $type = 'image',
-        array $filters = []
-    ): array {
-        $pexelsKey = setting('pexels_api_key') ?? config('services.pexels.key');
-
-        if (!$pexelsKey) {
-            throw new \Exception('Pexels API key not configured. Please add your Pexels API key in settings.');
+    public function searchPexels(string $query, string $type = 'image', array $filters = []): array
+    {
+        if (!$this->isConfigured()) {
+            return $this->errorResponse('Pexels API key not configured');
         }
 
         $orientation = $filters['orientation'] ?? 'landscape';
         $page = $filters['page'] ?? 1;
         $perPage = min($filters['perPage'] ?? 20, 40);
 
-        // Create cache key
-        $cacheKey = "stock_media:{$type}:" . md5("{$query}:{$orientation}:{$page}:{$perPage}");
-
-        // Check cache
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
-        }
-
-        $results = [
-            'items' => [],
-            'total' => 0,
-            'page' => $page,
-            'perPage' => $perPage,
-        ];
-
         try {
-            if ($type === 'video') {
-                $results = $this->searchPexelsVideos($pexelsKey, $query, $orientation, $page, $perPage);
-            } else {
-                $results = $this->searchPexelsImages($pexelsKey, $query, $orientation, $page, $perPage);
+            $endpoint = $type === 'video'
+                ? 'https://api.pexels.com/videos/search'
+                : 'https://api.pexels.com/v1/search';
+
+            $response = Http::withHeaders([
+                'Authorization' => $this->pexelsApiKey,
+            ])->timeout(15)->get($endpoint, [
+                'query' => $query,
+                'orientation' => $orientation,
+                'page' => $page,
+                'per_page' => $perPage,
+            ]);
+
+            if ($response->failed()) {
+                return $this->errorResponse('Pexels API request failed: ' . $response->status());
             }
 
-            // Cache results
-            Cache::put($cacheKey, $results, $this->cacheDuration);
+            $data = $response->json();
+
+            if ($type === 'video') {
+                $results = collect($data['videos'] ?? [])->map(function ($video) {
+                    $hdVideo = collect($video['video_files'] ?? [])->firstWhere('quality', 'hd');
+                    $sdVideo = collect($video['video_files'] ?? [])->firstWhere('quality', 'sd');
+                    $videoFile = $hdVideo ?? $sdVideo ?? ($video['video_files'][0] ?? null);
+
+                    return [
+                        'id' => 'pexels-video-' . $video['id'],
+                        'source' => 'pexels',
+                        'type' => 'video',
+                        'thumbnail' => $video['image'] ?? null,
+                        'preview' => $sdVideo['link'] ?? $videoFile['link'] ?? null,
+                        'url' => $hdVideo['link'] ?? $videoFile['link'] ?? null,
+                        'width' => $video['width'] ?? null,
+                        'height' => $video['height'] ?? null,
+                        'duration' => $video['duration'] ?? null,
+                        'author' => $video['user']['name'] ?? 'Pexels',
+                        'authorUrl' => $video['user']['url'] ?? null,
+                        'license' => 'Pexels License (Free)',
+                        'originalUrl' => $video['url'] ?? null,
+                    ];
+                })->toArray();
+            } else {
+                $results = collect($data['photos'] ?? [])->map(function ($photo) {
+                    return [
+                        'id' => 'pexels-image-' . $photo['id'],
+                        'source' => 'pexels',
+                        'type' => 'image',
+                        'thumbnail' => $photo['src']['small'] ?? $photo['src']['medium'] ?? null,
+                        'preview' => $photo['src']['medium'] ?? $photo['src']['large'] ?? null,
+                        'url' => $photo['src']['original'] ?? $photo['src']['large2x'] ?? null,
+                        'width' => $photo['width'] ?? null,
+                        'height' => $photo['height'] ?? null,
+                        'author' => $photo['photographer'] ?? 'Pexels',
+                        'authorUrl' => $photo['photographer_url'] ?? null,
+                        'license' => 'Pexels License (Free)',
+                        'originalUrl' => $photo['url'] ?? null,
+                        'avgColor' => $photo['avg_color'] ?? null,
+                    ];
+                })->toArray();
+            }
+
+            return [
+                'success' => true,
+                'results' => $results,
+                'total' => $data['total_results'] ?? count($results),
+                'page' => $page,
+                'perPage' => $perPage,
+            ];
 
         } catch (\Exception $e) {
-            Log::error('Stock media search failed: ' . $e->getMessage());
-            throw new \Exception('Failed to search stock media: ' . $e->getMessage());
+            Log::error('Pexels API error: ' . $e->getMessage());
+            return $this->errorResponse($e->getMessage());
         }
-
-        return $results;
     }
 
     /**
-     * Search Pexels for images.
+     * Generate smart search queries for a scene.
      */
-    protected function searchPexelsImages(
-        string $apiKey,
-        string $query,
-        string $orientation,
-        int $page,
-        int $perPage
-    ): array {
-        $response = Http::timeout(10)
-            ->withHeaders([
-                'Authorization' => $apiKey,
-            ])
-            ->get('https://api.pexels.com/v1/search', [
-                'query' => $query,
-                'orientation' => $orientation,
-                'page' => $page,
-                'per_page' => $perPage,
-            ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Pexels API error: ' . $response->status());
-        }
-
-        $data = $response->json();
-
-        $items = collect($data['photos'] ?? [])->map(function ($photo) {
-            return [
-                'id' => "pexels-{$photo['id']}",
-                'source' => 'pexels',
-                'type' => 'image',
-                'thumbnail' => $photo['src']['small'] ?? $photo['src']['medium'],
-                'preview' => $photo['src']['medium'] ?? $photo['src']['large'],
-                'url' => $photo['src']['large2x'] ?? $photo['src']['original'],
-                'width' => $photo['width'],
-                'height' => $photo['height'],
-                'author' => $photo['photographer'],
-                'authorUrl' => $photo['photographer_url'],
-                'license' => 'Pexels License (Free)',
-                'originalUrl' => $photo['url'],
-                'avgColor' => $photo['avg_color'] ?? null,
-            ];
-        })->toArray();
-
-        return [
-            'items' => $items,
-            'total' => $data['total_results'] ?? count($items),
-            'page' => $page,
-            'perPage' => $perPage,
-            'hasMore' => ($page * $perPage) < ($data['total_results'] ?? 0),
-        ];
-    }
-
-    /**
-     * Search Pexels for videos.
-     */
-    protected function searchPexelsVideos(
-        string $apiKey,
-        string $query,
-        string $orientation,
-        int $page,
-        int $perPage
-    ): array {
-        $response = Http::timeout(10)
-            ->withHeaders([
-                'Authorization' => $apiKey,
-            ])
-            ->get('https://api.pexels.com/videos/search', [
-                'query' => $query,
-                'orientation' => $orientation,
-                'page' => $page,
-                'per_page' => $perPage,
-            ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Pexels API error: ' . $response->status());
-        }
-
-        $data = $response->json();
-
-        $items = collect($data['videos'] ?? [])->map(function ($video) {
-            $hdVideo = collect($video['video_files'] ?? [])->firstWhere('quality', 'hd');
-            $sdVideo = collect($video['video_files'] ?? [])->firstWhere('quality', 'sd');
-            $videoUrl = $hdVideo['link'] ?? $sdVideo['link'] ?? ($video['video_files'][0]['link'] ?? null);
-
-            return [
-                'id' => "pexels-{$video['id']}",
-                'source' => 'pexels',
-                'type' => 'video',
-                'thumbnail' => $video['image'],
-                'preview' => $sdVideo['link'] ?? ($video['video_files'][0]['link'] ?? null),
-                'url' => $videoUrl,
-                'videoUrl' => $videoUrl,
-                'width' => $video['width'],
-                'height' => $video['height'],
-                'duration' => $video['duration'],
-                'author' => $video['user']['name'] ?? 'Pexels',
-                'authorUrl' => $video['user']['url'] ?? null,
-                'license' => 'Pexels License (Free)',
-                'originalUrl' => $video['url'],
-            ];
-        })->toArray();
-
-        return [
-            'items' => $items,
-            'total' => $data['total_results'] ?? count($items),
-            'page' => $page,
-            'perPage' => $perPage,
-            'hasMore' => ($page * $perPage) < ($data['total_results'] ?? 0),
-        ];
-    }
-
-    /**
-     * Get curated photos from Pexels.
-     */
-    public function getCurated(int $page = 1, int $perPage = 20): array
+    public function generateSearchQueries(string $sceneDescription, string $narration = ''): array
     {
-        $pexelsKey = setting('pexels_api_key') ?? config('services.pexels.key');
+        // Simple keyword extraction for stock media search
+        $combined = $sceneDescription . ' ' . $narration;
 
-        if (!$pexelsKey) {
-            throw new \Exception('Pexels API key not configured');
+        // Remove common words and extract key concepts
+        $stopWords = ['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+            'may', 'might', 'can', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+            'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between',
+            'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why',
+            'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
+            'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'just', 'and'];
+
+        // Extract words
+        $words = preg_split('/\s+/', strtolower($combined));
+        $words = array_filter($words, function ($word) use ($stopWords) {
+            $word = preg_replace('/[^a-z0-9]/', '', $word);
+            return strlen($word) > 2 && !in_array($word, $stopWords);
+        });
+
+        // Get top unique words
+        $wordCounts = array_count_values($words);
+        arsort($wordCounts);
+        $topWords = array_slice(array_keys($wordCounts), 0, 5);
+
+        // Build search queries
+        $queries = [];
+
+        // Primary query - first 3 keywords
+        if (count($topWords) >= 3) {
+            $queries[] = implode(' ', array_slice($topWords, 0, 3));
         }
 
-        $cacheKey = "stock_media:curated:{$page}:{$perPage}";
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
+        // Secondary queries - individual keywords
+        foreach (array_slice($topWords, 0, 3) as $word) {
+            if (strlen($word) > 3) {
+                $queries[] = $word;
+            }
         }
 
-        $response = Http::timeout(10)
-            ->withHeaders([
-                'Authorization' => $pexelsKey,
-            ])
-            ->get('https://api.pexels.com/v1/curated', [
-                'page' => $page,
-                'per_page' => min($perPage, 40),
-            ]);
-
-        if (!$response->successful()) {
-            throw new \Exception('Pexels API error: ' . $response->status());
-        }
-
-        $data = $response->json();
-
-        $items = collect($data['photos'] ?? [])->map(function ($photo) {
-            return [
-                'id' => "pexels-{$photo['id']}",
-                'source' => 'pexels',
-                'type' => 'image',
-                'thumbnail' => $photo['src']['small'] ?? $photo['src']['medium'],
-                'preview' => $photo['src']['medium'] ?? $photo['src']['large'],
-                'url' => $photo['src']['large2x'] ?? $photo['src']['original'],
-                'width' => $photo['width'],
-                'height' => $photo['height'],
-                'author' => $photo['photographer'],
-                'authorUrl' => $photo['photographer_url'],
-                'license' => 'Pexels License (Free)',
-                'originalUrl' => $photo['url'],
-            ];
-        })->toArray();
-
-        $result = [
-            'items' => $items,
-            'total' => $data['total_results'] ?? count($items),
-            'page' => $page,
-            'perPage' => $perPage,
-        ];
-
-        Cache::put($cacheKey, $result, $this->cacheDuration);
-
-        return $result;
+        return array_unique($queries);
     }
 
     /**
-     * Download and assign stock media to a scene.
+     * Import stock media to project storage.
      */
-    public function assignToScene(
+    public function importMedia(
         WizardProject $project,
-        array $scene,
-        array $mediaItem,
-        array $options = []
+        string $mediaUrl,
+        string $mediaId,
+        string $type,
+        string $sceneId,
+        array $metadata = []
     ): array {
-        $mediaUrl = $mediaItem['url'];
-        $mediaType = $mediaItem['type'] ?? 'image';
-
         try {
-            // Download media
-            $contents = file_get_contents($mediaUrl);
+            // Download the media
+            $response = Http::timeout(120)->get($mediaUrl);
 
-            if (!$contents) {
+            if ($response->failed()) {
                 throw new \Exception('Failed to download media');
             }
 
+            $contents = $response->body();
+
             // Determine file extension
-            $extension = $mediaType === 'video' ? 'mp4' : 'jpg';
-            $filename = Str::slug($scene['id']) . '-stock-' . time() . '.' . $extension;
-            $path = "wizard-projects/{$project->id}/images/{$filename}";
+            $extension = $type === 'video' ? 'mp4' : 'jpg';
+            $contentType = $response->header('Content-Type');
+            if ($contentType) {
+                if (str_contains($contentType, 'png')) {
+                    $extension = 'png';
+                } elseif (str_contains($contentType, 'webp')) {
+                    $extension = 'webp';
+                } elseif (str_contains($contentType, 'webm')) {
+                    $extension = 'webm';
+                }
+            }
+
+            // Generate filename and path
+            $filename = Str::slug($sceneId) . '-stock-' . time() . '.' . $extension;
+            $folder = $type === 'video' ? 'videos' : 'images';
+            $path = "wizard-projects/{$project->id}/{$folder}/{$filename}";
 
             // Store file
             Storage::disk('public')->put($path, $contents);
@@ -275,64 +213,79 @@ class StockMediaService
             $asset = WizardAsset::create([
                 'project_id' => $project->id,
                 'user_id' => $project->user_id,
-                'type' => $mediaType === 'video' ? WizardAsset::TYPE_VIDEO : WizardAsset::TYPE_IMAGE,
-                'name' => $scene['title'] ?? $scene['id'],
+                'type' => $type === 'video' ? WizardAsset::TYPE_VIDEO : WizardAsset::TYPE_IMAGE,
+                'name' => $sceneId . ' - Stock Media',
                 'path' => $path,
                 'url' => Storage::disk('public')->url($path),
-                'mime_type' => $mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-                'scene_index' => $options['sceneIndex'] ?? null,
-                'scene_id' => $scene['id'],
-                'metadata' => [
+                'mime_type' => $type === 'video' ? 'video/mp4' : 'image/jpeg',
+                'scene_id' => $sceneId,
+                'metadata' => array_merge($metadata, [
                     'source' => 'stock',
-                    'provider' => $mediaItem['source'] ?? 'pexels',
-                    'originalId' => $mediaItem['id'],
-                    'originalUrl' => $mediaItem['originalUrl'] ?? $mediaUrl,
-                    'author' => $mediaItem['author'] ?? null,
-                    'authorUrl' => $mediaItem['authorUrl'] ?? null,
-                    'license' => $mediaItem['license'] ?? 'Pexels License',
-                    'width' => $mediaItem['width'] ?? null,
-                    'height' => $mediaItem['height'] ?? null,
-                ],
+                    'stockMediaId' => $mediaId,
+                    'originalUrl' => $mediaUrl,
+                    'importedAt' => now()->toISOString(),
+                ]),
             ]);
 
             return [
                 'success' => true,
-                'imageUrl' => $asset->url,
                 'assetId' => $asset->id,
-                'source' => 'stock',
-                'status' => 'ready',
+                'url' => $asset->url,
+                'path' => $path,
             ];
 
         } catch (\Exception $e) {
-            Log::error('Failed to assign stock media: ' . $e->getMessage());
-            throw new \Exception('Failed to assign stock media: ' . $e->getMessage());
+            Log::error('Stock media import error: ' . $e->getMessage());
+            return $this->errorResponse($e->getMessage());
         }
     }
 
     /**
-     * Get popular search terms for suggestions.
+     * Get curated collections for common scene types.
      */
-    public function getPopularSearchTerms(): array
+    public function getCuratedQueries(string $sceneType = ''): array
     {
-        return [
-            'Nature & Landscape' => ['nature', 'mountain', 'ocean', 'forest', 'sunset', 'sky'],
-            'Business & Technology' => ['business', 'technology', 'office', 'computer', 'meeting', 'startup'],
-            'People & Lifestyle' => ['people', 'family', 'friends', 'fitness', 'yoga', 'travel'],
-            'Food & Drink' => ['food', 'coffee', 'restaurant', 'cooking', 'healthy', 'breakfast'],
-            'Urban & Architecture' => ['city', 'architecture', 'street', 'building', 'night', 'urban'],
-            'Abstract & Backgrounds' => ['abstract', 'texture', 'pattern', 'background', 'minimal', 'gradient'],
+        $collections = [
+            'city' => ['city skyline', 'urban street', 'downtown', 'cityscape aerial'],
+            'nature' => ['forest landscape', 'mountains sunset', 'ocean waves', 'green nature'],
+            'business' => ['office meeting', 'business team', 'corporate', 'professional workspace'],
+            'technology' => ['technology modern', 'computer coding', 'digital network', 'futuristic tech'],
+            'people' => ['diverse people', 'happy lifestyle', 'portrait professional', 'team collaboration'],
+            'abstract' => ['abstract background', 'motion graphics', 'particles animation', 'geometric shapes'],
+            'food' => ['food photography', 'restaurant dining', 'cooking kitchen', 'healthy food'],
+            'travel' => ['travel adventure', 'vacation destination', 'airplane journey', 'road trip'],
+            'fitness' => ['fitness workout', 'gym training', 'yoga meditation', 'running exercise'],
+            'education' => ['education learning', 'student classroom', 'library books', 'teaching'],
         ];
+
+        if ($sceneType && isset($collections[$sceneType])) {
+            return $collections[$sceneType];
+        }
+
+        return $collections;
     }
 
     /**
-     * Get orientation options for filtering.
+     * Map aspect ratio to Pexels orientation.
      */
-    public function getOrientationOptions(): array
+    public function getOrientation(string $aspectRatio): string
+    {
+        return match ($aspectRatio) {
+            '9:16', '4:5' => 'portrait',
+            '1:1' => 'square',
+            default => 'landscape',
+        };
+    }
+
+    /**
+     * Error response format.
+     */
+    protected function errorResponse(string $message): array
     {
         return [
-            'landscape' => 'Landscape (16:9)',
-            'portrait' => 'Portrait (9:16)',
-            'square' => 'Square (1:1)',
+            'success' => false,
+            'error' => $message,
+            'results' => [],
         ];
     }
 }

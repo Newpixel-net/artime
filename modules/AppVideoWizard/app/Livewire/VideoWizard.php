@@ -53,7 +53,7 @@ class VideoWizard extends Component
     public array $storyboard = [
         'scenes' => [],
         'styleBible' => null,
-        'imageModel' => 'flux',
+        'imageModel' => 'hidream',
         'visualStyle' => [
             'mood' => '',
             'lighting' => '',
@@ -566,17 +566,41 @@ class VideoWizard extends Component
                 'teamId' => session('current_team_id', 0),
             ]);
 
-            // Update storyboard with the generated image
+            // Update storyboard with the generated image or set generating state
             if (!isset($this->storyboard['scenes'])) {
                 $this->storyboard['scenes'] = [];
             }
-            $this->storyboard['scenes'][$sceneIndex] = [
-                'sceneId' => $sceneId,
-                'imageUrl' => $result['imageUrl'],
-                'assetId' => $result['assetId'] ?? null,
-            ];
 
-            $this->saveProject();
+            if ($result['async'] ?? false) {
+                // HiDream async job - set generating state and start polling
+                $this->storyboard['scenes'][$sceneIndex] = [
+                    'sceneId' => $sceneId,
+                    'imageUrl' => null,
+                    'assetId' => null,
+                    'status' => 'generating',
+                    'jobId' => $result['jobId'] ?? null,
+                    'processingJobId' => $result['processingJobId'] ?? null,
+                ];
+
+                $this->saveProject();
+
+                // Dispatch event to start polling
+                $this->dispatch('image-generation-started', [
+                    'sceneIndex' => $sceneIndex,
+                    'async' => true,
+                ]);
+            } else {
+                // Sync generation - image is ready
+                $this->storyboard['scenes'][$sceneIndex] = [
+                    'sceneId' => $sceneId,
+                    'imageUrl' => $result['imageUrl'],
+                    'assetId' => $result['assetId'] ?? null,
+                    'source' => 'ai',
+                    'status' => 'ready',
+                ];
+
+                $this->saveProject();
+            }
 
         } catch (\Exception $e) {
             $this->error = __('Failed to generate image: ') . $e->getMessage();
@@ -593,6 +617,7 @@ class VideoWizard extends Component
     {
         $this->isLoading = true;
         $this->error = null;
+        $hasAsyncJobs = false;
 
         try {
             if (!$this->projectId) {
@@ -607,8 +632,9 @@ class VideoWizard extends Component
             }
 
             foreach ($this->script['scenes'] as $index => $scene) {
-                // Skip if already has an image
-                if (!empty($this->storyboard['scenes'][$index]['imageUrl'])) {
+                // Skip if already has an image or is generating
+                $existingScene = $this->storyboard['scenes'][$index] ?? null;
+                if (!empty($existingScene['imageUrl']) || ($existingScene['status'] ?? '') === 'generating') {
                     continue;
                 }
 
@@ -618,11 +644,27 @@ class VideoWizard extends Component
                         'teamId' => session('current_team_id', 0),
                     ]);
 
-                    $this->storyboard['scenes'][$index] = [
-                        'sceneId' => $scene['id'],
-                        'imageUrl' => $result['imageUrl'],
-                        'assetId' => $result['assetId'] ?? null,
-                    ];
+                    if ($result['async'] ?? false) {
+                        // HiDream async job
+                        $this->storyboard['scenes'][$index] = [
+                            'sceneId' => $scene['id'],
+                            'imageUrl' => null,
+                            'assetId' => null,
+                            'status' => 'generating',
+                            'jobId' => $result['jobId'] ?? null,
+                            'processingJobId' => $result['processingJobId'] ?? null,
+                        ];
+                        $hasAsyncJobs = true;
+                    } else {
+                        // Sync generation - image is ready
+                        $this->storyboard['scenes'][$index] = [
+                            'sceneId' => $scene['id'],
+                            'imageUrl' => $result['imageUrl'],
+                            'assetId' => $result['assetId'] ?? null,
+                            'source' => 'ai',
+                            'status' => 'ready',
+                        ];
+                    }
 
                     $this->saveProject();
 
@@ -630,6 +672,14 @@ class VideoWizard extends Component
                     // Log individual scene errors but continue
                     \Log::warning("Failed to generate image for scene {$index}: " . $e->getMessage());
                 }
+            }
+
+            // Dispatch polling start if we have async jobs
+            if ($hasAsyncJobs) {
+                $this->dispatch('image-generation-started', [
+                    'async' => true,
+                    'sceneIndex' => -1, // Indicates batch
+                ]);
             }
 
         } catch (\Exception $e) {
@@ -649,6 +699,202 @@ class VideoWizard extends Component
         if ($scene) {
             $this->generateImage($sceneIndex, $scene['id']);
         }
+    }
+
+    /**
+     * Search stock media.
+     */
+    #[On('search-stock-media')]
+    public function searchStockMedia(string $query, string $type = 'image', int $sceneIndex = 0): void
+    {
+        $this->isLoading = true;
+        $this->error = null;
+
+        try {
+            $stockService = app(StockMediaService::class);
+
+            // Get orientation based on aspect ratio
+            $orientation = $stockService->getOrientation($this->aspectRatio);
+
+            $result = $stockService->searchPexels($query, $type, [
+                'orientation' => $orientation,
+                'page' => 1,
+                'perPage' => 20,
+            ]);
+
+            if ($result['success']) {
+                $this->dispatch('stock-media-results', [
+                    'results' => $result['results'],
+                    'total' => $result['total'],
+                    'sceneIndex' => $sceneIndex,
+                ]);
+            } else {
+                $this->error = $result['error'] ?? __('Failed to search stock media');
+            }
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to search stock media: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Select stock media for a scene.
+     */
+    #[On('select-stock-media')]
+    public function selectStockMedia(int $sceneIndex, string $mediaUrl, string $mediaId, string $type = 'image'): void
+    {
+        $this->isLoading = true;
+        $this->error = null;
+
+        try {
+            if (!$this->projectId) {
+                $this->saveProject();
+            }
+
+            $project = WizardProject::findOrFail($this->projectId);
+            $scene = $this->script['scenes'][$sceneIndex] ?? null;
+
+            if (!$scene) {
+                throw new \Exception(__('Scene not found'));
+            }
+
+            $stockService = app(StockMediaService::class);
+
+            $result = $stockService->importMedia(
+                $project,
+                $mediaUrl,
+                $mediaId,
+                $type,
+                $scene['id'],
+                ['sceneIndex' => $sceneIndex]
+            );
+
+            if ($result['success']) {
+                // Update storyboard with the stock media
+                if (!isset($this->storyboard['scenes'])) {
+                    $this->storyboard['scenes'] = [];
+                }
+
+                $this->storyboard['scenes'][$sceneIndex] = [
+                    'sceneId' => $scene['id'],
+                    'imageUrl' => $result['url'],
+                    'assetId' => $result['assetId'],
+                    'source' => 'stock',
+                    'status' => 'ready',
+                ];
+
+                $this->saveProject();
+
+                $this->dispatch('stock-media-selected', [
+                    'sceneIndex' => $sceneIndex,
+                    'imageUrl' => $result['url'],
+                ]);
+            } else {
+                throw new \Exception($result['error'] ?? 'Import failed');
+            }
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to import stock media: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Poll for pending HiDream image generation jobs.
+     */
+    #[On('poll-image-jobs')]
+    public function pollImageJobs(): void
+    {
+        if (!$this->projectId) {
+            return;
+        }
+
+        try {
+            $project = WizardProject::findOrFail($this->projectId);
+            $imageService = app(ImageGenerationService::class);
+
+            // Get pending/processing jobs
+            $jobs = \Modules\AppVideoWizard\Models\WizardProcessingJob::query()
+                ->where('project_id', $project->id)
+                ->where('type', \Modules\AppVideoWizard\Models\WizardProcessingJob::TYPE_IMAGE_GENERATION)
+                ->whereIn('status', [
+                    \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PENDING,
+                    \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PROCESSING,
+                ])
+                ->get();
+
+            foreach ($jobs as $job) {
+                $result = $imageService->pollHiDreamJob($job);
+
+                if ($result['status'] === 'ready' && $result['success']) {
+                    // Image is ready - update storyboard
+                    $sceneIndex = $result['sceneIndex'] ?? null;
+                    if ($sceneIndex !== null) {
+                        if (!isset($this->storyboard['scenes'])) {
+                            $this->storyboard['scenes'] = [];
+                        }
+                        $this->storyboard['scenes'][$sceneIndex] = [
+                            'sceneId' => $job->input_data['sceneId'] ?? null,
+                            'imageUrl' => $result['imageUrl'],
+                            'assetId' => $result['assetId'],
+                            'source' => 'ai',
+                            'status' => 'ready',
+                        ];
+
+                        $this->saveProject();
+
+                        $this->dispatch('image-ready', [
+                            'sceneIndex' => $sceneIndex,
+                            'imageUrl' => $result['imageUrl'],
+                        ]);
+                    }
+                } elseif ($result['status'] === 'error') {
+                    $this->dispatch('image-error', [
+                        'sceneIndex' => $job->input_data['sceneIndex'] ?? null,
+                        'error' => $result['error'],
+                    ]);
+                }
+            }
+
+            // If there are still pending jobs, schedule another poll
+            $pendingCount = \Modules\AppVideoWizard\Models\WizardProcessingJob::query()
+                ->where('project_id', $project->id)
+                ->where('type', \Modules\AppVideoWizard\Models\WizardProcessingJob::TYPE_IMAGE_GENERATION)
+                ->whereIn('status', [
+                    \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PENDING,
+                    \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PROCESSING,
+                ])
+                ->count();
+
+            $this->dispatch('poll-status', [
+                'pendingJobs' => $pendingCount,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to poll image jobs: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get pending jobs count for a project.
+     */
+    public function getPendingJobsCount(): int
+    {
+        if (!$this->projectId) {
+            return 0;
+        }
+
+        return \Modules\AppVideoWizard\Models\WizardProcessingJob::query()
+            ->where('project_id', $this->projectId)
+            ->where('type', \Modules\AppVideoWizard\Models\WizardProcessingJob::TYPE_IMAGE_GENERATION)
+            ->whereIn('status', [
+                \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PENDING,
+                \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PROCESSING,
+            ])
+            ->count();
     }
 
     /**
