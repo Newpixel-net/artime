@@ -231,6 +231,21 @@ class VideoWizard extends Component
         if ($project->assembly) {
             $this->assembly = array_merge($this->assembly, $project->assembly);
         }
+
+        // Restore Scene Memory, Multi-Shot Mode, and Concept Variations from content_config
+        if ($project->content_config) {
+            $config = $project->content_config;
+
+            if (isset($config['sceneMemory'])) {
+                $this->sceneMemory = array_merge($this->sceneMemory, $config['sceneMemory']);
+            }
+            if (isset($config['multiShotMode'])) {
+                $this->multiShotMode = array_merge($this->multiShotMode, $config['multiShotMode']);
+            }
+            if (isset($config['conceptVariations'])) {
+                $this->conceptVariations = $config['conceptVariations'];
+            }
+        }
     }
 
     /**
@@ -239,6 +254,7 @@ class VideoWizard extends Component
     public function saveProject(): void
     {
         $this->isSaving = true;
+        $isNewProject = !$this->projectId;
 
         try {
             $data = [
@@ -256,6 +272,12 @@ class VideoWizard extends Component
                 'storyboard' => $this->storyboard,
                 'animation' => $this->animation,
                 'assembly' => $this->assembly,
+                // Save Scene Memory, Multi-Shot Mode, and Concept Variations
+                'content_config' => [
+                    'sceneMemory' => $this->sceneMemory,
+                    'multiShotMode' => $this->multiShotMode,
+                    'conceptVariations' => $this->conceptVariations,
+                ],
             ];
 
             if ($this->projectId) {
@@ -270,6 +292,11 @@ class VideoWizard extends Component
             }
 
             $this->dispatch('project-saved', projectId: $this->projectId);
+
+            // Update browser URL with project ID for new projects
+            if ($isNewProject && $this->projectId) {
+                $this->dispatch('update-browser-url', projectId: $this->projectId);
+            }
         } catch (\Exception $e) {
             $this->error = 'Failed to save project: ' . $e->getMessage();
         } finally {
