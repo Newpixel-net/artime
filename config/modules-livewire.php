@@ -9,7 +9,7 @@ return [
     |
     */
 
-    'namespace' => 'app/Livewire',
+    'namespace' => 'Livewire',
 
     /*
     |--------------------------------------------------------------------------
@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'view' => 'themes/app/pico/resources/views',
+    'view' => 'resources/views/livewire',
 
     /*
     |--------------------------------------------------------------------------
