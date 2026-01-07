@@ -567,6 +567,331 @@
         color: rgba(255, 255, 255, 0.3) !important;
         font-size: 0.8rem !important;
     }
+
+    /* Advanced Scene Cards */
+    .vw-advanced-scene-card {
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.75rem !important;
+        margin-bottom: 1rem !important;
+        overflow: hidden !important;
+        transition: border-color 0.2s !important;
+    }
+
+    .vw-advanced-scene-card:hover {
+        border-color: rgba(139, 92, 246, 0.3) !important;
+    }
+
+    .vw-advanced-scene-card.expanded {
+        border-color: rgba(139, 92, 246, 0.4) !important;
+    }
+
+    .vw-scene-card-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 1rem 1.25rem !important;
+        cursor: pointer !important;
+        user-select: none !important;
+    }
+
+    .vw-scene-card-header-left {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        flex: 1 !important;
+    }
+
+    .vw-scene-expand-icon {
+        color: rgba(255, 255, 255, 0.5) !important;
+        transition: transform 0.2s !important;
+        font-size: 0.9rem !important;
+    }
+
+    .vw-advanced-scene-card.expanded .vw-scene-expand-icon {
+        transform: rotate(180deg) !important;
+    }
+
+    .vw-scene-music-badge {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.25rem !important;
+        padding: 0.25rem 0.5rem !important;
+        background: rgba(251, 191, 36, 0.2) !important;
+        color: #fbbf24 !important;
+        border-radius: 0.25rem !important;
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+    }
+
+    .vw-scene-meta-badges {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        flex-wrap: wrap !important;
+    }
+
+    .vw-scene-meta-badge {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.25rem !important;
+        padding: 0.25rem 0.5rem !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border-radius: 0.25rem !important;
+        font-size: 0.75rem !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
+
+    .vw-scene-card-body {
+        padding: 0 1.25rem 1.25rem !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .vw-scene-section {
+        margin-top: 1.25rem !important;
+    }
+
+    .vw-scene-section-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .vw-scene-section-label {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.375rem !important;
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    .vw-scene-write-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.25rem !important;
+        padding: 0.375rem 0.625rem !important;
+        background: rgba(139, 92, 246, 0.2) !important;
+        border: 1px solid rgba(139, 92, 246, 0.3) !important;
+        border-radius: 0.375rem !important;
+        color: #c4b5fd !important;
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+
+    .vw-scene-write-btn:hover:not(:disabled) {
+        background: rgba(139, 92, 246, 0.3) !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+    }
+
+    .vw-scene-write-btn:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+    }
+
+    .vw-scene-textarea {
+        width: 100% !important;
+        min-height: 80px !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.5rem !important;
+        padding: 0.75rem !important;
+        color: #ffffff !important;
+        font-size: 0.9rem !important;
+        line-height: 1.5 !important;
+        resize: vertical !important;
+        transition: border-color 0.2s !important;
+    }
+
+    .vw-scene-textarea:focus {
+        outline: none !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+    }
+
+    .vw-scene-textarea::placeholder {
+        color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .vw-music-only-notice {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        padding: 0.75rem !important;
+        background: rgba(251, 191, 36, 0.1) !important;
+        border: 1px solid rgba(251, 191, 36, 0.2) !important;
+        border-radius: 0.5rem !important;
+        color: #fbbf24 !important;
+        font-size: 0.85rem !important;
+    }
+
+    .vw-scene-controls-row {
+        display: flex !important;
+        align-items: flex-end !important;
+        gap: 1rem !important;
+        margin-top: 1.25rem !important;
+        flex-wrap: wrap !important;
+    }
+
+    .vw-scene-control-group {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.375rem !important;
+    }
+
+    .vw-scene-control-label {
+        font-size: 0.75rem !important;
+        color: rgba(255, 255, 255, 0.5) !important;
+    }
+
+    .vw-scene-duration-input {
+        width: 80px !important;
+        padding: 0.5rem 0.75rem !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.375rem !important;
+        color: #ffffff !important;
+        font-size: 0.9rem !important;
+        text-align: center !important;
+    }
+
+    .vw-scene-duration-input:focus {
+        outline: none !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+    }
+
+    .vw-scene-transition-select {
+        padding: 0.5rem 0.75rem !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.375rem !important;
+        color: #ffffff !important;
+        font-size: 0.9rem !important;
+        cursor: pointer !important;
+        min-width: 120px !important;
+    }
+
+    .vw-scene-transition-select:focus {
+        outline: none !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+    }
+
+    .vw-scene-transition-select option {
+        background: #1a1a2e !important;
+        color: #ffffff !important;
+    }
+
+    .vw-scene-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        margin-left: auto !important;
+    }
+
+    .vw-scene-action-btn {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important;
+        height: 32px !important;
+        background: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.375rem !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        font-size: 0.9rem !important;
+    }
+
+    .vw-scene-action-btn:hover:not(:disabled) {
+        border-color: rgba(139, 92, 246, 0.4) !important;
+        color: #c4b5fd !important;
+        background: rgba(139, 92, 246, 0.1) !important;
+    }
+
+    .vw-scene-action-btn.danger:hover:not(:disabled) {
+        border-color: rgba(239, 68, 68, 0.4) !important;
+        color: #fca5a5 !important;
+        background: rgba(239, 68, 68, 0.1) !important;
+    }
+
+    .vw-scene-action-btn:disabled {
+        opacity: 0.3 !important;
+        cursor: not-allowed !important;
+    }
+
+    .vw-scene-regenerate-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.375rem !important;
+        padding: 0.5rem 0.875rem !important;
+        background: rgba(139, 92, 246, 0.2) !important;
+        border: 1px solid rgba(139, 92, 246, 0.3) !important;
+        border-radius: 0.375rem !important;
+        color: #c4b5fd !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+    }
+
+    .vw-scene-regenerate-btn:hover:not(:disabled) {
+        background: rgba(139, 92, 246, 0.3) !important;
+        border-color: rgba(139, 92, 246, 0.5) !important;
+    }
+
+    .vw-scene-regenerate-btn:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+    }
+
+    /* Add Scene Button */
+    .vw-add-scene-btn {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        padding: 1rem !important;
+        background: transparent !important;
+        border: 2px dashed rgba(139, 92, 246, 0.3) !important;
+        border-radius: 0.75rem !important;
+        color: rgba(139, 92, 246, 0.7) !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        margin-top: 1rem !important;
+    }
+
+    .vw-add-scene-btn:hover {
+        border-color: rgba(139, 92, 246, 0.5) !important;
+        background: rgba(139, 92, 246, 0.05) !important;
+        color: #c4b5fd !important;
+    }
+
+    /* Music Only Toggle */
+    .vw-music-only-toggle {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        cursor: pointer !important;
+        user-select: none !important;
+    }
+
+    .vw-music-only-checkbox {
+        width: 18px !important;
+        height: 18px !important;
+        accent-color: #8b5cf6 !important;
+        cursor: pointer !important;
+    }
+
+    .vw-music-only-label {
+        font-size: 0.8rem !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
 </style>
 
 <div class="vw-script-step">
@@ -846,23 +1171,147 @@
                 </div>
             @endif
 
+            @php
+                $transitions = config('appvideowizard.transitions', [
+                    'cut' => 'Cut',
+                    'dissolve' => 'Dissolve',
+                    'fade' => 'Fade',
+                    'wipe' => 'Wipe',
+                ]);
+            @endphp
+
             @foreach($script['scenes'] as $index => $scene)
-                <div class="vw-scene-card">
-                    <div class="vw-scene-header">
-                        <div style="display: flex; align-items: center;">
+                @php
+                    $isMusicOnly = isset($scene['voiceover']['enabled']) && !$scene['voiceover']['enabled'];
+                    $sceneId = $scene['id'] ?? 'scene_' . $index;
+                @endphp
+                <div class="vw-advanced-scene-card"
+                     x-data="{ expanded: false }"
+                     :class="{ 'expanded': expanded }">
+                    {{-- Scene Header (Clickable to expand) --}}
+                    <div class="vw-scene-card-header" @click="expanded = !expanded">
+                        <div class="vw-scene-card-header-left">
+                            <span class="vw-scene-expand-icon">▼</span>
                             <span class="vw-scene-number">{{ $index + 1 }}</span>
+                            @if($isMusicOnly)
+                                <span class="vw-scene-music-badge">🎵 {{ __('Music only') }}</span>
+                            @endif
                             <span class="vw-scene-title">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</span>
                         </div>
-                        <span class="vw-scene-duration">{{ $scene['duration'] ?? 15 }}s</span>
+                        <div class="vw-scene-meta-badges">
+                            <span class="vw-scene-meta-badge">{{ $scene['duration'] ?? 15 }}s</span>
+                            <span class="vw-scene-meta-badge">{{ $transitions[$scene['transition'] ?? 'cut'] ?? 'Cut' }}</span>
+                            @if(!empty($scene['mood']))
+                                <span class="vw-scene-meta-badge">{{ ucfirst($scene['mood']) }}</span>
+                            @endif
+                        </div>
                     </div>
-                    <p class="vw-scene-narration">{{ $scene['narration'] ?? '' }}</p>
-                    @if(!empty($scene['visualDescription']))
-                        <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-top: 0.75rem; font-style: italic;">
-                            🎬 {{ $scene['visualDescription'] }}
-                        </p>
-                    @endif
+
+                    {{-- Scene Body (Expandable) --}}
+                    <div class="vw-scene-card-body" x-show="expanded" x-collapse>
+                        {{-- Visual Prompt Section --}}
+                        <div class="vw-scene-section">
+                            <div class="vw-scene-section-header">
+                                <span class="vw-scene-section-label">🖼️ {{ __('Visual Prompt') }}</span>
+                                <button class="vw-scene-write-btn"
+                                        wire:click="generateVisualPrompt({{ $index }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="generateVisualPrompt">
+                                    <span wire:loading.remove wire:target="generateVisualPrompt({{ $index }})">✨ {{ __('Write for SR') }}</span>
+                                    <span wire:loading wire:target="generateVisualPrompt({{ $index }})">...</span>
+                                </button>
+                            </div>
+                            <textarea class="vw-scene-textarea"
+                                      placeholder="{{ __('Describe the visual scene for AI video generation. Include camera movements, lighting, subject...') }}"
+                                      wire:blur="updateSceneVisualPrompt({{ $index }}, $event.target.value)">{{ $scene['visualPrompt'] ?? $scene['visualDescription'] ?? '' }}</textarea>
+                        </div>
+
+                        {{-- Narration/Voiceover Section --}}
+                        <div class="vw-scene-section">
+                            <div class="vw-scene-section-header">
+                                <span class="vw-scene-section-label">🎙️ {{ __('Voiceover') }}</span>
+                                <div style="display: flex; align-items: center; gap: 1rem;">
+                                    <label class="vw-music-only-toggle">
+                                        <input type="checkbox"
+                                               class="vw-music-only-checkbox"
+                                               {{ $isMusicOnly ? 'checked' : '' }}
+                                               wire:click="toggleSceneMusicOnly({{ $index }})">
+                                        <span class="vw-music-only-label">{{ __('Music only') }}</span>
+                                    </label>
+                                    @if(!$isMusicOnly)
+                                        <button class="vw-scene-write-btn"
+                                                wire:click="generateVoiceoverText({{ $index }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="generateVoiceoverText">
+                                            <span wire:loading.remove wire:target="generateVoiceoverText({{ $index }})">✨ {{ __('Write VO') }}</span>
+                                            <span wire:loading wire:target="generateVoiceoverText({{ $index }})">...</span>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                            @if($isMusicOnly)
+                                <div class="vw-music-only-notice">
+                                    🎵 {{ __('Music/ambient only - no voiceover for this scene') }}
+                                </div>
+                            @else
+                                <textarea class="vw-scene-textarea"
+                                          placeholder="{{ __('Voiceover text for this scene...') }}"
+                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $scene['narration'] ?? '' }}</textarea>
+                            @endif
+                        </div>
+
+                        {{-- Controls Row --}}
+                        <div class="vw-scene-controls-row">
+                            <div class="vw-scene-control-group">
+                                <span class="vw-scene-control-label">⏱️ {{ __('Duration (seconds)') }}</span>
+                                <input type="number"
+                                       class="vw-scene-duration-input"
+                                       value="{{ $scene['duration'] ?? 15 }}"
+                                       min="1"
+                                       max="300"
+                                       wire:blur="updateSceneDuration({{ $index }}, $event.target.value)">
+                            </div>
+                            <div class="vw-scene-control-group">
+                                <span class="vw-scene-control-label">📋 {{ __('Transition') }}</span>
+                                <select class="vw-scene-transition-select"
+                                        wire:change="updateSceneTransition({{ $index }}, $event.target.value)">
+                                    @foreach($transitions as $key => $label)
+                                        <option value="{{ $key }}" {{ ($scene['transition'] ?? 'cut') === $key ? 'selected' : '' }}>
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="vw-scene-actions">
+                                <button class="vw-scene-regenerate-btn"
+                                        wire:click="regenerateScene({{ $index }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="regenerateScene">
+                                    <span wire:loading.remove wire:target="regenerateScene({{ $index }})">🔄 {{ __('Regenerate') }}</span>
+                                    <span wire:loading wire:target="regenerateScene({{ $index }})">...</span>
+                                </button>
+                                <button class="vw-scene-action-btn"
+                                        wire:click="reorderScene({{ $index }}, 'up')"
+                                        @if($index === 0) disabled @endif
+                                        title="{{ __('Move Up') }}">↑</button>
+                                <button class="vw-scene-action-btn"
+                                        wire:click="reorderScene({{ $index }}, 'down')"
+                                        @if($index === count($script['scenes']) - 1) disabled @endif
+                                        title="{{ __('Move Down') }}">↓</button>
+                                <button class="vw-scene-action-btn danger"
+                                        wire:click="deleteScene({{ $index }})"
+                                        wire:confirm="{{ __('Are you sure you want to delete this scene?') }}"
+                                        title="{{ __('Delete') }}">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             @endforeach
+
+            {{-- Add Scene Button --}}
+            <button class="vw-add-scene-btn" wire:click="addScene">
+                ➕ {{ __('Add Scene') }}
+            </button>
 
             @if(!empty($script['cta']))
                 <div style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
