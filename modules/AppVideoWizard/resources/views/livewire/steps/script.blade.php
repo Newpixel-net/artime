@@ -1065,12 +1065,14 @@
     {{-- Script Results (shown after generation) --}}
     @if(!empty($script['scenes']) && count($script['scenes']) > 0)
         @php
-            // Calculate script stats
-            $totalDuration = array_sum(array_column($script['scenes'], 'duration'));
+            // Script data is sanitized by VideoWizard::sanitizeScriptData()
+            // All fields are guaranteed to be properly typed (strings, numbers, arrays)
             $sceneCount = count($script['scenes']);
-            $avgDuration = $sceneCount > 0 ? round($totalDuration / $sceneCount) : 0;
+            $totalDuration = (int)($script['totalDuration'] ?? array_sum(array_column($script['scenes'], 'duration')));
             $totalNarrationWords = array_sum(array_map(fn($s) => str_word_count($s['narration'] ?? ''), $script['scenes']));
-            $estimatedNarrationTime = round(($totalNarrationWords / 150) * 60); // 150 words per minute
+
+            $avgDuration = $sceneCount > 0 ? round($totalDuration / $sceneCount) : 0;
+            $estimatedNarrationTime = round(($totalNarrationWords / 150) * 60);
             $totalMin = floor($totalDuration / 60);
             $totalSec = $totalDuration % 60;
             $totalTimeText = $totalMin > 0 ? ($totalMin . 'm ' . $totalSec . 's') : ($totalSec . 's');
@@ -1086,12 +1088,17 @@
                 $pacingText = __('Cinematic');
                 $pacingIcon = '🎬';
             }
+
+            // Safety net: ensure script fields are strings even if sanitization didn't run
+            $safeScriptTitle = is_string($script['title'] ?? null) ? $script['title'] : __('Your Script');
+            $safeHook = is_string($script['hook'] ?? null) ? $script['hook'] : '';
+            $safeCta = is_string($script['cta'] ?? null) ? $script['cta'] : '';
         @endphp
 
         <div class="vw-script-card vw-script-results">
             <div class="vw-script-header" style="margin-bottom: 1rem;">
                 <div>
-                    <h3 class="vw-script-title">{{ $script['title'] ?? __('Your Script') }}</h3>
+                    <h3 class="vw-script-title">{{ $safeScriptTitle }}</h3>
                     <p class="vw-script-subtitle">
                         {{ $sceneCount }} {{ __('scenes') }} •
                         {{ $totalDuration }}s {{ __('total') }}
@@ -1164,10 +1171,11 @@
                 </div>
             </div>
 
-            @if(!empty($script['hook']))
+            {{-- Hook section - $safeHook is defined above and guaranteed to be string --}}
+            @if($safeHook)
                 <div style="background: rgba(236, 72, 153, 0.1); border: 1px solid rgba(236, 72, 153, 0.3); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
                     <span style="color: #f472b6; font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">{{ __('Hook') }}</span>
-                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $script['hook'] }}</p>
+                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $safeHook }}</p>
                 </div>
             @endif
 
@@ -1182,8 +1190,25 @@
 
             @foreach($script['scenes'] as $index => $scene)
                 @php
+                    // Safety net: ensure all fields are strings even if sanitization didn't run
+                    // (e.g., old projects loaded before fix was deployed)
+                    $safeTitle = is_string($scene['title'] ?? null) ? $scene['title'] : (__('Scene') . ' ' . ($index + 1));
+                    $safeNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                    $safeVisualPrompt = is_string($scene['visualPrompt'] ?? null) ? $scene['visualPrompt'] : '';
+                    $safeVisualDescription = is_string($scene['visualDescription'] ?? null) ? $scene['visualDescription'] : '';
+                    $safeMood = is_string($scene['mood'] ?? null) ? $scene['mood'] : '';
+                    $safeTransition = is_string($scene['transition'] ?? null) ? $scene['transition'] : 'cut';
+                    $safeDuration = is_numeric($scene['duration'] ?? null) ? (int)$scene['duration'] : 15;
+
+                    // Use visualPrompt first, fall back to visualDescription
+                    $displayVisualPrompt = $safeVisualPrompt ?: $safeVisualDescription;
+
+                    // Check music only status
                     $isMusicOnly = isset($scene['voiceover']['enabled']) && !$scene['voiceover']['enabled'];
-                    $sceneId = $scene['id'] ?? 'scene_' . $index;
+                    $sceneId = is_string($scene['id'] ?? null) ? $scene['id'] : ('scene_' . $index);
+
+                    // Get transition label
+                    $transitionLabel = $transitions[$safeTransition] ?? 'Cut';
                 @endphp
                 <div class="vw-advanced-scene-card"
                      x-data="{ expanded: false }"
@@ -1196,13 +1221,13 @@
                             @if($isMusicOnly)
                                 <span class="vw-scene-music-badge">🎵 {{ __('Music only') }}</span>
                             @endif
-                            <span class="vw-scene-title">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</span>
+                            <span class="vw-scene-title">{{ $safeTitle }}</span>
                         </div>
                         <div class="vw-scene-meta-badges">
-                            <span class="vw-scene-meta-badge">{{ $scene['duration'] ?? 15 }}s</span>
-                            <span class="vw-scene-meta-badge">{{ $transitions[$scene['transition'] ?? 'cut'] ?? 'Cut' }}</span>
-                            @if(!empty($scene['mood']) && is_string($scene['mood']))
-                                <span class="vw-scene-meta-badge">{{ ucfirst($scene['mood']) }}</span>
+                            <span class="vw-scene-meta-badge">{{ $safeDuration }}s</span>
+                            <span class="vw-scene-meta-badge">{{ $transitionLabel }}</span>
+                            @if($safeMood)
+                                <span class="vw-scene-meta-badge">{{ ucfirst($safeMood) }}</span>
                             @endif
                         </div>
                     </div>
@@ -1223,7 +1248,7 @@
                             </div>
                             <textarea class="vw-scene-textarea"
                                       placeholder="{{ __('Describe the visual scene for AI video generation. Include camera movements, lighting, subject...') }}"
-                                      wire:blur="updateSceneVisualPrompt({{ $index }}, $event.target.value)">{{ $scene['visualPrompt'] ?? $scene['visualDescription'] ?? '' }}</textarea>
+                                      wire:blur="updateSceneVisualPrompt({{ $index }}, $event.target.value)">{{ $displayVisualPrompt }}</textarea>
                         </div>
 
                         {{-- Narration/Voiceover Section --}}
@@ -1256,7 +1281,7 @@
                             @else
                                 <textarea class="vw-scene-textarea"
                                           placeholder="{{ __('Voiceover text for this scene...') }}"
-                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $scene['narration'] ?? '' }}</textarea>
+                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $safeNarration }}</textarea>
                             @endif
                         </div>
 
@@ -1266,7 +1291,7 @@
                                 <span class="vw-scene-control-label">⏱️ {{ __('Duration (seconds)') }}</span>
                                 <input type="number"
                                        class="vw-scene-duration-input"
-                                       value="{{ $scene['duration'] ?? 15 }}"
+                                       value="{{ $safeDuration }}"
                                        min="1"
                                        max="300"
                                        wire:blur="updateSceneDuration({{ $index }}, $event.target.value)">
@@ -1276,7 +1301,7 @@
                                 <select class="vw-scene-transition-select"
                                         wire:change="updateSceneTransition({{ $index }}, $event.target.value)">
                                     @foreach($transitions as $key => $label)
-                                        <option value="{{ $key }}" {{ ($scene['transition'] ?? 'cut') === $key ? 'selected' : '' }}>
+                                        <option value="{{ $key }}" {{ $safeTransition === $key ? 'selected' : '' }}>
                                             {{ $label }}
                                         </option>
                                     @endforeach
@@ -1313,10 +1338,11 @@
                 ➕ {{ __('Add Scene') }}
             </button>
 
-            @if(!empty($script['cta']))
+            {{-- CTA section - $safeCta is defined above and guaranteed to be string --}}
+            @if($safeCta)
                 <div style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
                     <span style="color: #22d3ee; font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">{{ __('Call to Action') }}</span>
-                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $script['cta'] }}</p>
+                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $safeCta }}</p>
                 </div>
             @endif
         </div>
@@ -1343,34 +1369,40 @@
                          x-transition:enter-start="opacity-0 transform scale-95"
                          x-transition:enter-end="opacity-100 transform scale-100"
                          @click.stop>
+                        {{-- Modal uses $safeScriptTitle, $safeHook, $safeCta from parent scope --}}
                         <div class="vw-full-script-header">
                             <div>
                                 <h3 class="vw-script-title">📄 {{ __('Full Script') }}</h3>
-                                <p class="vw-script-subtitle">{{ $script['title'] ?? __('Your Script') }}</p>
+                                <p class="vw-script-subtitle">{{ $safeScriptTitle }}</p>
                             </div>
                             <button class="vw-full-script-close" @click="showFullScript = false">✕</button>
                         </div>
 
                         <div class="vw-full-script-text">
-                            @if(!empty($script['hook']))
+                            @if($safeHook)
                                 <strong style="color: #f472b6;">{{ __('HOOK:') }}</strong>
-                                <br>{{ $script['hook'] }}
+                                <br>{{ $safeHook }}
                                 <div class="vw-full-script-scene-divider">— — —</div>
                             @endif
 
                             @foreach($script['scenes'] as $index => $scene)
-                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $scene['title'] ?? '' }}</strong>
-                                <br>{{ $scene['narration'] ?? '' }}
+                                @php
+                                    // Safety net for modal scene display
+                                    $modalSceneTitle = is_string($scene['title'] ?? null) ? $scene['title'] : '';
+                                    $modalSceneNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                                @endphp
+                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $modalSceneTitle }}</strong>
+                                <br>{{ $modalSceneNarration }}
 
                                 @if(!$loop->last)
                                     <div class="vw-full-script-scene-divider">— — —</div>
                                 @endif
                             @endforeach
 
-                            @if(!empty($script['cta']))
+                            @if($safeCta)
                                 <div class="vw-full-script-scene-divider">— — —</div>
                                 <strong style="color: #22d3ee;">{{ __('CALL TO ACTION:') }}</strong>
-                                <br>{{ $script['cta'] }}
+                                <br>{{ $safeCta }}
                             @endif
                         </div>
                     </div>
