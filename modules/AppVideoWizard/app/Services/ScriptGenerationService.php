@@ -769,53 +769,133 @@ PROMPT;
 
     /**
      * Normalize and validate script structure.
+     * Ensures all fields are properly typed to prevent htmlspecialchars errors in views.
      */
     protected function normalizeScript(array $script, int $targetDuration): array
     {
-        // Ensure required fields
-        $script['title'] = $script['title'] ?? 'Untitled Script';
-        $script['hook'] = $script['hook'] ?? '';
-        $script['cta'] = $script['cta'] ?? '';
+        // Ensure required top-level fields are STRINGS (not arrays)
+        $script['title'] = $this->ensureString($script['title'] ?? null, 'Untitled Script');
+        $script['hook'] = $this->ensureString($script['hook'] ?? null, '');
+        $script['cta'] = $this->ensureString($script['cta'] ?? null, '');
 
         // Normalize each scene
         $sceneCount = count($script['scenes']);
         $avgDuration = (int) ceil($targetDuration / $sceneCount);
 
         foreach ($script['scenes'] as $index => &$scene) {
-            // Ensure ID
-            $scene['id'] = $scene['id'] ?? 'scene-' . ($index + 1);
-
-            // Ensure title
-            $scene['title'] = $scene['title'] ?? 'Scene ' . ($index + 1);
-
-            // Ensure narration
-            $scene['narration'] = $scene['narration'] ?? '';
-
-            // Ensure visual description
-            $scene['visualDescription'] = $scene['visualDescription']
-                ?? $scene['visual_description']
-                ?? $scene['visual']
-                ?? $scene['narration'];
-
-            // Ensure duration is reasonable
-            $scene['duration'] = isset($scene['duration']) && is_numeric($scene['duration'])
-                ? max(5, min(60, (int) $scene['duration']))
-                : $avgDuration;
-
-            // Ensure Ken Burns effect
-            if (!isset($scene['kenBurns']) || !is_array($scene['kenBurns'])) {
-                $scene['kenBurns'] = $this->generateKenBurnsEffect();
-            }
+            $scene = $this->sanitizeScene($scene, $index, $avgDuration);
         }
 
-        // Calculate totals
-        $script['totalDuration'] = array_sum(array_column($script['scenes'], 'duration'));
-        $script['wordCount'] = array_sum(array_map(
-            fn($s) => str_word_count($s['narration'] ?? ''),
-            $script['scenes']
-        ));
+        // Calculate totals safely
+        $script['totalDuration'] = 0;
+        $script['wordCount'] = 0;
+        foreach ($script['scenes'] as $s) {
+            $script['totalDuration'] += is_numeric($s['duration'] ?? null) ? (int)$s['duration'] : $avgDuration;
+            $narration = is_string($s['narration'] ?? null) ? $s['narration'] : '';
+            $script['wordCount'] += str_word_count($narration);
+        }
 
         return $script;
+    }
+
+    /**
+     * Sanitize a single scene to ensure all fields are properly typed.
+     * This is the SINGLE SOURCE OF TRUTH for scene data sanitization.
+     */
+    public function sanitizeScene(array $scene, int $index = 0, int $defaultDuration = 15): array
+    {
+        return [
+            // Core identifiers
+            'id' => $this->ensureString($scene['id'] ?? null, 'scene-' . ($index + 1)),
+            'title' => $this->ensureString($scene['title'] ?? null, 'Scene ' . ($index + 1)),
+
+            // Text content - must be strings
+            'narration' => $this->ensureString($scene['narration'] ?? null, ''),
+            'visualDescription' => $this->ensureString(
+                $scene['visualDescription'] ?? $scene['visual_description'] ?? $scene['visual'] ?? null,
+                ''
+            ),
+            'visualPrompt' => $this->ensureString($scene['visualPrompt'] ?? null, ''),
+
+            // Metadata - must be strings
+            'mood' => $this->ensureString($scene['mood'] ?? null, ''),
+            'transition' => $this->ensureString($scene['transition'] ?? null, 'cut'),
+            'status' => $this->ensureString($scene['status'] ?? null, 'draft'),
+
+            // Duration - must be numeric
+            'duration' => $this->ensureNumeric($scene['duration'] ?? null, $defaultDuration, 5, 300),
+
+            // Voiceover structure
+            'voiceover' => $this->sanitizeVoiceover($scene['voiceover'] ?? []),
+
+            // Ken Burns effect
+            'kenBurns' => $this->sanitizeKenBurns($scene['kenBurns'] ?? null),
+
+            // Image data (preserve as-is if exists)
+            'image' => $scene['image'] ?? null,
+            'imageUrl' => $this->ensureString($scene['imageUrl'] ?? null, ''),
+        ];
+    }
+
+    /**
+     * Sanitize voiceover structure.
+     */
+    protected function sanitizeVoiceover($voiceover): array
+    {
+        if (!is_array($voiceover)) {
+            $voiceover = [];
+        }
+
+        return [
+            'enabled' => (bool)($voiceover['enabled'] ?? true),
+            'text' => $this->ensureString($voiceover['text'] ?? null, ''),
+            'voiceId' => $voiceover['voiceId'] ?? null,
+            'status' => $this->ensureString($voiceover['status'] ?? null, 'pending'),
+        ];
+    }
+
+    /**
+     * Sanitize Ken Burns effect configuration.
+     */
+    protected function sanitizeKenBurns($kenBurns): array
+    {
+        if (!is_array($kenBurns)) {
+            return $this->generateKenBurnsEffect();
+        }
+
+        return [
+            'startScale' => (float)($kenBurns['startScale'] ?? 1.0),
+            'endScale' => (float)($kenBurns['endScale'] ?? 1.15),
+            'startX' => (float)($kenBurns['startX'] ?? 0.5),
+            'startY' => (float)($kenBurns['startY'] ?? 0.5),
+            'endX' => (float)($kenBurns['endX'] ?? 0.5),
+            'endY' => (float)($kenBurns['endY'] ?? 0.5),
+        ];
+    }
+
+    /**
+     * Ensure a value is a string. If it's an array or other type, return default.
+     */
+    protected function ensureString($value, string $default = ''): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return (string)$value;
+        }
+        return $default;
+    }
+
+    /**
+     * Ensure a value is numeric within bounds.
+     */
+    protected function ensureNumeric($value, int $default, int $min = 0, int $max = PHP_INT_MAX): int
+    {
+        if (is_numeric($value)) {
+            return max($min, min($max, (int)$value));
+        }
+        return $default;
     }
 
     /**

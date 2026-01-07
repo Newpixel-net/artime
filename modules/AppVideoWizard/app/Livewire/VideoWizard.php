@@ -306,6 +306,8 @@ class VideoWizard extends Component
         }
         if ($project->script) {
             $this->script = array_merge($this->script, $project->script);
+            // Sanitize loaded script data to prevent type errors in views
+            $this->sanitizeScriptData();
         }
         if ($project->storyboard) {
             $this->storyboard = array_merge($this->storyboard, $project->storyboard);
@@ -676,6 +678,9 @@ class VideoWizard extends Component
             // Update script data
             $this->script = array_merge($this->script, $generatedScript);
 
+            // Sanitize generated script data to prevent type errors in views
+            $this->sanitizeScriptData();
+
             // Recalculate voice status based on new script
             $this->recalculateVoiceStatus();
 
@@ -826,7 +831,8 @@ class VideoWizard extends Component
                 $regeneratedScene['id'] = $this->script['scenes'][$sceneIndex]['id'];
                 $regeneratedScene['transition'] = $this->script['scenes'][$sceneIndex]['transition'] ?? 'cut';
 
-                $this->script['scenes'][$sceneIndex] = $regeneratedScene;
+                // Sanitize the regenerated scene to ensure proper data types
+                $this->script['scenes'][$sceneIndex] = $this->sanitizeScene($regeneratedScene, $sceneIndex);
                 $this->recalculateScriptTotals();
                 $this->recalculateVoiceStatus();
                 $this->saveProject();
@@ -909,23 +915,18 @@ class VideoWizard extends Component
         $sceneCount = count($this->script['scenes'] ?? []);
         $newSceneId = 'scene_' . ($sceneCount + 1) . '_' . time();
 
-        $newScene = [
+        // Create new scene with sanitized structure
+        $newScene = $this->sanitizeScene([
             'id' => $newSceneId,
             'title' => __('Scene') . ' ' . ($sceneCount + 1),
             'narration' => '',
             'visualDescription' => '',
             'visualPrompt' => '',
-            'voiceover' => [
-                'enabled' => true,
-                'text' => '',
-                'voiceId' => null,
-                'status' => 'pending',
-            ],
             'duration' => 15,
             'transition' => 'cut',
             'mood' => 'neutral',
             'status' => 'draft',
-        ];
+        ], $sceneCount);
 
         $this->script['scenes'][] = $newScene;
         $this->recalculateScriptTotals();
@@ -1047,6 +1048,111 @@ class VideoWizard extends Component
 
         $this->script['totalDuration'] = $totalDuration;
         $this->script['totalNarrationTime'] = round($totalNarrationTime, 1);
+    }
+
+    /**
+     * Sanitize script data to ensure all fields are properly typed.
+     * This prevents htmlspecialchars errors when rendering in Blade views.
+     * Should be called after loading script data from database or generating new script.
+     */
+    protected function sanitizeScriptData(): void
+    {
+        if (empty($this->script['scenes'])) {
+            return;
+        }
+
+        // Sanitize top-level script fields
+        $this->script['title'] = $this->ensureString($this->script['title'] ?? null, 'Untitled Script');
+        $this->script['hook'] = $this->ensureString($this->script['hook'] ?? null, '');
+        $this->script['cta'] = $this->ensureString($this->script['cta'] ?? null, '');
+
+        // Sanitize each scene
+        foreach ($this->script['scenes'] as $index => &$scene) {
+            $scene = $this->sanitizeScene($scene, $index);
+        }
+    }
+
+    /**
+     * Sanitize a single scene to ensure all fields are properly typed.
+     */
+    protected function sanitizeScene(array $scene, int $index = 0): array
+    {
+        return [
+            // Core identifiers
+            'id' => $this->ensureString($scene['id'] ?? null, 'scene-' . ($index + 1)),
+            'title' => $this->ensureString($scene['title'] ?? null, 'Scene ' . ($index + 1)),
+
+            // Text content - must be strings
+            'narration' => $this->ensureString($scene['narration'] ?? null, ''),
+            'visualDescription' => $this->ensureString(
+                $scene['visualDescription'] ?? $scene['visual_description'] ?? $scene['visual'] ?? null,
+                ''
+            ),
+            'visualPrompt' => $this->ensureString($scene['visualPrompt'] ?? null, ''),
+
+            // Metadata - must be strings
+            'mood' => $this->ensureString($scene['mood'] ?? null, ''),
+            'transition' => $this->ensureString($scene['transition'] ?? null, 'cut'),
+            'status' => $this->ensureString($scene['status'] ?? null, 'draft'),
+
+            // Duration - must be numeric
+            'duration' => $this->ensureNumeric($scene['duration'] ?? null, 15, 5, 300),
+
+            // Voiceover structure
+            'voiceover' => $this->sanitizeVoiceover($scene['voiceover'] ?? []),
+
+            // Ken Burns effect (preserve if valid, otherwise generate)
+            'kenBurns' => is_array($scene['kenBurns'] ?? null) ? $scene['kenBurns'] : [
+                'startScale' => 1.0, 'endScale' => 1.15,
+                'startX' => 0.5, 'startY' => 0.5, 'endX' => 0.5, 'endY' => 0.5
+            ],
+
+            // Image data (preserve as-is if exists)
+            'image' => $scene['image'] ?? null,
+            'imageUrl' => $this->ensureString($scene['imageUrl'] ?? null, ''),
+        ];
+    }
+
+    /**
+     * Sanitize voiceover structure.
+     */
+    protected function sanitizeVoiceover($voiceover): array
+    {
+        if (!is_array($voiceover)) {
+            $voiceover = [];
+        }
+
+        return [
+            'enabled' => (bool)($voiceover['enabled'] ?? true),
+            'text' => $this->ensureString($voiceover['text'] ?? null, ''),
+            'voiceId' => $voiceover['voiceId'] ?? null,
+            'status' => $this->ensureString($voiceover['status'] ?? null, 'pending'),
+        ];
+    }
+
+    /**
+     * Ensure a value is a string. If it's an array or other type, return default.
+     */
+    protected function ensureString($value, string $default = ''): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return (string)$value;
+        }
+        return $default;
+    }
+
+    /**
+     * Ensure a value is numeric within bounds.
+     */
+    protected function ensureNumeric($value, int $default, int $min = 0, int $max = PHP_INT_MAX): int
+    {
+        if (is_numeric($value)) {
+            return max($min, min($max, (int)$value));
+        }
+        return $default;
     }
 
     /**

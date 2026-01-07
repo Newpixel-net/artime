@@ -1065,20 +1065,14 @@
     {{-- Script Results (shown after generation) --}}
     @if(!empty($script['scenes']) && count($script['scenes']) > 0)
         @php
-            // Calculate script stats with safe type checking
+            // Script data is sanitized by VideoWizard::sanitizeScriptData()
+            // All fields are guaranteed to be properly typed (strings, numbers, arrays)
             $sceneCount = count($script['scenes']);
-
-            // Safely sum durations (handle arrays or non-numeric values)
-            $totalDuration = 0;
-            $totalNarrationWords = 0;
-            foreach ($script['scenes'] as $s) {
-                $totalDuration += is_numeric($s['duration'] ?? null) ? (int)$s['duration'] : 15;
-                $narrationText = is_string($s['narration'] ?? null) ? $s['narration'] : '';
-                $totalNarrationWords += str_word_count($narrationText);
-            }
+            $totalDuration = (int)($script['totalDuration'] ?? array_sum(array_column($script['scenes'], 'duration')));
+            $totalNarrationWords = array_sum(array_map(fn($s) => str_word_count($s['narration'] ?? ''), $script['scenes']));
 
             $avgDuration = $sceneCount > 0 ? round($totalDuration / $sceneCount) : 0;
-            $estimatedNarrationTime = round(($totalNarrationWords / 150) * 60); // 150 words per minute
+            $estimatedNarrationTime = round(($totalNarrationWords / 150) * 60);
             $totalMin = floor($totalDuration / 60);
             $totalSec = $totalDuration % 60;
             $totalTimeText = $totalMin > 0 ? ($totalMin . 'm ' . $totalSec . 's') : ($totalSec . 's');
@@ -1095,8 +1089,10 @@
                 $pacingIcon = '🎬';
             }
 
-            // Safe script title
-            $safeScriptTitle = is_string($script['title'] ?? null) ? $script['title'] : __('Your Script');
+            // Script fields are guaranteed strings after sanitization
+            $safeScriptTitle = $script['title'] ?? __('Your Script');
+            $safeHook = $script['hook'] ?? '';
+            $safeCta = $script['cta'] ?? '';
         @endphp
 
         <div class="vw-script-card vw-script-results">
@@ -1175,9 +1171,7 @@
                 </div>
             </div>
 
-            @php
-                $safeHook = is_string($script['hook'] ?? null) ? $script['hook'] : '';
-            @endphp
+            {{-- Hook section - $safeHook is defined above and guaranteed to be string --}}
             @if($safeHook)
                 <div style="background: rgba(236, 72, 153, 0.1); border: 1px solid rgba(236, 72, 153, 0.3); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
                     <span style="color: #f472b6; font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">{{ __('Hook') }}</span>
@@ -1196,25 +1190,24 @@
 
             @foreach($script['scenes'] as $index => $scene)
                 @php
-                    // Comprehensive safe extraction of ALL scene fields that might be arrays
-                    // This prevents htmlspecialchars errors when AI returns unexpected data types
-
-                    $safeTitle = is_string($scene['title'] ?? null) ? $scene['title'] : (__('Scene') . ' ' . ($index + 1));
-                    $safeNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
-                    $safeVisualPrompt = is_string($scene['visualPrompt'] ?? null) ? $scene['visualPrompt'] : '';
-                    $safeVisualDescription = is_string($scene['visualDescription'] ?? null) ? $scene['visualDescription'] : '';
-                    $safeMood = is_string($scene['mood'] ?? null) ? $scene['mood'] : '';
-                    $safeTransition = is_string($scene['transition'] ?? null) ? $scene['transition'] : 'cut';
-                    $safeDuration = is_numeric($scene['duration'] ?? null) ? (int)$scene['duration'] : 15;
+                    // Scene data is sanitized by VideoWizard::sanitizeScriptData()
+                    // All fields are guaranteed to be properly typed (strings for text, int for duration)
+                    $safeTitle = $scene['title'] ?? (__('Scene') . ' ' . ($index + 1));
+                    $safeNarration = $scene['narration'] ?? '';
+                    $safeVisualPrompt = $scene['visualPrompt'] ?? '';
+                    $safeVisualDescription = $scene['visualDescription'] ?? '';
+                    $safeMood = $scene['mood'] ?? '';
+                    $safeTransition = $scene['transition'] ?? 'cut';
+                    $safeDuration = (int)($scene['duration'] ?? 15);
 
                     // Use visualPrompt first, fall back to visualDescription
                     $displayVisualPrompt = $safeVisualPrompt ?: $safeVisualDescription;
 
                     // Check music only status
                     $isMusicOnly = isset($scene['voiceover']['enabled']) && !$scene['voiceover']['enabled'];
-                    $sceneId = is_string($scene['id'] ?? null) ? $scene['id'] : ('scene_' . $index);
+                    $sceneId = $scene['id'] ?? ('scene_' . $index);
 
-                    // Get transition label safely
+                    // Get transition label
                     $transitionLabel = $transitions[$safeTransition] ?? 'Cut';
                 @endphp
                 <div class="vw-advanced-scene-card"
@@ -1345,10 +1338,11 @@
                 ➕ {{ __('Add Scene') }}
             </button>
 
-            @if(!empty($script['cta']))
+            {{-- CTA section - $safeCta is defined above and guaranteed to be string --}}
+            @if($safeCta)
                 <div style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
                     <span style="color: #22d3ee; font-weight: 600; font-size: 0.8rem; text-transform: uppercase;">{{ __('Call to Action') }}</span>
-                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $script['cta'] }}</p>
+                    <p style="color: rgba(255,255,255,0.8); margin-top: 0.5rem;">{{ $safeCta }}</p>
                 </div>
             @endif
         </div>
@@ -1375,44 +1369,36 @@
                          x-transition:enter-start="opacity-0 transform scale-95"
                          x-transition:enter-end="opacity-100 transform scale-100"
                          @click.stop>
-                        @php
-                            // Safe extraction for modal display
-                            $modalScriptTitle = is_string($script['title'] ?? null) ? $script['title'] : __('Your Script');
-                            $modalHook = is_string($script['hook'] ?? null) ? $script['hook'] : '';
-                            $modalCta = is_string($script['cta'] ?? null) ? $script['cta'] : '';
-                        @endphp
+                        {{-- Modal uses $safeScriptTitle, $safeHook, $safeCta from parent scope --}}
                         <div class="vw-full-script-header">
                             <div>
                                 <h3 class="vw-script-title">📄 {{ __('Full Script') }}</h3>
-                                <p class="vw-script-subtitle">{{ $modalScriptTitle }}</p>
+                                <p class="vw-script-subtitle">{{ $safeScriptTitle }}</p>
                             </div>
                             <button class="vw-full-script-close" @click="showFullScript = false">✕</button>
                         </div>
 
                         <div class="vw-full-script-text">
-                            @if($modalHook)
+                            @if($safeHook)
                                 <strong style="color: #f472b6;">{{ __('HOOK:') }}</strong>
-                                <br>{{ $modalHook }}
+                                <br>{{ $safeHook }}
                                 <div class="vw-full-script-scene-divider">— — —</div>
                             @endif
 
                             @foreach($script['scenes'] as $index => $scene)
-                                @php
-                                    $modalSceneTitle = is_string($scene['title'] ?? null) ? $scene['title'] : '';
-                                    $modalSceneNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
-                                @endphp
-                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $modalSceneTitle }}</strong>
-                                <br>{{ $modalSceneNarration }}
+                                {{-- Scene data is sanitized - guaranteed strings --}}
+                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $scene['title'] ?? '' }}</strong>
+                                <br>{{ $scene['narration'] ?? '' }}
 
                                 @if(!$loop->last)
                                     <div class="vw-full-script-scene-divider">— — —</div>
                                 @endif
                             @endforeach
 
-                            @if($modalCta)
+                            @if($safeCta)
                                 <div class="vw-full-script-scene-divider">— — —</div>
                                 <strong style="color: #22d3ee;">{{ __('CALL TO ACTION:') }}</strong>
-                                <br>{{ $modalCta }}
+                                <br>{{ $safeCta }}
                             @endif
                         </div>
                     </div>
