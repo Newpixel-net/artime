@@ -44,6 +44,16 @@
                 <span class="vw-pm-count">{{ $projectManagerStatusCounts['all'] ?? 0 }} {{ __('total') }}</span>
             </div>
             <div class="vw-pm-header-right">
+                {{-- Import Button --}}
+                <label class="vw-pm-import-btn" title="{{ __('Import project from JSON') }}">
+                    <input type="file"
+                           accept=".json"
+                           wire:model="importFile"
+                           style="display: none;"
+                           x-on:change="$wire.importProject($event.target.files[0]); $event.target.value = ''">
+                    <span wire:loading.remove wire:target="importProject, importFile">📥 {{ __('Import') }}</span>
+                    <span wire:loading wire:target="importProject, importFile">{{ __('Importing...') }}</span>
+                </label>
                 <button type="button"
                         class="vw-pm-new-btn"
                         wire:click="createNewProject"
@@ -99,14 +109,60 @@
                        placeholder="{{ __('Search projects...') }}"
                        wire:model.live.debounce.300ms="projectManagerSearch">
             </div>
-            <div class="vw-pm-sort">
+            <div class="vw-pm-sort-group">
                 <select class="vw-pm-sort-select" wire:model.live="projectManagerSort">
                     <option value="updated_at">{{ __('Last Modified') }}</option>
                     <option value="created_at">{{ __('Date Created') }}</option>
                     <option value="name">{{ __('Name') }}</option>
                 </select>
+                <button type="button"
+                        class="vw-pm-sort-dir-btn"
+                        wire:click="toggleProjectManagerSortDirection"
+                        title="{{ $projectManagerSortDirection === 'asc' ? __('Ascending') : __('Descending') }}">
+                    @if($projectManagerSortDirection === 'asc')
+                        ↑
+                    @else
+                        ↓
+                    @endif
+                </button>
             </div>
+            <button type="button"
+                    class="vw-pm-select-btn {{ $projectManagerSelectMode ? 'active' : '' }}"
+                    wire:click="toggleProjectManagerSelectMode"
+                    title="{{ __('Select multiple') }}">
+                ☑️ {{ __('Select') }}
+            </button>
         </div>
+
+        {{-- Bulk Actions Bar --}}
+        @if($projectManagerSelectMode)
+            <div class="vw-pm-bulk-bar">
+                <div class="vw-pm-bulk-info">
+                    <span class="vw-pm-bulk-count">{{ count($projectManagerSelected) }}</span>
+                    {{ __('selected') }}
+                </div>
+                <div class="vw-pm-bulk-actions">
+                    <button type="button"
+                            class="vw-pm-bulk-btn"
+                            wire:click="selectAllProjects">
+                        {{ __('Select All') }}
+                    </button>
+                    <button type="button"
+                            class="vw-pm-bulk-btn"
+                            wire:click="deselectAllProjects">
+                        {{ __('Deselect All') }}
+                    </button>
+                    @if(count($projectManagerSelected) > 0)
+                        <button type="button"
+                                class="vw-pm-bulk-btn vw-pm-bulk-btn-delete"
+                                wire:click="deleteSelectedProjects"
+                                wire:confirm="{{ __('Are you sure you want to delete') }} {{ count($projectManagerSelected) }} {{ __('projects? This cannot be undone.') }}">
+                            🗑️ {{ __('Delete Selected') }}
+                        </button>
+                    @endif
+                </div>
+            </div>
+        @endif
 
         {{-- Projects Grid --}}
         <div class="vw-pm-content" wire:loading.class="vw-pm-loading" wire:target="loadProjectManagerProjects, setProjectManagerStatusFilter">
@@ -158,6 +214,16 @@
 
                             {{-- Card Header --}}
                             <div class="vw-pm-card-header">
+                                @if($projectManagerSelectMode)
+                                    <button type="button"
+                                            class="vw-pm-card-checkbox {{ in_array($project['id'], $projectManagerSelected) ? 'checked' : '' }}"
+                                            wire:click="toggleProjectSelection({{ $project['id'] }})"
+                                            @if($isCurrent) disabled title="{{ __('Cannot select currently open project') }}" @endif>
+                                        @if(in_array($project['id'], $projectManagerSelected))
+                                            ✓
+                                        @endif
+                                    </button>
+                                @endif
                                 <div class="vw-pm-card-platform">
                                     <span class="vw-pm-card-platform-icon">{{ $platformIcon }}</span>
                                     <span class="vw-pm-card-platform-name">{{ $platformName }}</span>
@@ -255,6 +321,15 @@
                                     </button>
                                 @endif
                                 <button type="button"
+                                        class="vw-pm-card-btn vw-pm-card-btn-export"
+                                        wire:click="exportProject({{ $project['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="exportProject({{ $project['id'] }})"
+                                        title="{{ __('Export to JSON') }}">
+                                    <span wire:loading.remove wire:target="exportProject({{ $project['id'] }})">📤</span>
+                                    <span wire:loading wire:target="exportProject({{ $project['id'] }})">⏳</span>
+                                </button>
+                                <button type="button"
                                         class="vw-pm-card-btn vw-pm-card-btn-duplicate"
                                         wire:click="duplicateProject({{ $project['id'] }})"
                                         wire:loading.attr="disabled"
@@ -312,7 +387,7 @@
         {{-- Loading Overlay --}}
         <div class="vw-pm-loading-overlay"
              wire:loading.flex
-             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject, setProjectManagerStatusFilter">
+             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject, setProjectManagerStatusFilter, deleteSelectedProjects, exportProject, importProject, importFile">
             <div class="vw-pm-loading-spinner"></div>
             <span class="vw-pm-loading-text">{{ __('Please wait...') }}</span>
         </div>
@@ -592,6 +667,146 @@
 .vw-pm-sort-select:focus {
     outline: none;
     border-color: rgba(139, 92, 246, 0.5);
+}
+
+.vw-pm-sort-group {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.vw-pm-sort-dir-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 0.5rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vw-pm-sort-dir-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #fff;
+}
+
+.vw-pm-select-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 0.5rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.vw-pm-select-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #fff;
+}
+
+.vw-pm-select-btn.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(6, 182, 212, 0.3) 100%);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #fff;
+}
+
+/* Bulk Actions Bar */
+.vw-pm-bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.vw-pm-bulk-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.vw-pm-bulk-count {
+    font-weight: 700;
+    color: #8b5cf6;
+}
+
+.vw-pm-bulk-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.vw-pm-bulk-btn {
+    padding: 0.375rem 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.375rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vw-pm-bulk-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.vw-pm-bulk-btn-delete {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+}
+
+.vw-pm-bulk-btn-delete:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+/* Card Checkbox */
+.vw-pm-card-checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(139, 92, 246, 0.4);
+    border-radius: 0.25rem;
+    color: #fff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.vw-pm-card-checkbox:hover:not(:disabled) {
+    border-color: rgba(139, 92, 246, 0.7);
+    background: rgba(139, 92, 246, 0.2);
+}
+
+.vw-pm-card-checkbox.checked {
+    background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+    border-color: transparent;
+}
+
+.vw-pm-card-checkbox:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
 }
 
 /* Content */
@@ -1022,6 +1237,45 @@
     color: #ef4444;
 }
 
+.vw-pm-card-btn-export {
+    flex: 0;
+    width: 2.25rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: rgba(16, 185, 129, 0.7);
+}
+
+.vw-pm-card-btn-export:hover {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.vw-pm-card-btn-export:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Import Button */
+.vw-pm-import-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vw-pm-import-btn:hover {
+    background: rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.5);
+    transform: translateY(-1px);
+}
+
 /* Loading Overlay */
 .vw-pm-loading-overlay {
     position: absolute;
@@ -1127,28 +1381,190 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .vw-project-manager-modal {
-        max-height: 90vh;
+        max-height: 92vh;
+        margin: 0.5rem;
     }
 
     .vw-pm-header {
         flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 1rem;
     }
 
-    .vw-pm-header-right {
-        width: 100%;
+    .vw-pm-header-left {
         justify-content: space-between;
     }
 
+    .vw-pm-header-right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-start;
+    }
+
+    .vw-pm-import-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    .vw-pm-new-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    /* Status Tabs - horizontal scroll */
+    .vw-pm-status-tabs {
+        padding: 0.5rem 1rem;
+        gap: 0.375rem;
+    }
+
+    .vw-pm-status-tab {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+    }
+
+    .vw-pm-status-tab-label {
+        display: none;
+    }
+
+    .vw-pm-status-tab:first-child .vw-pm-status-tab-label {
+        display: inline;
+    }
+
+    /* Filters - improved mobile layout */
     .vw-pm-filters {
         flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .vw-pm-sort-group {
+        width: 100%;
+    }
+
+    .vw-pm-sort-select {
+        flex: 1;
+    }
+
+    .vw-pm-select-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Bulk Actions Bar - improved mobile layout */
+    .vw-pm-bulk-bar {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        align-items: stretch;
+    }
+
+    .vw-pm-bulk-info {
+        justify-content: center;
+        font-size: 0.8125rem;
+    }
+
+    .vw-pm-bulk-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.375rem;
+    }
+
+    .vw-pm-bulk-btn {
+        flex: 1;
+        min-width: calc(50% - 0.25rem);
+        justify-content: center;
+        padding: 0.5rem 0.5rem;
+        font-size: 0.6875rem;
+    }
+
+    .vw-pm-bulk-btn-delete {
+        min-width: 100%;
+    }
+
+    /* Content and Grid */
+    .vw-pm-content {
+        padding: 1rem;
     }
 
     .vw-pm-grid {
         grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    /* Card improvements */
+    .vw-pm-card-meta {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .vw-pm-card-progress {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .vw-pm-card-actions {
+        padding: 0.5rem 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .vw-pm-card-btn-load,
+    .vw-pm-card-btn-current {
+        flex: 1 1 100%;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Pagination */
+    .vw-pm-pagination {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+    }
+
+    .vw-pm-pagination-info {
+        font-size: 0.75rem;
+    }
+
+    .vw-pm-pagination-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .vw-pm-pagination-btn {
+        min-width: 1.75rem;
+        height: 1.75rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 400px) {
+    .vw-pm-header-right {
+        flex-direction: column;
+    }
+
+    .vw-pm-import-btn,
+    .vw-pm-new-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .vw-pm-close-btn {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+
+    .vw-pm-status-tab-count {
+        display: none;
+    }
+
+    .vw-pm-card-btn-export,
+    .vw-pm-card-btn-duplicate,
+    .vw-pm-card-btn-delete {
+        width: 2rem;
     }
 }
 </style>
