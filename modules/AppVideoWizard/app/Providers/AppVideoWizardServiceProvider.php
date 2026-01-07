@@ -3,6 +3,7 @@
 namespace Modules\AppVideoWizard\Providers;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -28,7 +29,105 @@ class AppVideoWizardServiceProvider extends ServiceProvider
         $this->registerConfig();
         $this->registerViews();
         $this->registerLivewireComponents();
+        $this->registerAdminMenu();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
+    }
+
+    /**
+     * Register admin sidebar menu for Video Wizard.
+     */
+    protected function registerAdminMenu(): void
+    {
+        // Use view composer to inject admin menu after sidebar is shared
+        View::composer('*', function ($view) {
+            // Only run once per request
+            static $menuRegistered = false;
+            if ($menuRegistered) {
+                return;
+            }
+
+            // Check if user is admin
+            $loginAs = session('login_as', 'client');
+            if ($loginAs !== 'admin') {
+                return;
+            }
+
+            // Get current sidebar data
+            $sidebar = View::shared('sidebar');
+            if (!$sidebar || !isset($sidebar['top'])) {
+                return;
+            }
+
+            // Check if Video Wizard admin menu already exists
+            foreach ($sidebar['top'] as $item) {
+                if (isset($item['uri']) && str_contains($item['uri'], 'admin/video-wizard')) {
+                    $menuRegistered = true;
+                    return;
+                }
+            }
+
+            // Add Video Wizard admin menu under AI Settings tab
+            $videoWizardMenu = [
+                'id' => 'admin-video-wizard',
+                'uri' => 'admin/video-wizard',
+                'role' => 'admin',
+                'platform' => 0,
+                'section' => 'top',
+                'tab_id' => 10, // AI Settings tab
+                'tab_name' => 'AI Settings',
+                'position' => 4000, // Before AI Templates (5000)
+                'name' => 'Video Creator',
+                'color' => '#8b5cf6',
+                'icon' => 'fa-light fa-video',
+                'sub_menu' => [
+                    [
+                        'uri' => 'admin/video-wizard',
+                        'name' => 'Dashboard',
+                        'position' => 100,
+                        'icon' => 'fa-light fa-gauge',
+                    ],
+                    [
+                        'uri' => 'admin/video-wizard/prompts',
+                        'name' => 'AI Prompts',
+                        'position' => 90,
+                        'icon' => 'fa-light fa-message-bot',
+                    ],
+                    [
+                        'uri' => 'admin/video-wizard/production-types',
+                        'name' => 'Production Types',
+                        'position' => 80,
+                        'icon' => 'fa-light fa-clapperboard',
+                    ],
+                    [
+                        'uri' => 'admin/video-wizard/logs',
+                        'name' => 'Generation Logs',
+                        'position' => 70,
+                        'icon' => 'fa-light fa-list-timeline',
+                    ],
+                    [
+                        'uri' => 'admin/video-wizard/logs/analytics',
+                        'name' => 'Analytics',
+                        'position' => 60,
+                        'icon' => 'fa-light fa-chart-mixed',
+                    ],
+                ],
+            ];
+
+            // Insert menu and re-sort
+            $sidebar['top'][] = $videoWizardMenu;
+
+            // Sort by tab_id then position
+            usort($sidebar['top'], function ($a, $b) {
+                if ($a['tab_id'] !== $b['tab_id']) {
+                    return $a['tab_id'] <=> $b['tab_id'];
+                }
+                return ($b['position'] ?? 0) <=> ($a['position'] ?? 0);
+            });
+
+            // Re-share the sidebar
+            View::share('sidebar', $sidebar);
+            $menuRegistered = true;
+        });
     }
 
     /**
