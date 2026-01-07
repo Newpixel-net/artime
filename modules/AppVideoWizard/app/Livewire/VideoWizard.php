@@ -13,6 +13,7 @@ use Modules\AppVideoWizard\Services\ImageGenerationService;
 use Modules\AppVideoWizard\Services\VoiceoverService;
 use Modules\AppVideoWizard\Services\StockMediaService;
 use Modules\AppVideoWizard\Services\CharacterExtractionService;
+use Modules\AppVideoWizard\Services\LocationExtractionService;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
 use Illuminate\Support\Facades\Log;
 
@@ -3820,10 +3821,94 @@ class VideoWizard extends Component
     }
 
     /**
-     * Auto-detect locations from script (enhanced version with pattern matching).
-     * Uses visual descriptions to infer location types, time of day, and weather.
+     * Auto-detect locations from script content using AI extraction.
+     * Falls back to pattern matching if AI fails.
      */
     protected function autoDetectLocationsFromScript(): void
+    {
+        // Try AI-powered extraction first
+        try {
+            $service = app(LocationExtractionService::class);
+
+            $result = $service->extractLocations($this->script, [
+                'teamId' => session('current_team_id', 0),
+                'genre' => $this->productionType ?? 'General',
+                'productionType' => $this->productionType,
+                'productionMode' => 'standard',
+                'styleBible' => $this->sceneMemory['styleBible'] ?? null,
+            ]);
+
+            if ($result['success'] && !empty($result['locations'])) {
+                Log::info('LocationExtraction: AI extraction successful', [
+                    'count' => count($result['locations']),
+                ]);
+
+                // Add AI-extracted locations to Location Bible
+                foreach ($result['locations'] as $location) {
+                    // Check if already exists
+                    $exists = collect($this->sceneMemory['locationBible']['locations'])
+                        ->filter(fn($loc) => strtolower($loc['name'] ?? '') === strtolower($location['name']))
+                        ->isNotEmpty();
+
+                    if (!$exists) {
+                        $this->sceneMemory['locationBible']['locations'][] = [
+                            'id' => $location['id'] ?? uniqid('loc_'),
+                            'name' => $location['name'],
+                            'description' => $location['description'] ?? '',
+                            'type' => $location['type'] ?? 'exterior',
+                            'timeOfDay' => $location['timeOfDay'] ?? 'day',
+                            'weather' => $location['weather'] ?? 'clear',
+                            'atmosphere' => $location['atmosphere'] ?? '',
+                            'scenes' => $location['scenes'] ?? [],
+                            'stateChanges' => $location['stateChanges'] ?? [],
+                            'referenceImage' => null,
+                            'autoDetected' => true,
+                            'aiGenerated' => true,
+                        ];
+                    }
+                }
+
+                // Enable Location Bible if we detected any locations
+                if (!empty($result['locations'])) {
+                    $this->sceneMemory['locationBible']['enabled'] = true;
+                }
+
+                // Dispatch event for debugging
+                $this->dispatch('vw-debug', [
+                    'type' => 'location_extraction',
+                    'method' => 'ai',
+                    'count' => count($result['locations']),
+                ]);
+
+                return; // AI extraction successful, no need for fallback
+            }
+
+            // If AI returned no locations but was successful, video might be abstract
+            if ($result['success'] && empty($result['locations'])) {
+                Log::info('LocationExtraction: AI determined no distinct locations in video');
+                $this->dispatch('vw-debug', [
+                    'type' => 'location_extraction',
+                    'method' => 'ai',
+                    'count' => 0,
+                    'message' => 'No distinct locations detected',
+                ]);
+                return;
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('LocationExtraction: AI extraction failed, falling back to pattern matching', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Fallback to pattern-based detection
+        $this->autoDetectLocationsWithPatterns();
+    }
+
+    /**
+     * Pattern-based location detection (fallback method).
+     */
+    protected function autoDetectLocationsWithPatterns(): void
     {
         $locationMap = [];
 
@@ -3873,6 +3958,7 @@ class VideoWizard extends Component
                     'scenes' => $data['scenes'],
                     'referenceImage' => null,
                     'autoDetected' => true,
+                    'patternMatched' => true,
                 ];
             }
         }
@@ -3881,6 +3967,13 @@ class VideoWizard extends Component
         if (!empty($locationMap)) {
             $this->sceneMemory['locationBible']['enabled'] = true;
         }
+
+        // Dispatch event for debugging
+        $this->dispatch('vw-debug', [
+            'type' => 'location_extraction',
+            'method' => 'pattern',
+            'count' => count($locationMap),
+        ]);
     }
 
     /**
@@ -4186,29 +4279,8 @@ class VideoWizard extends Component
      */
     public function autoDetectLocations(): void
     {
-        // Simple detection from visual descriptions
-        foreach ($this->script['scenes'] as $index => $scene) {
-            $visual = $scene['visualDescription'] ?? '';
-            if (empty($visual)) continue;
-
-            // Check if location already exists for this scene
-            $exists = collect($this->sceneMemory['locationBible']['locations'])
-                ->where('name', 'Scene ' . ($index + 1) . ' Location')
-                ->isNotEmpty();
-
-            if (!$exists && !empty($visual)) {
-                $this->sceneMemory['locationBible']['locations'][] = [
-                    'id' => uniqid('loc_'),
-                    'name' => 'Scene ' . ($index + 1) . ' Location',
-                    'type' => 'exterior',
-                    'timeOfDay' => 'day',
-                    'weather' => 'clear',
-                    'description' => $visual,
-                    'referenceImage' => null,
-                ];
-            }
-        }
-
+        // Use AI-powered extraction (with pattern fallback)
+        $this->autoDetectLocationsFromScript();
         $this->saveProject();
     }
 
