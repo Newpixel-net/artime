@@ -24,6 +24,10 @@ class VideoWizard extends Component
     // Import file for project import
     public $importFile;
 
+    // Reference image uploads for Character/Location Bible
+    public $characterImageUpload;
+    public $locationImageUpload;
+
     // Project state
     public ?int $projectId = null;
     public string $projectName = 'Untitled Video';
@@ -4641,6 +4645,51 @@ class VideoWizard extends Component
     }
 
     /**
+     * Upload a reference image for a character.
+     */
+    public function uploadCharacterPortrait(int $index): void
+    {
+        if (!$this->characterImageUpload) {
+            return;
+        }
+
+        $this->validate([
+            'characterImageUpload' => 'image|max:10240', // 10MB max
+        ]);
+
+        try {
+            // Generate unique filename
+            $filename = 'character_' . uniqid() . '_' . time() . '.' . $this->characterImageUpload->getClientOriginalExtension();
+
+            // Store in public disk under wizard-assets
+            $path = $this->characterImageUpload->storeAs('wizard-assets/characters', $filename, 'public');
+
+            // Get the public URL
+            $url = \Storage::disk('public')->url($path);
+
+            // Update character with the uploaded image
+            $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = $url;
+            $this->sceneMemory['characterBible']['characters'][$index]['referenceImageSource'] = 'upload';
+
+            // Clear the upload
+            $this->characterImageUpload = null;
+
+            $this->saveProject();
+
+            // Dispatch debug event
+            $this->dispatch('vw-debug', [
+                'type' => 'character_image_upload',
+                'characterIndex' => $index,
+                'filename' => $filename,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Character image upload failed', ['error' => $e->getMessage()]);
+            $this->error = __('Failed to upload image: ') . $e->getMessage();
+        }
+    }
+
+    /**
      * Apply character template.
      */
     public function applyCharacterTemplate(int $index, string $template): void
@@ -4831,6 +4880,51 @@ class VideoWizard extends Component
         if (isset($this->sceneMemory['locationBible']['locations'][$index])) {
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = null;
             $this->saveProject();
+        }
+    }
+
+    /**
+     * Upload a reference image for a location.
+     */
+    public function uploadLocationReference(int $index): void
+    {
+        if (!$this->locationImageUpload) {
+            return;
+        }
+
+        $this->validate([
+            'locationImageUpload' => 'image|max:10240', // 10MB max
+        ]);
+
+        try {
+            // Generate unique filename
+            $filename = 'location_' . uniqid() . '_' . time() . '.' . $this->locationImageUpload->getClientOriginalExtension();
+
+            // Store in public disk under wizard-assets
+            $path = $this->locationImageUpload->storeAs('wizard-assets/locations', $filename, 'public');
+
+            // Get the public URL
+            $url = \Storage::disk('public')->url($path);
+
+            // Update location with the uploaded image
+            $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = $url;
+            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageSource'] = 'upload';
+
+            // Clear the upload
+            $this->locationImageUpload = null;
+
+            $this->saveProject();
+
+            // Dispatch debug event
+            $this->dispatch('vw-debug', [
+                'type' => 'location_image_upload',
+                'locationIndex' => $index,
+                'filename' => $filename,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Location image upload failed', ['error' => $e->getMessage()]);
+            $this->error = __('Failed to upload image: ') . $e->getMessage();
         }
     }
 

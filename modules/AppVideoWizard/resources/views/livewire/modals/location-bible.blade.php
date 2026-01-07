@@ -109,6 +109,33 @@
                                     <span wire:loading.remove wire:target="generateLocationReference">🎨 {{ __('Generate Reference') }}</span>
                                     <span wire:loading wire:target="generateLocationReference">{{ __('Generating...') }}</span>
                                 </button>
+
+                                {{-- Upload Button & Input --}}
+                                <div x-data="{ uploading: false }" style="position: relative; margin-top: 0.35rem;">
+                                    <input type="file"
+                                           wire:model="locationImageUpload"
+                                           accept="image/*"
+                                           x-on:livewire-upload-start="uploading = true"
+                                           x-on:livewire-upload-finish="uploading = false; $wire.uploadLocationReference({{ $editIndex }})"
+                                           x-on:livewire-upload-error="uploading = false"
+                                           style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;">
+                                    <button type="button"
+                                            style="width: 100%; padding: 0.5rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.35rem; color: rgba(255,255,255,0.8); font-size: 0.75rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                                        <template x-if="!uploading">
+                                            <span>📤 {{ __('Upload Image') }}</span>
+                                        </template>
+                                        <template x-if="uploading">
+                                            <span>{{ __('Uploading...') }}</span>
+                                        </template>
+                                    </button>
+                                </div>
+
+                                {{-- Source indicator --}}
+                                @if(!empty($currentLocation['referenceImage']) && !empty($currentLocation['referenceImageSource']))
+                                    <div style="text-align: center; margin-top: 0.25rem; font-size: 0.6rem; color: rgba(255,255,255,0.4);">
+                                        {{ $currentLocation['referenceImageSource'] === 'upload' ? __('Uploaded') : __('AI Generated') }}
+                                    </div>
+                                @endif
                             </div>
 
                             {{-- Basic Info --}}

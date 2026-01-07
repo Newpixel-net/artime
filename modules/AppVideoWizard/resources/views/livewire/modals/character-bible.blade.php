@@ -99,6 +99,7 @@
                             </div>
                             {{-- Portrait Actions --}}
                             <div style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem;">
+                                {{-- Generate Button --}}
                                 <button type="button"
                                         wire:click="generateCharacterPortrait({{ $editIndex }})"
                                         wire:loading.attr="disabled"
@@ -107,6 +108,33 @@
                                     <span wire:loading.remove wire:target="generateCharacterPortrait">🎨 {{ empty($currentChar['referenceImage']) ? __('Generate') : __('Regenerate') }}</span>
                                     <span wire:loading wire:target="generateCharacterPortrait">...</span>
                                 </button>
+
+                                {{-- Upload Button & Input --}}
+                                <div x-data="{ uploading: false }" style="position: relative;">
+                                    <input type="file"
+                                           wire:model="characterImageUpload"
+                                           accept="image/*"
+                                           x-on:livewire-upload-start="uploading = true"
+                                           x-on:livewire-upload-finish="uploading = false; $wire.uploadCharacterPortrait({{ $editIndex }})"
+                                           x-on:livewire-upload-error="uploading = false"
+                                           style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1;">
+                                    <button type="button"
+                                            style="width: 100%; padding: 0.5rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; color: rgba(255,255,255,0.8); font-size: 0.7rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                                        <template x-if="!uploading">
+                                            <span>📤 {{ __('Upload Image') }}</span>
+                                        </template>
+                                        <template x-if="uploading">
+                                            <span>{{ __('Uploading...') }}</span>
+                                        </template>
+                                    </button>
+                                </div>
+
+                                {{-- Source indicator --}}
+                                @if(!empty($currentChar['referenceImage']) && !empty($currentChar['referenceImageSource']))
+                                    <div style="text-align: center; font-size: 0.6rem; color: rgba(255,255,255,0.4);">
+                                        {{ $currentChar['referenceImageSource'] === 'upload' ? __('Uploaded') : __('AI Generated') }}
+                                    </div>
+                                @endif
                             </div>
                         </div>
 
