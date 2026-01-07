@@ -1089,10 +1089,10 @@
                 $pacingIcon = '🎬';
             }
 
-            // Script fields are guaranteed strings after sanitization
-            $safeScriptTitle = $script['title'] ?? __('Your Script');
-            $safeHook = $script['hook'] ?? '';
-            $safeCta = $script['cta'] ?? '';
+            // Safety net: ensure script fields are strings even if sanitization didn't run
+            $safeScriptTitle = is_string($script['title'] ?? null) ? $script['title'] : __('Your Script');
+            $safeHook = is_string($script['hook'] ?? null) ? $script['hook'] : '';
+            $safeCta = is_string($script['cta'] ?? null) ? $script['cta'] : '';
         @endphp
 
         <div class="vw-script-card vw-script-results">
@@ -1190,22 +1190,22 @@
 
             @foreach($script['scenes'] as $index => $scene)
                 @php
-                    // Scene data is sanitized by VideoWizard::sanitizeScriptData()
-                    // All fields are guaranteed to be properly typed (strings for text, int for duration)
-                    $safeTitle = $scene['title'] ?? (__('Scene') . ' ' . ($index + 1));
-                    $safeNarration = $scene['narration'] ?? '';
-                    $safeVisualPrompt = $scene['visualPrompt'] ?? '';
-                    $safeVisualDescription = $scene['visualDescription'] ?? '';
-                    $safeMood = $scene['mood'] ?? '';
-                    $safeTransition = $scene['transition'] ?? 'cut';
-                    $safeDuration = (int)($scene['duration'] ?? 15);
+                    // Safety net: ensure all fields are strings even if sanitization didn't run
+                    // (e.g., old projects loaded before fix was deployed)
+                    $safeTitle = is_string($scene['title'] ?? null) ? $scene['title'] : (__('Scene') . ' ' . ($index + 1));
+                    $safeNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                    $safeVisualPrompt = is_string($scene['visualPrompt'] ?? null) ? $scene['visualPrompt'] : '';
+                    $safeVisualDescription = is_string($scene['visualDescription'] ?? null) ? $scene['visualDescription'] : '';
+                    $safeMood = is_string($scene['mood'] ?? null) ? $scene['mood'] : '';
+                    $safeTransition = is_string($scene['transition'] ?? null) ? $scene['transition'] : 'cut';
+                    $safeDuration = is_numeric($scene['duration'] ?? null) ? (int)$scene['duration'] : 15;
 
                     // Use visualPrompt first, fall back to visualDescription
                     $displayVisualPrompt = $safeVisualPrompt ?: $safeVisualDescription;
 
                     // Check music only status
                     $isMusicOnly = isset($scene['voiceover']['enabled']) && !$scene['voiceover']['enabled'];
-                    $sceneId = $scene['id'] ?? ('scene_' . $index);
+                    $sceneId = is_string($scene['id'] ?? null) ? $scene['id'] : ('scene_' . $index);
 
                     // Get transition label
                     $transitionLabel = $transitions[$safeTransition] ?? 'Cut';
@@ -1386,9 +1386,13 @@
                             @endif
 
                             @foreach($script['scenes'] as $index => $scene)
-                                {{-- Scene data is sanitized - guaranteed strings --}}
-                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $scene['title'] ?? '' }}</strong>
-                                <br>{{ $scene['narration'] ?? '' }}
+                                @php
+                                    // Safety net for modal scene display
+                                    $modalSceneTitle = is_string($scene['title'] ?? null) ? $scene['title'] : '';
+                                    $modalSceneNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                                @endphp
+                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $modalSceneTitle }}</strong>
+                                <br>{{ $modalSceneNarration }}
 
                                 @if(!$loop->last)
                                     <div class="vw-full-script-scene-divider">— — —</div>
