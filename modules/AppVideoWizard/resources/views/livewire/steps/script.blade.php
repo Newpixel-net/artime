@@ -496,15 +496,20 @@
         background: rgba(139, 92, 246, 0.1) !important;
     }
 
-    /* Full Script Modal */
+    /* Full Script Modal - hidden by default */
     .vw-full-script-modal {
         position: fixed !important;
         inset: 0 !important;
         z-index: 100 !important;
-        display: flex !important;
+        display: none !important; /* Hidden by default */
         align-items: center !important;
         justify-content: center !important;
         padding: 2rem !important;
+    }
+
+    /* Only show when .is-open class is added by Alpine */
+    .vw-full-script-modal.is-open {
+        display: flex !important;
     }
 
     .vw-full-script-overlay {
@@ -1446,14 +1451,14 @@
              @keydown.escape.window="showFullScript = false">
             <template x-teleport="body">
                 <div x-show="showFullScript"
+                     :class="{ 'is-open': showFullScript }"
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0"
                      x-transition:enter-end="opacity-100"
                      x-transition:leave="transition ease-in duration-150"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0"
-                     class="vw-full-script-modal"
-                     style="display: none;">
+                     class="vw-full-script-modal">
                     <div class="vw-full-script-overlay" @click="showFullScript = false"></div>
                     <div class="vw-full-script-content"
                          x-transition:enter="transition ease-out duration-200"
