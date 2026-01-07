@@ -949,16 +949,20 @@
 
             <div class="vw-concept-meta">
                 <div class="vw-concept-meta-left">
-                    @if(!empty($concept['suggestedMood']))
+                    @php
+                        $safeSuggestedMood = is_string($concept['suggestedMood'] ?? null) ? $concept['suggestedMood'] : (is_array($concept['suggestedMood'] ?? null) ? implode(', ', $concept['suggestedMood']) : '');
+                        $safeSuggestedTone = is_string($concept['suggestedTone'] ?? null) ? $concept['suggestedTone'] : (is_array($concept['suggestedTone'] ?? null) ? implode(', ', $concept['suggestedTone']) : '');
+                    @endphp
+                    @if(!empty($safeSuggestedMood))
                         <div class="vw-concept-meta-item">
                             <span>{{ __('Mood:') }}</span>
-                            <span>{{ $concept['suggestedMood'] }}</span>
+                            <span>{{ $safeSuggestedMood }}</span>
                         </div>
                     @endif
-                    @if(!empty($concept['suggestedTone']))
+                    @if(!empty($safeSuggestedTone))
                         <div class="vw-concept-meta-item">
                             <span>{{ __('Tone:') }}</span>
-                            <span>{{ $concept['suggestedTone'] }}</span>
+                            <span>{{ $safeSuggestedTone }}</span>
                         </div>
                     @endif
                     <div class="vw-concept-meta-item duration">
@@ -1191,12 +1195,14 @@
             @foreach($script['scenes'] as $index => $scene)
                 @php
                     // Safety net: ensure all fields are strings even if sanitization didn't run
-                    // (e.g., old projects loaded before fix was deployed)
+                    // (e.g., old projects loaded before fix was deployed, or AI returned unexpected types)
                     $safeTitle = is_string($scene['title'] ?? null) ? $scene['title'] : (__('Scene') . ' ' . ($index + 1));
                     $safeNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
                     $safeVisualPrompt = is_string($scene['visualPrompt'] ?? null) ? $scene['visualPrompt'] : '';
                     $safeVisualDescription = is_string($scene['visualDescription'] ?? null) ? $scene['visualDescription'] : '';
-                    $safeMood = is_string($scene['mood'] ?? null) ? $scene['mood'] : '';
+                    // Mood can sometimes be an array from AI - extract string safely
+                    $rawMood = $scene['mood'] ?? null;
+                    $safeMood = is_string($rawMood) ? $rawMood : (is_array($rawMood) ? (is_string($rawMood[0] ?? null) ? $rawMood[0] : '') : '');
                     $safeTransition = is_string($scene['transition'] ?? null) ? $scene['transition'] : 'cut';
                     $safeDuration = is_numeric($scene['duration'] ?? null) ? (int)$scene['duration'] : 15;
 
