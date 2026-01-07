@@ -59,6 +59,10 @@
     			align-items: center;
 				cursor: pointer;
 				gap: 10px;
+				border-radius: 8px 0 0 8px;
+				margin-right: -0.825rem;
+				padding-right: calc(0.5rem + 0.825rem);
+				transition: background-color 0.15s ease-in-out;
 
 				&:after{
 					display: none;
@@ -96,6 +100,13 @@
 
 				&:hover{
 					color: $blue;
+					background-color: rgba(139, 92, 246, 0.08);
+				}
+
+				// Active state - light purple background with left rounded corners
+				&.text-primary,
+				&.active {
+					background-color: rgba(139, 92, 246, 0.12);
 				}
 
 				.menu-bullet{
