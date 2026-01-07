@@ -1223,7 +1223,7 @@
                     for ($moodLoop = 0; $moodLoop < 10 && is_array($rawMood); $moodLoop++) {
                         $rawMood = !empty($rawMood) ? reset($rawMood) : null;
                     }
-                    // If STILL an array after 10 iterations, json_encode it
+                    // If STILL an array after 10 iterations, empty string
                     if (is_array($rawMood)) {
                         $safeMood = '';
                     } elseif (is_string($rawMood)) {
@@ -1233,6 +1233,8 @@
                     } else {
                         $safeMood = '';
                     }
+                    // Pre-compute the display value - GUARANTEED string
+                    $moodDisplay = (is_string($safeMood) && strlen($safeMood) > 0) ? ucfirst($safeMood) : '';
 
                     // Extract transition
                     $rawTransition = $scene['transition'] ?? null;
@@ -1272,8 +1274,8 @@
                         <div class="vw-scene-meta-badges">
                             <span class="vw-scene-meta-badge">{{ $safeDuration }}s</span>
                             <span class="vw-scene-meta-badge">{{ $transitionLabel }}</span>
-                            @if(is_string($safeMood) && $safeMood !== '')
-                                <span class="vw-scene-meta-badge">{{ ucfirst((string)$safeMood) }}</span>
+                            @if($moodDisplay !== '')
+                                <span class="vw-scene-meta-badge">{{ $moodDisplay }}</span>
                             @endif
                         </div>
                     </div>
