@@ -564,7 +564,15 @@ class ImageGenerationService
                     foreach ($sceneCharacters as $character) {
                         if (!empty($character['description'])) {
                             $name = $character['name'] ?? 'Character';
-                            $characterDescriptions[] = "{$name}: {$character['description']}";
+                            $charDesc = "{$name}: {$character['description']}";
+
+                            // Include traits if available for personality/expression guidance
+                            $traits = $character['traits'] ?? [];
+                            if (!empty($traits)) {
+                                $charDesc .= ' (personality: ' . implode(', ', array_slice($traits, 0, 4)) . ')';
+                            }
+
+                            $characterDescriptions[] = $charDesc;
                         }
                     }
                     if (!empty($characterDescriptions)) {

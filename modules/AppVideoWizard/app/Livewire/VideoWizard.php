@@ -2431,9 +2431,95 @@ class VideoWizard extends Component
             'id' => uniqid('char_'),
             'name' => $name,
             'description' => $description,
+            'role' => 'Supporting',
             'appliedScenes' => [],
+            'traits' => [],
             'referenceImage' => null,
         ];
+        $this->saveProject();
+    }
+
+    /**
+     * Add a trait to a character.
+     */
+    public function addCharacterTrait(int $characterIndex, string $trait = ''): void
+    {
+        $trait = trim($trait);
+        if (empty($trait)) {
+            return;
+        }
+
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        // Initialize traits array if not exists
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'])) {
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'] = [];
+        }
+
+        // Avoid duplicates (case-insensitive)
+        $existingTraits = array_map('strtolower', $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits']);
+        if (in_array(strtolower($trait), $existingTraits)) {
+            return;
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'][] = $trait;
+        $this->saveProject();
+    }
+
+    /**
+     * Remove a trait from a character.
+     */
+    public function removeCharacterTrait(int $characterIndex, int $traitIndex): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'][$traitIndex])) {
+            return;
+        }
+
+        unset($this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'][$traitIndex]);
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'] = array_values(
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits']
+        );
+        $this->saveProject();
+    }
+
+    /**
+     * Apply a preset trait set to a character based on archetype.
+     */
+    public function applyTraitPreset(int $characterIndex, string $preset): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $presets = [
+            'hero' => ['confident', 'determined', 'courageous', 'charismatic'],
+            'villain' => ['cunning', 'menacing', 'calculating', 'powerful'],
+            'mentor' => ['wise', 'patient', 'experienced', 'supportive'],
+            'comic' => ['witty', 'playful', 'energetic', 'quirky'],
+            'mysterious' => ['enigmatic', 'reserved', 'observant', 'cryptic'],
+            'professional' => ['competent', 'focused', 'reliable', 'articulate'],
+            'creative' => ['imaginative', 'passionate', 'expressive', 'innovative'],
+            'leader' => ['authoritative', 'decisive', 'inspiring', 'strategic'],
+        ];
+
+        if (!isset($presets[$preset])) {
+            return;
+        }
+
+        // Merge with existing traits, avoiding duplicates
+        $currentTraits = $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'] ?? [];
+        $currentTraitsLower = array_map('strtolower', $currentTraits);
+
+        foreach ($presets[$preset] as $trait) {
+            if (!in_array(strtolower($trait), $currentTraitsLower)) {
+                $currentTraits[] = $trait;
+                $currentTraitsLower[] = strtolower($trait);
+            }
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['traits'] = $currentTraits;
         $this->saveProject();
     }
 
@@ -2665,7 +2751,15 @@ class VideoWizard extends Component
                 foreach ($sceneCharacters as $character) {
                     if (!empty($character['description'])) {
                         $name = $character['name'] ?? 'Character';
-                        $characterDescriptions[] = "{$name}: {$character['description']}";
+                        $charDesc = "{$name}: {$character['description']}";
+
+                        // Include traits if available for personality/expression guidance
+                        $traits = $character['traits'] ?? [];
+                        if (!empty($traits)) {
+                            $charDesc .= ' (personality: ' . implode(', ', array_slice($traits, 0, 4)) . ')';
+                        }
+
+                        $characterDescriptions[] = $charDesc;
                     }
                 }
                 if (!empty($characterDescriptions)) {

@@ -167,6 +167,60 @@
                                           placeholder="{{ __('e.g., Mid-30s woman with short dark hair, sharp features, wears a leather jacket...') }}"
                                           style="width: 100%; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; color: white; font-size: 0.8rem; min-height: 80px; resize: vertical;"></textarea>
                             </div>
+
+                            {{-- Character Traits (Expandable) --}}
+                            <div x-data="{ traitsOpen: true, newTrait: '' }" style="margin-bottom: 0.75rem;">
+                                <button type="button"
+                                        @click="traitsOpen = !traitsOpen"
+                                        style="display: flex; align-items: center; gap: 0.35rem; width: 100%; background: none; border: none; padding: 0; cursor: pointer; margin-bottom: 0.35rem;">
+                                    <span style="color: rgba(255,255,255,0.6); font-size: 0.7rem; transition: transform 0.2s;" :style="traitsOpen ? '' : 'transform: rotate(-90deg)'">▼</span>
+                                    <span style="color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Character Traits') }}</span>
+                                    <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem; margin-left: 0.25rem;">({{ count($currentChar['traits'] ?? []) }})</span>
+                                </button>
+
+                                <div x-show="traitsOpen" x-collapse>
+                                    {{-- Current Traits --}}
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem;">
+                                        @forelse($currentChar['traits'] ?? [] as $traitIdx => $trait)
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 1rem; color: #c4b5fd; font-size: 0.65rem;">
+                                                {{ $trait }}
+                                                <button type="button"
+                                                        wire:click="removeCharacterTrait({{ $editIndex }}, {{ $traitIdx }})"
+                                                        style="background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; padding: 0; line-height: 1; font-size: 0.7rem;"
+                                                        title="{{ __('Remove') }}">&times;</button>
+                                            </span>
+                                        @empty
+                                            <span style="color: rgba(255,255,255,0.4); font-size: 0.65rem; font-style: italic;">{{ __('No traits added yet') }}</span>
+                                        @endforelse
+                                    </div>
+
+                                    {{-- Add New Trait --}}
+                                    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.5rem;">
+                                        <input type="text"
+                                               x-model="newTrait"
+                                               @keydown.enter.prevent="if(newTrait.trim()) { $wire.addCharacterTrait({{ $editIndex }}, newTrait.trim()); newTrait = ''; }"
+                                               placeholder="{{ __('Add trait (e.g., confident, mysterious)') }}"
+                                               style="flex: 1; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.35rem; color: white; font-size: 0.7rem;">
+                                        <button type="button"
+                                                @click="if(newTrait.trim()) { $wire.addCharacterTrait({{ $editIndex }}, newTrait.trim()); newTrait = ''; }"
+                                                style="padding: 0.4rem 0.6rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.35rem; color: #c4b5fd; font-size: 0.65rem; cursor: pointer;">
+                                            + {{ __('Add') }}
+                                        </button>
+                                    </div>
+
+                                    {{-- Trait Presets --}}
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                        <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem; margin-right: 0.25rem;">{{ __('Presets:') }}</span>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'hero')" style="padding: 0.2rem 0.4rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 0.25rem; color: #fca5a5; font-size: 0.55rem; cursor: pointer;">🦸 {{ __('Hero') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'villain')" style="padding: 0.2rem 0.4rem; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.55rem; cursor: pointer;">🦹 {{ __('Villain') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'mentor')" style="padding: 0.2rem 0.4rem; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); border-radius: 0.25rem; color: #fcd34d; font-size: 0.55rem; cursor: pointer;">🧙 {{ __('Mentor') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'professional')" style="padding: 0.2rem 0.4rem; background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.2); border-radius: 0.25rem; color: #67e8f9; font-size: 0.55rem; cursor: pointer;">💼 {{ __('Pro') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'mysterious')" style="padding: 0.2rem 0.4rem; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 0.25rem; color: #a5b4fc; font-size: 0.55rem; cursor: pointer;">🔮 {{ __('Mysterious') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'comic')" style="padding: 0.2rem 0.4rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); border-radius: 0.25rem; color: #6ee7b7; font-size: 0.55rem; cursor: pointer;">🎭 {{ __('Comic') }}</button>
+                                        <button type="button" wire:click="applyTraitPreset({{ $editIndex }}, 'leader')" style="padding: 0.2rem 0.4rem; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); border-radius: 0.25rem; color: #fcd34d; font-size: 0.55rem; cursor: pointer;">👑 {{ __('Leader') }}</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
