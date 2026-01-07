@@ -922,6 +922,15 @@
                                 <div class="vw-scene-generating">
                                     <div class="vw-spinner"></div>
                                     <span class="vw-generating-text">{{ __('Generating...') }}</span>
+                                    <button type="button"
+                                            wire:click="cancelImageGeneration({{ $index }})"
+                                            wire:confirm="{{ __('Cancel this generation? You can retry afterwards.') }}"
+                                            style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 0.25rem; border: 1px solid rgba(239,68,68,0.5); background: rgba(239,68,68,0.2); color: #f87171; cursor: pointer; font-size: 0.7rem; transition: all 0.2s;"
+                                            onmouseover="this.style.background='rgba(239,68,68,0.4)'"
+                                            onmouseout="this.style.background='rgba(239,68,68,0.2)'"
+                                            title="{{ __('Cancel and retry') }}">
+                                        ✕ {{ __('Cancel') }}
+                                    </button>
                                 </div>
                             @elseif($imageUrl)
                                 {{-- Image Ready --}}

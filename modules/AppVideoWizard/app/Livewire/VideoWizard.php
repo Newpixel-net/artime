@@ -204,6 +204,7 @@ class VideoWizard extends Component
     /**
      * Recover pending async jobs from database.
      * This restores job tracking after page refresh.
+     * Jobs older than 10 minutes are automatically marked as timed out.
      */
     protected function recoverPendingJobs(WizardProject $project): void
     {
@@ -221,8 +222,22 @@ class VideoWizard extends Component
             return;
         }
 
+        // Timeout threshold: 10 minutes
+        $timeoutThreshold = now()->subMinutes(10);
+
         // Restore pending jobs to component state
         foreach ($pendingJobs as $job) {
+            // Check if job has timed out
+            if ($job->created_at < $timeoutThreshold) {
+                $job->markAsFailed('Job timed out after 10 minutes');
+                \Log::warning("Auto-cancelled timed out job", [
+                    'jobId' => $job->id,
+                    'externalJobId' => $job->external_job_id,
+                    'createdAt' => $job->created_at,
+                ]);
+                continue;
+            }
+
             $inputData = $job->input_data ?? [];
             $sceneIndex = $inputData['sceneIndex'] ?? null;
 
@@ -1130,6 +1145,56 @@ class VideoWizard extends Component
                 \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PROCESSING,
             ])
             ->count();
+    }
+
+    /**
+     * Cancel a stuck image generation job.
+     */
+    #[On('cancel-image-generation')]
+    public function cancelImageGeneration(int $sceneIndex): void
+    {
+        try {
+            // Get the processing job for this scene
+            if ($this->projectId) {
+                $job = \Modules\AppVideoWizard\Models\WizardProcessingJob::query()
+                    ->where('project_id', $this->projectId)
+                    ->where('type', \Modules\AppVideoWizard\Models\WizardProcessingJob::TYPE_IMAGE_GENERATION)
+                    ->whereIn('status', [
+                        \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PENDING,
+                        \Modules\AppVideoWizard\Models\WizardProcessingJob::STATUS_PROCESSING,
+                    ])
+                    ->whereJsonContains('input_data->sceneIndex', $sceneIndex)
+                    ->first();
+
+                if ($job) {
+                    $job->markAsCancelled();
+                    \Log::info("Cancelled stuck job for scene {$sceneIndex}", ['jobId' => $job->id]);
+                }
+            }
+
+            // Reset the scene status in storyboard
+            if (isset($this->storyboard['scenes'][$sceneIndex])) {
+                $this->storyboard['scenes'][$sceneIndex]['status'] = null;
+                $this->storyboard['scenes'][$sceneIndex]['imageUrl'] = null;
+                $this->storyboard['scenes'][$sceneIndex]['jobId'] = null;
+                $this->storyboard['scenes'][$sceneIndex]['processingJobId'] = null;
+            }
+
+            // Remove from pendingJobs array if present
+            if (isset($this->pendingJobs[$sceneIndex])) {
+                unset($this->pendingJobs[$sceneIndex]);
+            }
+
+            $this->saveProject();
+
+            $this->dispatch('generation-cancelled', [
+                'sceneIndex' => $sceneIndex,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Failed to cancel generation for scene {$sceneIndex}: " . $e->getMessage());
+            $this->error = __('Failed to cancel generation');
+        }
     }
 
     /**
