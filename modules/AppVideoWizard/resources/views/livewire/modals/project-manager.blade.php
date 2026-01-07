@@ -1,7 +1,9 @@
 {{-- Project Manager Modal --}}
 <div x-data="{
         deleteConfirmId: null,
-        deleteConfirmName: ''
+        deleteConfirmName: '',
+        editingProjectId: null,
+        editingProjectName: ''
      }"
      x-show="$wire.showProjectManager"
      x-cloak
@@ -119,8 +121,36 @@
 
                             {{-- Card Body --}}
                             <div class="vw-pm-card-body">
-                                <h3 class="vw-pm-card-title">
+                                {{-- Inline Edit Title --}}
+                                <div x-show="editingProjectId === {{ $project['id'] }}" class="vw-pm-card-title-edit">
+                                    <input type="text"
+                                           x-model="editingProjectName"
+                                           @keydown.enter="$wire.renameProject({{ $project['id'] }}, editingProjectName); editingProjectId = null"
+                                           @keydown.escape="editingProjectId = null"
+                                           @click.outside="editingProjectId = null"
+                                           class="vw-pm-card-title-input"
+                                           x-ref="renameInput{{ $project['id'] }}"
+                                           @focus="$el.select()">
+                                    <div class="vw-pm-card-title-actions">
+                                        <button type="button"
+                                                class="vw-pm-card-title-btn vw-pm-card-title-save"
+                                                @click="$wire.renameProject({{ $project['id'] }}, editingProjectName); editingProjectId = null">
+                                            ✓
+                                        </button>
+                                        <button type="button"
+                                                class="vw-pm-card-title-btn vw-pm-card-title-cancel"
+                                                @click="editingProjectId = null">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                                {{-- Display Title --}}
+                                <h3 x-show="editingProjectId !== {{ $project['id'] }}"
+                                    class="vw-pm-card-title vw-pm-card-title-editable"
+                                    @click="editingProjectId = {{ $project['id'] }}; editingProjectName = '{{ addslashes($project['name'] ?? 'Untitled') }}'; $nextTick(() => $refs.renameInput{{ $project['id'] }}?.focus())"
+                                    title="{{ __('Click to rename') }}">
                                     {{ $project['name'] ?? __('Untitled Project') }}
+                                    <span class="vw-pm-card-title-edit-icon">✏️</span>
                                 </h3>
                                 @if($isCurrent)
                                     <span class="vw-pm-card-current-badge">{{ __('Currently Open') }}</span>
@@ -162,8 +192,18 @@
                                     </button>
                                 @endif
                                 <button type="button"
+                                        class="vw-pm-card-btn vw-pm-card-btn-duplicate"
+                                        wire:click="duplicateProject({{ $project['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="duplicateProject({{ $project['id'] }})"
+                                        title="{{ __('Duplicate project') }}">
+                                    <span wire:loading.remove wire:target="duplicateProject({{ $project['id'] }})">📋</span>
+                                    <span wire:loading wire:target="duplicateProject({{ $project['id'] }})">⏳</span>
+                                </button>
+                                <button type="button"
                                         class="vw-pm-card-btn vw-pm-card-btn-delete"
-                                        @click="deleteConfirmId = {{ $project['id'] }}; deleteConfirmName = '{{ addslashes($project['name'] ?? 'Untitled') }}'">
+                                        @click="deleteConfirmId = {{ $project['id'] }}; deleteConfirmName = '{{ addslashes($project['name'] ?? 'Untitled') }}'"
+                                        title="{{ __('Delete project') }}">
                                     🗑️
                                 </button>
                             </div>
@@ -176,7 +216,7 @@
         {{-- Loading Overlay --}}
         <div class="vw-pm-loading-overlay"
              wire:loading.flex
-             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject">
+             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject">
             <div class="vw-pm-loading-spinner"></div>
             <span class="vw-pm-loading-text">{{ __('Please wait...') }}</span>
         </div>
@@ -512,9 +552,19 @@
     color: #a78bfa;
 }
 
+.vw-pm-status-in_progress {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
 .vw-pm-status-processing {
     background: rgba(251, 191, 36, 0.2);
     color: #fbbf24;
+}
+
+.vw-pm-status-complete {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
 }
 
 .vw-pm-status-completed {
@@ -539,6 +589,90 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.vw-pm-card-title-editable {
+    cursor: pointer;
+    position: relative;
+    padding-right: 1.5rem;
+}
+
+.vw-pm-card-title-editable:hover {
+    color: #a78bfa;
+}
+
+.vw-pm-card-title-edit-icon {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.vw-pm-card-title-editable:hover .vw-pm-card-title-edit-icon {
+    opacity: 0.7;
+}
+
+.vw-pm-card-title-edit {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.vw-pm-card-title-input {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 0.375rem;
+    color: #fff;
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.vw-pm-card-title-input:focus {
+    outline: none;
+    border-color: rgba(139, 92, 246, 0.7);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.vw-pm-card-title-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.vw-pm-card-title-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vw-pm-card-title-save {
+    background: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.vw-pm-card-title-save:hover {
+    background: rgba(16, 185, 129, 0.5);
+}
+
+.vw-pm-card-title-cancel {
+    background: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.vw-pm-card-title-cancel:hover {
+    background: rgba(239, 68, 68, 0.5);
 }
 
 .vw-pm-card-current-badge {
@@ -611,6 +745,23 @@
     background: rgba(16, 185, 129, 0.2);
     color: #10b981;
     cursor: default;
+}
+
+.vw-pm-card-btn-duplicate {
+    flex: 0;
+    width: 2.25rem;
+    background: rgba(6, 182, 212, 0.1);
+    color: rgba(6, 182, 212, 0.7);
+}
+
+.vw-pm-card-btn-duplicate:hover {
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
+}
+
+.vw-pm-card-btn-duplicate:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .vw-pm-card-btn-delete {

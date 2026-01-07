@@ -2628,6 +2628,96 @@ class VideoWizard extends Component
         $this->loadProjectManagerProjects();
     }
 
+    /**
+     * Duplicate a project.
+     */
+    public function duplicateProject(int $projectId): void
+    {
+        try {
+            $original = WizardProject::findOrFail($projectId);
+
+            // Create a copy with a new name
+            $copy = $original->replicate();
+            $copy->name = $original->name . ' (Copy)';
+            $copy->created_at = now();
+            $copy->updated_at = now();
+            $copy->save();
+
+            // Reload the project list
+            $this->loadProjectManagerProjects();
+
+            $this->dispatch('project-duplicated', ['projectId' => $copy->id]);
+        } catch (\Exception $e) {
+            Log::error('Failed to duplicate project: ' . $e->getMessage());
+            $this->error = __('Failed to duplicate project');
+        }
+    }
+
+    /**
+     * Rename a project.
+     */
+    public function renameProject(int $projectId, string $newName): void
+    {
+        try {
+            $newName = trim($newName);
+            if (empty($newName)) {
+                $this->error = __('Project name cannot be empty');
+                return;
+            }
+
+            $project = WizardProject::findOrFail($projectId);
+            $project->name = $newName;
+            $project->save();
+
+            // If this is the currently loaded project, update local state
+            if ($this->projectId === $projectId) {
+                $this->projectName = $newName;
+            }
+
+            // Reload the project list
+            $this->loadProjectManagerProjects();
+
+            $this->dispatch('project-renamed', ['projectId' => $projectId, 'newName' => $newName]);
+        } catch (\Exception $e) {
+            Log::error('Failed to rename project: ' . $e->getMessage());
+            $this->error = __('Failed to rename project');
+        }
+    }
+
+    /**
+     * Get the status of a project based on its data.
+     */
+    public function getProjectStatus(array $projectData): string
+    {
+        $concept = $projectData['concept'] ?? [];
+        $script = $projectData['script'] ?? [];
+        $storyboard = $projectData['storyboard'] ?? [];
+        $animation = $projectData['animation'] ?? [];
+        $assembly = $projectData['assembly'] ?? [];
+
+        // Check if export/assembly is complete
+        if (!empty($assembly) && isset($assembly['exported']) && $assembly['exported']) {
+            return 'complete';
+        }
+
+        // Check if any work has been done beyond concept
+        if (!empty($storyboard) || !empty($animation) || !empty($assembly)) {
+            return 'in_progress';
+        }
+
+        // Check if script has scenes
+        if (!empty($script) && isset($script['scenes']) && count($script['scenes'] ?? []) > 0) {
+            return 'in_progress';
+        }
+
+        // Check if concept is filled
+        if (!empty($concept) && !empty($concept['topic'] ?? '')) {
+            return 'draft';
+        }
+
+        return 'draft';
+    }
+
     // =========================================================================
     // STYLE TEMPLATE METHODS
     // =========================================================================
