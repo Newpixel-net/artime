@@ -718,6 +718,42 @@
                 <p class="vw-model-description">{{ $imageModels[$selectedModel]['desc'] ?? '' }}</p>
             </div>
 
+            {{-- Video Model Selector (Coming Soon) --}}
+            <div class="vw-section" style="opacity: 0.6;">
+                <div class="vw-section-header">
+                    <div class="vw-section-label">
+                        <span>🎬</span>
+                        <span>{{ __('Video Model') }}</span>
+                    </div>
+                    <span style="font-size: 0.55rem; padding: 0.15rem 0.5rem; background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.4); border-radius: 0.5rem; color: #a5b4fc;">
+                        {{ __('COMING SOON') }}
+                    </span>
+                </div>
+                <div class="vw-model-buttons" style="pointer-events: none;">
+                    @php
+                        $videoModels = [
+                            'minimax' => ['name' => 'Minimax', 'cost' => 5, 'desc' => 'Fast video generation, 5-10s clips'],
+                            'multitalk' => ['name' => 'Multitalk', 'cost' => 8, 'desc' => 'Lip-sync & dialogue, character animation'],
+                            'kling' => ['name' => 'Kling AI', 'cost' => 10, 'desc' => 'High-quality cinematic motion'],
+                        ];
+                        $selectedVideoModel = $storyboard['videoModel'] ?? 'minimax';
+                    @endphp
+                    @foreach($videoModels as $modelId => $model)
+                        <button type="button"
+                                class="vw-model-btn {{ $selectedVideoModel === $modelId ? 'selected' : '' }}"
+                                style="opacity: 0.5; cursor: not-allowed;"
+                                disabled
+                                title="{{ $model['desc'] }}">
+                            <span class="vw-model-btn-name">{{ $model['name'] }}</span>
+                            <span class="vw-model-btn-cost">{{ $model['cost'] }} {{ __('tokens') }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                <p class="vw-model-description" style="color: rgba(255,255,255,0.4);">
+                    💡 {{ __('Video generation will animate your scenes with motion and optional lip-sync.') }}
+                </p>
+            </div>
+
             {{-- Visual Style Controls --}}
             @php
                 $hasActiveStyles = !empty($storyboard['visualStyle']['mood'] ?? '') ||
