@@ -1196,11 +1196,15 @@
                             @if($isMusicOnly)
                                 <span class="vw-scene-music-badge">🎵 {{ __('Music only') }}</span>
                             @endif
-                            <span class="vw-scene-title">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</span>
+                            <span class="vw-scene-title">{{ is_string($scene['title'] ?? '') ? ($scene['title'] ?? __('Scene') . ' ' . ($index + 1)) : __('Scene') . ' ' . ($index + 1) }}</span>
                         </div>
                         <div class="vw-scene-meta-badges">
                             <span class="vw-scene-meta-badge">{{ $scene['duration'] ?? 15 }}s</span>
-                            <span class="vw-scene-meta-badge">{{ $transitions[$scene['transition'] ?? 'cut'] ?? 'Cut' }}</span>
+                            @php
+                                $transitionKey = $scene['transition'] ?? 'cut';
+                                $transitionLabel = is_string($transitionKey) ? ($transitions[$transitionKey] ?? 'Cut') : 'Cut';
+                            @endphp
+                            <span class="vw-scene-meta-badge">{{ $transitionLabel }}</span>
                             @if(!empty($scene['mood']) && is_string($scene['mood']))
                                 <span class="vw-scene-meta-badge">{{ ucfirst($scene['mood']) }}</span>
                             @endif
