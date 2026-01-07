@@ -12,6 +12,7 @@ use Modules\AppVideoWizard\Services\ScriptGenerationService;
 use Modules\AppVideoWizard\Services\ImageGenerationService;
 use Modules\AppVideoWizard\Services\VoiceoverService;
 use Modules\AppVideoWizard\Services\StockMediaService;
+use Modules\AppVideoWizard\Services\CharacterExtractionService;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
 use Illuminate\Support\Facades\Log;
 
@@ -3583,10 +3584,92 @@ class VideoWizard extends Component
     }
 
     /**
-     * Auto-detect characters from script content (enhanced version).
-     * Analyzes narration and visual descriptions to identify potential characters.
+     * Auto-detect characters from script content using AI extraction.
+     * Falls back to pattern matching if AI fails.
      */
     protected function autoDetectCharactersFromScript(): void
+    {
+        // Try AI-powered extraction first
+        try {
+            $service = app(CharacterExtractionService::class);
+
+            $result = $service->extractCharacters($this->script, [
+                'teamId' => session('current_team_id', 0),
+                'genre' => $this->productionType ?? 'General',
+                'productionType' => $this->productionType,
+                'productionMode' => 'standard',
+                'styleBible' => $this->sceneMemory['styleBible'] ?? null,
+            ]);
+
+            if ($result['success'] && !empty($result['characters'])) {
+                Log::info('CharacterExtraction: AI extraction successful', [
+                    'count' => count($result['characters']),
+                ]);
+
+                // Add AI-extracted characters to Character Bible
+                foreach ($result['characters'] as $character) {
+                    // Check if already exists
+                    $exists = collect($this->sceneMemory['characterBible']['characters'])
+                        ->where('name', $character['name'])
+                        ->isNotEmpty();
+
+                    if (!$exists) {
+                        $this->sceneMemory['characterBible']['characters'][] = [
+                            'id' => $character['id'] ?? uniqid('char_'),
+                            'name' => $character['name'],
+                            'description' => $character['description'] ?? '',
+                            'role' => $character['role'] ?? 'Supporting',
+                            'appliedScenes' => $character['appearsInScenes'] ?? [],
+                            'traits' => $character['traits'] ?? [],
+                            'referenceImage' => null,
+                            'autoDetected' => true,
+                            'aiGenerated' => true,
+                        ];
+                    }
+                }
+
+                // Enable Character Bible if we detected any characters
+                if (!empty($result['characters'])) {
+                    $this->sceneMemory['characterBible']['enabled'] = true;
+                }
+
+                // Dispatch event for debugging
+                $this->dispatch('vw-debug', [
+                    'type' => 'character_extraction',
+                    'method' => 'ai',
+                    'count' => count($result['characters']),
+                    'hasHumanCharacters' => $result['hasHumanCharacters'],
+                ]);
+
+                return; // AI extraction successful, no need for fallback
+            }
+
+            // If AI returned no characters but was successful, check if video has no human characters
+            if ($result['success'] && empty($result['characters']) && !$result['hasHumanCharacters']) {
+                Log::info('CharacterExtraction: AI determined no human characters in video');
+                $this->dispatch('vw-debug', [
+                    'type' => 'character_extraction',
+                    'method' => 'ai',
+                    'count' => 0,
+                    'message' => 'No human characters detected',
+                ]);
+                return;
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('CharacterExtraction: AI extraction failed, falling back to pattern matching', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Fallback to pattern-based detection
+        $this->autoDetectCharactersWithPatterns();
+    }
+
+    /**
+     * Pattern-based character detection (fallback method).
+     */
+    protected function autoDetectCharactersWithPatterns(): void
     {
         $detectedCharacters = [];
         $characterScenes = []; // Track which scenes each character appears in
@@ -3676,6 +3759,7 @@ class VideoWizard extends Component
                     'appliedScenes' => $characterScenes[$name] ?? [],
                     'referenceImage' => null,
                     'autoDetected' => true,
+                    'patternMatched' => true,
                 ];
             }
         }
@@ -3684,6 +3768,13 @@ class VideoWizard extends Component
         if (!empty($detectedCharacters)) {
             $this->sceneMemory['characterBible']['enabled'] = true;
         }
+
+        // Dispatch event for debugging
+        $this->dispatch('vw-debug', [
+            'type' => 'character_extraction',
+            'method' => 'pattern',
+            'count' => count($detectedCharacters),
+        ]);
     }
 
     /**
@@ -3959,35 +4050,8 @@ class VideoWizard extends Component
      */
     public function autoDetectCharacters(): void
     {
-        // Simple detection - look for names in dialogue
-        $characters = [];
-        foreach ($this->script['scenes'] as $scene) {
-            if (isset($scene['dialogue']) && is_array($scene['dialogue'])) {
-                foreach ($scene['dialogue'] as $dialogue) {
-                    $speaker = $dialogue['speaker'] ?? null;
-                    if ($speaker && !in_array($speaker, $characters)) {
-                        $characters[] = $speaker;
-                    }
-                }
-            }
-        }
-
-        foreach ($characters as $name) {
-            $exists = collect($this->sceneMemory['characterBible']['characters'])
-                ->where('name', $name)
-                ->isNotEmpty();
-
-            if (!$exists) {
-                $this->sceneMemory['characterBible']['characters'][] = [
-                    'id' => uniqid('char_'),
-                    'name' => $name,
-                    'description' => '',
-                    'appliedScenes' => [],
-                    'referenceImage' => null,
-                ];
-            }
-        }
-
+        // Use AI-powered extraction (with pattern fallback)
+        $this->autoDetectCharactersFromScript();
         $this->saveProject();
     }
 
