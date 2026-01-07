@@ -44,6 +44,16 @@
                 <span class="vw-pm-count">{{ $projectManagerStatusCounts['all'] ?? 0 }} {{ __('total') }}</span>
             </div>
             <div class="vw-pm-header-right">
+                {{-- Import Button --}}
+                <label class="vw-pm-import-btn" title="{{ __('Import project from JSON') }}">
+                    <input type="file"
+                           accept=".json"
+                           wire:model="importFile"
+                           style="display: none;"
+                           x-on:change="$wire.importProject($event.target.files[0]); $event.target.value = ''">
+                    <span wire:loading.remove wire:target="importProject, importFile">📥 {{ __('Import') }}</span>
+                    <span wire:loading wire:target="importProject, importFile">{{ __('Importing...') }}</span>
+                </label>
                 <button type="button"
                         class="vw-pm-new-btn"
                         wire:click="createNewProject"
@@ -311,6 +321,15 @@
                                     </button>
                                 @endif
                                 <button type="button"
+                                        class="vw-pm-card-btn vw-pm-card-btn-export"
+                                        wire:click="exportProject({{ $project['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="exportProject({{ $project['id'] }})"
+                                        title="{{ __('Export to JSON') }}">
+                                    <span wire:loading.remove wire:target="exportProject({{ $project['id'] }})">📤</span>
+                                    <span wire:loading wire:target="exportProject({{ $project['id'] }})">⏳</span>
+                                </button>
+                                <button type="button"
                                         class="vw-pm-card-btn vw-pm-card-btn-duplicate"
                                         wire:click="duplicateProject({{ $project['id'] }})"
                                         wire:loading.attr="disabled"
@@ -368,7 +387,7 @@
         {{-- Loading Overlay --}}
         <div class="vw-pm-loading-overlay"
              wire:loading.flex
-             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject, setProjectManagerStatusFilter, deleteSelectedProjects">
+             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject, setProjectManagerStatusFilter, deleteSelectedProjects, exportProject, importProject, importFile">
             <div class="vw-pm-loading-spinner"></div>
             <span class="vw-pm-loading-text">{{ __('Please wait...') }}</span>
         </div>
@@ -1218,6 +1237,45 @@
     color: #ef4444;
 }
 
+.vw-pm-card-btn-export {
+    flex: 0;
+    width: 2.25rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: rgba(16, 185, 129, 0.7);
+}
+
+.vw-pm-card-btn-export:hover {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.vw-pm-card-btn-export:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Import Button */
+.vw-pm-import-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vw-pm-import-btn:hover {
+    background: rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.5);
+    transform: translateY(-1px);
+}
+
 /* Loading Overlay */
 .vw-pm-loading-overlay {
     position: absolute;
@@ -1323,28 +1381,190 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .vw-project-manager-modal {
-        max-height: 90vh;
+        max-height: 92vh;
+        margin: 0.5rem;
     }
 
     .vw-pm-header {
         flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
+        gap: 0.75rem;
+        align-items: stretch;
+        padding: 1rem;
     }
 
-    .vw-pm-header-right {
-        width: 100%;
+    .vw-pm-header-left {
         justify-content: space-between;
     }
 
+    .vw-pm-header-right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-start;
+    }
+
+    .vw-pm-import-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    .vw-pm-new-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    /* Status Tabs - horizontal scroll */
+    .vw-pm-status-tabs {
+        padding: 0.5rem 1rem;
+        gap: 0.375rem;
+    }
+
+    .vw-pm-status-tab {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+    }
+
+    .vw-pm-status-tab-label {
+        display: none;
+    }
+
+    .vw-pm-status-tab:first-child .vw-pm-status-tab-label {
+        display: inline;
+    }
+
+    /* Filters - improved mobile layout */
     .vw-pm-filters {
         flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .vw-pm-sort-group {
+        width: 100%;
+    }
+
+    .vw-pm-sort-select {
+        flex: 1;
+    }
+
+    .vw-pm-select-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Bulk Actions Bar - improved mobile layout */
+    .vw-pm-bulk-bar {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        align-items: stretch;
+    }
+
+    .vw-pm-bulk-info {
+        justify-content: center;
+        font-size: 0.8125rem;
+    }
+
+    .vw-pm-bulk-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.375rem;
+    }
+
+    .vw-pm-bulk-btn {
+        flex: 1;
+        min-width: calc(50% - 0.25rem);
+        justify-content: center;
+        padding: 0.5rem 0.5rem;
+        font-size: 0.6875rem;
+    }
+
+    .vw-pm-bulk-btn-delete {
+        min-width: 100%;
+    }
+
+    /* Content and Grid */
+    .vw-pm-content {
+        padding: 1rem;
     }
 
     .vw-pm-grid {
         grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    /* Card improvements */
+    .vw-pm-card-meta {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .vw-pm-card-progress {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .vw-pm-card-actions {
+        padding: 0.5rem 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .vw-pm-card-btn-load,
+    .vw-pm-card-btn-current {
+        flex: 1 1 100%;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Pagination */
+    .vw-pm-pagination {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 0;
+    }
+
+    .vw-pm-pagination-info {
+        font-size: 0.75rem;
+    }
+
+    .vw-pm-pagination-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .vw-pm-pagination-btn {
+        min-width: 1.75rem;
+        height: 1.75rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 400px) {
+    .vw-pm-header-right {
+        flex-direction: column;
+    }
+
+    .vw-pm-import-btn,
+    .vw-pm-new-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .vw-pm-close-btn {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+
+    .vw-pm-status-tab-count {
+        display: none;
+    }
+
+    .vw-pm-card-btn-export,
+    .vw-pm-card-btn-duplicate,
+    .vw-pm-card-btn-delete {
+        width: 2rem;
     }
 }
 </style>

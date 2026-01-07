@@ -4,6 +4,7 @@ namespace Modules\AppVideoWizard\Livewire;
 
 use Livewire\Component;
 use Livewire\Attributes\On;
+use Livewire\WithFileUploads;
 use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\WizardProcessingJob;
 use Modules\AppVideoWizard\Services\ConceptService;
@@ -14,6 +15,11 @@ use Modules\AppVideoWizard\Services\StockMediaService;
 
 class VideoWizard extends Component
 {
+    use WithFileUploads;
+
+    // Import file for project import
+    public $importFile;
+
     // Project state
     public ?int $projectId = null;
     public string $projectName = 'Untitled Video';
@@ -2859,6 +2865,97 @@ class VideoWizard extends Component
         } catch (\Exception $e) {
             Log::error('Failed to delete selected projects: ' . $e->getMessage());
             $this->error = __('Failed to delete selected projects');
+        }
+    }
+
+    /**
+     * Export a project to JSON.
+     */
+    public function exportProject(int $projectId): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $project = WizardProject::findOrFail($projectId);
+
+        $exportData = [
+            'version' => '1.0',
+            'exported_at' => now()->toIso8601String(),
+            'project' => [
+                'name' => $project->name,
+                'platform' => $project->platform,
+                'aspect_ratio' => $project->aspect_ratio,
+                'target_duration' => $project->target_duration,
+                'format' => $project->format,
+                'production_type' => $project->production_type,
+                'production_subtype' => $project->production_subtype,
+                'status' => $project->status,
+                'concept' => $project->concept,
+                'script' => $project->script,
+                'storyboard' => $project->storyboard,
+                'animation' => $project->animation,
+                'assembly' => $project->assembly,
+            ],
+        ];
+
+        $filename = \Illuminate\Support\Str::slug($project->name) . '-' . now()->format('Y-m-d') . '.json';
+
+        return response()->streamDownload(function () use ($exportData) {
+            echo json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }, $filename, [
+            'Content-Type' => 'application/json',
+        ]);
+    }
+
+    /**
+     * Import a project from JSON file.
+     */
+    public function importProject($file): void
+    {
+        try {
+            if (!$file) {
+                $this->error = __('No file selected');
+                return;
+            }
+
+            $content = file_get_contents($file->getRealPath());
+            $data = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->error = __('Invalid JSON file');
+                return;
+            }
+
+            if (!isset($data['project'])) {
+                $this->error = __('Invalid project file format');
+                return;
+            }
+
+            $projectData = $data['project'];
+
+            // Create new project from imported data
+            $project = new WizardProject();
+            $project->user_id = auth()->id();
+            $project->team_id = session('current_team_id', 0);
+            $project->name = ($projectData['name'] ?? 'Imported Project') . ' (Imported)';
+            $project->platform = $projectData['platform'] ?? null;
+            $project->aspect_ratio = $projectData['aspect_ratio'] ?? '16:9';
+            $project->target_duration = $projectData['target_duration'] ?? 60;
+            $project->format = $projectData['format'] ?? null;
+            $project->production_type = $projectData['production_type'] ?? null;
+            $project->production_subtype = $projectData['production_subtype'] ?? null;
+            $project->status = 'draft'; // Always start as draft
+            $project->concept = $projectData['concept'] ?? [];
+            $project->script = $projectData['script'] ?? [];
+            $project->storyboard = $projectData['storyboard'] ?? [];
+            $project->animation = $projectData['animation'] ?? [];
+            $project->assembly = $projectData['assembly'] ?? [];
+            $project->save();
+
+            // Reload the project list
+            $this->loadProjectManagerProjects();
+
+            $this->dispatch('project-imported', ['projectId' => $project->id]);
+        } catch (\Exception $e) {
+            Log::error('Failed to import project: ' . $e->getMessage());
+            $this->error = __('Failed to import project: ') . $e->getMessage();
         }
     }
 
