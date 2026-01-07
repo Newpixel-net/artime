@@ -142,9 +142,16 @@ class VideoWizard extends Component
     public array $projectManagerProjects = [];
     public string $projectManagerSearch = '';
     public string $projectManagerSort = 'updated_at';
+    public string $projectManagerStatusFilter = 'all';
     public int $projectManagerPage = 1;
     public int $projectManagerPerPage = 12;
     public int $projectManagerTotal = 0;
+    public array $projectManagerStatusCounts = [
+        'all' => 0,
+        'draft' => 0,
+        'in_progress' => 0,
+        'complete' => 0,
+    ];
 
     // Scene Memory state (Style Bible, Character Bible, Location Bible)
     public array $sceneMemory = [
@@ -2362,23 +2369,35 @@ class VideoWizard extends Component
     }
 
     /**
-     * Load projects for the project manager with pagination.
+     * Load projects for the project manager with pagination and filtering.
      */
     public function loadProjectManagerProjects(): void
     {
         $userId = auth()->id();
         $teamId = session('current_team_id', 0);
 
-        $query = WizardProject::where(function ($q) use ($userId, $teamId) {
+        // Base query for user's projects
+        $baseQuery = WizardProject::where(function ($q) use ($userId, $teamId) {
             $q->where('user_id', $userId);
             if ($teamId) {
                 $q->orWhere('team_id', $teamId);
             }
         });
 
-        // Apply search filter
+        // Apply search filter to base query
         if (!empty($this->projectManagerSearch)) {
-            $query->where('name', 'like', '%' . $this->projectManagerSearch . '%');
+            $baseQuery->where('name', 'like', '%' . $this->projectManagerSearch . '%');
+        }
+
+        // Calculate status counts (before applying status filter)
+        $this->calculateStatusCounts(clone $baseQuery);
+
+        // Clone for filtered query
+        $query = clone $baseQuery;
+
+        // Apply status filter
+        if ($this->projectManagerStatusFilter !== 'all') {
+            $query->where('status', $this->projectManagerStatusFilter);
         }
 
         // Apply sorting
@@ -2389,7 +2408,7 @@ class VideoWizard extends Component
         }
         $query->orderBy($sortField, $sortDirection);
 
-        // Get total count for pagination
+        // Get total count for pagination (after status filter)
         $this->projectManagerTotal = $query->count();
 
         // Calculate offset for pagination
@@ -2414,6 +2433,22 @@ class VideoWizard extends Component
                 'updated_at' => $project->updated_at?->toIso8601String(),
             ];
         })->toArray();
+    }
+
+    /**
+     * Calculate status counts for filter tabs.
+     */
+    protected function calculateStatusCounts($query): void
+    {
+        // Get all projects to count statuses
+        $allProjects = $query->get();
+
+        $this->projectManagerStatusCounts = [
+            'all' => $allProjects->count(),
+            'draft' => $allProjects->where('status', 'draft')->count(),
+            'in_progress' => $allProjects->where('status', 'in_progress')->count(),
+            'complete' => $allProjects->where('status', 'complete')->count(),
+        ];
     }
 
     /**
@@ -2739,6 +2774,16 @@ class VideoWizard extends Component
     public function updatedProjectManagerSort(): void
     {
         $this->projectManagerPage = 1; // Reset to first page when changing sort
+        $this->loadProjectManagerProjects();
+    }
+
+    /**
+     * Set status filter in project manager.
+     */
+    public function setProjectManagerStatusFilter(string $status): void
+    {
+        $this->projectManagerStatusFilter = $status;
+        $this->projectManagerPage = 1; // Reset to first page when changing filter
         $this->loadProjectManagerProjects();
     }
 
