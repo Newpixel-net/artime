@@ -1184,6 +1184,9 @@
                 @php
                     $isMusicOnly = isset($scene['voiceover']['enabled']) && !$scene['voiceover']['enabled'];
                     $sceneId = $scene['id'] ?? 'scene_' . $index;
+                    // Safe string extraction for fields that might be arrays
+                    $safeVisualPrompt = is_string($scene['visualPrompt'] ?? null) ? $scene['visualPrompt'] : (is_string($scene['visualDescription'] ?? null) ? $scene['visualDescription'] : '');
+                    $safeNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
                 @endphp
                 <div class="vw-advanced-scene-card"
                      x-data="{ expanded: false }"
@@ -1227,7 +1230,7 @@
                             </div>
                             <textarea class="vw-scene-textarea"
                                       placeholder="{{ __('Describe the visual scene for AI video generation. Include camera movements, lighting, subject...') }}"
-                                      wire:blur="updateSceneVisualPrompt({{ $index }}, $event.target.value)">{{ $scene['visualPrompt'] ?? $scene['visualDescription'] ?? '' }}</textarea>
+                                      wire:blur="updateSceneVisualPrompt({{ $index }}, $event.target.value)">{{ $safeVisualPrompt }}</textarea>
                         </div>
 
                         {{-- Narration/Voiceover Section --}}
@@ -1260,7 +1263,7 @@
                             @else
                                 <textarea class="vw-scene-textarea"
                                           placeholder="{{ __('Voiceover text for this scene...') }}"
-                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $scene['narration'] ?? '' }}</textarea>
+                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $safeNarration }}</textarea>
                             @endif
                         </div>
 
@@ -1363,8 +1366,12 @@
                             @endif
 
                             @foreach($script['scenes'] as $index => $scene)
-                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $scene['title'] ?? '' }}</strong>
-                                <br>{{ $scene['narration'] ?? '' }}
+                                @php
+                                    $sceneTitle = is_string($scene['title'] ?? null) ? $scene['title'] : '';
+                                    $sceneNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                                @endphp
+                                <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $sceneTitle }}</strong>
+                                <br>{{ $sceneNarration }}
 
                                 @if(!$loop->last)
                                     <div class="vw-full-script-scene-divider">— — —</div>
