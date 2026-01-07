@@ -2607,44 +2607,166 @@ class VideoWizard extends Component
     }
 
     /**
-     * Build prompt for a scene.
+     * Build comprehensive prompt for a scene integrating all Bibles.
+     *
+     * Prompt Chain Architecture (5 Layers):
+     * 1. Style Bible - Visual DNA, style, color grade, atmosphere, camera
+     * 2. Character Bible - Character descriptions for characters in this scene
+     * 3. Location Bible - Location description for this scene
+     * 4. Scene Content - Visual description + visual style settings
+     * 5. Technical Specs - Quality and format specifications
      */
     protected function buildScenePrompt(array $scene, int $index): string
     {
-        $prompt = $scene['visualDescription'] ?? $scene['narration'] ?? '';
+        $parts = [];
 
-        // Add style bible
-        if ($this->sceneMemory['styleBible']['enabled']) {
+        // =========================================================================
+        // LAYER 1: STYLE BIBLE (Visual DNA)
+        // =========================================================================
+        if ($this->sceneMemory['styleBible']['enabled'] ?? false) {
             $styleBible = $this->sceneMemory['styleBible'];
+            $styleParts = [];
+
             if (!empty($styleBible['style'])) {
-                $prompt = $styleBible['style'] . ', ' . $prompt;
+                $styleParts[] = $styleBible['style'];
             }
             if (!empty($styleBible['colorGrade'])) {
-                $prompt .= ', ' . $styleBible['colorGrade'];
+                $styleParts[] = $styleBible['colorGrade'];
             }
             if (!empty($styleBible['atmosphere'])) {
-                $prompt .= ', ' . $styleBible['atmosphere'];
+                $styleParts[] = $styleBible['atmosphere'];
+            }
+            if (!empty($styleBible['camera'])) {
+                $styleParts[] = $styleBible['camera'];
+            }
+
+            if (!empty($styleParts)) {
+                $parts[] = 'STYLE: ' . implode(', ', $styleParts);
+            }
+
+            if (!empty($styleBible['visualDNA'])) {
+                $parts[] = 'QUALITY: ' . $styleBible['visualDNA'];
             }
         }
 
-        // Add visual style
+        // =========================================================================
+        // LAYER 2: CHARACTER BIBLE (Characters in this scene)
+        // =========================================================================
+        if ($this->sceneMemory['characterBible']['enabled'] ?? false) {
+            $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+            $sceneCharacters = $this->getCharactersForSceneIndex($characters, $index);
+
+            if (!empty($sceneCharacters)) {
+                $characterDescriptions = [];
+                foreach ($sceneCharacters as $character) {
+                    if (!empty($character['description'])) {
+                        $name = $character['name'] ?? 'Character';
+                        $characterDescriptions[] = "{$name}: {$character['description']}";
+                    }
+                }
+                if (!empty($characterDescriptions)) {
+                    $parts[] = 'CHARACTERS: ' . implode('. ', $characterDescriptions);
+                }
+            }
+        }
+
+        // =========================================================================
+        // LAYER 3: LOCATION BIBLE (Location for this scene)
+        // =========================================================================
+        if ($this->sceneMemory['locationBible']['enabled'] ?? false) {
+            $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+            $sceneLocation = $this->getLocationForSceneIndex($locations, $index);
+
+            if ($sceneLocation) {
+                $locationParts = [];
+
+                $locName = $sceneLocation['name'] ?? '';
+                $locType = $sceneLocation['type'] ?? '';
+                if ($locName) {
+                    $locationParts[] = $locName . ($locType ? " ({$locType})" : '');
+                }
+
+                if (!empty($sceneLocation['description'])) {
+                    $locationParts[] = $sceneLocation['description'];
+                }
+
+                if (!empty($sceneLocation['timeOfDay'])) {
+                    $locationParts[] = $sceneLocation['timeOfDay'];
+                }
+
+                if (!empty($sceneLocation['weather']) && $sceneLocation['weather'] !== 'clear') {
+                    $locationParts[] = $sceneLocation['weather'] . ' weather';
+                }
+
+                if (!empty($locationParts)) {
+                    $parts[] = 'LOCATION: ' . implode(', ', $locationParts);
+                }
+            }
+        }
+
+        // =========================================================================
+        // LAYER 4: SCENE CONTENT (Visual description + Visual Style)
+        // =========================================================================
         $visualStyle = $this->storyboard['visualStyle'] ?? [];
+        $visualParts = [];
+
         if (!empty($visualStyle['mood'])) {
-            $prompt .= ', ' . $visualStyle['mood'] . ' mood';
+            $visualParts[] = $visualStyle['mood'] . ' mood';
         }
         if (!empty($visualStyle['lighting'])) {
-            $prompt .= ', ' . $visualStyle['lighting'] . ' lighting';
+            $visualParts[] = $visualStyle['lighting'] . ' lighting';
         }
         if (!empty($visualStyle['colorPalette'])) {
-            $prompt .= ', ' . $visualStyle['colorPalette'] . ' color palette';
+            $visualParts[] = $visualStyle['colorPalette'] . ' color palette';
+        }
+        if (!empty($visualStyle['composition'])) {
+            $visualParts[] = $visualStyle['composition'] . ' shot';
         }
 
-        // Add technical specs
+        if (!empty($visualParts)) {
+            $parts[] = 'VISUAL: ' . implode(', ', $visualParts);
+        }
+
+        // Scene visual description
+        $visualDescription = $scene['visualDescription'] ?? $scene['visual'] ?? $scene['narration'] ?? '';
+        if (!empty($visualDescription)) {
+            $parts[] = 'SCENE: ' . $visualDescription;
+        }
+
+        // =========================================================================
+        // LAYER 5: TECHNICAL SPECS
+        // =========================================================================
         if ($this->storyboard['technicalSpecs']['enabled'] ?? true) {
-            $prompt .= ', ' . ($this->storyboard['technicalSpecs']['positive'] ?? 'high quality, detailed, professional');
+            $techSpecs = $this->storyboard['technicalSpecs']['positive'] ?? 'high quality, detailed, professional, 8K resolution';
+            $parts[] = $techSpecs;
         }
 
-        return $prompt;
+        return implode('. ', array_filter($parts));
+    }
+
+    /**
+     * Get characters that appear in a specific scene (for prompt building).
+     */
+    protected function getCharactersForSceneIndex(array $characters, int $sceneIndex): array
+    {
+        return array_filter($characters, function ($character) use ($sceneIndex) {
+            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+            return in_array($sceneIndex, $appliedScenes);
+        });
+    }
+
+    /**
+     * Get the primary location for a specific scene (for prompt building).
+     */
+    protected function getLocationForSceneIndex(array $locations, int $sceneIndex): ?array
+    {
+        foreach ($locations as $location) {
+            $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+            if (in_array($sceneIndex, $scenes)) {
+                return $location;
+            }
+        }
+        return null;
     }
 
     // =========================================================================
