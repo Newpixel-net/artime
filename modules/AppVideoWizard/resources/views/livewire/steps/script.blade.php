@@ -1197,15 +1197,23 @@
                     // Safety net: ensure all fields are strings even if sanitization didn't run
                     // (e.g., old projects loaded before fix was deployed, or AI returned unexpected types)
 
-                    // Helper function to extract string from potentially nested arrays
-                    $extractString = function($value, $default = '') use (&$extractString) {
-                        if (is_string($value)) return $value;
-                        if (is_numeric($value)) return (string)$value;
-                        if (is_array($value)) {
-                            foreach ($value as $item) {
-                                $result = $extractString($item, '');
-                                if ($result !== '') return $result;
+                    // Helper function to extract string from potentially nested arrays (non-recursive for PHP compatibility)
+                    $extractString = function($value, $default = '') {
+                        // Keep unwrapping arrays until we find a string or run out of arrays
+                        $maxDepth = 10; // Prevent infinite loops
+                        $current = $value;
+                        for ($i = 0; $i < $maxDepth; $i++) {
+                            if (is_string($current)) {
+                                return $current;
                             }
+                            if (is_numeric($current)) {
+                                return (string)$current;
+                            }
+                            if (is_array($current) && !empty($current)) {
+                                $current = reset($current); // Get first element
+                                continue;
+                            }
+                            break;
                         }
                         return $default;
                     };
@@ -1217,6 +1225,11 @@
                     $safeMood = $extractString($scene['mood'] ?? null, '');
                     $safeTransition = $extractString($scene['transition'] ?? null, 'cut');
                     $safeDuration = is_numeric($scene['duration'] ?? null) ? (int)$scene['duration'] : 15;
+
+                    // Final safety: ensure these are definitely strings
+                    $safeTitle = is_string($safeTitle) ? $safeTitle : '';
+                    $safeMood = is_string($safeMood) ? $safeMood : '';
+                    $safeTransition = is_string($safeTransition) ? $safeTransition : 'cut';
 
                     // Use visualPrompt first, fall back to visualDescription
                     $displayVisualPrompt = $safeVisualPrompt ?: $safeVisualDescription;
