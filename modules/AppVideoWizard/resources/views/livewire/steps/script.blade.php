@@ -1116,9 +1116,20 @@
             }
 
             // Safety net: ensure script fields are strings even if sanitization didn't run
-            $safeScriptTitle = is_string($script['title'] ?? null) ? $script['title'] : __('Your Script');
-            $safeHook = is_string($script['hook'] ?? null) ? $script['hook'] : '';
-            $safeCta = is_string($script['cta'] ?? null) ? $script['cta'] : '';
+            $rawScriptTitle = $script['title'] ?? null;
+            if (is_array($rawScriptTitle)) $rawScriptTitle = reset($rawScriptTitle) ?: null;
+            if (is_array($rawScriptTitle)) $rawScriptTitle = reset($rawScriptTitle) ?: null;
+            $safeScriptTitle = is_string($rawScriptTitle) ? $rawScriptTitle : __('Your Script');
+
+            $rawHook = $script['hook'] ?? null;
+            if (is_array($rawHook)) $rawHook = reset($rawHook) ?: null;
+            if (is_array($rawHook)) $rawHook = reset($rawHook) ?: null;
+            $safeHook = is_string($rawHook) ? $rawHook : '';
+
+            $rawCta = $script['cta'] ?? null;
+            if (is_array($rawCta)) $rawCta = reset($rawCta) ?: null;
+            if (is_array($rawCta)) $rawCta = reset($rawCta) ?: null;
+            $safeCta = is_string($rawCta) ? $rawCta : '';
         @endphp
 
         <div class="vw-script-card vw-script-results">
@@ -1467,9 +1478,16 @@
 
                             @foreach($script['scenes'] as $index => $scene)
                                 @php
-                                    // Safety net for modal scene display
-                                    $modalSceneTitle = is_string($scene['title'] ?? null) ? $scene['title'] : '';
-                                    $modalSceneNarration = is_string($scene['narration'] ?? null) ? $scene['narration'] : '';
+                                    // Safety net for modal scene display - handle nested arrays
+                                    $rawModalTitle = $scene['title'] ?? null;
+                                    if (is_array($rawModalTitle)) $rawModalTitle = reset($rawModalTitle) ?: null;
+                                    if (is_array($rawModalTitle)) $rawModalTitle = reset($rawModalTitle) ?: null;
+                                    $modalSceneTitle = is_string($rawModalTitle) ? $rawModalTitle : ('Scene ' . ($index + 1));
+
+                                    $rawModalNarr = $scene['narration'] ?? null;
+                                    if (is_array($rawModalNarr)) $rawModalNarr = reset($rawModalNarr) ?: null;
+                                    if (is_array($rawModalNarr)) $rawModalNarr = reset($rawModalNarr) ?: null;
+                                    $modalSceneNarration = is_string($rawModalNarr) ? $rawModalNarr : '';
                                 @endphp
                                 <strong style="color: #c4b5fd;">{{ __('SCENE') }} {{ $index + 1 }}: {{ $modalSceneTitle }}</strong>
                                 <br>{{ $modalSceneNarration }}
