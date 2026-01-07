@@ -633,6 +633,12 @@ class ImageGenerationService
                         $locationParts[] = $sceneLocation['atmosphere'] . ' atmosphere';
                     }
 
+                    // Location state for this scene if available
+                    $locationState = $this->getLocationStateForScene($sceneLocation, $sceneIndex);
+                    if ($locationState) {
+                        $locationParts[] = 'current state: ' . $locationState;
+                    }
+
                     if (!empty($locationParts)) {
                         $parts[] = 'LOCATION: ' . implode(', ', $locationParts);
                     }
@@ -792,6 +798,34 @@ class ImageGenerationService
             }
         }
         return null;
+    }
+
+    /**
+     * Get the location state for a specific scene index.
+     * Returns the most recent state change at or before this scene.
+     */
+    protected function getLocationStateForScene(array $location, int $sceneIndex): ?string
+    {
+        $stateChanges = $location['stateChanges'] ?? [];
+        if (empty($stateChanges)) {
+            return null;
+        }
+
+        // Sort by scene index to ensure proper order
+        usort($stateChanges, fn($a, $b) => ($a['scene'] ?? 0) <=> ($b['scene'] ?? 0));
+
+        // Find the most recent state change at or before this scene
+        $applicableState = null;
+        foreach ($stateChanges as $change) {
+            $changeScene = $change['scene'] ?? -1;
+            if ($changeScene <= $sceneIndex) {
+                $applicableState = $change['state'] ?? null;
+            } else {
+                break; // Since sorted, no need to continue
+            }
+        }
+
+        return $applicableState;
     }
 
     /**
