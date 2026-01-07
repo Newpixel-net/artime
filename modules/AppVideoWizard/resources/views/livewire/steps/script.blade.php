@@ -1217,10 +1217,22 @@
                     while (is_array($rawVisualDescription) && !empty($rawVisualDescription)) { $rawVisualDescription = reset($rawVisualDescription); }
                     $safeVisualDescription = is_string($rawVisualDescription) ? $rawVisualDescription : '';
 
-                    // Extract mood - most problematic field
+                    // Extract mood - most problematic field (AI returns nested arrays)
                     $rawMood = $scene['mood'] ?? null;
-                    while (is_array($rawMood) && !empty($rawMood)) { $rawMood = reset($rawMood); }
-                    $safeMood = is_string($rawMood) ? $rawMood : '';
+                    // Nuclear option: keep unwrapping until we get a non-array
+                    for ($moodLoop = 0; $moodLoop < 10 && is_array($rawMood); $moodLoop++) {
+                        $rawMood = !empty($rawMood) ? reset($rawMood) : null;
+                    }
+                    // If STILL an array after 10 iterations, json_encode it
+                    if (is_array($rawMood)) {
+                        $safeMood = '';
+                    } elseif (is_string($rawMood)) {
+                        $safeMood = $rawMood;
+                    } elseif (is_numeric($rawMood)) {
+                        $safeMood = (string)$rawMood;
+                    } else {
+                        $safeMood = '';
+                    }
 
                     // Extract transition
                     $rawTransition = $scene['transition'] ?? null;
@@ -1260,8 +1272,8 @@
                         <div class="vw-scene-meta-badges">
                             <span class="vw-scene-meta-badge">{{ $safeDuration }}s</span>
                             <span class="vw-scene-meta-badge">{{ $transitionLabel }}</span>
-                            @if($safeMood)
-                                <span class="vw-scene-meta-badge">{{ ucfirst($safeMood) }}</span>
+                            @if(is_string($safeMood) && $safeMood !== '')
+                                <span class="vw-scene-meta-badge">{{ ucfirst((string)$safeMood) }}</span>
                             @endif
                         </div>
                     </div>
