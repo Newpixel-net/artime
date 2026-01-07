@@ -41,7 +41,7 @@
                     <span class="vw-pm-title-icon">📁</span>
                     {{ __('My Projects') }}
                 </h2>
-                <span class="vw-pm-count">{{ count($projectManagerProjects ?? []) }} {{ __('projects') }}</span>
+                <span class="vw-pm-count">{{ $projectManagerStatusCounts['all'] ?? 0 }} {{ __('total') }}</span>
             </div>
             <div class="vw-pm-header-right">
                 <button type="button"
@@ -57,6 +57,37 @@
                     ✕
                 </button>
             </div>
+        </div>
+
+        {{-- Status Filter Tabs --}}
+        <div class="vw-pm-status-tabs">
+            <button type="button"
+                    class="vw-pm-status-tab {{ $projectManagerStatusFilter === 'all' ? 'active' : '' }}"
+                    wire:click="setProjectManagerStatusFilter('all')">
+                <span class="vw-pm-status-tab-label">{{ __('All') }}</span>
+                <span class="vw-pm-status-tab-count">{{ $projectManagerStatusCounts['all'] ?? 0 }}</span>
+            </button>
+            <button type="button"
+                    class="vw-pm-status-tab {{ $projectManagerStatusFilter === 'draft' ? 'active' : '' }}"
+                    wire:click="setProjectManagerStatusFilter('draft')">
+                <span class="vw-pm-status-tab-icon">📝</span>
+                <span class="vw-pm-status-tab-label">{{ __('Draft') }}</span>
+                <span class="vw-pm-status-tab-count">{{ $projectManagerStatusCounts['draft'] ?? 0 }}</span>
+            </button>
+            <button type="button"
+                    class="vw-pm-status-tab {{ $projectManagerStatusFilter === 'in_progress' ? 'active' : '' }}"
+                    wire:click="setProjectManagerStatusFilter('in_progress')">
+                <span class="vw-pm-status-tab-icon">🔄</span>
+                <span class="vw-pm-status-tab-label">{{ __('In Progress') }}</span>
+                <span class="vw-pm-status-tab-count">{{ $projectManagerStatusCounts['in_progress'] ?? 0 }}</span>
+            </button>
+            <button type="button"
+                    class="vw-pm-status-tab {{ $projectManagerStatusFilter === 'complete' ? 'active' : '' }}"
+                    wire:click="setProjectManagerStatusFilter('complete')">
+                <span class="vw-pm-status-tab-icon">✅</span>
+                <span class="vw-pm-status-tab-label">{{ __('Complete') }}</span>
+                <span class="vw-pm-status-tab-count">{{ $projectManagerStatusCounts['complete'] ?? 0 }}</span>
+            </button>
         </div>
 
         {{-- Search and Sort --}}
@@ -78,18 +109,33 @@
         </div>
 
         {{-- Projects Grid --}}
-        <div class="vw-pm-content" wire:loading.class="vw-pm-loading" wire:target="loadProjectManagerProjects">
+        <div class="vw-pm-content" wire:loading.class="vw-pm-loading" wire:target="loadProjectManagerProjects, setProjectManagerStatusFilter">
             @if(empty($projectManagerProjects ?? []))
                 {{-- Empty State --}}
                 <div class="vw-pm-empty">
-                    <div class="vw-pm-empty-icon">📽️</div>
-                    <h3 class="vw-pm-empty-title">{{ __('No projects yet') }}</h3>
-                    <p class="vw-pm-empty-text">{{ __('Create your first video project to get started!') }}</p>
-                    <button type="button"
-                            class="vw-pm-empty-btn"
-                            wire:click="createNewProject">
-                        ➕ {{ __('Create New Project') }}
-                    </button>
+                    @if($projectManagerStatusFilter !== 'all')
+                        {{-- Filtered empty state --}}
+                        <div class="vw-pm-empty-icon">🔍</div>
+                        <h3 class="vw-pm-empty-title">{{ __('No projects found') }}</h3>
+                        <p class="vw-pm-empty-text">
+                            {{ __('No') }} {{ str_replace('_', ' ', $projectManagerStatusFilter) }} {{ __('projects match your criteria.') }}
+                        </p>
+                        <button type="button"
+                                class="vw-pm-empty-btn"
+                                wire:click="setProjectManagerStatusFilter('all')">
+                            {{ __('View All Projects') }}
+                        </button>
+                    @else
+                        {{-- No projects at all --}}
+                        <div class="vw-pm-empty-icon">📽️</div>
+                        <h3 class="vw-pm-empty-title">{{ __('No projects yet') }}</h3>
+                        <p class="vw-pm-empty-text">{{ __('Create your first video project to get started!') }}</p>
+                        <button type="button"
+                                class="vw-pm-empty-btn"
+                                wire:click="createNewProject">
+                            ➕ {{ __('Create New Project') }}
+                        </button>
+                    @endif
                 </div>
             @else
                 <div class="vw-pm-grid">
@@ -266,7 +312,7 @@
         {{-- Loading Overlay --}}
         <div class="vw-pm-loading-overlay"
              wire:loading.flex
-             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject">
+             wire:target="loadProjectFromManager, deleteProjectFromManager, createNewProject, duplicateProject, renameProject, setProjectManagerStatusFilter">
             <div class="vw-pm-loading-spinner"></div>
             <span class="vw-pm-loading-text">{{ __('Please wait...') }}</span>
         </div>
@@ -420,6 +466,70 @@
 .vw-pm-close-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;
+}
+
+/* Status Filter Tabs */
+.vw-pm-status-tabs {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.vw-pm-status-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.vw-pm-status-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: 2rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.vw-pm-status-tab:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.vw-pm-status-tab.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(6, 182, 212, 0.3) 100%);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #fff;
+}
+
+.vw-pm-status-tab-icon {
+    font-size: 0.875rem;
+}
+
+.vw-pm-status-tab-label {
+    font-weight: 500;
+}
+
+.vw-pm-status-tab-count {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.125rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+.vw-pm-status-tab.active .vw-pm-status-tab-count {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 /* Filters */
