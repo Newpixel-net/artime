@@ -917,14 +917,27 @@
         @php
             $productionTypes = config('appvideowizard.production_types', []);
             $typeName = $productionTypes[$productionType]['name'] ?? ucfirst($productionType ?? 'movie');
+            // Safety: ensure typeName is string
+            if (is_array($typeName)) $typeName = reset($typeName) ?: 'Video';
+            $typeName = is_string($typeName) ? $typeName : strval($typeName ?? 'Video');
+
             $subtypeName = '';
             if ($productionSubtype && isset($productionTypes[$productionType]['subTypes'][$productionSubtype])) {
                 $subtypeName = $productionTypes[$productionType]['subTypes'][$productionSubtype]['name'];
             }
+            // Safety: ensure subtypeName is string
+            if (is_array($subtypeName)) $subtypeName = reset($subtypeName) ?: '';
+            $subtypeName = is_string($subtypeName) ? $subtypeName : '';
+
             $durationMin = floor($targetDuration / 60);
             $durationSec = $targetDuration % 60;
             $durationText = $durationMin > 0 ? ($durationMin . 'm' . ($durationSec > 0 ? ' ' . $durationSec . 's' : '')) : ($durationSec . 's');
-            $conceptText = $concept['refinedConcept'] ?: $concept['rawInput'];
+
+            // Safety: ensure conceptText is string
+            $conceptText = $concept['refinedConcept'] ?? $concept['rawInput'] ?? '';
+            if (is_array($conceptText)) $conceptText = reset($conceptText) ?: '';
+            if (is_array($conceptText)) $conceptText = reset($conceptText) ?: '';
+            $conceptText = is_string($conceptText) ? $conceptText : '';
             $charCount = strlen($conceptText);
         @endphp
 
@@ -950,8 +963,17 @@
             <div class="vw-concept-meta">
                 <div class="vw-concept-meta-left">
                     @php
-                        $safeSuggestedMood = is_string($concept['suggestedMood'] ?? null) ? $concept['suggestedMood'] : (is_array($concept['suggestedMood'] ?? null) ? implode(', ', $concept['suggestedMood']) : '');
-                        $safeSuggestedTone = is_string($concept['suggestedTone'] ?? null) ? $concept['suggestedTone'] : (is_array($concept['suggestedTone'] ?? null) ? implode(', ', $concept['suggestedTone']) : '');
+                        // Safely extract mood - handle nested arrays
+                        $rawSugMood = $concept['suggestedMood'] ?? null;
+                        if (is_array($rawSugMood)) $rawSugMood = reset($rawSugMood) ?: null;
+                        if (is_array($rawSugMood)) $rawSugMood = reset($rawSugMood) ?: null;
+                        $safeSuggestedMood = is_string($rawSugMood) ? $rawSugMood : '';
+
+                        // Safely extract tone - handle nested arrays
+                        $rawSugTone = $concept['suggestedTone'] ?? null;
+                        if (is_array($rawSugTone)) $rawSugTone = reset($rawSugTone) ?: null;
+                        if (is_array($rawSugTone)) $rawSugTone = reset($rawSugTone) ?: null;
+                        $safeSuggestedTone = is_string($rawSugTone) ? $rawSugTone : '';
                     @endphp
                     @if(!empty($safeSuggestedMood))
                         <div class="vw-concept-meta-item">
@@ -1358,8 +1380,9 @@
                                 <select class="vw-scene-transition-select"
                                         wire:change="updateSceneTransition({{ $index }}, $event.target.value)">
                                     @foreach($transitions as $key => $label)
+                                        @php $safeLabel = is_string($label) ? $label : (is_array($label) ? (reset($label) ?: $key) : strval($label ?? $key)); @endphp
                                         <option value="{{ $key }}" {{ $safeTransition === $key ? 'selected' : '' }}>
-                                            {{ $label }}
+                                            {{ $safeLabel }}
                                         </option>
                                     @endforeach
                                 </select>
