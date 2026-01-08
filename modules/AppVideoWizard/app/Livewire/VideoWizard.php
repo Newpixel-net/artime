@@ -45,6 +45,25 @@ class VideoWizard extends Component
     public ?string $productionType = null;
     public ?string $productionSubtype = null;
 
+    // Step 1: Production Configuration (matches original wizard)
+    public array $production = [
+        'type' => 'standard',           // Production type: standard, cinematic, documentary, etc.
+        'subType' => null,              // Production subtype
+        'targetDuration' => 60,         // Target duration in seconds
+    ];
+
+    // Step 1: Content Configuration (matches original wizard)
+    public array $content = [
+        'pacing' => 'balanced',         // 'fast' | 'balanced' | 'contemplative'
+        'productionMode' => 'standard', // 'standard' | 'documentary' | 'thriller' | 'cinematic'
+        'genre' => null,                // Genre for style consistency
+        'videoModel' => [
+            'model' => 'hailuo-2.3',
+            'duration' => '10s',        // Clip duration: '5s' | '6s' | '10s'
+            'resolution' => '768p',
+        ],
+    ];
+
     // Step 2: Concept
     public array $concept = [
         'rawInput' => '',
@@ -76,6 +95,12 @@ class VideoWizard extends Component
         'cta' => '',
         'totalDuration' => 0,
         'totalNarrationTime' => 0,
+        // Timing configuration for Hollywood-style scene/shot architecture
+        'timing' => [
+            'sceneDuration' => 35,      // Default scene duration (30-60s Hollywood style)
+            'clipDuration' => 10,       // Shot/clip duration (5s/6s/10s)
+            'pacing' => 'balanced',     // Pacing affects scene duration
+        ],
     ];
 
     /// Step 3: Progressive Script Generation State
@@ -559,6 +584,14 @@ class VideoWizard extends Component
                     }
                 }
             }
+
+            // Restore production and content configuration (Hollywood-style scene/shot architecture)
+            if (isset($config['production'])) {
+                $this->production = array_merge($this->production, $config['production']);
+            }
+            if (isset($config['content'])) {
+                $this->content = array_merge($this->content, $config['content']);
+            }
         }
 
         // Recalculate voice status if script exists
@@ -592,6 +625,8 @@ class VideoWizard extends Component
             'assembly' => $this->assembly,
             'sceneMemory' => $this->sceneMemory,
             'multiShotMode' => $this->multiShotMode,
+            'production' => $this->production,
+            'content' => $this->content,
         ];
 
         return md5(json_encode($data));
@@ -628,13 +663,16 @@ class VideoWizard extends Component
                 'storyboard' => $this->storyboard,
                 'animation' => $this->animation,
                 'assembly' => $this->assembly,
-                // Save Scene Memory, Multi-Shot Mode, Concept Variations, Character Intelligence, and Script Generation State
+                // Save Scene Memory, Multi-Shot Mode, Concept Variations, Character Intelligence, Script Generation State,
+                // and Hollywood-style Production/Content configuration
                 'content_config' => [
                     'sceneMemory' => $this->sceneMemory,
                     'multiShotMode' => $this->multiShotMode,
                     'conceptVariations' => $this->conceptVariations,
                     'characterIntelligence' => $this->characterIntelligence,
                     'scriptGeneration' => $this->scriptGeneration,
+                    'production' => $this->production,
+                    'content' => $this->content,
                 ],
             ];
 
@@ -1522,27 +1560,106 @@ class VideoWizard extends Component
     // =========================================================================
 
     /**
-     * Calculate exact scene count based on duration and production type.
+     * Calculate exact scene count based on duration and pacing.
+     *
+     * HOLLYWOOD-STYLE ARCHITECTURE:
+     * - Scenes are 25-45 seconds each (content segments with narration)
+     * - Each scene will be decomposed into multiple SHOTS (5-10s clips)
+     * - Pacing controls scene duration, not shot duration
+     *
+     * For a 2:30 (150s) video with balanced pacing:
+     * - 150 / 35 = ~4-5 scenes
+     * - Each scene has 3-4 shots
+     * - Total: ~12-20 video clips
      */
     public function calculateSceneCount(): int
     {
         $targetDuration = $this->targetDuration ?? 60;
-        $productionType = $this->production['type'] ?? 'standard';
+        $pacing = $this->content['pacing'] ?? 'balanced';
 
-        // Scene duration based on production type
+        // Hollywood-style scene durations based on pacing
+        // These are SCENE durations (content segments), NOT shot/clip durations
         $sceneDurations = [
-            'tiktok-viral' => 3,      // Fast cuts, 3s per scene
-            'youtube-short' => 5,     // Medium pace, 5s per scene
-            'short-form' => 4,        // Short form content
-            'standard' => 6,          // Standard pace, 6s per scene
-            'cinematic' => 8,         // Slower, cinematic, 8s per scene
-            'documentary' => 10,      // Documentary style, 10s per scene
-            'long-form' => 8,         // Long form content
+            'fast' => 25,           // Fast-paced: ~25s per scene (more scenes, quicker transitions)
+            'balanced' => 35,       // Balanced: ~35s per scene (standard Hollywood pacing)
+            'contemplative' => 45,  // Contemplative: ~45s per scene (fewer scenes, more breathing room)
         ];
 
-        $sceneDuration = $sceneDurations[$productionType] ?? 6;
+        $sceneDuration = $sceneDurations[$pacing] ?? 35;
 
-        return (int) ceil($targetDuration / $sceneDuration);
+        // Update script timing for reference
+        $this->script['timing']['sceneDuration'] = $sceneDuration;
+        $this->script['timing']['pacing'] = $pacing;
+
+        // Minimum 2 scenes, maximum based on duration
+        $sceneCount = (int) ceil($targetDuration / $sceneDuration);
+
+        return max(2, $sceneCount);
+    }
+
+    /**
+     * Calculate estimated shot count for display.
+     * Each scene is decomposed into multiple shots.
+     */
+    public function calculateEstimatedShotCount(): int
+    {
+        $sceneCount = $this->calculateSceneCount();
+        $clipDuration = $this->getClipDuration();
+        $sceneDuration = $this->script['timing']['sceneDuration'] ?? 35;
+
+        // Hollywood Math: shots per scene = sceneDuration / clipDuration
+        $shotsPerScene = (int) ceil($sceneDuration / $clipDuration);
+
+        return $sceneCount * $shotsPerScene;
+    }
+
+    /**
+     * Get clip/shot duration based on video model settings.
+     */
+    public function getClipDuration(): int
+    {
+        $durationStr = $this->content['videoModel']['duration'] ?? '10s';
+
+        return match($durationStr) {
+            '5s' => 5,
+            '6s' => 6,
+            '10s' => 10,
+            default => 10,
+        };
+    }
+
+    /**
+     * Set content pacing.
+     */
+    public function setPacing(string $pacing): void
+    {
+        $validPacings = ['fast', 'balanced', 'contemplative'];
+        if (in_array($pacing, $validPacings)) {
+            $this->content['pacing'] = $pacing;
+            $this->script['timing']['pacing'] = $pacing;
+
+            // Auto-adjust clip duration based on pacing
+            if ($pacing === 'fast') {
+                $this->content['videoModel']['duration'] = '6s';
+            } else {
+                $this->content['videoModel']['duration'] = '10s';
+            }
+
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Set video model clip duration.
+     */
+    public function setClipDuration(string $duration): void
+    {
+        $validDurations = ['5s', '6s', '10s'];
+        if (in_array($duration, $validDurations)) {
+            $this->content['videoModel']['duration'] = $duration;
+            $this->script['timing']['clipDuration'] = $this->getClipDuration();
+            $this->saveProject();
+        }
     }
 
     /**
