@@ -1453,6 +1453,7 @@ JSON;
 
     /**
      * Extract scenes from the scenes array by finding balanced braces.
+     * Also handles malformed JSON where scene objects lack opening braces.
      */
     protected function extractScenesFromArray(string $response, int $startPos): array
     {
@@ -1472,7 +1473,7 @@ JSON;
                 break;
             }
 
-            // Expect opening brace for scene object
+            // Case 1: Proper scene object with opening brace
             if ($response[$pos] === '{') {
                 $sceneStart = $pos;
                 $braceCount = 1;
@@ -1505,6 +1506,34 @@ JSON;
                         $sceneIndex++;
                     }
                 }
+            }
+            // Case 2: Malformed - scene starts with "id" or "narration" without opening brace
+            elseif ($response[$pos] === '"') {
+                // Look ahead to see if this looks like a scene field
+                $ahead = substr($response, $pos, 20);
+                if (preg_match('/^"(id|narration|title|visualDescription)"/', $ahead)) {
+                    // Find the end of this malformed scene object
+                    // It ends at the next scene-id pattern or end of array
+                    $sceneStart = $pos;
+                    $nextScenePos = $this->findNextSceneStart($response, $pos + 1);
+                    $sceneEnd = $nextScenePos !== false ? $nextScenePos : strpos($response, ']', $pos);
+
+                    if ($sceneEnd !== false) {
+                        $sceneContent = substr($response, $sceneStart, $sceneEnd - $sceneStart);
+                        // Wrap in braces to make valid JSON
+                        $sceneJson = '{' . rtrim(trim($sceneContent), ',') . '}';
+                        $scene = $this->parseSceneObject($sceneJson, $sceneIndex);
+                        if ($scene) {
+                            $scenes[] = $scene;
+                            $sceneIndex++;
+                        }
+                        $pos = $sceneEnd;
+                    } else {
+                        $pos++;
+                    }
+                } else {
+                    $pos++;
+                }
             } else {
                 // Unexpected character, move forward
                 $pos++;
@@ -1512,6 +1541,27 @@ JSON;
         }
 
         return $scenes;
+    }
+
+    /**
+     * Find the start position of the next scene in the response.
+     */
+    protected function findNextSceneStart(string $response, int $startPos): int|false
+    {
+        // Look for patterns that indicate a new scene
+        $patterns = [
+            '/"id"\s*:\s*"scene-\d+"/i',
+            '/,\s*\{\s*"id"/i',
+            '/,\s*"id"\s*:\s*"scene-/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $response, $match, PREG_OFFSET_CAPTURE, $startPos)) {
+                return $match[0][1];
+            }
+        }
+
+        return false;
     }
 
     /**
