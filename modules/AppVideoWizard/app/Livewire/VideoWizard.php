@@ -582,61 +582,95 @@ class VideoWizard extends Component
     }
 
     /**
+     * Determine if current duration is feature-length (20+ minutes).
+     */
+    public function isFeatureLength(): bool
+    {
+        return $this->targetDuration >= 1200; // 20 minutes in seconds
+    }
+
+    /**
+     * Get the content format category based on duration.
+     */
+    public function getContentFormat(): string
+    {
+        return $this->isFeatureLength() ? 'feature' : 'short';
+    }
+
+    /**
      * Get the preset mapping for current production type/subtype.
-     * Returns recommended, compatible, and hidden presets.
+     * Returns recommended, compatible presets based on content format (short/feature).
      */
     public function getPresetMappingForProduction(): array
     {
         $mappings = config('appvideowizard.production_preset_mapping', []);
+        $format = $this->getContentFormat();
+
+        $emptyMapping = [
+            'default' => null,
+            'recommended' => [],
+            'compatible' => [],
+        ];
 
         if (empty($this->productionType) || !isset($mappings[$this->productionType])) {
-            return [
-                'default' => null,
-                'recommended' => [],
-                'compatible' => [],
-                'hidden' => [],
-            ];
+            return $emptyMapping;
         }
 
         $typeMapping = $mappings[$this->productionType];
 
         // First check for specific subtype mapping, then fall back to _default
+        $subtypeMapping = null;
         if (!empty($this->productionSubtype) && isset($typeMapping[$this->productionSubtype])) {
-            return $typeMapping[$this->productionSubtype];
+            $subtypeMapping = $typeMapping[$this->productionSubtype];
+        } else {
+            $subtypeMapping = $typeMapping['_default'] ?? null;
         }
 
-        return $typeMapping['_default'] ?? [
-            'default' => null,
-            'recommended' => [],
-            'compatible' => [],
-            'hidden' => [],
-        ];
+        if (!$subtypeMapping) {
+            return $emptyMapping;
+        }
+
+        // Get the format-specific mapping (short or feature)
+        $formatMapping = $subtypeMapping[$format] ?? null;
+
+        // If no mapping for this format, try the other format as fallback
+        if (!$formatMapping) {
+            $fallbackFormat = $format === 'feature' ? 'short' : 'feature';
+            $formatMapping = $subtypeMapping[$fallbackFormat] ?? null;
+        }
+
+        return $formatMapping ?? $emptyMapping;
     }
 
     /**
      * Get narrative presets organized by recommendation level.
      * Used by the view to display presets with proper hierarchy.
+     * Filters presets by content format (short/feature) based on duration.
      */
     public function getOrganizedNarrativePresets(): array
     {
         $allPresets = config('appvideowizard.narrative_presets', []);
         $mapping = $this->getPresetMappingForProduction();
+        $format = $this->getContentFormat();
 
         $recommended = [];
         $compatible = [];
         $other = [];
 
         foreach ($allPresets as $key => $preset) {
-            // Skip hidden presets
-            if (in_array($key, $mapping['hidden'] ?? [])) {
-                continue;
-            }
+            $presetCategory = $preset['category'] ?? 'short';
 
-            if (in_array($key, $mapping['recommended'] ?? [])) {
+            // Filter by content format - only show presets matching current format
+            // unless they're in recommended/compatible lists
+            $inRecommended = in_array($key, $mapping['recommended'] ?? []);
+            $inCompatible = in_array($key, $mapping['compatible'] ?? []);
+
+            if ($inRecommended) {
                 $recommended[$key] = $preset;
-            } elseif (in_array($key, $mapping['compatible'] ?? [])) {
+            } elseif ($inCompatible) {
                 $compatible[$key] = $preset;
-            } else {
+            } elseif ($presetCategory === $format) {
+                // Only show other presets if they match the current format
                 $other[$key] = $preset;
             }
         }
@@ -646,6 +680,7 @@ class VideoWizard extends Component
             'compatible' => $compatible,
             'other' => $other,
             'defaultPreset' => $mapping['default'] ?? null,
+            'contentFormat' => $format,
         ];
     }
 
@@ -1180,7 +1215,7 @@ class VideoWizard extends Component
 
     /**
      * Apply narrative preset defaults.
-     * When a preset is selected, auto-set story arc, tension curve, and emotional journey.
+     * When a preset is selected, auto-set story structure, tension curve, and emotional journey.
      */
     public function applyNarrativePreset(string $preset): void
     {
@@ -1194,8 +1229,11 @@ class VideoWizard extends Component
 
         $presetConfig = $presets[$preset];
 
-        // Auto-set story arc if preset defines one
-        if (!empty($presetConfig['defaultArc'])) {
+        // Auto-set story arc/structure if preset defines one
+        // Support both 'defaultStructure' (new) and 'defaultArc' (legacy)
+        if (!empty($presetConfig['defaultStructure'])) {
+            $this->storyArc = $presetConfig['defaultStructure'];
+        } elseif (!empty($presetConfig['defaultArc'])) {
             $this->storyArc = $presetConfig['defaultArc'];
         }
 

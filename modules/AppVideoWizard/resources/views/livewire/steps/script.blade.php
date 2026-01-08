@@ -996,6 +996,29 @@
     }
 
     /* Cascading preset organization styles */
+    .vw-format-badge {
+        display: inline-block !important;
+        padding: 0.125rem 0.5rem !important;
+        border-radius: 0.25rem !important;
+        font-size: 0.65rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin-left: 0.5rem !important;
+    }
+
+    .vw-format-badge.short {
+        background: rgba(59, 130, 246, 0.2) !important;
+        color: rgba(96, 165, 250, 0.9) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    }
+
+    .vw-format-badge.feature {
+        background: rgba(168, 85, 247, 0.2) !important;
+        color: rgba(192, 132, 252, 0.9) !important;
+        border: 1px solid rgba(168, 85, 247, 0.3) !important;
+    }
+
     .vw-preset-context-hint {
         font-size: 0.75rem !important;
         color: rgba(16, 185, 129, 0.8) !important;
@@ -1355,14 +1378,21 @@
             </div>
 
             {{-- Narrative Presets - Platform-optimized storytelling --}}
-            {{-- Now organized by production type selection from Step 1 --}}
+            {{-- Now organized by production type selection from Step 1 and content format (short/feature) --}}
             @php
                 $organizedPresets = $this->getOrganizedNarrativePresets();
                 $hasProductionType = !empty($productionType);
+                $contentFormat = $organizedPresets['contentFormat'] ?? 'short';
+                $isFeature = $contentFormat === 'feature';
             @endphp
             <div class="vw-narrative-presets-row">
                 <div class="vw-narrative-preset-label">
                     {{ __('Storytelling Formula') }}
+                    @if($isFeature)
+                        <span class="vw-format-badge feature">{{ __('Feature Film') }}</span>
+                    @else
+                        <span class="vw-format-badge short">{{ __('Short Form') }}</span>
+                    @endif
                     @if($hasProductionType && !empty($organizedPresets['recommended']))
                         <span class="vw-preset-context-hint">
                             — {{ __('Recommended for') }} {{ config('appvideowizard.production_types.' . $productionType . '.name', $productionType) }}
