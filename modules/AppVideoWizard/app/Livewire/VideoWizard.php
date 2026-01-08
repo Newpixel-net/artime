@@ -130,6 +130,7 @@ class VideoWizard extends Component
     // Step 5: Animation
     public array $animation = [
         'scenes' => [],
+        'selectedSceneIndex' => 0,
         'voiceover' => [
             'voice' => 'nova',
             'speed' => 1.0,
@@ -1988,8 +1989,23 @@ class VideoWizard extends Component
             return;
         }
 
+        // Toggle in script array
         $currentValue = $this->script['scenes'][$sceneIndex]['voiceover']['enabled'] ?? true;
-        $this->script['scenes'][$sceneIndex]['voiceover']['enabled'] = !$currentValue;
+        $newValue = !$currentValue;
+        $this->script['scenes'][$sceneIndex]['voiceover']['enabled'] = $newValue;
+
+        // Also sync to animation array for UI state
+        // musicOnly = true when voiceover.enabled = false
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+        $this->animation['scenes'][$sceneIndex]['musicOnly'] = !$newValue;
+
+        // If enabling music only, clear any existing voiceover
+        if ($this->animation['scenes'][$sceneIndex]['musicOnly']) {
+            unset($this->animation['scenes'][$sceneIndex]['voiceoverUrl']);
+            unset($this->animation['scenes'][$sceneIndex]['assetId']);
+        }
 
         $this->recalculateVoiceStatus();
         $this->saveProject();
@@ -3224,6 +3240,202 @@ class VideoWizard extends Component
             }
             $this->generateVoiceover($sceneIndex, $scene['id']);
         }
+    }
+
+    /**
+     * Generate AI video animation for a single scene.
+     */
+    #[On('animate-scene')]
+    public function animateScene(int $sceneIndex): void
+    {
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        $sbScene = $this->storyboard['scenes'][$sceneIndex] ?? [];
+
+        if (!$scene) {
+            $this->error = __('Scene not found');
+            return;
+        }
+
+        // Check if scene has an image to animate
+        $imageUrl = $sbScene['imageUrl'] ?? null;
+        if (!$imageUrl) {
+            $this->error = __('Please generate an image first before creating video');
+            return;
+        }
+
+        // Initialize animation scene data if not exists
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        // Mark as generating
+        $this->animation['scenes'][$sceneIndex]['animationStatus'] = 'generating';
+        $this->saveProject();
+
+        try {
+            // Get video settings
+            $videoModel = $this->content['videoModel'] ?? [
+                'model' => 'hailuo-2.3',
+                'duration' => '10s',
+                'resolution' => '768p'
+            ];
+
+            // Get camera movements for this scene
+            $cameraMovements = $this->animation['scenes'][$sceneIndex]['cameraMovements'] ?? [];
+
+            // TODO: Integrate with actual video generation API (Minimax/Hailuo)
+            // For now, dispatch a job or queue the video generation
+            // This is a placeholder that will be connected to the actual API
+
+            \Log::info("Animating scene {$sceneIndex}", [
+                'imageUrl' => $imageUrl,
+                'model' => $videoModel['model'],
+                'duration' => $videoModel['duration'],
+                'cameraMovements' => $cameraMovements,
+            ]);
+
+            // Placeholder: In production, this would call the video generation API
+            // and update the status when the video is ready via webhook or polling
+            $this->dispatch('notify', [
+                'type' => 'info',
+                'message' => __('Video generation started for Scene :num. This may take a few minutes.', ['num' => $sceneIndex + 1])
+            ]);
+
+        } catch (\Exception $e) {
+            $this->animation['scenes'][$sceneIndex]['animationStatus'] = 'error';
+            $this->animation['scenes'][$sceneIndex]['animationError'] = $e->getMessage();
+            $this->error = __('Failed to start video generation: ') . $e->getMessage();
+            \Log::error("Failed to animate scene {$sceneIndex}: " . $e->getMessage());
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Generate AI video animation for all scenes that have images.
+     */
+    #[On('animate-all-scenes')]
+    public function animateAllScenes(): void
+    {
+        $scenesQueued = 0;
+        $scenesSkipped = 0;
+
+        foreach ($this->script['scenes'] as $index => $scene) {
+            $sbScene = $this->storyboard['scenes'][$index] ?? [];
+            $animScene = $this->animation['scenes'][$index] ?? [];
+
+            // Skip if already has video
+            if (!empty($animScene['videoUrl'])) {
+                $scenesSkipped++;
+                continue;
+            }
+
+            // Skip if no image to animate
+            $imageUrl = $sbScene['imageUrl'] ?? null;
+            if (!$imageUrl) {
+                $scenesSkipped++;
+                continue;
+            }
+
+            // Skip if already generating
+            if (($animScene['animationStatus'] ?? '') === 'generating') {
+                continue;
+            }
+
+            // Queue this scene for animation
+            $this->animateScene($index);
+            $scenesQueued++;
+        }
+
+        if ($scenesQueued > 0) {
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => __(':count scenes queued for video generation', ['count' => $scenesQueued])
+            ]);
+        } else {
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => __('No scenes available for animation. Generate images first.')
+            ]);
+        }
+    }
+
+    /**
+     * Remove voiceover from a scene.
+     */
+    public function removeVoiceover(int $sceneIndex): void
+    {
+        if (isset($this->animation['scenes'][$sceneIndex])) {
+            unset($this->animation['scenes'][$sceneIndex]['voiceoverUrl']);
+            unset($this->animation['scenes'][$sceneIndex]['assetId']);
+            unset($this->animation['scenes'][$sceneIndex]['duration']);
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Set animation type for a scene (ken_burns, talking_head, static).
+     */
+    public function setSceneAnimationType(int $sceneIndex, string $type): void
+    {
+        $validTypes = ['ken_burns', 'talking_head', 'static'];
+        if (!in_array($type, $validTypes)) {
+            return;
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        $this->animation['scenes'][$sceneIndex]['animationType'] = $type;
+        $this->saveProject();
+    }
+
+    /**
+     * Toggle a camera movement for a scene (max 3 allowed).
+     */
+    public function toggleCameraMovement(int $sceneIndex, string $movement): void
+    {
+        $validMovements = [
+            'Pan left', 'Pan right', 'Zoom in', 'Zoom out',
+            'Push in', 'Pull out', 'Tilt up', 'Tilt down',
+            'Tracking shot', 'Static shot'
+        ];
+
+        if (!in_array($movement, $validMovements)) {
+            return;
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex]['cameraMovements'])) {
+            $this->animation['scenes'][$sceneIndex]['cameraMovements'] = [];
+        }
+
+        $movements = &$this->animation['scenes'][$sceneIndex]['cameraMovements'];
+
+        // If movement already selected, remove it
+        $key = array_search($movement, $movements);
+        if ($key !== false) {
+            array_splice($movements, $key, 1);
+        } else {
+            // Add if under limit of 3
+            if (count($movements) < 3) {
+                $movements[] = $movement;
+            }
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Select a scene for detailed editing in Animation Studio.
+     */
+    public function selectSceneForAnimation(int $sceneIndex): void
+    {
+        $this->animation['selectedSceneIndex'] = $sceneIndex;
     }
 
     /**
