@@ -173,6 +173,14 @@ class VideoWizard extends Component
             'position' => 'bottom',
             'size' => 1,
         ],
+        // Hollywood-style shot-based assembly
+        'shotBased' => false,               // Whether using shot-based assembly
+        'collectedVideos' => [],            // All video URLs in order
+        'sceneClips' => [],                 // Videos grouped by scene
+        'totalDuration' => 0,               // Total video duration
+        'assemblyStatus' => 'pending',      // 'pending' | 'collecting' | 'ready' | 'rendering' | 'complete'
+        'renderProgress' => 0,              // Render progress percentage
+        'finalVideoUrl' => null,            // Final rendered video URL
     ];
 
     // UI state
@@ -8130,6 +8138,274 @@ class VideoWizard extends Component
                 $this->generateShotVideo($sceneIndex, $shotIndex);
             }
         }
+    }
+
+    // =========================================================================
+    // PHASE 5: SHOT-BASED VIDEO ASSEMBLY METHODS
+    // =========================================================================
+
+    /**
+     * Collect all shot videos in scene/shot order for assembly.
+     * Hollywood workflow: Scenes contain shots, shots have videos.
+     *
+     * @return array List of video URLs in playback order
+     */
+    public function collectAllShotVideos(): array
+    {
+        $videos = [];
+        $sceneClips = [];
+
+        // If multi-shot mode is enabled, collect from decomposed scenes
+        if ($this->multiShotMode['enabled'] && !empty($this->multiShotMode['decomposedScenes'])) {
+            foreach ($this->multiShotMode['decomposedScenes'] as $sceneIndex => $decomposed) {
+                $sceneVideos = [];
+
+                foreach ($decomposed['shots'] ?? [] as $shotIndex => $shot) {
+                    if (!empty($shot['videoUrl'])) {
+                        $videoEntry = [
+                            'url' => $shot['videoUrl'],
+                            'sceneIndex' => $sceneIndex,
+                            'shotIndex' => $shotIndex,
+                            'duration' => $shot['selectedDuration'] ?? $shot['duration'] ?? 6,
+                            'type' => $shot['type'] ?? 'medium',
+                            'cameraMovement' => $shot['cameraMovement'] ?? 'static',
+                        ];
+                        $videos[] = $videoEntry;
+                        $sceneVideos[] = $videoEntry;
+                    }
+                }
+
+                if (!empty($sceneVideos)) {
+                    $sceneClips[$sceneIndex] = [
+                        'sceneIndex' => $sceneIndex,
+                        'sceneTitle' => $this->script['scenes'][$sceneIndex]['title'] ?? "Scene " . ($sceneIndex + 1),
+                        'clips' => $sceneVideos,
+                        'clipCount' => count($sceneVideos),
+                        'totalDuration' => array_sum(array_column($sceneVideos, 'duration')),
+                    ];
+                }
+            }
+        } else {
+            // Fallback: Collect from standard animation scenes (non-multi-shot mode)
+            foreach ($this->animation['scenes'] ?? [] as $sceneIndex => $animScene) {
+                if (!empty($animScene['videoUrl'])) {
+                    $videoEntry = [
+                        'url' => $animScene['videoUrl'],
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => 0,
+                        'duration' => $animScene['clipDuration'] ?? 6,
+                        'type' => 'full_scene',
+                        'cameraMovement' => $animScene['motion'] ?? 'standard',
+                    ];
+                    $videos[] = $videoEntry;
+                    $sceneClips[$sceneIndex] = [
+                        'sceneIndex' => $sceneIndex,
+                        'sceneTitle' => $this->script['scenes'][$sceneIndex]['title'] ?? "Scene " . ($sceneIndex + 1),
+                        'clips' => [$videoEntry],
+                        'clipCount' => 1,
+                        'totalDuration' => $videoEntry['duration'],
+                    ];
+                }
+            }
+        }
+
+        // Update assembly state
+        $this->assembly['collectedVideos'] = $videos;
+        $this->assembly['sceneClips'] = $sceneClips;
+        $this->assembly['totalDuration'] = array_sum(array_column($videos, 'duration'));
+        $this->assembly['shotBased'] = $this->multiShotMode['enabled'];
+
+        return $videos;
+    }
+
+    /**
+     * Get assembly readiness status.
+     * Checks if all shots/scenes have videos ready for assembly.
+     *
+     * @return array Readiness status with details
+     */
+    public function getAssemblyReadiness(): array
+    {
+        $totalScenes = count($this->script['scenes'] ?? []);
+        $totalShots = 0;
+        $readyShots = 0;
+        $pendingShots = [];
+        $scenesWithAllVideos = 0;
+
+        if ($this->multiShotMode['enabled'] && !empty($this->multiShotMode['decomposedScenes'])) {
+            // Multi-shot mode: Count individual shots
+            foreach ($this->multiShotMode['decomposedScenes'] as $sceneIndex => $decomposed) {
+                $sceneReady = true;
+
+                foreach ($decomposed['shots'] ?? [] as $shotIndex => $shot) {
+                    $totalShots++;
+
+                    if (!empty($shot['videoUrl'])) {
+                        $readyShots++;
+                    } else {
+                        $sceneReady = false;
+                        $pendingShots[] = [
+                            'sceneIndex' => $sceneIndex,
+                            'shotIndex' => $shotIndex,
+                            'type' => $shot['type'] ?? 'unknown',
+                            'status' => $shot['videoStatus'] ?? 'pending',
+                        ];
+                    }
+                }
+
+                if ($sceneReady && !empty($decomposed['shots'])) {
+                    $scenesWithAllVideos++;
+                }
+            }
+        } else {
+            // Standard mode: Each scene = 1 video
+            foreach ($this->animation['scenes'] ?? [] as $sceneIndex => $animScene) {
+                $totalShots++;
+
+                if (!empty($animScene['videoUrl'])) {
+                    $readyShots++;
+                    $scenesWithAllVideos++;
+                } else {
+                    $pendingShots[] = [
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => 0,
+                        'type' => 'full_scene',
+                        'status' => $animScene['videoStatus'] ?? 'pending',
+                    ];
+                }
+            }
+        }
+
+        $isReady = $totalShots > 0 && $readyShots === $totalShots;
+        $progress = $totalShots > 0 ? round(($readyShots / $totalShots) * 100) : 0;
+
+        return [
+            'isReady' => $isReady,
+            'totalScenes' => $totalScenes,
+            'totalShots' => $totalShots,
+            'readyShots' => $readyShots,
+            'pendingShots' => $pendingShots,
+            'pendingCount' => count($pendingShots),
+            'scenesWithAllVideos' => $scenesWithAllVideos,
+            'progress' => $progress,
+            'mode' => $this->multiShotMode['enabled'] ? 'multi-shot' : 'standard',
+        ];
+    }
+
+    /**
+     * Prepare assembly for export/rendering.
+     * Collects all videos and validates readiness.
+     *
+     * @return array Preparation result with status
+     */
+    public function prepareForExport(): array
+    {
+        $this->assembly['assemblyStatus'] = 'collecting';
+
+        // Collect all videos
+        $videos = $this->collectAllShotVideos();
+
+        // Check readiness
+        $readiness = $this->getAssemblyReadiness();
+
+        if (!$readiness['isReady']) {
+            $this->assembly['assemblyStatus'] = 'pending';
+            return [
+                'success' => false,
+                'error' => __('Not all videos are ready'),
+                'readiness' => $readiness,
+                'pendingCount' => $readiness['pendingCount'],
+            ];
+        }
+
+        $this->assembly['assemblyStatus'] = 'ready';
+        $this->saveProject();
+
+        return [
+            'success' => true,
+            'videoCount' => count($videos),
+            'totalDuration' => $this->assembly['totalDuration'],
+            'sceneCount' => count($this->assembly['sceneClips']),
+            'videos' => $videos,
+            'readiness' => $readiness,
+        ];
+    }
+
+    /**
+     * Get all video URLs in order for final rendering.
+     *
+     * @return array List of video URLs only
+     */
+    public function getVideoUrlsForRender(): array
+    {
+        $this->collectAllShotVideos();
+        return array_column($this->assembly['collectedVideos'], 'url');
+    }
+
+    /**
+     * Enable or disable shot-based assembly mode.
+     */
+    public function setShotBasedAssembly(bool $enabled): void
+    {
+        $this->assembly['shotBased'] = $enabled;
+
+        if ($enabled) {
+            // Re-collect videos to update state
+            $this->collectAllShotVideos();
+        } else {
+            // Clear shot-based data
+            $this->assembly['collectedVideos'] = [];
+            $this->assembly['sceneClips'] = [];
+            $this->assembly['totalDuration'] = 0;
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Reset assembly state.
+     */
+    public function resetAssembly(): void
+    {
+        $this->assembly['collectedVideos'] = [];
+        $this->assembly['sceneClips'] = [];
+        $this->assembly['totalDuration'] = 0;
+        $this->assembly['assemblyStatus'] = 'pending';
+        $this->assembly['renderProgress'] = 0;
+        $this->assembly['finalVideoUrl'] = null;
+
+        $this->saveProject();
+    }
+
+    /**
+     * Get assembly statistics for display.
+     */
+    public function getAssemblyStats(): array
+    {
+        $this->collectAllShotVideos();
+        $readiness = $this->getAssemblyReadiness();
+
+        return [
+            'mode' => $this->assembly['shotBased'] ? 'multi-shot' : 'standard',
+            'status' => $this->assembly['assemblyStatus'],
+            'videoCount' => count($this->assembly['collectedVideos']),
+            'sceneCount' => count($this->assembly['sceneClips']),
+            'totalDuration' => $this->assembly['totalDuration'],
+            'formattedDuration' => $this->formatDuration($this->assembly['totalDuration']),
+            'isReady' => $readiness['isReady'],
+            'progress' => $readiness['progress'],
+            'pendingShots' => $readiness['pendingCount'],
+        ];
+    }
+
+    /**
+     * Format duration in seconds to MM:SS.
+     */
+    protected function formatDuration(int $seconds): string
+    {
+        $minutes = floor($seconds / 60);
+        $secs = $seconds % 60;
+        return sprintf('%d:%02d', $minutes, $secs);
     }
 
     // =========================================================================
