@@ -1,288 +1,374 @@
-{{-- Step 5: Animation & Voiceover --}}
+{{-- Step 5: Animation Studio Pro --}}
 <style>
-    .vw-animation-step {
-        width: 100%;
+    /* ========================================
+       ANIMATION STUDIO PRO - Full Screen Layout
+       ======================================== */
+
+    .vw-animation-studio {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #0a0a14 0%, #141428 100%);
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     }
 
-    .vw-animation-card {
-        background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%) !important;
-        border: 1px solid rgba(139, 92, 246, 0.2) !important;
-        border-radius: 1rem !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    /* Top Header Bar */
+    .vw-studio-header {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.6rem 1.25rem;
+        background: rgba(15, 15, 28, 0.98);
+        border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+        backdrop-filter: blur(10px);
     }
 
-    .vw-animation-header {
-        display: flex !important;
-        align-items: center !important;
-        gap: 1rem !important;
-        margin-bottom: 1rem !important;
+    .vw-studio-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
     }
 
-    .vw-animation-icon {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-        background: linear-gradient(135deg, #06b6d4 0%, #10b981 100%) !important;
-        border-radius: 0.75rem !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 1.25rem !important;
+    .vw-studio-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
     }
 
-    .vw-animation-title {
-        font-size: 1.1rem !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        margin: 0 !important;
+    .vw-studio-title {
+        font-weight: 700;
+        color: white;
+        font-size: 1rem;
+        letter-spacing: -0.02em;
     }
 
-    .vw-animation-subtitle {
-        font-size: 0.8rem !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-        margin-top: 0.15rem !important;
+    .vw-studio-subtitle {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.5);
     }
 
     /* Progress Pills */
-    .vw-progress-pills {
+    .vw-studio-pills {
         display: flex;
         gap: 0.5rem;
-        margin-top: 0.75rem;
-        flex-wrap: wrap;
+        margin-left: 1.5rem;
     }
 
-    .vw-progress-pill {
+    .vw-studio-pill {
         display: flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.4rem;
         padding: 0.35rem 0.7rem;
         border-radius: 2rem;
         font-size: 0.7rem;
     }
 
-    .vw-progress-pill.voiceover {
+    .vw-studio-pill.voiceover {
         background: rgba(139, 92, 246, 0.15);
         border: 1px solid rgba(139, 92, 246, 0.3);
-        color: #a78bfa;
     }
 
-    .vw-progress-pill.voiceover.complete {
+    .vw-studio-pill.voiceover.complete {
         background: rgba(16, 185, 129, 0.15);
         border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .vw-studio-pill.voiceover .pill-value {
+        color: #a78bfa;
+        font-weight: 600;
+    }
+
+    .vw-studio-pill.voiceover.complete .pill-value {
         color: #10b981;
     }
 
-    .vw-progress-pill.ready {
+    .vw-studio-pill.animated {
+        background: rgba(6, 182, 212, 0.15);
+        border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .vw-studio-pill.animated .pill-value {
+        color: #06b6d4;
+        font-weight: 600;
+    }
+
+    .vw-studio-pill.ready {
         background: rgba(16, 185, 129, 0.15);
         border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .vw-studio-pill.ready .pill-value {
         color: #10b981;
-    }
-
-    /* Voice Settings */
-    .vw-voice-settings {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .vw-voice-settings-label {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.6);
-        margin-bottom: 0.75rem;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-    }
-
-    .vw-voice-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
-    }
-
-    @media (max-width: 768px) {
-        .vw-voice-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    .vw-voice-btn {
-        padding: 0.6rem 0.75rem;
-        border-radius: 0.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(255, 255, 255, 0.03);
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        font-size: 0.75rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.15rem;
-        transition: all 0.2s;
-        text-align: left;
-    }
-
-    .vw-voice-btn:hover {
-        border-color: rgba(139, 92, 246, 0.4);
-        background: rgba(139, 92, 246, 0.1);
-    }
-
-    .vw-voice-btn.selected {
-        border-color: #8b5cf6;
-        background: rgba(139, 92, 246, 0.2);
-        color: white;
-    }
-
-    .vw-voice-name {
         font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
     }
 
-    .vw-voice-desc {
-        font-size: 0.65rem;
+    /* Header Actions */
+    .vw-studio-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .vw-studio-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.5rem 0.85rem;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-studio-btn.back {
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: transparent;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .vw-studio-btn.back:hover {
+        border-color: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .vw-studio-btn.continue {
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
         color: rgba(255, 255, 255, 0.4);
     }
 
-    .vw-voice-btn.selected .vw-voice-desc {
-        color: rgba(255, 255, 255, 0.6);
-    }
-
-    /* Speed Control */
-    .vw-speed-control {
-        margin-top: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .vw-speed-label {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.6);
-        min-width: 100px;
-    }
-
-    .vw-speed-slider {
-        flex: 1;
-        -webkit-appearance: none;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-        outline: none;
-    }
-
-    .vw-speed-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 16px;
-        height: 16px;
-        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-        border-radius: 50%;
-        cursor: pointer;
-    }
-
-    .vw-speed-value {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #a78bfa;
-        min-width: 40px;
-        text-align: right;
-    }
-
-    /* Bulk Actions */
-    .vw-bulk-actions {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 1rem;
-    }
-
-    .vw-bulk-btn {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.4rem;
-        padding: 0.65rem 1rem;
-        border-radius: 0.5rem;
-        font-size: 0.8rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: none;
-    }
-
-    .vw-bulk-btn.voice {
-        background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    .vw-studio-btn.continue.enabled {
+        background: linear-gradient(135deg, #10b981, #059669);
         color: white;
+        font-weight: 600;
     }
 
-    .vw-bulk-btn.voice:hover:not(:disabled) {
+    .vw-studio-btn.continue.enabled:hover {
         transform: translateY(-1px);
-        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
 
-    .vw-bulk-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+    /* Main Split Panel Content */
+    .vw-studio-content {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 0;
+        overflow: hidden;
     }
 
-    /* Scene List */
-    .vw-scene-list {
-        margin-top: 1rem;
+    @media (max-width: 900px) {
+        .vw-studio-content {
+            grid-template-columns: 1fr;
+        }
+        .vw-scene-grid-panel {
+            display: none;
+        }
     }
 
-    .vw-scene-list-header {
+    /* ========================================
+       LEFT PANEL - Scene Grid
+       ======================================== */
+
+    .vw-scene-grid-panel {
+        background: rgba(15, 15, 28, 0.98);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .vw-scene-grid-header {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .vw-scene-grid-title-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.6rem;
     }
 
-    .vw-scene-list-title {
-        font-size: 0.8rem;
+    .vw-scene-grid-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .vw-scene-grid-title span {
+        font-size: 0.75rem;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.7);
+        color: white;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
-    /* Scene Item */
-    .vw-scene-item {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 0.75rem;
-        padding: 1rem;
-        margin-bottom: 0.75rem;
+    .vw-scene-grid-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .vw-tool-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: transparent;
+        color: rgba(255, 255, 255, 0.5);
+        cursor: pointer;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         transition: all 0.2s;
     }
 
-    .vw-scene-item:hover {
-        border-color: rgba(139, 92, 246, 0.3);
+    .vw-tool-btn:hover {
+        border-color: rgba(139, 92, 246, 0.4);
+        background: rgba(139, 92, 246, 0.1);
+        color: #a78bfa;
     }
 
-    .vw-scene-item.selected {
-        border-color: #8b5cf6;
+    /* Quick Actions */
+    .vw-quick-actions {
+        display: flex;
+        gap: 0.4rem;
+    }
+
+    .vw-quick-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+        padding: 0.45rem;
+        border-radius: 0.4rem;
+        border: none;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-quick-btn.voice {
+        background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    }
+
+    .vw-quick-btn.voice:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+    }
+
+    .vw-quick-btn.animate {
+        background: linear-gradient(135deg, #06b6d4, #10b981);
+    }
+
+    .vw-quick-btn.animate:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4);
+    }
+
+    .vw-quick-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Hint */
+    .vw-scene-grid-hint {
+        padding: 0.35rem 1rem;
+        background: rgba(139, 92, 246, 0.05);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 0.55rem;
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* Scrollable Scene List */
+    .vw-scene-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    /* Scene Card */
+    .vw-scene-card {
+        position: relative;
+        display: flex;
+        gap: 0.6rem;
+        padding: 0.5rem;
+        margin-bottom: 0.4rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .vw-scene-card:hover {
+        border-color: rgba(139, 92, 246, 0.3);
         background: rgba(139, 92, 246, 0.05);
     }
 
-    .vw-scene-row {
-        display: flex;
-        gap: 1rem;
-        align-items: flex-start;
+    .vw-scene-card.selected {
+        background: rgba(139, 92, 246, 0.2);
+        border-color: rgba(139, 92, 246, 0.5);
     }
 
-    .vw-scene-thumb {
-        width: 120px;
-        height: 68px;
-        border-radius: 0.5rem;
+    .vw-scene-card.processing {
+        border-color: rgba(251, 191, 36, 0.4);
+    }
+
+    /* Progress Ring Container */
+    .vw-progress-ring-container {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        flex-shrink: 0;
+    }
+
+    .vw-progress-ring {
+        transform: rotate(-90deg);
+    }
+
+    .vw-progress-ring-bg {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.1);
+        stroke-width: 3;
+    }
+
+    .vw-progress-ring-fill {
+        fill: none;
+        stroke-width: 3;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .vw-scene-thumb-inner {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        width: 50px;
+        height: 50px;
+        border-radius: 0.35rem;
         overflow: hidden;
         background: rgba(0, 0, 0, 0.3);
-        flex-shrink: 0;
-        position: relative;
     }
 
-    .vw-scene-thumb img {
+    .vw-scene-thumb-inner img {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -295,401 +381,893 @@
         align-items: center;
         justify-content: center;
         color: rgba(255, 255, 255, 0.3);
-        font-size: 1.25rem;
+        font-size: 1rem;
     }
 
-    .vw-scene-number-badge {
+    .vw-scene-number {
         position: absolute;
-        top: 0.35rem;
-        left: 0.35rem;
-        width: 20px;
-        height: 20px;
-        background: rgba(0, 0, 0, 0.7);
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        background: rgba(0, 0, 0, 0.8);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.65rem;
+        font-size: 0.55rem;
         font-weight: 600;
         color: white;
+        z-index: 1;
     }
 
-    .vw-scene-content {
+    /* Scene Info */
+    .vw-scene-info {
         flex: 1;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
-    .vw-scene-title-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    .vw-scene-name {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 0.2rem;
+    }
+
+    .vw-scene-duration {
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.4);
         margin-bottom: 0.35rem;
     }
 
-    .vw-scene-title {
+    .vw-scene-status {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .vw-status-badge {
+        font-size: 0.55rem;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.2rem;
+        font-weight: 500;
+    }
+
+    .vw-status-badge.voice-ready {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+    }
+
+    .vw-status-badge.voice-pending {
+        background: rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+    }
+
+    .vw-status-badge.animated {
+        background: rgba(6, 182, 212, 0.2);
+        color: #06b6d4;
+    }
+
+    .vw-status-badge.generating {
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+    }
+
+    /* ========================================
+       RIGHT PANEL - Detail View
+       ======================================== */
+
+    .vw-detail-panel {
+        flex: 1;
+        background: linear-gradient(180deg, rgba(15, 15, 28, 0.95) 0%, rgba(10, 10, 20, 0.98) 100%);
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .vw-detail-content {
+        width: 100%;
+        max-width: 700px;
+    }
+
+    /* Scene Preview Header */
+    .vw-preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .vw-preview-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .vw-preview-title-icon {
+        font-size: 1rem;
+    }
+
+    .vw-preview-title-text {
         font-size: 0.9rem;
         font-weight: 600;
         color: white;
     }
 
-    .vw-scene-badges {
-        display: flex;
-        gap: 0.35rem;
-    }
-
-    .vw-badge {
+    .vw-preview-badge {
         font-size: 0.6rem;
-        padding: 0.15rem 0.4rem;
-        border-radius: 0.25rem;
-        font-weight: 500;
+        padding: 0.2rem 0.5rem;
+        border-radius: 1rem;
+        font-weight: 600;
     }
 
-    .vw-badge.duration {
+    .vw-preview-badge.ken-burns {
         background: rgba(6, 182, 212, 0.2);
-        color: #67e8f9;
+        color: #06b6d4;
     }
 
-    .vw-badge.voiceover-ready {
+    .vw-preview-badge.animated {
         background: rgba(16, 185, 129, 0.2);
         color: #10b981;
     }
 
-    .vw-badge.voiceover-pending {
-        background: rgba(251, 191, 36, 0.2);
-        color: #fbbf24;
+    .vw-preview-badge.stock {
+        background: rgba(245, 158, 11, 0.2);
+        color: #f59e0b;
     }
 
-    .vw-scene-narration {
-        font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.6);
-        line-height: 1.5;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        margin-bottom: 0.75rem;
-    }
-
-    /* Audio Player */
-    .vw-audio-section {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .vw-audio-player {
-        flex: 1;
-        height: 32px;
-    }
-
-    .vw-audio-player audio {
-        width: 100%;
-        height: 100%;
-    }
-
-    .vw-audio-actions {
-        display: flex;
-        gap: 0.35rem;
-    }
-
-    .vw-audio-btn {
-        padding: 0.4rem 0.6rem;
-        border-radius: 0.35rem;
-        font-size: 0.7rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        transition: all 0.2s;
-    }
-
-    .vw-audio-btn.generate {
-        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-        border: none;
-        color: white;
-    }
-
-    .vw-audio-btn.generate:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
-    }
-
-    .vw-audio-btn.regenerate {
-        background: rgba(139, 92, 246, 0.15);
-        border: 1px solid rgba(139, 92, 246, 0.3);
-        color: #c4b5fd;
-    }
-
-    .vw-audio-btn.regenerate:hover {
-        background: rgba(139, 92, 246, 0.25);
-    }
-
-    /* Generating State */
-    .vw-generating-indicator {
+    .vw-preview-tools {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        background: rgba(139, 92, 246, 0.1);
+    }
+
+    .vw-preview-tool-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.6rem;
         border-radius: 0.35rem;
+        font-size: 0.65rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-preview-tool-btn.pip {
+        border: 1px solid rgba(6, 182, 212, 0.3);
+        background: rgba(6, 182, 212, 0.1);
+        color: #06b6d4;
+    }
+
+    .vw-preview-tool-btn.device {
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        background: rgba(139, 92, 246, 0.1);
+        color: #a78bfa;
+    }
+
+    .vw-preview-scene-count {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Main Preview Container */
+    .vw-preview-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(20, 20, 40, 0.6));
+        border-radius: 0.75rem;
+        overflow: hidden;
+        border: 2px solid rgba(139, 92, 246, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        margin-bottom: 1rem;
+    }
+
+    .vw-preview-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .vw-preview-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Ken Burns Animation */
+    @keyframes kenBurnsPreview {
+        0% { transform: scale(1) translate(0, 0); }
+        50% { transform: scale(1.08) translate(-1%, -1%); }
+        100% { transform: scale(1) translate(0, 0); }
+    }
+
+    .vw-ken-burns-preview {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .vw-ken-burns-preview img {
+        width: 115%;
+        height: 115%;
+        object-fit: cover;
+        object-position: center;
+        animation: kenBurnsPreview 8s ease-in-out infinite alternate;
+        transform-origin: center center;
+    }
+
+    /* Preview Overlays */
+    .vw-preview-play-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .vw-preview-play-overlay:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    .vw-preview-play-btn {
+        width: 70px;
+        height: 70px;
+        background: rgba(139, 92, 246, 0.9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+        font-size: 1.75rem;
+        padding-left: 4px;
+    }
+
+    .vw-preview-status-badge {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 0.35rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .vw-preview-status-badge.animated {
+        background: rgba(16, 185, 129, 0.9);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .vw-preview-status-badge.generating {
+        background: rgba(139, 92, 246, 0.9);
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    /* Scene Info Overlay */
+    .vw-preview-info-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+        padding: 2rem 1rem 0.85rem;
+    }
+
+    .vw-preview-info-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .vw-preview-scene-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: white;
+        margin-bottom: 0.2rem;
+    }
+
+    .vw-preview-scene-duration {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .vw-preview-quick-actions {
+        display: flex;
+        gap: 0.4rem;
+    }
+
+    .vw-preview-action-btn {
+        padding: 0.4rem 0.7rem;
+        border-radius: 0.4rem;
+        border: none;
+        font-size: 0.7rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: all 0.2s;
+    }
+
+    .vw-preview-action-btn.animate {
+        background: rgba(6, 182, 212, 0.9);
+        color: white;
+    }
+
+    .vw-preview-action-btn.animate:hover {
+        background: rgba(6, 182, 212, 1);
+    }
+
+    /* Empty State */
+    .vw-preview-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.3);
+    }
+
+    .vw-preview-empty-content {
+        text-align: center;
+    }
+
+    .vw-preview-empty-icon {
+        font-size: 3.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .vw-preview-empty-text {
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .vw-preview-empty-hint {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.2);
+        margin-top: 0.25rem;
+    }
+
+    /* Generating Overlay */
+    .vw-preview-generating {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+
+    .vw-preview-generating-spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid rgba(6, 182, 212, 0.3);
+        border-top-color: #06b6d4;
+        border-radius: 50%;
+        animation: vw-spin 0.8s linear infinite;
+        margin-bottom: 1rem;
+    }
+
+    .vw-preview-generating-text {
+        color: white;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .vw-preview-generating-hint {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
     }
 
     @keyframes vw-spin {
         to { transform: rotate(360deg); }
     }
 
-    .vw-generating-indicator svg {
-        width: 16px;
-        height: 16px;
-        animation: vw-spin 0.8s linear infinite;
-    }
-
-    .vw-generating-text {
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.75rem;
-    }
-
-    /* Alert */
-    .vw-alert {
+    /* Mini Timeline */
+    .vw-mini-timeline {
         display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        gap: 0.35rem;
+        overflow-x: auto;
+        padding: 0.5rem 0;
         margin-bottom: 1rem;
     }
 
-    .vw-alert.warning {
-        background: rgba(251, 191, 36, 0.15);
-        border: 1px solid rgba(251, 191, 36, 0.3);
-        color: #fbbf24;
+    .vw-mini-timeline-item {
+        flex-shrink: 0;
+        width: 60px;
+        height: 34px;
+        border-radius: 0.25rem;
+        overflow: hidden;
+        border: 2px solid transparent;
+        cursor: pointer;
+        opacity: 0.5;
+        transition: all 0.2s;
     }
 
-    .vw-alert-icon {
-        font-size: 1.25rem;
+    .vw-mini-timeline-item:hover {
+        opacity: 0.8;
     }
 
-    .vw-alert-text {
-        font-size: 0.9rem;
+    .vw-mini-timeline-item.active {
+        border-color: #8b5cf6;
+        opacity: 1;
     }
 
-    /* Preview Tip */
-    .vw-preview-tip {
-        margin-top: 1rem;
-        padding: 0.75rem 1rem;
-        background: rgba(6, 182, 212, 0.1);
-        border: 1px solid rgba(6, 182, 212, 0.2);
-        border-radius: 0.5rem;
+    .vw-mini-timeline-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .vw-mini-timeline-empty {
+        width: 100%;
+        height: 100%;
+        background: #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 0.6rem;
+    }
+
+    /* Section Cards */
+    .vw-section-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .vw-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .vw-section-title {
         display: flex;
         align-items: center;
         gap: 0.5rem;
     }
 
-    .vw-preview-tip-icon {
+    .vw-section-title-icon {
         font-size: 1rem;
     }
 
-    .vw-preview-tip-text {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.6);
+    .vw-section-title-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: white;
     }
 
-    .vw-preview-tip kbd {
-        background: rgba(255, 255, 255, 0.1);
+    .vw-section-badge {
+        font-size: 0.5rem;
         padding: 0.15rem 0.35rem;
-        border-radius: 0.25rem;
-        font-size: 0.7rem;
+        border-radius: 0.2rem;
+        font-weight: 600;
+    }
+
+    .vw-section-badge.auto {
+        background: linear-gradient(135deg, #f59e0b, #ec4899);
+        color: white;
+    }
+
+    /* Alert */
+    .vw-studio-alert {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.5rem;
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+        border-radius: 0.75rem;
+        color: #fbbf24;
+        margin: 2rem auto;
+        max-width: 500px;
+    }
+
+    .vw-studio-alert-icon {
+        font-size: 1.5rem;
+    }
+
+    .vw-studio-alert-text {
+        font-size: 1rem;
     }
 </style>
 
-<div class="vw-animation-step">
-    @if(empty($script['scenes']))
-        <div class="vw-alert warning">
-            <span class="vw-alert-icon">⚠️</span>
-            <span class="vw-alert-text">{{ __('Please generate a script first.') }}</span>
-        </div>
-    @else
-        @php
-            $voiceoversReady = count(array_filter($animation['scenes'] ?? [], fn($s) => !empty($s['voiceoverUrl'])));
-            $totalScenes = count($script['scenes']);
-            $allVoiceoversReady = $voiceoversReady >= $totalScenes;
-            $selectedVoice = $animation['voiceover']['voice'] ?? 'nova';
-            $speed = $animation['voiceover']['speed'] ?? 1.0;
-        @endphp
+@if(empty($script['scenes']))
+    <div class="vw-studio-alert">
+        <span class="vw-studio-alert-icon">⚠️</span>
+        <span class="vw-studio-alert-text">{{ __('Please generate a script first before using Animation Studio.') }}</span>
+    </div>
+@else
+    @php
+        $scriptScenes = $script['scenes'] ?? [];
+        $animationScenes = $animation['scenes'] ?? [];
+        $storyboardScenes = $storyboard['scenes'] ?? [];
+        $totalScenes = count($scriptScenes);
 
-        {{-- Main Card --}}
-        <div class="vw-animation-card">
-            {{-- Header --}}
-            <div class="vw-animation-header">
-                <div class="vw-animation-icon">🎬</div>
-                <div style="flex: 1;">
-                    <h2 class="vw-animation-title">{{ __('Animation Studio') }}</h2>
-                    <p class="vw-animation-subtitle">
-                        {{ __('Generate voiceovers for your scenes') }}
-                    </p>
+        // Calculate stats
+        $voiceoversReady = count(array_filter($animationScenes, fn($s) => !empty($s['voiceoverUrl'])));
+        $animatedCount = count(array_filter($animationScenes, fn($s) => !empty($s['videoUrl'])));
+        $stockVideoCount = count(array_filter($storyboardScenes, fn($s) => ($s['source'] ?? '') === 'stock-video' && !empty($s['videoUrl'])));
+
+        // A scene is ready if it has visual AND (voiceover OR doesn't need narration)
+        $readyScenes = 0;
+        foreach ($scriptScenes as $idx => $scriptScene) {
+            $animScene = $animationScenes[$idx] ?? [];
+            $sbScene = $storyboardScenes[$idx] ?? [];
+            $hasVoiceover = !empty($animScene['voiceoverUrl']);
+            $hasVisual = !empty($animScene['videoUrl']) || (($sbScene['source'] ?? '') === 'stock-video' && !empty($sbScene['videoUrl'])) || !empty($sbScene['imageUrl']);
+            $hasNarration = !empty($scriptScene['narration']) && trim($scriptScene['narration']) !== '';
+            $requiresVoiceover = ($scriptScene['hasNarration'] ?? true) !== false && $hasNarration;
+            if ($hasVisual && ($hasVoiceover || !$requiresVoiceover)) {
+                $readyScenes++;
+            }
+        }
+
+        $allScenesReady = $readyScenes >= $totalScenes;
+        $selectedIndex = $animation['selectedSceneIndex'] ?? 0;
+        $selectedScene = $scriptScenes[$selectedIndex] ?? null;
+        $selectedAnimScene = $animationScenes[$selectedIndex] ?? [];
+        $selectedStoryboardScene = $storyboardScenes[$selectedIndex] ?? [];
+    @endphp
+
+    <div class="vw-animation-studio">
+        {{-- TOP HEADER BAR --}}
+        <div class="vw-studio-header">
+            <div class="vw-studio-brand">
+                <div class="vw-studio-icon">🎬</div>
+                <div>
+                    <div class="vw-studio-title">{{ __('Animation Studio Pro') }}</div>
+                    <div class="vw-studio-subtitle">{{ __('Generate voiceovers • Create animations') }}</div>
                 </div>
             </div>
 
             {{-- Progress Pills --}}
-            <div class="vw-progress-pills">
-                <div class="vw-progress-pill voiceover {{ $allVoiceoversReady ? 'complete' : '' }}">
+            <div class="vw-studio-pills">
+                <div class="vw-studio-pill voiceover {{ $voiceoversReady >= $totalScenes ? 'complete' : '' }}">
                     <span>🎙️</span>
-                    <span style="font-weight: 600;">{{ $voiceoversReady }}/{{ $totalScenes }}</span>
-                    <span>{{ __('voiceovers') }}</span>
+                    <span class="pill-value">{{ $voiceoversReady }}/{{ $totalScenes }}</span>
                 </div>
-                @if($allVoiceoversReady)
-                    <div class="vw-progress-pill ready">
-                        <span>✓</span>
-                        <span style="font-weight: 600;">{{ __('Ready for assembly') }}</span>
-                    </div>
-                @endif
-            </div>
-
-            {{-- Voice Settings --}}
-            <div class="vw-voice-settings">
-                <div class="vw-voice-settings-label">
-                    <span>🎙️</span>
-                    <span>{{ __('Select Voice') }}</span>
+                <div class="vw-studio-pill animated">
+                    <span>🎬</span>
+                    <span class="pill-value">{{ $animatedCount }} {{ __('animated') }}</span>
                 </div>
-                <div class="vw-voice-grid">
-                    @php
-                        $voices = [
-                            'alloy' => ['icon' => '🎭', 'name' => 'Alloy', 'desc' => 'Neutral, versatile'],
-                            'echo' => ['icon' => '🎤', 'name' => 'Echo', 'desc' => 'Male, warm'],
-                            'fable' => ['icon' => '📖', 'name' => 'Fable', 'desc' => 'Storytelling'],
-                            'onyx' => ['icon' => '🎸', 'name' => 'Onyx', 'desc' => 'Deep male'],
-                            'nova' => ['icon' => '✨', 'name' => 'Nova', 'desc' => 'Female, expressive'],
-                            'shimmer' => ['icon' => '💫', 'name' => 'Shimmer', 'desc' => 'Bright female'],
-                        ];
-                    @endphp
-                    @foreach($voices as $voiceId => $voice)
-                        <button type="button"
-                                class="vw-voice-btn {{ $selectedVoice === $voiceId ? 'selected' : '' }}"
-                                wire:click="$set('animation.voiceover.voice', '{{ $voiceId }}')">
-                            <span class="vw-voice-name">{{ $voice['icon'] }} {{ $voice['name'] }}</span>
-                            <span class="vw-voice-desc">{{ $voice['desc'] }}</span>
-                        </button>
-                    @endforeach
+                <div class="vw-studio-pill ready">
+                    <span>✓</span>
+                    <span class="pill-value">{{ $readyScenes }} {{ __('ready') }}</span>
                 </div>
             </div>
 
-            {{-- Speed Control --}}
-            <div class="vw-speed-control">
-                <span class="vw-speed-label">⚡ {{ __('Speed') }}:</span>
-                <input type="range"
-                       wire:model.live="animation.voiceover.speed"
-                       min="0.5" max="2.0" step="0.1"
-                       class="vw-speed-slider">
-                <span class="vw-speed-value">{{ number_format($speed, 1) }}x</span>
-            </div>
-
-            {{-- Bulk Actions --}}
-            <div class="vw-bulk-actions">
-                <button class="vw-bulk-btn voice"
-                        wire:click="$dispatch('generate-all-voiceovers')"
-                        wire:loading.attr="disabled"
-                        wire:target="generateAllVoiceovers">
-                    <span wire:loading.remove wire:target="generateAllVoiceovers">
-                        🎙️ {{ __('Generate All Voiceovers') }}
-                    </span>
-                    <span wire:loading wire:target="generateAllVoiceovers">
-                        <svg style="width: 16px; height: 16px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
-                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-                        </svg>
-                        {{ __('Generating...') }}
-                    </span>
+            {{-- Header Actions --}}
+            <div class="vw-studio-actions">
+                <button type="button"
+                        class="vw-studio-btn back"
+                        wire:click="goToStep(4)">
+                    <span>←</span> {{ __('Back') }}
+                </button>
+                <button type="button"
+                        class="vw-studio-btn continue {{ $allScenesReady ? 'enabled' : '' }}"
+                        wire:click="goToStep(6)"
+                        {{ !$allScenesReady ? 'disabled' : '' }}>
+                    {{ __('Continue') }} <span>→</span>
                 </button>
             </div>
         </div>
 
-        {{-- Scene List --}}
-        <div class="vw-scene-list">
-            <div class="vw-scene-list-header">
-                <span class="vw-scene-list-title">{{ __('Scenes') }} ({{ $totalScenes }})</span>
-            </div>
-
-            @foreach($script['scenes'] as $index => $scene)
-                @php
-                    $animationScene = $animation['scenes'][$index] ?? null;
-                    $voiceoverUrl = $animationScene['voiceoverUrl'] ?? null;
-                    $storyboardScene = $storyboard['scenes'][$index] ?? null;
-                    $imageUrl = $storyboardScene['imageUrl'] ?? null;
-                    $voiceoverStatus = $animationScene['status'] ?? 'pending';
-                @endphp
-                <div class="vw-scene-item">
-                    <div class="vw-scene-row">
-                        {{-- Thumbnail --}}
-                        <div class="vw-scene-thumb">
-                            @if($imageUrl)
-                                <img src="{{ $imageUrl }}" alt="{{ $scene['title'] ?? 'Scene ' . ($index + 1) }}">
-                            @else
-                                <div class="vw-scene-thumb-empty">🎬</div>
-                            @endif
-                            <div class="vw-scene-number-badge">{{ $index + 1 }}</div>
+        {{-- MAIN SPLIT-PANEL CONTENT --}}
+        <div class="vw-studio-content">
+            {{-- LEFT PANEL - Scene Grid --}}
+            <div class="vw-scene-grid-panel">
+                <div class="vw-scene-grid-header">
+                    <div class="vw-scene-grid-title-row">
+                        <div class="vw-scene-grid-title">
+                            <span>{{ __('SCENES') }}</span>
                         </div>
+                        <div class="vw-scene-grid-tools">
+                            <button type="button" class="vw-tool-btn" title="{{ __('Keyboard shortcuts') }}">⌨️</button>
+                            <button type="button" class="vw-tool-btn" title="{{ __('Cinema mode') }}">🎬</button>
+                            <button type="button" class="vw-tool-btn" title="{{ __('Queue manager') }}">📋</button>
+                        </div>
+                    </div>
 
-                        {{-- Content --}}
-                        <div class="vw-scene-content">
-                            <div class="vw-scene-title-row">
-                                <span class="vw-scene-title">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</span>
-                                <div class="vw-scene-badges">
-                                    <span class="vw-badge duration">{{ $scene['duration'] ?? 8 }}s</span>
-                                    @if($voiceoverUrl)
-                                        <span class="vw-badge voiceover-ready">✓ {{ __('Voice') }}</span>
+                    {{-- Quick Actions --}}
+                    <div class="vw-quick-actions">
+                        <button type="button"
+                                class="vw-quick-btn voice"
+                                wire:click="$dispatch('generate-all-voiceovers')"
+                                wire:loading.attr="disabled">
+                            <span>🎙️</span> {{ __('All Voices') }}
+                        </button>
+                        <button type="button"
+                                class="vw-quick-btn animate"
+                                wire:click="$dispatch('animate-all-scenes')"
+                                wire:loading.attr="disabled">
+                            <span>🎬</span> {{ __('All Anim') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="vw-scene-grid-hint">
+                    💡 {{ __('Click a scene to edit • Shift+Click for multi-select') }}
+                </div>
+
+                {{-- Scrollable Scene List --}}
+                <div class="vw-scene-list">
+                    @foreach($scriptScenes as $index => $scene)
+                        @php
+                            $animScene = $animationScenes[$index] ?? [];
+                            $sbScene = $storyboardScenes[$index] ?? [];
+                            $isSelected = $selectedIndex === $index;
+                            $hasVoiceover = !empty($animScene['voiceoverUrl']);
+                            $hasAnimation = !empty($animScene['videoUrl']);
+                            $isVoiceGenerating = ($animScene['voiceoverStatus'] ?? '') === 'generating';
+                            $isAnimGenerating = ($animScene['animationStatus'] ?? '') === 'generating';
+                            $isProcessing = $isVoiceGenerating || $isAnimGenerating;
+                            $imageUrl = $sbScene['imageUrl'] ?? null;
+
+                            // Calculate progress
+                            $progress = 0;
+                            if ($hasVoiceover && $hasAnimation) $progress = 100;
+                            elseif ($hasVoiceover) $progress = 50;
+                            elseif ($isProcessing) $progress = 25;
+
+                            // Ring calculation
+                            $ringRadius = 26;
+                            $ringCircumference = 2 * 3.14159 * $ringRadius;
+                            $ringOffset = $ringCircumference - ($progress / 100) * $ringCircumference;
+                            $ringColor = $progress === 100 ? '#10b981' : ($progress >= 50 ? '#fbbf24' : ($isProcessing ? '#8b5cf6' : '#ef4444'));
+                        @endphp
+                        <div class="vw-scene-card {{ $isSelected ? 'selected' : '' }} {{ $isProcessing ? 'processing' : '' }}"
+                             wire:click="$set('animation.selectedSceneIndex', {{ $index }})">
+                            {{-- Progress Ring with Thumbnail --}}
+                            <div class="vw-progress-ring-container">
+                                <svg class="vw-progress-ring" width="60" height="60">
+                                    <circle class="vw-progress-ring-bg" cx="30" cy="30" r="{{ $ringRadius }}"/>
+                                    <circle class="vw-progress-ring-fill"
+                                            cx="30" cy="30" r="{{ $ringRadius }}"
+                                            stroke="{{ $ringColor }}"
+                                            stroke-dasharray="{{ $ringCircumference }}"
+                                            stroke-dashoffset="{{ $ringOffset }}"/>
+                                </svg>
+                                <div class="vw-scene-thumb-inner">
+                                    @if($imageUrl)
+                                        <img src="{{ $imageUrl }}" alt="Scene {{ $index + 1 }}">
                                     @else
-                                        <span class="vw-badge voiceover-pending">{{ __('Pending') }}</span>
+                                        <div class="vw-scene-thumb-empty">🎬</div>
+                                    @endif
+                                </div>
+                                <div class="vw-scene-number">{{ $index + 1 }}</div>
+                            </div>
+
+                            {{-- Scene Info --}}
+                            <div class="vw-scene-info">
+                                <div class="vw-scene-name">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</div>
+                                <div class="vw-scene-duration">{{ $scene['duration'] ?? 8 }}s</div>
+                                <div class="vw-scene-status">
+                                    @if($isVoiceGenerating)
+                                        <span class="vw-status-badge generating">⏳ {{ __('Voice...') }}</span>
+                                    @elseif($hasVoiceover)
+                                        <span class="vw-status-badge voice-ready">🎙️</span>
+                                    @else
+                                        <span class="vw-status-badge voice-pending">🎙️</span>
+                                    @endif
+
+                                    @if($isAnimGenerating)
+                                        <span class="vw-status-badge generating">⏳ {{ __('Anim...') }}</span>
+                                    @elseif($hasAnimation)
+                                        <span class="vw-status-badge animated">🎬</span>
                                     @endif
                                 </div>
                             </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
 
-                            <p class="vw-scene-narration">"{{ Str::limit($scene['narration'] ?? '', 120) }}"</p>
+            {{-- RIGHT PANEL - Detail View --}}
+            <div class="vw-detail-panel">
+                <div class="vw-detail-content">
+                    @if($selectedScene)
+                        @php
+                            $selectedImageUrl = $selectedStoryboardScene['imageUrl'] ?? null;
+                            $selectedVideoUrl = $selectedAnimScene['videoUrl'] ?? null;
+                            $selectedVoiceoverUrl = $selectedAnimScene['voiceoverUrl'] ?? null;
+                            $selectedAnimStatus = $selectedAnimScene['animationStatus'] ?? null;
+                            $selectedVoiceStatus = $selectedAnimScene['voiceoverStatus'] ?? null;
+                            $isStockVideo = ($selectedStoryboardScene['source'] ?? '') === 'stock-video';
+                        @endphp
 
-                            {{-- Audio Section --}}
-                            <div class="vw-audio-section">
-                                @if($voiceoverStatus === 'generating' || ($isLoading && !$voiceoverUrl))
-                                    <div class="vw-generating-indicator">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
-                                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-                                        </svg>
-                                        <span class="vw-generating-text">{{ __('Generating voiceover...') }}</span>
+                        {{-- Preview Header --}}
+                        <div class="vw-preview-header">
+                            <div class="vw-preview-title">
+                                <span class="vw-preview-title-icon">🎬</span>
+                                <span class="vw-preview-title-text">{{ __('SCENE PREVIEW') }}</span>
+                                @if($selectedVideoUrl)
+                                    <span class="vw-preview-badge animated">✓ {{ __('Animated') }}</span>
+                                @elseif($isStockVideo)
+                                    <span class="vw-preview-badge stock">📹 {{ __('Stock') }}</span>
+                                @elseif($selectedImageUrl)
+                                    <span class="vw-preview-badge ken-burns">{{ __('Ken Burns') }}</span>
+                                @endif
+                            </div>
+                            <div class="vw-preview-tools">
+                                <button type="button" class="vw-preview-tool-btn pip">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                        <rect x="11" y="9" width="10" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+                                    </svg>
+                                    {{ __('PiP') }}
+                                </button>
+                                <button type="button" class="vw-preview-tool-btn device">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                        <line x1="8" y1="21" x2="16" y2="21"/>
+                                        <line x1="12" y1="17" x2="12" y2="21"/>
+                                    </svg>
+                                    {{ __('Preview') }}
+                                </button>
+                                <span class="vw-preview-scene-count">{{ __('Scene') }} {{ $selectedIndex + 1 }} {{ __('of') }} {{ $totalScenes }}</span>
+                            </div>
+                        </div>
+
+                        {{-- Main Preview Container --}}
+                        <div class="vw-preview-container">
+                            @if($selectedVideoUrl)
+                                {{-- Animated Video --}}
+                                <video class="vw-preview-video" src="{{ $selectedVideoUrl }}" id="preview-video-{{ $selectedIndex }}"></video>
+                                <div class="vw-preview-play-overlay" onclick="document.getElementById('preview-video-{{ $selectedIndex }}').play()">
+                                    <div class="vw-preview-play-btn">▶</div>
+                                </div>
+                                <div class="vw-preview-status-badge animated">✓ {{ __('ANIMATED') }}</div>
+                            @elseif($selectedImageUrl)
+                                {{-- Ken Burns Preview --}}
+                                <div class="vw-ken-burns-preview">
+                                    <img src="{{ $selectedImageUrl }}" alt="{{ $selectedScene['title'] ?? 'Scene' }}">
+                                </div>
+                                @if($selectedAnimStatus === 'generating')
+                                    <div class="vw-preview-generating">
+                                        <div class="vw-preview-generating-spinner"></div>
+                                        <div class="vw-preview-generating-text">{{ __('Generating Animation...') }}</div>
+                                        <div class="vw-preview-generating-hint">{{ __('This may take a moment') }}</div>
                                     </div>
-                                @elseif($voiceoverUrl)
-                                    <div class="vw-audio-player">
-                                        <audio controls style="width: 100%; height: 32px;">
-                                            <source src="{{ $voiceoverUrl }}" type="audio/mpeg">
-                                        </audio>
+                                @endif
+                            @else
+                                {{-- No Image --}}
+                                <div class="vw-preview-empty">
+                                    <div class="vw-preview-empty-content">
+                                        <div class="vw-preview-empty-icon">🖼️</div>
+                                        <div class="vw-preview-empty-text">{{ __('No storyboard image') }}</div>
+                                        <div class="vw-preview-empty-hint">{{ __('Generate images in Step 4') }}</div>
                                     </div>
-                                    <div class="vw-audio-actions">
-                                        <button type="button"
-                                                class="vw-audio-btn regenerate"
-                                                wire:click="$dispatch('regenerate-voiceover', { sceneIndex: {{ $index }} })"
-                                                wire:loading.attr="disabled">
-                                            🔄
-                                        </button>
+                                </div>
+                            @endif
+
+                            {{-- Scene Info Overlay --}}
+                            @if($selectedImageUrl || $selectedVideoUrl)
+                                <div class="vw-preview-info-overlay">
+                                    <div class="vw-preview-info-row">
+                                        <div>
+                                            <div class="vw-preview-scene-title">{{ __('Scene') }} {{ $selectedIndex + 1 }}</div>
+                                            <div class="vw-preview-scene-duration">{{ $selectedScene['duration'] ?? 8 }}s {{ __('duration') }}</div>
+                                        </div>
+                                        <div class="vw-preview-quick-actions">
+                                            @if(!$selectedVideoUrl && $selectedImageUrl)
+                                                <button type="button"
+                                                        class="vw-preview-action-btn animate"
+                                                        wire:click="$dispatch('animate-scene', { sceneIndex: {{ $selectedIndex }} })">
+                                                    🎬 {{ __('Animate') }}
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Mini Timeline --}}
+                        <div class="vw-mini-timeline">
+                            @foreach($scriptScenes as $idx => $s)
+                                @php
+                                    $sb = $storyboardScenes[$idx] ?? [];
+                                    $imgUrl = $sb['imageUrl'] ?? null;
+                                @endphp
+                                <div class="vw-mini-timeline-item {{ $selectedIndex === $idx ? 'active' : '' }}"
+                                     wire:click="$set('animation.selectedSceneIndex', {{ $idx }})">
+                                    @if($imgUrl)
+                                        <img src="{{ $imgUrl }}" alt="Scene {{ $idx + 1 }}">
+                                    @else
+                                        <div class="vw-mini-timeline-empty">{{ $idx + 1 }}</div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+
+                        {{-- Voiceover Section (placeholder for Phase 2) --}}
+                        <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.05)); border-color: rgba(139, 92, 246, 0.2);">
+                            <div class="vw-section-header">
+                                <div class="vw-section-title">
+                                    <span class="vw-section-title-icon">🎙️</span>
+                                    <span class="vw-section-title-text">{{ __('Voiceover Pro') }}</span>
+                                </div>
+                            </div>
+                            <div style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">
+                                @if($selectedVoiceoverUrl)
+                                    <audio controls style="width: 100%; margin-bottom: 0.5rem;">
+                                        <source src="{{ $selectedVoiceoverUrl }}" type="audio/mpeg">
+                                    </audio>
+                                    <button type="button"
+                                            style="padding: 0.5rem 1rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.5rem; color: #a78bfa; font-size: 0.75rem; cursor: pointer;"
+                                            wire:click="$dispatch('regenerate-voiceover', { sceneIndex: {{ $selectedIndex }} })">
+                                        🔄 {{ __('Regenerate') }}
+                                    </button>
+                                @elseif($selectedVoiceStatus === 'generating')
+                                    <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem;">
+                                        <div style="width: 20px; height: 20px; border: 2px solid rgba(139,92,246,0.3); border-top-color: #8b5cf6; border-radius: 50%; animation: vw-spin 0.8s linear infinite;"></div>
+                                        <span>{{ __('Generating voiceover...') }}</span>
                                     </div>
                                 @else
+                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">♫</div>
+                                    <div style="margin-bottom: 0.5rem;">{{ __('Cinematic Music Scene') }}</div>
+                                    <div style="font-size: 0.75rem; margin-bottom: 1rem;">{{ __('No voiceover - relax and let images tell the story') }}</div>
                                     <button type="button"
-                                            class="vw-audio-btn generate"
-                                            wire:click="$dispatch('generate-voiceover', { sceneIndex: {{ $index }}, sceneId: '{{ $scene['id'] }}' })"
-                                            wire:loading.attr="disabled">
-                                        🎙️ {{ __('Generate Voiceover') }}
+                                            style="padding: 0.5rem 1rem; background: linear-gradient(135deg, #8b5cf6, #06b6d4); border: none; border-radius: 0.5rem; color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer;"
+                                            wire:click="$dispatch('generate-voiceover', { sceneIndex: {{ $selectedIndex }}, sceneId: '{{ $selectedScene['id'] ?? '' }}' })">
+                                        + {{ __('Add Voiceover') }}
                                     </button>
                                 @endif
                             </div>
                         </div>
-                    </div>
-                </div>
-            @endforeach
-        </div>
 
-        {{-- Preview Tip --}}
-        <div class="vw-preview-tip">
-            <span class="vw-preview-tip-icon">💡</span>
-            <span class="vw-preview-tip-text">
-                {{ __('Tip: Generate all voiceovers at once for faster processing. You can preview each scene after generation.') }}
-            </span>
+                        {{-- Animation Style Section (placeholder for Phase 2) --}}
+                        <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(16, 185, 129, 0.05)); border-color: rgba(6, 182, 212, 0.2);">
+                            <div class="vw-section-header">
+                                <div class="vw-section-title">
+                                    <span class="vw-section-title-icon">🎬</span>
+                                    <span class="vw-section-title-text">{{ __('Animation Style') }}</span>
+                                </div>
+                            </div>
+                            <div style="color: rgba(255,255,255,0.4); font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                {{ __('Animation style controls will be added in Phase 2') }}
+                            </div>
+                        </div>
+
+                        {{-- Audio & Music Section (placeholder for Phase 2) --}}
+                        <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(236, 72, 153, 0.05)); border-color: rgba(245, 158, 11, 0.25);">
+                            <div class="vw-section-header">
+                                <div class="vw-section-title">
+                                    <span class="vw-section-title-icon">🎵</span>
+                                    <span class="vw-section-title-text">{{ __('Audio & Music') }}</span>
+                                    <span class="vw-section-badge auto">{{ __('AUTO') }}</span>
+                                </div>
+                            </div>
+                            <div style="color: rgba(255,255,255,0.4); font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                {{ __('Audio controls will be added in Phase 2') }}
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
-    @endif
-</div>
+    </div>
+@endif

@@ -130,6 +130,7 @@ class VideoWizard extends Component
     // Step 5: Animation
     public array $animation = [
         'scenes' => [],
+        'selectedSceneIndex' => 0,
         'voiceover' => [
             'voice' => 'nova',
             'speed' => 1.0,
