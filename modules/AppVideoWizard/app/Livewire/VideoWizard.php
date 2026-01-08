@@ -3228,6 +3228,105 @@ class VideoWizard extends Component
     }
 
     /**
+     * Toggle Music Only mode for a scene (no voiceover).
+     */
+    public function toggleSceneMusicOnly(int $sceneIndex): void
+    {
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        $currentValue = $this->animation['scenes'][$sceneIndex]['musicOnly'] ?? false;
+        $this->animation['scenes'][$sceneIndex]['musicOnly'] = !$currentValue;
+
+        // If enabling music only, clear any existing voiceover
+        if ($this->animation['scenes'][$sceneIndex]['musicOnly']) {
+            unset($this->animation['scenes'][$sceneIndex]['voiceoverUrl']);
+            unset($this->animation['scenes'][$sceneIndex]['assetId']);
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Remove voiceover from a scene.
+     */
+    public function removeVoiceover(int $sceneIndex): void
+    {
+        if (isset($this->animation['scenes'][$sceneIndex])) {
+            unset($this->animation['scenes'][$sceneIndex]['voiceoverUrl']);
+            unset($this->animation['scenes'][$sceneIndex]['assetId']);
+            unset($this->animation['scenes'][$sceneIndex]['duration']);
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Set animation type for a scene (ken_burns, talking_head, static).
+     */
+    public function setSceneAnimationType(int $sceneIndex, string $type): void
+    {
+        $validTypes = ['ken_burns', 'talking_head', 'static'];
+        if (!in_array($type, $validTypes)) {
+            return;
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        $this->animation['scenes'][$sceneIndex]['animationType'] = $type;
+        $this->saveProject();
+    }
+
+    /**
+     * Toggle a camera movement for a scene (max 3 allowed).
+     */
+    public function toggleCameraMovement(int $sceneIndex, string $movement): void
+    {
+        $validMovements = [
+            'pan_left', 'pan_right', 'zoom_in', 'zoom_out',
+            'push_in', 'pull_out', 'tilt_up', 'tilt_down',
+            'tracking', 'static'
+        ];
+
+        if (!in_array($movement, $validMovements)) {
+            return;
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        if (!isset($this->animation['scenes'][$sceneIndex]['cameraMovements'])) {
+            $this->animation['scenes'][$sceneIndex]['cameraMovements'] = [];
+        }
+
+        $movements = &$this->animation['scenes'][$sceneIndex]['cameraMovements'];
+
+        // If movement already selected, remove it
+        $key = array_search($movement, $movements);
+        if ($key !== false) {
+            array_splice($movements, $key, 1);
+        } else {
+            // Add if under limit of 3
+            if (count($movements) < 3) {
+                $movements[] = $movement;
+            }
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Select a scene for detailed editing in Animation Studio.
+     */
+    public function selectSceneForAnimation(int $sceneIndex): void
+    {
+        $this->animation['selectedSceneIndex'] = $sceneIndex;
+    }
+
+    /**
      * Get step titles.
      */
     public function getStepTitles(): array

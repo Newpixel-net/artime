@@ -1203,43 +1203,126 @@
                             @endforeach
                         </div>
 
-                        {{-- Voiceover Section (placeholder for Phase 2) --}}
+                        {{-- Voiceover Pro Section --}}
+                        @php
+                            $isMusicOnly = $selectedAnimScene['musicOnly'] ?? false;
+                            $selectedVoice = $animation['voiceover']['voice'] ?? 'nova';
+                            $voiceSpeed = $animation['voiceover']['speed'] ?? 1.0;
+                            $voices = [
+                                'alloy' => ['icon' => '🎭', 'name' => 'Alloy', 'desc' => 'Neutral'],
+                                'echo' => ['icon' => '🎤', 'name' => 'Echo', 'desc' => 'Male'],
+                                'fable' => ['icon' => '📖', 'name' => 'Fable', 'desc' => 'Story'],
+                                'onyx' => ['icon' => '🎸', 'name' => 'Onyx', 'desc' => 'Deep'],
+                                'nova' => ['icon' => '✨', 'name' => 'Nova', 'desc' => 'Female'],
+                                'shimmer' => ['icon' => '💫', 'name' => 'Shimmer', 'desc' => 'Bright'],
+                            ];
+                        @endphp
                         <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.05)); border-color: rgba(139, 92, 246, 0.2);">
                             <div class="vw-section-header">
                                 <div class="vw-section-title">
                                     <span class="vw-section-title-icon">🎙️</span>
                                     <span class="vw-section-title-text">{{ __('Voiceover Pro') }}</span>
                                 </div>
+                                {{-- Music Only Toggle --}}
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <span style="font-size: 0.7rem; color: rgba(255,255,255,0.6);">🎵 {{ __('Music Only') }}</span>
+                                    <div style="position: relative; width: 36px; height: 20px;">
+                                        <input type="checkbox"
+                                               wire:click="toggleSceneMusicOnly({{ $selectedIndex }})"
+                                               {{ $isMusicOnly ? 'checked' : '' }}
+                                               style="opacity: 0; width: 0; height: 0;">
+                                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: {{ $isMusicOnly ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}; transition: 0.2s; border-radius: 20px;">
+                                            <span style="position: absolute; height: 16px; width: 16px; left: {{ $isMusicOnly ? '18px' : '2px' }}; bottom: 2px; background-color: white; transition: 0.2s; border-radius: 50%;"></span>
+                                        </span>
+                                    </div>
+                                </label>
                             </div>
-                            <div style="padding: 1rem; text-align: center; color: rgba(255,255,255,0.5);">
-                                @if($selectedVoiceoverUrl)
-                                    <audio controls style="width: 100%; margin-bottom: 0.5rem;">
+
+                            @if($isMusicOnly)
+                                {{-- Music Only Mode --}}
+                                <div style="text-align: center; padding: 1.5rem; color: rgba(255,255,255,0.6);">
+                                    <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">♫</div>
+                                    <div style="font-size: 0.95rem; font-weight: 600; color: white; margin-bottom: 0.25rem;">{{ __('Cinematic Music Scene') }}</div>
+                                    <div style="font-size: 0.75rem;">{{ __('No voiceover - relax and let images tell the story') }}</div>
+                                </div>
+                            @elseif($selectedVoiceoverUrl)
+                                {{-- Has Voiceover --}}
+                                <div style="padding: 0.5rem 0;">
+                                    <audio controls style="width: 100%; height: 40px; margin-bottom: 0.75rem;">
                                         <source src="{{ $selectedVoiceoverUrl }}" type="audio/mpeg">
                                     </audio>
-                                    <button type="button"
-                                            style="padding: 0.5rem 1rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.5rem; color: #a78bfa; font-size: 0.75rem; cursor: pointer;"
-                                            wire:click="$dispatch('regenerate-voiceover', { sceneIndex: {{ $selectedIndex }} })">
-                                        🔄 {{ __('Regenerate') }}
-                                    </button>
-                                @elseif($selectedVoiceStatus === 'generating')
-                                    <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem;">
-                                        <div style="width: 20px; height: 20px; border: 2px solid rgba(139,92,246,0.3); border-top-color: #8b5cf6; border-radius: 50%; animation: vw-spin 0.8s linear infinite;"></div>
-                                        <span>{{ __('Generating voiceover...') }}</span>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button type="button"
+                                                style="flex: 1; padding: 0.5rem; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.4rem; color: #a78bfa; font-size: 0.75rem; cursor: pointer;"
+                                                wire:click="$dispatch('regenerate-voiceover', { sceneIndex: {{ $selectedIndex }} })">
+                                            🔄 {{ __('Regenerate') }}
+                                        </button>
+                                        <button type="button"
+                                                style="padding: 0.5rem 0.75rem; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 0.4rem; color: #f87171; font-size: 0.75rem; cursor: pointer;"
+                                                wire:click="removeVoiceover({{ $selectedIndex }})">
+                                            🗑️
+                                        </button>
                                     </div>
-                                @else
-                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">♫</div>
-                                    <div style="margin-bottom: 0.5rem;">{{ __('Cinematic Music Scene') }}</div>
-                                    <div style="font-size: 0.75rem; margin-bottom: 1rem;">{{ __('No voiceover - relax and let images tell the story') }}</div>
+                                </div>
+                            @elseif($selectedVoiceStatus === 'generating')
+                                {{-- Generating --}}
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem;">
+                                    <div style="width: 24px; height: 24px; border: 2px solid rgba(139,92,246,0.3); border-top-color: #8b5cf6; border-radius: 50%; animation: vw-spin 0.8s linear infinite;"></div>
+                                    <span style="color: rgba(255,255,255,0.7);">{{ __('Generating voiceover...') }}</span>
+                                </div>
+                            @else
+                                {{-- No Voiceover - Show Voice Selection --}}
+                                <div style="padding: 0.5rem 0;">
+                                    {{-- Voice Grid --}}
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-bottom: 0.75rem;">
+                                        @foreach($voices as $voiceId => $voice)
+                                            <button type="button"
+                                                    wire:click="$set('animation.voiceover.voice', '{{ $voiceId }}')"
+                                                    style="padding: 0.4rem; border-radius: 0.35rem; border: 1px solid {{ $selectedVoice === $voiceId ? '#8b5cf6' : 'rgba(255,255,255,0.1)' }}; background: {{ $selectedVoice === $voiceId ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.03)' }}; color: {{ $selectedVoice === $voiceId ? 'white' : 'rgba(255,255,255,0.6)' }}; font-size: 0.65rem; cursor: pointer; text-align: center;">
+                                                <div style="font-size: 0.9rem;">{{ $voice['icon'] }}</div>
+                                                <div style="font-weight: 600;">{{ $voice['name'] }}</div>
+                                            </button>
+                                        @endforeach
+                                    </div>
+
+                                    {{-- Speed Slider --}}
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5);">⚡</span>
+                                        <input type="range" wire:model.live="animation.voiceover.speed" min="0.5" max="2.0" step="0.1"
+                                               style="flex: 1; height: 4px; accent-color: #8b5cf6;">
+                                        <span style="font-size: 0.7rem; color: #a78bfa; font-weight: 600; min-width: 35px;">{{ number_format($voiceSpeed, 1) }}x</span>
+                                    </div>
+
+                                    {{-- Generate Button --}}
                                     <button type="button"
-                                            style="padding: 0.5rem 1rem; background: linear-gradient(135deg, #8b5cf6, #06b6d4); border: none; border-radius: 0.5rem; color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer;"
+                                            style="width: 100%; padding: 0.6rem; background: linear-gradient(135deg, #8b5cf6, #06b6d4); border: none; border-radius: 0.5rem; color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem;"
                                             wire:click="$dispatch('generate-voiceover', { sceneIndex: {{ $selectedIndex }}, sceneId: '{{ $selectedScene['id'] ?? '' }}' })">
-                                        + {{ __('Add Voiceover') }}
+                                        🎙️ {{ __('Generate Voiceover') }}
                                     </button>
-                                @endif
-                            </div>
+                                </div>
+                            @endif
                         </div>
 
-                        {{-- Animation Style Section (placeholder for Phase 2) --}}
+                        {{-- Animation Style Gallery --}}
+                        @php
+                            $currentAnimationType = $selectedAnimScene['animationType'] ?? 'ken_burns';
+                            $animationStyles = [
+                                'ken_burns' => ['icon' => '🎬', 'name' => 'Ken Burns', 'desc' => 'Smooth zoom & pan', 'color' => '#06b6d4'],
+                                'talking_head' => ['icon' => '🗣️', 'name' => 'Talking Head', 'desc' => 'Subtle movement', 'color' => '#8b5cf6'],
+                                'static' => ['icon' => '🖼️', 'name' => 'Static', 'desc' => 'No animation', 'color' => '#6b7280'],
+                            ];
+                            // AI Suggestion based on scene content
+                            $suggestedStyle = null;
+                            $suggestionReason = '';
+                            $narration = $selectedScene['narration'] ?? '';
+                            if (strlen($narration) > 100) {
+                                $suggestedStyle = 'talking_head';
+                                $suggestionReason = 'Long narration detected - talking head works best';
+                            } elseif (str_contains(strtolower($selectedScene['visualDescription'] ?? ''), 'landscape') || str_contains(strtolower($selectedScene['visualDescription'] ?? ''), 'aerial')) {
+                                $suggestedStyle = 'ken_burns';
+                                $suggestionReason = 'Landscape/aerial shot - Ken Burns adds cinematic feel';
+                            }
+                        @endphp
                         <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(16, 185, 129, 0.05)); border-color: rgba(6, 182, 212, 0.2);">
                             <div class="vw-section-header">
                                 <div class="vw-section-title">
@@ -1247,12 +1330,135 @@
                                     <span class="vw-section-title-text">{{ __('Animation Style') }}</span>
                                 </div>
                             </div>
-                            <div style="color: rgba(255,255,255,0.4); font-size: 0.8rem; text-align: center; padding: 1rem;">
-                                {{ __('Animation style controls will be added in Phase 2') }}
+
+                            {{-- AI Suggestion Banner --}}
+                            @if($suggestedStyle && $suggestedStyle !== $currentAnimationType)
+                                <div wire:click="setSceneAnimationType({{ $selectedIndex }}, '{{ $suggestedStyle }}')"
+                                     style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1)); border: 1px solid rgba(251,191,36,0.3); border-radius: 0.5rem; margin-bottom: 0.75rem; cursor: pointer;">
+                                    <span style="font-size: 1rem;">💡</span>
+                                    <div style="flex: 1;">
+                                        <div style="font-size: 0.7rem; color: #fbbf24; font-weight: 600;">{{ __('AI Suggestion') }}</div>
+                                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.6);">{{ $suggestionReason }}</div>
+                                    </div>
+                                    <span style="font-size: 0.65rem; color: #fbbf24; background: rgba(251,191,36,0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem;">{{ __('Apply') }}</span>
+                                </div>
+                            @endif
+
+                            {{-- Style Cards Grid --}}
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+                                @foreach($animationStyles as $styleId => $style)
+                                    @php
+                                        $isSelected = $currentAnimationType === $styleId;
+                                        $isSuggested = $suggestedStyle === $styleId && !$isSelected;
+                                    @endphp
+                                    <div wire:click="setSceneAnimationType({{ $selectedIndex }}, '{{ $styleId }}')"
+                                         style="position: relative; padding: 0.6rem; background: {{ $isSelected ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.03)' }}; border: 2px solid {{ $isSelected ? $style['color'] : 'rgba(255,255,255,0.08)' }}; border-radius: 0.5rem; cursor: pointer; text-align: center; transition: all 0.15s;">
+                                        @if($isSuggested)
+                                            <div style="position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; background: #fbbf24; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.55rem;">💡</div>
+                                        @endif
+                                        <div style="font-size: 1.25rem; margin-bottom: 0.25rem;">{{ $style['icon'] }}</div>
+                                        <div style="font-size: 0.7rem; font-weight: 600; color: {{ $isSelected ? $style['color'] : 'white' }};">{{ $style['name'] }}</div>
+                                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">{{ $style['desc'] }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            {{-- Camera Movement Selection --}}
+                            @php
+                                $cameraMovements = $selectedAnimScene['cameraMovements'] ?? ($selectedScene['cameraMovement'] ?? []);
+                                $cameraOptions = [
+                                    ['id' => 'Pan left', 'icon' => '⬅️', 'label' => 'Pan L'],
+                                    ['id' => 'Pan right', 'icon' => '➡️', 'label' => 'Pan R'],
+                                    ['id' => 'Zoom in', 'icon' => '🔍', 'label' => 'Zoom+'],
+                                    ['id' => 'Zoom out', 'icon' => '🔎', 'label' => 'Zoom-'],
+                                    ['id' => 'Push in', 'icon' => '⏩', 'label' => 'Push'],
+                                    ['id' => 'Pull out', 'icon' => '⏪', 'label' => 'Pull'],
+                                    ['id' => 'Tilt up', 'icon' => '⬆️', 'label' => 'Tilt↑'],
+                                    ['id' => 'Tilt down', 'icon' => '⬇️', 'label' => 'Tilt↓'],
+                                    ['id' => 'Tracking shot', 'icon' => '🎯', 'label' => 'Track'],
+                                    ['id' => 'Static shot', 'icon' => '🔲', 'label' => 'Static'],
+                                ];
+                                $hasScriptMovements = !empty($selectedScene['cameraMovement']) && empty($selectedAnimScene['cameraMovements']);
+                            @endphp
+                            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                        <span style="font-size: 0.85rem;">🎥</span>
+                                        <span style="font-size: 0.75rem; font-weight: 600; color: white;">{{ __('Camera Movement') }}</span>
+                                        <span style="font-size: 0.55rem; padding: 0.15rem 0.35rem; background: rgba(6,182,212,0.2); color: #06b6d4; border-radius: 0.25rem;">{{ __('Minimax AI') }}</span>
+                                        @if($hasScriptMovements)
+                                            <span style="font-size: 0.55rem; padding: 0.15rem 0.35rem; background: rgba(139,92,246,0.2); color: #a78bfa; border-radius: 0.25rem;">{{ __('AI Suggested') }}</span>
+                                        @endif
+                                    </div>
+                                    @if(count($cameraMovements) > 0)
+                                        <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">{{ count($cameraMovements) }}/3 {{ __('selected') }}</span>
+                                    @endif
+                                </div>
+
+                                {{-- Camera Movement Buttons --}}
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                    @foreach($cameraOptions as $cam)
+                                        @php
+                                            $isMovementSelected = in_array($cam['id'], $cameraMovements);
+                                            $canSelect = $isMovementSelected || count($cameraMovements) < 3;
+                                        @endphp
+                                        <button type="button"
+                                                wire:click="toggleCameraMovement({{ $selectedIndex }}, '{{ $cam['id'] }}')"
+                                                {{ !$canSelect ? 'disabled' : '' }}
+                                                style="padding: 0.35rem 0.5rem; border-radius: 0.35rem; border: 1px solid {{ $isMovementSelected ? '#06b6d4' : 'rgba(255,255,255,0.15)' }}; background: {{ $isMovementSelected ? 'rgba(6,182,212,0.2)' : 'transparent' }}; color: {{ $isMovementSelected ? '#06b6d4' : ($canSelect ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)') }}; font-size: 0.6rem; cursor: {{ $canSelect ? 'pointer' : 'not-allowed' }}; display: flex; align-items: center; gap: 0.2rem; transition: all 0.15s;">
+                                            <span style="font-size: 0.7rem;">{{ $cam['icon'] }}</span>
+                                            <span>{{ $cam['label'] }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+
+                                {{-- Selected Movements Preview --}}
+                                @if(count($cameraMovements) > 0)
+                                    <div style="margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: rgba(6,182,212,0.1); border-radius: 0.35rem; font-size: 0.65rem; color: #06b6d4;">
+                                        📽️ [{{ implode(', ', $cameraMovements) }}]
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Generate AI Video Button --}}
+                            @php
+                                $isAnimating = $selectedAnimStatus === 'generating' || $selectedAnimStatus === 'processing';
+                                $hasImage = !empty($selectedImageUrl);
+                                $canAnimate = $hasImage && !$isAnimating;
+                                $videoModel = $content['videoModel'] ?? ['model' => 'hailuo-2.3', 'duration' => '10s', 'resolution' => '768p'];
+                                $modelName = match($videoModel['model'] ?? 'hailuo-2.3') {
+                                    'hailuo-2.3-fast' => 'Hailuo 2.3 Fast',
+                                    'hailuo-02' => 'Hailuo 02',
+                                    default => 'Hailuo 2.3',
+                                };
+                            @endphp
+                            <div style="margin-top: 0.75rem;">
+                                <button type="button"
+                                        wire:click="$dispatch('animate-scene', { sceneIndex: {{ $selectedIndex }} })"
+                                        {{ !$canAnimate ? 'disabled' : '' }}
+                                        style="width: 100%; padding: 0.65rem; border-radius: 0.5rem; border: none; background: {{ $canAnimate ? 'linear-gradient(135deg, #06b6d4, #10b981)' : 'rgba(255,255,255,0.1)' }}; color: {{ $canAnimate ? 'white' : 'rgba(255,255,255,0.4)' }}; font-size: 0.8rem; font-weight: 600; cursor: {{ $canAnimate ? 'pointer' : 'not-allowed' }}; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                    @if($isAnimating)
+                                        <span style="animation: vw-spin 1s linear infinite;">⏳</span> {{ __('Generating AI Video...') }}
+                                    @elseif(!$hasImage)
+                                        <span>🔒</span> {{ __('Generate image first') }}
+                                    @else
+                                        <span>🎬</span> {{ __('Generate') }} {{ $videoModel['duration'] ?? '10s' }} {{ __('AI Video') }}
+                                    @endif
+                                </button>
+                                <div style="text-align: center; margin-top: 0.35rem; font-size: 0.6rem; color: rgba(255,255,255,0.4);">
+                                    {{ __('Using') }} {{ $modelName }} @ {{ $videoModel['resolution'] ?? '768p' }}
+                                </div>
                             </div>
                         </div>
 
-                        {{-- Audio & Music Section (placeholder for Phase 2) --}}
+                        {{-- Audio & Music Section --}}
+                        @php
+                            $musicEnabled = $assembly['music']['enabled'] ?? false;
+                            $musicVolume = $assembly['music']['volume'] ?? 30;
+                            $voiceVolume = $assembly['audioMix']['voiceVolume'] ?? 100;
+                            $duckingEnabled = ($assembly['audioMix']['ducking'] ?? true) !== false;
+                            $genreId = $content['genre'] ?? null;
+                        @endphp
                         <div class="vw-section-card" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(236, 72, 153, 0.05)); border-color: rgba(245, 158, 11, 0.25);">
                             <div class="vw-section-header">
                                 <div class="vw-section-title">
@@ -1260,9 +1466,75 @@
                                     <span class="vw-section-title-text">{{ __('Audio & Music') }}</span>
                                     <span class="vw-section-badge auto">{{ __('AUTO') }}</span>
                                 </div>
+                                <button type="button"
+                                        wire:click="goToStep(6)"
+                                        style="font-size: 0.6rem; padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: rgba(255,255,255,0.6); cursor: pointer;">
+                                    {{ __('Full Editor') }} →
+                                </button>
                             </div>
-                            <div style="color: rgba(255,255,255,0.4); font-size: 0.8rem; text-align: center; padding: 1rem;">
-                                {{ __('Audio controls will be added in Phase 2') }}
+
+                            {{-- Genre Info --}}
+                            @if($genreId)
+                                <div style="background: rgba(0,0,0,0.2); border-radius: 0.4rem; padding: 0.6rem; margin-bottom: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem;">
+                                        <span style="font-size: 0.65rem; color: #f59e0b;">✨</span>
+                                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">{{ __('Based on your') }} <strong style="color: #f59e0b;">{{ str_replace('-', ' ', $genreId) }}</strong> {{ __('genre') }}:</span>
+                                    </div>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                        <span style="font-size: 0.6rem; padding: 0.2rem 0.4rem; background: rgba(245,158,11,0.2); border-radius: 0.2rem; color: #fbbf24;">🎭 {{ __('atmospheric') }}</span>
+                                        <span style="font-size: 0.6rem; padding: 0.2rem 0.4rem; background: rgba(139,92,246,0.2); border-radius: 0.2rem; color: #a78bfa;">🎵 {{ __('ambient') }}</span>
+                                        <span style="font-size: 0.6rem; padding: 0.2rem 0.4rem; background: rgba(6,182,212,0.2); border-radius: 0.2rem; color: #22d3ee;">{{ __('cinematic') }}</span>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Quick Controls --}}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                {{-- Music Toggle & Volume --}}
+                                <div style="background: rgba(0,0,0,0.15); border-radius: 0.4rem; padding: 0.6rem;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">🎵 {{ __('Music') }}</span>
+                                        <label style="position: relative; display: inline-block; width: 32px; height: 18px;">
+                                            <input type="checkbox"
+                                                   wire:click="$set('assembly.music.enabled', {{ $musicEnabled ? 'false' : 'true' }})"
+                                                   {{ $musicEnabled ? 'checked' : '' }}
+                                                   style="opacity: 0; width: 0; height: 0;">
+                                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: {{ $musicEnabled ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}; transition: 0.2s; border-radius: 18px;">
+                                                <span style="position: absolute; height: 14px; width: 14px; left: {{ $musicEnabled ? '15px' : '2px' }}; bottom: 2px; background-color: white; transition: 0.2s; border-radius: 50%;"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <input type="range" wire:model.live="assembly.music.volume" min="0" max="100"
+                                           style="width: 100%; height: 4px; cursor: pointer; accent-color: #8b5cf6;" {{ !$musicEnabled ? 'disabled' : '' }}>
+                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.4); text-align: right; margin-top: 0.2rem;">{{ $musicVolume }}%</div>
+                                </div>
+
+                                {{-- Voice Volume --}}
+                                <div style="background: rgba(0,0,0,0.15); border-radius: 0.4rem; padding: 0.6rem;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                                        <span style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">🎙️ {{ __('Voice') }}</span>
+                                        <span style="font-size: 0.6rem; color: #06b6d4;">{{ $voiceVolume }}%</span>
+                                    </div>
+                                    <input type="range" wire:model.live="assembly.audioMix.voiceVolume" min="0" max="100"
+                                           style="width: 100%; height: 4px; cursor: pointer; accent-color: #06b6d4;">
+                                </div>
+                            </div>
+
+                            {{-- Auto-Ducking Toggle --}}
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 0.35rem;">
+                                <div>
+                                    <span style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">{{ __('Auto-Duck') }}</span>
+                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.4);">{{ __('Lower music during voiceover') }}</div>
+                                </div>
+                                <label style="position: relative; display: inline-block; width: 32px; height: 18px;">
+                                    <input type="checkbox"
+                                           wire:click="$set('assembly.audioMix.ducking', {{ $duckingEnabled ? 'false' : 'true' }})"
+                                           {{ $duckingEnabled ? 'checked' : '' }}
+                                           style="opacity: 0; width: 0; height: 0;">
+                                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: {{ $duckingEnabled ? '#10b981' : 'rgba(255,255,255,0.2)' }}; transition: 0.2s; border-radius: 18px;">
+                                        <span style="position: absolute; height: 14px; width: 14px; left: {{ $duckingEnabled ? '15px' : '2px' }}; bottom: 2px; background-color: white; transition: 0.2s; border-radius: 50%;"></span>
+                                    </span>
+                                </label>
                             </div>
                         </div>
                     @endif
