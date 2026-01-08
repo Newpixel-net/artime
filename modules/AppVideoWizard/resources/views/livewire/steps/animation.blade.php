@@ -456,6 +456,32 @@
     .vw-status-badge.generating {
         background: rgba(139, 92, 246, 0.2);
         color: #a78bfa;
+        animation: vw-pulse-badge 1.5s infinite;
+    }
+
+    .vw-status-badge.video-pending {
+        background: rgba(107, 114, 128, 0.2);
+        color: #9ca3af;
+    }
+
+    .vw-status-badge.video-ready {
+        background: rgba(6, 182, 212, 0.2);
+        color: #06b6d4;
+    }
+
+    .vw-status-badge.error {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+
+    .vw-status-badge.music-only {
+        background: rgba(236, 72, 153, 0.2);
+        color: #ec4899;
+    }
+
+    @keyframes vw-pulse-badge {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
     }
 
     /* ========================================
@@ -1021,22 +1047,27 @@
                             $isSelected = $selectedIndex === $index;
                             $hasVoiceover = !empty($animScene['voiceoverUrl']);
                             $hasAnimation = !empty($animScene['videoUrl']);
+                            $hasImage = !empty($sbScene['imageUrl']);
+                            $isStockVideo = ($sbScene['source'] ?? '') === 'stock-video' && !empty($sbScene['videoUrl']);
+                            $isMusicOnlyScene = ($animScene['musicOnly'] ?? false) || (($scene['voiceover']['enabled'] ?? true) === false);
                             $isVoiceGenerating = ($animScene['voiceoverStatus'] ?? '') === 'generating';
                             $isAnimGenerating = ($animScene['animationStatus'] ?? '') === 'generating';
+                            $hasVoiceError = ($animScene['voiceoverStatus'] ?? '') === 'error';
+                            $hasAnimError = ($animScene['animationStatus'] ?? '') === 'error';
                             $isProcessing = $isVoiceGenerating || $isAnimGenerating;
                             $imageUrl = $sbScene['imageUrl'] ?? null;
 
-                            // Calculate progress
+                            // Calculate progress (more granular)
                             $progress = 0;
-                            if ($hasVoiceover && $hasAnimation) $progress = 100;
-                            elseif ($hasVoiceover) $progress = 50;
-                            elseif ($isProcessing) $progress = 25;
+                            if ($hasImage) $progress += 25;
+                            if ($hasVoiceover || $isMusicOnlyScene) $progress += 25;
+                            if ($hasAnimation || $isStockVideo) $progress += 50;
 
                             // Ring calculation
                             $ringRadius = 26;
                             $ringCircumference = 2 * 3.14159 * $ringRadius;
                             $ringOffset = $ringCircumference - ($progress / 100) * $ringCircumference;
-                            $ringColor = $progress === 100 ? '#10b981' : ($progress >= 50 ? '#fbbf24' : ($isProcessing ? '#8b5cf6' : '#ef4444'));
+                            $ringColor = $progress === 100 ? '#10b981' : ($progress >= 50 ? '#06b6d4' : ($progress >= 25 ? '#fbbf24' : ($isProcessing ? '#8b5cf6' : 'rgba(255,255,255,0.2)')));
                         @endphp
                         <div class="vw-scene-card {{ $isSelected ? 'selected' : '' }} {{ $isProcessing ? 'processing' : '' }}"
                              wire:click="$set('animation.selectedSceneIndex', {{ $index }})">
@@ -1062,21 +1093,33 @@
 
                             {{-- Scene Info --}}
                             <div class="vw-scene-info">
-                                <div class="vw-scene-name">{{ $scene['title'] ?? __('Scene') . ' ' . ($index + 1) }}</div>
+                                <div class="vw-scene-name">{{ Str::limit($scene['title'] ?? __('Scene') . ' ' . ($index + 1), 18) }}</div>
                                 <div class="vw-scene-duration">{{ $scene['duration'] ?? 8 }}s</div>
                                 <div class="vw-scene-status">
-                                    @if($isVoiceGenerating)
-                                        <span class="vw-status-badge generating">⏳ {{ __('Voice...') }}</span>
+                                    {{-- Voiceover Status --}}
+                                    @if($isMusicOnlyScene)
+                                        <span class="vw-status-badge music-only" title="{{ __('Music Only') }}">♫</span>
+                                    @elseif($isVoiceGenerating)
+                                        <span class="vw-status-badge generating" title="{{ __('Generating voiceover...') }}">⏳</span>
+                                    @elseif($hasVoiceError)
+                                        <span class="vw-status-badge error" title="{{ __('Voiceover error') }}">⚠️</span>
                                     @elseif($hasVoiceover)
-                                        <span class="vw-status-badge voice-ready">🎙️</span>
+                                        <span class="vw-status-badge voice-ready" title="{{ __('Voiceover ready') }}">🎙️</span>
                                     @else
-                                        <span class="vw-status-badge voice-pending">🎙️</span>
+                                        <span class="vw-status-badge voice-pending" title="{{ __('No voiceover') }}">🎙️</span>
                                     @endif
 
+                                    {{-- Video Status --}}
                                     @if($isAnimGenerating)
-                                        <span class="vw-status-badge generating">⏳ {{ __('Anim...') }}</span>
+                                        <span class="vw-status-badge generating" title="{{ __('Generating video...') }}">⏳</span>
+                                    @elseif($hasAnimError)
+                                        <span class="vw-status-badge error" title="{{ __('Video error') }}">⚠️</span>
                                     @elseif($hasAnimation)
-                                        <span class="vw-status-badge animated">🎬</span>
+                                        <span class="vw-status-badge video-ready" title="{{ __('Video ready') }}">🎬</span>
+                                    @elseif($isStockVideo)
+                                        <span class="vw-status-badge video-ready" title="{{ __('Stock video') }}">📹</span>
+                                    @elseif($hasImage)
+                                        <span class="vw-status-badge video-pending" title="{{ __('Ready to animate') }}">🎬</span>
                                     @endif
                                 </div>
                             </div>

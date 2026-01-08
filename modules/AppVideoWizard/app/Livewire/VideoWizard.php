@@ -3243,6 +3243,124 @@ class VideoWizard extends Component
     }
 
     /**
+     * Generate AI video animation for a single scene.
+     */
+    #[On('animate-scene')]
+    public function animateScene(int $sceneIndex): void
+    {
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        $sbScene = $this->storyboard['scenes'][$sceneIndex] ?? [];
+
+        if (!$scene) {
+            $this->error = __('Scene not found');
+            return;
+        }
+
+        // Check if scene has an image to animate
+        $imageUrl = $sbScene['imageUrl'] ?? null;
+        if (!$imageUrl) {
+            $this->error = __('Please generate an image first before creating video');
+            return;
+        }
+
+        // Initialize animation scene data if not exists
+        if (!isset($this->animation['scenes'][$sceneIndex])) {
+            $this->animation['scenes'][$sceneIndex] = [];
+        }
+
+        // Mark as generating
+        $this->animation['scenes'][$sceneIndex]['animationStatus'] = 'generating';
+        $this->saveProject();
+
+        try {
+            // Get video settings
+            $videoModel = $this->content['videoModel'] ?? [
+                'model' => 'hailuo-2.3',
+                'duration' => '10s',
+                'resolution' => '768p'
+            ];
+
+            // Get camera movements for this scene
+            $cameraMovements = $this->animation['scenes'][$sceneIndex]['cameraMovements'] ?? [];
+
+            // TODO: Integrate with actual video generation API (Minimax/Hailuo)
+            // For now, dispatch a job or queue the video generation
+            // This is a placeholder that will be connected to the actual API
+
+            \Log::info("Animating scene {$sceneIndex}", [
+                'imageUrl' => $imageUrl,
+                'model' => $videoModel['model'],
+                'duration' => $videoModel['duration'],
+                'cameraMovements' => $cameraMovements,
+            ]);
+
+            // Placeholder: In production, this would call the video generation API
+            // and update the status when the video is ready via webhook or polling
+            $this->dispatch('notify', [
+                'type' => 'info',
+                'message' => __('Video generation started for Scene :num. This may take a few minutes.', ['num' => $sceneIndex + 1])
+            ]);
+
+        } catch (\Exception $e) {
+            $this->animation['scenes'][$sceneIndex]['animationStatus'] = 'error';
+            $this->animation['scenes'][$sceneIndex]['animationError'] = $e->getMessage();
+            $this->error = __('Failed to start video generation: ') . $e->getMessage();
+            \Log::error("Failed to animate scene {$sceneIndex}: " . $e->getMessage());
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Generate AI video animation for all scenes that have images.
+     */
+    #[On('animate-all-scenes')]
+    public function animateAllScenes(): void
+    {
+        $scenesQueued = 0;
+        $scenesSkipped = 0;
+
+        foreach ($this->script['scenes'] as $index => $scene) {
+            $sbScene = $this->storyboard['scenes'][$index] ?? [];
+            $animScene = $this->animation['scenes'][$index] ?? [];
+
+            // Skip if already has video
+            if (!empty($animScene['videoUrl'])) {
+                $scenesSkipped++;
+                continue;
+            }
+
+            // Skip if no image to animate
+            $imageUrl = $sbScene['imageUrl'] ?? null;
+            if (!$imageUrl) {
+                $scenesSkipped++;
+                continue;
+            }
+
+            // Skip if already generating
+            if (($animScene['animationStatus'] ?? '') === 'generating') {
+                continue;
+            }
+
+            // Queue this scene for animation
+            $this->animateScene($index);
+            $scenesQueued++;
+        }
+
+        if ($scenesQueued > 0) {
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => __(':count scenes queued for video generation', ['count' => $scenesQueued])
+            ]);
+        } else {
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => __('No scenes available for animation. Generate images first.')
+            ]);
+        }
+    }
+
+    /**
      * Remove voiceover from a scene.
      */
     public function removeVoiceover(int $sceneIndex): void
