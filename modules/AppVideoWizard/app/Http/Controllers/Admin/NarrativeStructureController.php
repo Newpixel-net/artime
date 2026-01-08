@@ -29,6 +29,13 @@ class NarrativeStructureController extends Controller
         $sceneBeats = config('appvideowizard.scene_beats', []);
         $transitions = config('appvideowizard.transitions', []);
 
+        // Load advanced configs (Tier 3)
+        $visualStyles = config('appvideowizard.visual_styles', []);
+        $musicMoods = config('appvideowizard.music_moods', []);
+        $pacingProfiles = config('appvideowizard.pacing_profiles', []);
+        $genreTemplates = config('appvideowizard.genre_templates', []);
+        $visualThemes = config('appvideowizard.visual_themes', []);
+
         // Get enabled/disabled status from settings
         $settings = $this->getSettings();
 
@@ -46,6 +53,12 @@ class NarrativeStructureController extends Controller
             'total_color_grades' => count($colorGrades),
             'total_compositions' => count($compositions),
             'total_retention_hooks' => count($retentionHooks),
+            // Tier 3 stats
+            'total_visual_styles' => count($visualStyles),
+            'total_music_moods' => count($musicMoods),
+            'total_pacing_profiles' => count($pacingProfiles),
+            'total_genre_templates' => count($genreTemplates),
+            'total_visual_themes' => count($visualThemes),
         ];
 
         return view('appvideowizard::admin.narrative-structures.index', compact(
@@ -63,7 +76,13 @@ class NarrativeStructureController extends Controller
             'compositions',
             'retentionHooks',
             'sceneBeats',
-            'transitions'
+            'transitions',
+            // Tier 3 data
+            'visualStyles',
+            'musicMoods',
+            'pacingProfiles',
+            'genreTemplates',
+            'visualThemes'
         ));
     }
 

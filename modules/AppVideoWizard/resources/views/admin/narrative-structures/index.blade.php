@@ -42,6 +42,11 @@
                         class="px-4 py-3 text-sm font-medium border-b-2 transition">
                     <i class="fas fa-bolt mr-2"></i>{{ __('Engagement') }}
                 </button>
+                <button @click="activeTab = 'advanced'"
+                        :class="activeTab === 'advanced' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-400 hover:text-white'"
+                        class="px-4 py-3 text-sm font-medium border-b-2 transition">
+                    <i class="fas fa-wand-magic-sparkles mr-2"></i>{{ __('Advanced') }}
+                </button>
             </div>
 
             {{-- TIER 1: Narrative Structure Stats --}}
@@ -177,6 +182,67 @@
                             <div>
                                 <p class="text-gray-400 text-sm">{{ __('Transitions') }}</p>
                                 <p class="text-2xl font-bold text-white">{{ count($transitions ?? []) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- TIER 3: Advanced Stats --}}
+            <div x-show="activeTab === 'advanced'" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                                <span class="text-2xl">🎨</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-sm">{{ __('Visual Styles') }}</p>
+                                <p class="text-2xl font-bold text-white">{{ $stats['total_visual_styles'] ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
+                                <span class="text-2xl">🎵</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-sm">{{ __('Music Moods') }}</p>
+                                <p class="text-2xl font-bold text-white">{{ $stats['total_music_moods'] ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-sky-500/20 rounded-xl flex items-center justify-center">
+                                <span class="text-2xl">⏱️</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-sm">{{ __('Pacing Profiles') }}</p>
+                                <p class="text-2xl font-bold text-white">{{ $stats['total_pacing_profiles'] ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                <span class="text-2xl">📋</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-sm">{{ __('Genre Templates') }}</p>
+                                <p class="text-2xl font-bold text-white">{{ $stats['total_genre_templates'] ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-lime-500/20 rounded-xl flex items-center justify-center">
+                                <span class="text-2xl">🎭</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-400 text-sm">{{ __('Visual Themes') }}</p>
+                                <p class="text-2xl font-bold text-white">{{ $stats['total_visual_themes'] ?? 0 }}</p>
                             </div>
                         </div>
                     </div>
@@ -617,7 +683,7 @@
         </div>
 
         {{-- Transitions --}}
-        <div class="bg-gray-800 rounded-xl border border-gray-700">
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-8">
             <div class="p-6 border-b border-gray-700">
                 <h2 class="text-lg font-semibold text-white flex items-center gap-2">
                     <span class="text-xl">✨</span> {{ __('Transitions') }}
@@ -651,6 +717,182 @@
                                 @endforeach
                             </div>
                         @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- ======================= TIER 3: ADVANCED ======================= --}}
+
+        {{-- Visual Styles --}}
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-8">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <span class="text-xl">🎨</span> {{ __('Visual Styles') }}
+                    <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full ml-2">{{ __('Advanced') }}</span>
+                </h2>
+                <p class="text-gray-400 text-sm">{{ __('Consistent visual style presets for image generation') }}</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                @foreach($visualStyles ?? [] as $key => $style)
+                    <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-emerald-500/50 transition">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">{{ $style['icon'] ?? '🎨' }}</span>
+                                <span class="font-medium text-white">{{ $style['name'] }}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs mb-2">{{ $style['description'] ?? '' }}</p>
+                        @if(!empty($style['bestFor']))
+                            <div class="flex flex-wrap gap-1">
+                                @foreach(array_slice($style['bestFor'], 0, 2) as $use)
+                                    <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs">{{ $use }}</span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Music Moods --}}
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-8">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <span class="text-xl">🎵</span> {{ __('Music Moods') }}
+                    <span class="text-xs bg-fuchsia-500/20 text-fuchsia-400 px-2 py-1 rounded-full ml-2">{{ __('Advanced') }}</span>
+                </h2>
+                <p class="text-gray-400 text-sm">{{ __('Soundtrack mood suggestions for scenes') }}</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                @foreach($musicMoods ?? [] as $key => $mood)
+                    <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-fuchsia-500/50 transition">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">{{ $mood['icon'] ?? '🎵' }}</span>
+                                <span class="font-medium text-white">{{ $mood['name'] }}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs mb-2">{{ $mood['description'] ?? '' }}</p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="bg-fuchsia-500/20 text-fuchsia-400 px-2 py-0.5 rounded text-xs">{{ $mood['tempo'] ?? 'moderate' }}</span>
+                            <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $mood['energy'] ?? 'medium' }}</span>
+                        </div>
+                        @if(!empty($mood['instruments']))
+                            <div class="text-xs text-gray-500 truncate">
+                                {{ implode(', ', array_slice($mood['instruments'], 0, 3)) }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Pacing Profiles --}}
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-8">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <span class="text-xl">⏱️</span> {{ __('Pacing Profiles') }}
+                    <span class="text-xs bg-sky-500/20 text-sky-400 px-2 py-1 rounded-full ml-2">{{ __('Advanced') }}</span>
+                </h2>
+                <p class="text-gray-400 text-sm">{{ __('Words-per-minute and scene duration optimization') }}</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                @foreach($pacingProfiles ?? [] as $key => $profile)
+                    <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-sky-500/50 transition">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">{{ $profile['icon'] ?? '⏱️' }}</span>
+                                <span class="font-medium text-white">{{ $profile['name'] }}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs mb-2">{{ $profile['description'] ?? '' }}</p>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded text-sm font-bold">{{ $profile['wpm'] ?? 0 }} WPM</span>
+                        </div>
+                        @if(!empty($profile['sceneDuration']))
+                            <div class="text-xs text-gray-500">
+                                {{ $profile['sceneDuration']['min'] ?? 0 }}s - {{ $profile['sceneDuration']['max'] ?? 0 }}s per scene
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Genre Templates --}}
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-8">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <span class="text-xl">📋</span> {{ __('Genre Templates') }}
+                    <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full ml-2">{{ __('Advanced') }}</span>
+                </h2>
+                <p class="text-gray-400 text-sm">{{ __('Pre-configured settings for specific video genres') }}</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach($genreTemplates ?? [] as $key => $template)
+                    <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-amber-500/50 transition">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">{{ $template['icon'] ?? '📋' }}</span>
+                                <span class="font-medium text-white">{{ $template['name'] }}</span>
+                            </div>
+                        </div>
+                        <p class="text-gray-400 text-xs mb-3">{{ $template['description'] ?? '' }}</p>
+                        @if(!empty($template['tips']))
+                            <div class="bg-amber-500/10 border border-amber-500/30 rounded p-2 mb-2">
+                                <p class="text-amber-400 text-xs"><i class="fas fa-lightbulb mr-1"></i>{{ $template['tips'] }}</p>
+                            </div>
+                        @endif
+                        @if(!empty($template['defaults']))
+                            <div class="flex flex-wrap gap-1">
+                                @if(!empty($template['defaults']['visualStyle']))
+                                    <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $template['defaults']['visualStyle'] }}</span>
+                                @endif
+                                @if(!empty($template['defaults']['musicMood']))
+                                    <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $template['defaults']['musicMood'] }}</span>
+                                @endif
+                                @if(!empty($template['defaults']['pacingProfile']))
+                                    <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $template['defaults']['pacingProfile'] }}</span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- Visual Themes --}}
+        <div class="bg-gray-800 rounded-xl border border-gray-700">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <span class="text-xl">🎭</span> {{ __('Visual Themes') }}
+                    <span class="text-xs bg-lime-500/20 text-lime-400 px-2 py-1 rounded-full ml-2">{{ __('Advanced') }}</span>
+                </h2>
+                <p class="text-gray-400 text-sm">{{ __('Cohesive visual theme configurations for consistency') }}</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                @foreach($visualThemes ?? [] as $key => $theme)
+                    <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-lime-500/50 transition">
+                        <div class="flex items-start justify-between mb-2">
+                            <span class="font-medium text-white">{{ $theme['name'] }}</span>
+                        </div>
+                        <p class="text-gray-400 text-xs mb-2">{{ $theme['mood'] ?? '' }} mood</p>
+                        @if(!empty($theme['colors']))
+                            <div class="flex gap-1 mb-2">
+                                @foreach($theme['colors'] as $color)
+                                    <div class="w-6 h-6 rounded border border-gray-500" style="background-color: {{ $color }};" title="{{ $color }}"></div>
+                                @endforeach
+                            </div>
+                        @endif
+                        <div class="flex flex-wrap gap-1">
+                            @if(!empty($theme['lighting']))
+                                <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $theme['lighting'] }}</span>
+                            @endif
+                            @if(!empty($theme['colorGrade']))
+                                <span class="bg-gray-600 px-2 py-0.5 rounded text-xs text-gray-300">{{ $theme['colorGrade'] }}</span>
+                            @endif
+                        </div>
                     </div>
                 @endforeach
             </div>

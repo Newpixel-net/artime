@@ -700,7 +700,28 @@ PROMPT;
         $prompt .= $this->buildTransitionGuidance($narrativePreset, $emotionalJourney);
         $prompt .= "\n";
 
-        // === LAYER 10: OUTPUT FORMAT ===
+        // === LAYER 10: VISUAL STYLE (TIER 3) ===
+        $visualStyle = $params['visualStyle'] ?? null;
+        $genreTemplate = $params['genreTemplate'] ?? null;
+        $prompt .= $this->buildVisualStyleGuidance($visualStyle, $genreTemplate);
+        $prompt .= "\n";
+
+        // === LAYER 11: MUSIC MOOD GUIDANCE (TIER 3) ===
+        $prompt .= $this->buildMusicMoodGuidance($sceneCount, $emotionalJourney, $genreTemplate);
+        $prompt .= "\n";
+
+        // === LAYER 12: PACING OPTIMIZATION (TIER 3) ===
+        $pacingProfile = $params['pacingProfile'] ?? null;
+        $prompt .= $this->buildPacingGuidance($duration, $sceneCount, $pacingProfile, $genreTemplate);
+        $prompt .= "\n";
+
+        // === LAYER 13: GENRE TEMPLATE TIPS (TIER 3) ===
+        if ($genreTemplate) {
+            $prompt .= $this->buildGenreTemplateTips($genreTemplate);
+            $prompt .= "\n";
+        }
+
+        // === LAYER 14: OUTPUT FORMAT ===
         $prompt .= "=== OUTPUT FORMAT ===\n";
         $prompt .= "RESPOND WITH ONLY THIS JSON (no markdown code blocks, no explanation, just pure JSON):\n";
         $prompt .= <<<JSON
@@ -714,6 +735,8 @@ PROMPT;
       "narration": "Narrator text (~{$wordsPerScene} words) - emotionally resonant, matches tension curve",
       "visualDescription": "Cinematic visual: [SHOT TYPE] [SUBJECT/ACTION]. [LIGHTING]. [COLOR MOOD]. [COMPOSITION]. [ATMOSPHERE]",
       "mood": "Scene emotional tone (matches emotional journey beat)",
+      "musicMood": "Soundtrack mood (epic, emotional, tense, upbeat, ambient, corporate, dramatic, playful, horror, electronic)",
+      "transition": "Scene transition type (cut, fade, dissolve, wipe, zoom, slide, morph, flash)",
       "duration": {$avgSceneDuration},
       "kenBurns": {
         "startScale": 1.0,
@@ -1008,6 +1031,197 @@ JSON;
         }
 
         return ['neutral', 'warm', 'teal-orange'];
+    }
+
+    // ======================= TIER 3 METHODS =======================
+
+    /**
+     * Build visual style guidance for consistent image generation.
+     */
+    protected function buildVisualStyleGuidance(?string $visualStyle, ?string $genreTemplate): string
+    {
+        $visualStyles = config('appvideowizard.visual_styles', []);
+
+        // Try to get style from genre template if not specified
+        if (!$visualStyle && $genreTemplate) {
+            $templates = config('appvideowizard.genre_templates', []);
+            if (isset($templates[$genreTemplate]['defaults']['visualStyle'])) {
+                $visualStyle = $templates[$genreTemplate]['defaults']['visualStyle'];
+            }
+        }
+
+        $guidance = "=== VISUAL STYLE CONSISTENCY ===\n";
+
+        if ($visualStyle && isset($visualStyles[$visualStyle])) {
+            $style = $visualStyles[$visualStyle];
+            $guidance .= "Selected Style: {$style['name']}\n\n";
+            $guidance .= "For ALL image descriptions, incorporate these style elements:\n";
+            $guidance .= "- Style Prefix: {$style['promptPrefix']}\n";
+            $guidance .= "- Style Suffix: {$style['promptSuffix']}\n";
+            $guidance .= "- Avoid: {$style['negativePrompt']}\n\n";
+            $guidance .= "IMPORTANT: Maintain visual consistency across ALL scenes. Each visualDescription should:\n";
+            $guidance .= "1. Start with style-appropriate framing keywords\n";
+            $guidance .= "2. Include consistent lighting terminology\n";
+            $guidance .= "3. Reference the same artistic style throughout\n";
+        } else {
+            $guidance .= "Default Style: Cinematic\n";
+            $guidance .= "Maintain consistent visual style across all scenes.\n";
+        }
+
+        return $guidance;
+    }
+
+    /**
+     * Build music mood guidance for soundtrack suggestions.
+     */
+    protected function buildMusicMoodGuidance(int $sceneCount, ?string $emotionalJourney, ?string $genreTemplate): string
+    {
+        $musicMoods = config('appvideowizard.music_moods', []);
+
+        // Determine appropriate moods based on emotional journey
+        $suggestedMoods = $this->getSuggestedMusicMoods($emotionalJourney, $genreTemplate);
+
+        $guidance = "=== SOUNDTRACK GUIDANCE ===\n";
+        $guidance .= "Include a 'musicMood' field for each scene to guide background music selection.\n\n";
+        $guidance .= "Available moods: " . implode(', ', array_keys($musicMoods)) . "\n\n";
+
+        $guidance .= "Recommended for this content:\n";
+        foreach ($suggestedMoods as $idx => $moodId) {
+            if (isset($musicMoods[$moodId])) {
+                $mood = $musicMoods[$moodId];
+                $guidance .= "- {$mood['name']}: {$mood['description']}\n";
+            }
+        }
+
+        $guidance .= "\nMusic progression tips:\n";
+        $guidance .= "- Opening scenes: Lower energy, establish tone\n";
+        $guidance .= "- Middle scenes: Build energy, vary dynamics\n";
+        $guidance .= "- Climax scenes: Peak energy, match emotional high point\n";
+        $guidance .= "- Closing scenes: Resolution, emotional landing\n";
+
+        return $guidance;
+    }
+
+    /**
+     * Get suggested music moods based on content type.
+     */
+    protected function getSuggestedMusicMoods(?string $emotionalJourney, ?string $genreTemplate): array
+    {
+        $journeyMoods = [
+            'triumph' => ['emotional', 'dramatic', 'epic'],
+            'thriller' => ['tense', 'dramatic', 'ambient'],
+            'horror' => ['horror', 'tense', 'ambient'],
+            'comedy' => ['playful', 'upbeat', 'playful'],
+            'educational' => ['corporate', 'ambient', 'upbeat'],
+            'meditative' => ['ambient', 'emotional', 'ambient'],
+            'nostalgia' => ['emotional', 'ambient', 'emotional'],
+        ];
+
+        $templateMoods = [
+            'youtube-explainer' => ['corporate', 'upbeat', 'ambient'],
+            'tiktok-viral' => ['upbeat', 'electronic', 'dramatic'],
+            'cinematic-drama' => ['emotional', 'dramatic', 'epic'],
+            'documentary' => ['ambient', 'emotional', 'dramatic'],
+            'horror-thriller' => ['horror', 'tense', 'ambient'],
+            'commercial-ad' => ['corporate', 'upbeat', 'emotional'],
+            'inspirational' => ['emotional', 'epic', 'upbeat'],
+        ];
+
+        if ($genreTemplate && isset($templateMoods[$genreTemplate])) {
+            return $templateMoods[$genreTemplate];
+        }
+
+        if ($emotionalJourney && isset($journeyMoods[$emotionalJourney])) {
+            return $journeyMoods[$emotionalJourney];
+        }
+
+        return ['ambient', 'corporate', 'emotional'];
+    }
+
+    /**
+     * Build pacing guidance for scene duration and WPM.
+     */
+    protected function buildPacingGuidance(int $duration, int $sceneCount, ?string $pacingProfile, ?string $genreTemplate): string
+    {
+        $pacingProfiles = config('appvideowizard.pacing_profiles', []);
+
+        // Get profile from genre template if not specified
+        if (!$pacingProfile && $genreTemplate) {
+            $templates = config('appvideowizard.genre_templates', []);
+            if (isset($templates[$genreTemplate]['defaults']['pacingProfile'])) {
+                $pacingProfile = $templates[$genreTemplate]['defaults']['pacingProfile'];
+            }
+        }
+
+        $profile = $pacingProfiles[$pacingProfile ?? 'standard'] ?? $pacingProfiles['standard'];
+
+        $guidance = "=== PACING OPTIMIZATION ===\n";
+        $guidance .= "Target Pace: {$profile['name']} ({$profile['wpm']} WPM)\n\n";
+
+        // Calculate target words per scene
+        $totalSeconds = $duration;
+        $wordsPerMinute = $profile['wpm'];
+        $totalWords = ($totalSeconds / 60) * $wordsPerMinute;
+        $avgWordsPerScene = round($totalWords / $sceneCount);
+
+        $guidance .= "Target Metrics:\n";
+        $guidance .= "- Total Duration: {$duration}s\n";
+        $guidance .= "- Scene Count: {$sceneCount}\n";
+        $guidance .= "- Target WPM: {$wordsPerMinute}\n";
+        $guidance .= "- Target Words: ~" . round($totalWords) . " total\n";
+        $guidance .= "- Words Per Scene: ~{$avgWordsPerScene} words\n\n";
+
+        $guidance .= "Scene Duration Guidelines:\n";
+        $guidance .= "- Minimum: {$profile['sceneDuration']['min']}s\n";
+        $guidance .= "- Average: {$profile['sceneDuration']['avg']}s\n";
+        $guidance .= "- Maximum: {$profile['sceneDuration']['max']}s\n\n";
+
+        $guidance .= "IMPORTANT: Each narration should be spoken at ~{$wordsPerMinute} WPM pace.\n";
+        $guidance .= "Count words carefully - keep each scene's narration to approximately {$avgWordsPerScene} words.\n";
+
+        return $guidance;
+    }
+
+    /**
+     * Build genre template tips for specialized content.
+     */
+    protected function buildGenreTemplateTips(?string $genreTemplate): string
+    {
+        if (!$genreTemplate) {
+            return '';
+        }
+
+        $templates = config('appvideowizard.genre_templates', []);
+
+        if (!isset($templates[$genreTemplate])) {
+            return '';
+        }
+
+        $template = $templates[$genreTemplate];
+
+        $guidance = "=== GENRE-SPECIFIC TIPS ===\n";
+        $guidance .= "Genre: {$template['name']}\n";
+        $guidance .= "Description: {$template['description']}\n\n";
+
+        if (!empty($template['tips'])) {
+            $guidance .= "Pro Tips: {$template['tips']}\n";
+        }
+
+        return $guidance;
+    }
+
+    /**
+     * Get genre template defaults for pre-configuration.
+     */
+    public function getGenreTemplateDefaults(string $genreTemplate): array
+    {
+        $templates = config('appvideowizard.genre_templates', []);
+
+        if (!isset($templates[$genreTemplate])) {
+            return [];
+        }
+
+        return $templates[$genreTemplate]['defaults'] ?? [];
     }
 
     /**
