@@ -55,6 +55,19 @@ class ImageGenerationService
     }
 
     /**
+     * Generate a public URL for a storage path.
+     * Uses /files/ prefix to bypass nginx interception of /storage/ paths.
+     */
+    protected function getPublicUrl(string $path): string
+    {
+        // Remove leading slash if present
+        $path = ltrim($path, '/');
+
+        // Use /files/ prefix which routes through Laravel instead of nginx
+        return url('/files/' . $path);
+    }
+
+    /**
      * Get available image models.
      */
     public function getModels(): array
@@ -230,7 +243,7 @@ class ImageGenerationService
                     // Regular URL - download and store
                     $storedPath = $this->storeImage($imageUrl, $project, $sceneId);
                 }
-                $publicUrl = Storage::disk('public')->url($storedPath);
+                $publicUrl = $this->getPublicUrl($storedPath);
 
                 // Create asset record
                 $asset = WizardAsset::create([
@@ -457,11 +470,11 @@ class ImageGenerationService
                 $project,
                 $scene['id']
             );
-            $imageUrl = Storage::disk('public')->url($storedPath);
+            $imageUrl = $this->getPublicUrl($storedPath);
         } elseif (isset($imageData['url'])) {
             $imageUrl = $imageData['url'];
             $storedPath = $this->storeImage($imageUrl, $project, $scene['id']);
-            $imageUrl = Storage::disk('public')->url($storedPath);
+            $imageUrl = $this->getPublicUrl($storedPath);
         } else {
             throw new \Exception('Invalid image response format');
         }
@@ -944,7 +957,7 @@ class ImageGenerationService
             throw new \Exception('Image file was not saved correctly');
         }
 
-        $fullUrl = Storage::disk('public')->url($path);
+        $fullUrl = $this->getPublicUrl($path);
         Log::info('ImageGeneration: Image stored successfully', [
             'path' => $path,
             'url' => $fullUrl,
@@ -991,7 +1004,7 @@ class ImageGenerationService
             throw new \Exception('Image file was not saved correctly');
         }
 
-        $fullUrl = Storage::disk('public')->url($path);
+        $fullUrl = $this->getPublicUrl($path);
         Log::info('ImageGeneration: Base64 image stored successfully', [
             'path' => $path,
             'url' => $fullUrl,
@@ -1123,7 +1136,7 @@ class ImageGenerationService
                 // Save upscaled image
                 $filename = 'wizard/upscaled/' . Str::uuid() . '.png';
                 Storage::disk('public')->put($filename, base64_decode($result['imageData']));
-                $upscaledUrl = Storage::disk('public')->url($filename);
+                $upscaledUrl = $this->getPublicUrl($filename);
 
                 return [
                     'success' => true,
@@ -1178,7 +1191,7 @@ class ImageGenerationService
                 // Save edited image
                 $filename = 'wizard/edited/' . Str::uuid() . '.png';
                 Storage::disk('public')->put($filename, base64_decode($result['imageData']));
-                $editedUrl = Storage::disk('public')->url($filename);
+                $editedUrl = $this->getPublicUrl($filename);
 
                 return [
                     'success' => true,
@@ -1195,7 +1208,7 @@ class ImageGenerationService
             if (!empty($fallbackResult['imageData'])) {
                 $filename = 'wizard/edited/' . Str::uuid() . '.png';
                 Storage::disk('public')->put($filename, base64_decode($fallbackResult['imageData']));
-                $editedUrl = Storage::disk('public')->url($filename);
+                $editedUrl = $this->getPublicUrl($filename);
 
                 return [
                     'success' => true,
