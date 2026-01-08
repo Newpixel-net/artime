@@ -284,6 +284,10 @@ class VideoWizard extends Component
     public int $editingLocationIndex = 0;
     public bool $isGeneratingLocationRef = false;
 
+    // Scene Overwrite Confirmation Modal
+    public bool $showSceneOverwriteModal = false;
+    public string $sceneOverwriteAction = 'replace'; // 'replace' or 'append'
+
     // Storyboard Pagination (Performance optimization for 45+ scenes)
     public int $storyboardPage = 1;
     public int $storyboardPerPage = 12;
@@ -1524,7 +1528,7 @@ class VideoWizard extends Component
 
     /**
      * Start progressive script generation.
-     * Initializes batch tracking and generates first batch.
+     * If scenes exist, shows confirmation modal first.
      */
     #[On('start-progressive-generation')]
     public function startProgressiveGeneration(): void
@@ -1534,19 +1538,69 @@ class VideoWizard extends Component
             return;
         }
 
+        // Check if scenes already exist - show confirmation modal
+        $existingSceneCount = count($this->script['scenes'] ?? []);
+        if ($existingSceneCount > 0) {
+            $this->showSceneOverwriteModal = true;
+            return;
+        }
+
+        // No existing scenes - proceed directly
+        $this->executeProgressiveGeneration('replace');
+    }
+
+    /**
+     * Handle scene overwrite confirmation.
+     */
+    public function confirmSceneOverwrite(string $action): void
+    {
+        $this->showSceneOverwriteModal = false;
+        $this->sceneOverwriteAction = $action;
+
+        if ($action === 'cancel') {
+            return;
+        }
+
+        $this->executeProgressiveGeneration($action);
+    }
+
+    /**
+     * Execute the progressive generation with specified action.
+     * @param string $action 'replace' to start fresh, 'append' to add to existing scenes
+     */
+    protected function executeProgressiveGeneration(string $action): void
+    {
         $this->isLoading = true;
         $this->error = null;
 
         try {
             $targetSceneCount = $this->calculateSceneCount();
             $batchSize = 5;
+
+            // If appending, adjust target count
+            $existingSceneCount = 0;
+            if ($action === 'append') {
+                $existingSceneCount = count($this->script['scenes'] ?? []);
+                // Calculate how many more scenes we need
+                $remainingScenes = max(0, $targetSceneCount - $existingSceneCount);
+                if ($remainingScenes === 0) {
+                    $this->error = __('You already have :count scenes. Target is :target scenes.', [
+                        'count' => $existingSceneCount,
+                        'target' => $targetSceneCount,
+                    ]);
+                    $this->isLoading = false;
+                    return;
+                }
+                $targetSceneCount = $remainingScenes;
+            }
+
             $totalBatches = (int) ceil($targetSceneCount / $batchSize);
 
             // Initialize batch tracking
             $batches = [];
             for ($i = 0; $i < $totalBatches; $i++) {
-                $startScene = ($i * $batchSize) + 1;
-                $endScene = min(($i + 1) * $batchSize, $targetSceneCount);
+                $startScene = $existingSceneCount + ($i * $batchSize) + 1;
+                $endScene = $existingSceneCount + min(($i + 1) * $batchSize, $targetSceneCount);
 
                 $batches[] = [
                     'batchNumber' => $i + 1,
@@ -1560,8 +1614,8 @@ class VideoWizard extends Component
 
             $this->scriptGeneration = [
                 'status' => 'generating',
-                'targetSceneCount' => $targetSceneCount,
-                'generatedSceneCount' => 0,
+                'targetSceneCount' => $existingSceneCount + $targetSceneCount,
+                'generatedSceneCount' => $existingSceneCount,
                 'batchSize' => $batchSize,
                 'currentBatch' => 0,
                 'totalBatches' => $totalBatches,
@@ -1569,22 +1623,26 @@ class VideoWizard extends Component
                 'autoGenerate' => false,
             ];
 
-            // Initialize script structure
-            $this->script = [
-                'title' => $this->concept['refinedConcept'] ?? $this->concept['rawInput'] ?? 'Untitled',
-                'hook' => '',
-                'scenes' => [],
-                'cta' => '',
-                'totalDuration' => 0,
-                'totalNarrationTime' => 0,
-            ];
+            // Initialize or keep script structure based on action
+            if ($action === 'replace') {
+                $this->script = [
+                    'title' => $this->concept['refinedConcept'] ?? $this->concept['rawInput'] ?? 'Untitled',
+                    'hook' => '',
+                    'scenes' => [],
+                    'cta' => '',
+                    'totalDuration' => 0,
+                    'totalNarrationTime' => 0,
+                ];
+            }
+            // If appending, keep existing script structure
 
             $this->saveProject();
 
             // Dispatch event for UI update
             $this->dispatch('progressive-generation-started', [
-                'targetSceneCount' => $targetSceneCount,
+                'targetSceneCount' => $this->scriptGeneration['targetSceneCount'],
                 'totalBatches' => $totalBatches,
+                'action' => $action,
             ]);
 
             // Generate first batch
