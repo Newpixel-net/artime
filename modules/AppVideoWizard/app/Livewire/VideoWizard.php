@@ -724,6 +724,48 @@ class VideoWizard extends Component
     }
 
     /**
+     * Apply the enhanced concept to the main input.
+     * This copies the refined concept to rawInput so the user can edit it further.
+     */
+    public function applyEnhancedConcept(): void
+    {
+        if (!empty($this->concept['refinedConcept'])) {
+            // Apply the refined concept to the main input
+            $this->concept['rawInput'] = $this->concept['refinedConcept'];
+
+            // Keep the enhancement data but mark as applied
+            $this->saveProject();
+
+            $this->dispatch('vw-debug', [
+                'action' => 'apply-enhancement',
+                'message' => 'Enhanced concept applied to input',
+            ]);
+        }
+    }
+
+    /**
+     * Dismiss the enhancement preview without applying.
+     * This clears the refined concept but keeps the original input.
+     */
+    public function dismissEnhancement(): void
+    {
+        // Clear the refined concept to hide the preview
+        $this->concept['refinedConcept'] = '';
+        $this->concept['logline'] = '';
+        $this->concept['suggestedMood'] = null;
+        $this->concept['suggestedTone'] = null;
+        $this->concept['keyElements'] = [];
+        $this->concept['targetAudience'] = '';
+
+        $this->saveProject();
+
+        $this->dispatch('vw-debug', [
+            'action' => 'dismiss-enhancement',
+            'message' => 'Enhancement preview dismissed',
+        ]);
+    }
+
+    /**
      * Generate unique ideas based on concept.
      */
     public function generateIdeas(): void
