@@ -1324,12 +1324,16 @@ class VideoWizard extends Component
         try {
             Log::info('VideoWizard: Starting script generation', $inputData);
 
-            // Create or update the project first
-            if (!$this->projectId) {
-                $this->saveProject();
-            }
+            // Always save project first to ensure database has latest settings (duration, etc.)
+            $this->forceSaveProject();
 
             $project = WizardProject::findOrFail($this->projectId);
+
+            // Log the actual duration that will be used
+            Log::info('VideoWizard: Script generation using duration', [
+                'component_targetDuration' => $this->targetDuration,
+                'project_target_duration' => $project->target_duration,
+            ]);
             $scriptService = app(ScriptGenerationService::class);
 
             $generatedScript = $scriptService->generateScript($project, [

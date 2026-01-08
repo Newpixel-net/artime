@@ -913,13 +913,43 @@ class ImageGenerationService
         try {
             $contents = Http::timeout(60)->get($imageUrl)->body();
         } catch (\Exception $e) {
+            Log::warning('ImageGeneration: HTTP fetch failed, trying file_get_contents', [
+                'url' => $imageUrl,
+                'error' => $e->getMessage(),
+            ]);
             $contents = file_get_contents($imageUrl);
+        }
+
+        if (empty($contents)) {
+            Log::error('ImageGeneration: Failed to download image', ['url' => $imageUrl]);
+            throw new \Exception('Failed to download image from URL');
         }
 
         $filename = Str::slug($sceneId) . '-' . time() . '.png';
         $path = "wizard-projects/{$project->id}/images/{$filename}";
 
-        Storage::disk('public')->put($path, $contents);
+        $stored = Storage::disk('public')->put($path, $contents);
+
+        if (!$stored) {
+            Log::error('ImageGeneration: Failed to store image', [
+                'path' => $path,
+                'contentLength' => strlen($contents),
+            ]);
+            throw new \Exception('Failed to store image to disk');
+        }
+
+        // Verify the file was actually stored
+        if (!Storage::disk('public')->exists($path)) {
+            Log::error('ImageGeneration: Image file does not exist after storage', ['path' => $path]);
+            throw new \Exception('Image file was not saved correctly');
+        }
+
+        $fullUrl = Storage::disk('public')->url($path);
+        Log::info('ImageGeneration: Image stored successfully', [
+            'path' => $path,
+            'url' => $fullUrl,
+            'size' => strlen($contents),
+        ]);
 
         return $path;
     }
@@ -931,6 +961,11 @@ class ImageGenerationService
     {
         $contents = base64_decode($base64Data);
 
+        if (empty($contents)) {
+            Log::error('ImageGeneration: Failed to decode base64 image');
+            throw new \Exception('Failed to decode base64 image data');
+        }
+
         $extension = match ($mimeType) {
             'image/jpeg' => 'jpg',
             'image/webp' => 'webp',
@@ -940,7 +975,28 @@ class ImageGenerationService
         $filename = Str::slug($sceneId) . '-' . time() . '.' . $extension;
         $path = "wizard-projects/{$project->id}/images/{$filename}";
 
-        Storage::disk('public')->put($path, $contents);
+        $stored = Storage::disk('public')->put($path, $contents);
+
+        if (!$stored) {
+            Log::error('ImageGeneration: Failed to store base64 image', [
+                'path' => $path,
+                'contentLength' => strlen($contents),
+            ]);
+            throw new \Exception('Failed to store image to disk');
+        }
+
+        // Verify the file was actually stored
+        if (!Storage::disk('public')->exists($path)) {
+            Log::error('ImageGeneration: Base64 image file does not exist after storage', ['path' => $path]);
+            throw new \Exception('Image file was not saved correctly');
+        }
+
+        $fullUrl = Storage::disk('public')->url($path);
+        Log::info('ImageGeneration: Base64 image stored successfully', [
+            'path' => $path,
+            'url' => $fullUrl,
+            'size' => strlen($contents),
+        ]);
 
         return $path;
     }

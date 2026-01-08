@@ -200,6 +200,17 @@ class ScriptGenerationService
         // Words per scene
         $wordsPerScene = (int) ceil($targetWords / $sceneCount);
 
+        \Log::info('VideoWizard: calculateScriptParameters', [
+            'input_duration' => $duration,
+            'input_contentDepth' => $contentDepth,
+            'calculated_wpm' => $wpm,
+            'calculated_targetWords' => $targetWords,
+            'calculated_avgSceneDuration' => $avgSceneDuration,
+            'calculated_sceneCount' => $sceneCount,
+            'calculated_wordsPerScene' => $wordsPerScene,
+            'duration_formula' => "max(3, ceil({$duration} / {$avgSceneDuration})) = max(3, " . ceil($duration / $avgSceneDuration) . ") = {$sceneCount}",
+        ]);
+
         return [
             'wpm' => $wpm,
             'targetWords' => $targetWords,
