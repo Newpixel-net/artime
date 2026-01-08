@@ -1031,6 +1031,361 @@
     .vw-studio-alert-text {
         font-size: 1rem;
     }
+
+    /* ========================================
+       PHASE 5: VIDEO PLAYER CONTROLS
+       ======================================== */
+
+    /* Video Player Container */
+    .vw-video-player {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .vw-video-player video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Video Controls Overlay */
+    .vw-video-controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4) 60%, transparent);
+        padding: 2.5rem 1rem 0.75rem;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+    }
+
+    .vw-video-player:hover .vw-video-controls,
+    .vw-video-player.controls-visible .vw-video-controls {
+        opacity: 1;
+    }
+
+    /* Progress Bar */
+    .vw-progress-container {
+        position: relative;
+        height: 4px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 2px;
+        margin-bottom: 0.6rem;
+        cursor: pointer;
+        transition: height 0.15s;
+    }
+
+    .vw-progress-container:hover {
+        height: 6px;
+    }
+
+    .vw-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+        border-radius: 2px;
+        transition: width 0.1s;
+    }
+
+    .vw-progress-handle {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        width: 14px;
+        height: 14px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        transition: transform 0.15s;
+    }
+
+    .vw-progress-container:hover .vw-progress-handle {
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Control Buttons Row */
+    .vw-controls-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .vw-control-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        color: white;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .vw-control-btn:hover {
+        background: rgba(255,255,255,0.2);
+        transform: scale(1.05);
+    }
+
+    .vw-control-btn.play {
+        width: 44px;
+        height: 44px;
+        background: rgba(139,92,246,0.9);
+        font-size: 1.1rem;
+    }
+
+    .vw-control-btn.play:hover {
+        background: rgba(139,92,246,1);
+    }
+
+    /* Time Display */
+    .vw-time-display {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        color: rgba(255,255,255,0.8);
+    }
+
+    .vw-time-current {
+        color: white;
+        font-weight: 600;
+    }
+
+    .vw-time-separator {
+        color: rgba(255,255,255,0.4);
+    }
+
+    .vw-time-total {
+        color: rgba(255,255,255,0.6);
+    }
+
+    /* Volume Control */
+    .vw-volume-control {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-left: auto;
+    }
+
+    .vw-volume-slider {
+        width: 0;
+        height: 4px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 2px;
+        cursor: pointer;
+        transition: width 0.2s;
+        overflow: hidden;
+    }
+
+    .vw-volume-control:hover .vw-volume-slider {
+        width: 70px;
+    }
+
+    .vw-volume-slider input[type="range"] {
+        width: 100%;
+        height: 100%;
+        -webkit-appearance: none;
+        background: transparent;
+        cursor: pointer;
+    }
+
+    .vw-volume-slider input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    /* Fullscreen & Loop Buttons */
+    .vw-player-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: auto;
+    }
+
+    .vw-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.9rem;
+        cursor: pointer;
+        border-radius: 0.25rem;
+        transition: all 0.15s;
+    }
+
+    .vw-action-btn:hover {
+        background: rgba(255,255,255,0.1);
+        color: white;
+    }
+
+    .vw-action-btn.active {
+        color: #06b6d4;
+    }
+
+    /* Center Play Button (for paused state) */
+    .vw-center-play {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        background: rgba(139, 92, 246, 0.9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 4px 24px rgba(139, 92, 246, 0.5);
+        transition: all 0.2s;
+        padding-left: 5px;
+    }
+
+    .vw-center-play:hover {
+        transform: translate(-50%, -50%) scale(1.08);
+        box-shadow: 0 6px 32px rgba(139, 92, 246, 0.6);
+    }
+
+    /* Fullscreen Mode */
+    .vw-preview-container.fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9999;
+        border-radius: 0;
+        aspect-ratio: unset;
+        border: none;
+    }
+
+    .vw-fullscreen-exit {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        z-index: 10000;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0,0,0,0.6);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 0.4rem;
+        color: white;
+        font-size: 0.75rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .vw-fullscreen-exit:hover {
+        background: rgba(0,0,0,0.8);
+    }
+
+    /* Progress Summary Panel */
+    .vw-progress-summary {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 0.5rem;
+        margin-left: 1rem;
+    }
+
+    .vw-progress-summary-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+    }
+
+    .vw-progress-summary-bar {
+        width: 48px;
+        height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .vw-progress-summary-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.3s;
+    }
+
+    .vw-progress-summary-fill.voice {
+        background: linear-gradient(90deg, #8b5cf6, #a855f7);
+    }
+
+    .vw-progress-summary-fill.video {
+        background: linear-gradient(90deg, #06b6d4, #10b981);
+    }
+
+    .vw-progress-summary-fill.ready {
+        background: linear-gradient(90deg, #10b981, #22c55e);
+    }
+
+    .vw-progress-summary-label {
+        font-size: 0.55rem;
+        color: rgba(255,255,255,0.5);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .vw-progress-summary-value {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: white;
+    }
+
+    /* Quick Stats Panel */
+    .vw-quick-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 0.5rem;
+        margin-left: 1rem;
+    }
+
+    .vw-stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .vw-stat-icon {
+        font-size: 0.85rem;
+    }
+
+    .vw-stat-value {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: white;
+    }
+
+    .vw-stat-label {
+        font-size: 0.55rem;
+        color: rgba(255,255,255,0.4);
+    }
 </style>
 
 @if(empty($script['scenes']))
@@ -1095,6 +1450,33 @@
                 <div class="vw-studio-pill ready">
                     <span>✓</span>
                     <span class="pill-value">{{ $readyScenes }} {{ __('ready') }}</span>
+                </div>
+            </div>
+
+            {{-- Progress Summary Bars --}}
+            @php
+                $voicePercent = $totalScenes > 0 ? round(($voiceoversReady / $totalScenes) * 100) : 0;
+                $videoPercent = $totalScenes > 0 ? round((($animatedCount + $stockVideoCount) / $totalScenes) * 100) : 0;
+                $readyPercent = $totalScenes > 0 ? round(($readyScenes / $totalScenes) * 100) : 0;
+            @endphp
+            <div class="vw-progress-summary">
+                <div class="vw-progress-summary-item">
+                    <div class="vw-progress-summary-bar">
+                        <div class="vw-progress-summary-fill voice" style="width: {{ $voicePercent }}%"></div>
+                    </div>
+                    <span class="vw-progress-summary-label">{{ __('Voice') }}</span>
+                </div>
+                <div class="vw-progress-summary-item">
+                    <div class="vw-progress-summary-bar">
+                        <div class="vw-progress-summary-fill video" style="width: {{ $videoPercent }}%"></div>
+                    </div>
+                    <span class="vw-progress-summary-label">{{ __('Video') }}</span>
+                </div>
+                <div class="vw-progress-summary-item">
+                    <div class="vw-progress-summary-bar">
+                        <div class="vw-progress-summary-fill ready" style="width: {{ $readyPercent }}%"></div>
+                    </div>
+                    <span class="vw-progress-summary-label">{{ __('Ready') }}</span>
                 </div>
             </div>
 
@@ -1322,12 +1704,102 @@
                         </div>
 
                         {{-- Main Preview Container --}}
-                        <div class="vw-preview-container">
+                        <div class="vw-preview-container" id="preview-container-{{ $selectedIndex }}" x-data="videoPlayer{{ $selectedIndex }}()">
                             @if($selectedVideoUrl)
-                                {{-- Animated Video --}}
-                                <video class="vw-preview-video" src="{{ $selectedVideoUrl }}" id="preview-video-{{ $selectedIndex }}"></video>
-                                <div class="vw-preview-play-overlay" onclick="document.getElementById('preview-video-{{ $selectedIndex }}').play()">
-                                    <div class="vw-preview-play-btn">▶</div>
+                                {{-- Enhanced Video Player --}}
+                                <div class="vw-video-player" :class="{ 'controls-visible': showControls }"
+                                     @mouseenter="showControls = true"
+                                     @mouseleave="if(!isPlaying) showControls = true; else showControls = false">
+                                    <video class="vw-preview-video"
+                                           id="preview-video-{{ $selectedIndex }}"
+                                           src="{{ $selectedVideoUrl }}"
+                                           :loop="isLooping"
+                                           x-ref="video"
+                                           @timeupdate="updateProgress($event)"
+                                           @loadedmetadata="duration = $event.target.duration"
+                                           @ended="isPlaying = false; showControls = true"
+                                           @play="isPlaying = true"
+                                           @pause="isPlaying = false"></video>
+
+                                    {{-- Center Play Button (when paused) --}}
+                                    <div class="vw-center-play" x-show="!isPlaying" @click="togglePlay()" x-cloak>
+                                        ▶
+                                    </div>
+
+                                    {{-- Fullscreen Exit Button --}}
+                                    <button type="button" class="vw-fullscreen-exit" x-show="isFullscreen" @click="exitFullscreen()" x-cloak>
+                                        <span>✕</span> {{ __('Exit Fullscreen') }}
+                                    </button>
+
+                                    {{-- Video Controls Overlay --}}
+                                    <div class="vw-video-controls">
+                                        {{-- Progress Bar --}}
+                                        <div class="vw-progress-container" @click="seek($event)">
+                                            <div class="vw-progress-bar" :style="'width:' + progressPercent + '%'"></div>
+                                            <div class="vw-progress-handle" :style="'left:' + progressPercent + '%'"></div>
+                                        </div>
+
+                                        {{-- Controls Row --}}
+                                        <div class="vw-controls-row">
+                                            {{-- Play/Pause --}}
+                                            <button type="button" class="vw-control-btn play" @click="togglePlay()">
+                                                <span x-text="isPlaying ? '⏸' : '▶'"></span>
+                                            </button>
+
+                                            {{-- Skip Back/Forward --}}
+                                            <button type="button" class="vw-control-btn" @click="skip(-5)" title="{{ __('Back 5s') }}">
+                                                ⏪
+                                            </button>
+                                            <button type="button" class="vw-control-btn" @click="skip(5)" title="{{ __('Forward 5s') }}">
+                                                ⏩
+                                            </button>
+
+                                            {{-- Time Display --}}
+                                            <div class="vw-time-display">
+                                                <span class="vw-time-current" x-text="formatTime(currentTime)">0:00</span>
+                                                <span class="vw-time-separator">/</span>
+                                                <span class="vw-time-total" x-text="formatTime(duration)">0:00</span>
+                                            </div>
+
+                                            {{-- Spacer --}}
+                                            <div style="flex: 1;"></div>
+
+                                            {{-- Volume Control --}}
+                                            <div class="vw-volume-control">
+                                                <button type="button" class="vw-action-btn" @click="toggleMute()" :title="isMuted ? '{{ __('Unmute') }}' : '{{ __('Mute') }}'">
+                                                    <span x-text="isMuted || volume === 0 ? '🔇' : (volume < 50 ? '🔉' : '🔊')"></span>
+                                                </button>
+                                                <div class="vw-volume-slider">
+                                                    <input type="range" min="0" max="100" x-model="volume" @input="updateVolume()">
+                                                </div>
+                                            </div>
+
+                                            {{-- Loop Toggle --}}
+                                            <button type="button"
+                                                    class="vw-action-btn"
+                                                    :class="{ 'active': isLooping }"
+                                                    @click="isLooping = !isLooping"
+                                                    title="{{ __('Loop') }}">
+                                                🔁
+                                            </button>
+
+                                            {{-- Playback Speed --}}
+                                            <button type="button"
+                                                    class="vw-action-btn"
+                                                    @click="cycleSpeed()"
+                                                    :title="'{{ __('Speed') }}: ' + playbackSpeed + 'x'">
+                                                <span x-text="playbackSpeed + 'x'" style="font-size: 0.7rem; font-weight: 600;"></span>
+                                            </button>
+
+                                            {{-- Fullscreen --}}
+                                            <button type="button"
+                                                    class="vw-action-btn"
+                                                    @click="toggleFullscreen()"
+                                                    title="{{ __('Fullscreen') }}">
+                                                ⛶
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="vw-preview-status-badge animated">✓ {{ __('ANIMATED') }}</div>
                             @elseif($selectedImageUrl)
@@ -1751,6 +2223,18 @@
                 <span class="vw-keyboard-key">Space</span>
                 <span>{{ __('Play') }}</span>
             </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span class="vw-keyboard-key">F</span>
+                <span>{{ __('Fullscreen') }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span class="vw-keyboard-key">L</span>
+                <span>{{ __('Loop') }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span class="vw-keyboard-key">M</span>
+                <span>{{ __('Mute') }}</span>
+            </div>
             <button type="button"
                     onclick="document.getElementById('keyboard-hint').style.display='none'"
                     style="margin-left: 0.5rem; background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.7rem;">
@@ -1758,6 +2242,144 @@
             </button>
         </div>
     </div>
+
+    {{-- Alpine.js Video Player Component --}}
+    <script>
+        function videoPlayer{{ $selectedIndex }}() {
+            return {
+                isPlaying: false,
+                isLooping: false,
+                isMuted: false,
+                isFullscreen: false,
+                showControls: true,
+                volume: 100,
+                previousVolume: 100,
+                currentTime: 0,
+                duration: 0,
+                progressPercent: 0,
+                playbackSpeed: 1,
+                speeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
+
+                init() {
+                    // Auto-hide controls after 3 seconds of inactivity
+                    let hideTimeout;
+                    const container = this.$el;
+                    container.addEventListener('mousemove', () => {
+                        this.showControls = true;
+                        clearTimeout(hideTimeout);
+                        if (this.isPlaying) {
+                            hideTimeout = setTimeout(() => {
+                                this.showControls = false;
+                            }, 3000);
+                        }
+                    });
+                },
+
+                togglePlay() {
+                    const video = this.$refs.video;
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                },
+
+                skip(seconds) {
+                    const video = this.$refs.video;
+                    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+                },
+
+                seek(event) {
+                    const video = this.$refs.video;
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const percent = (event.clientX - rect.left) / rect.width;
+                    video.currentTime = percent * video.duration;
+                },
+
+                updateProgress(event) {
+                    const video = event.target;
+                    this.currentTime = video.currentTime;
+                    this.progressPercent = (video.currentTime / video.duration) * 100;
+                },
+
+                toggleMute() {
+                    const video = this.$refs.video;
+                    if (this.isMuted) {
+                        this.volume = this.previousVolume;
+                        video.volume = this.previousVolume / 100;
+                        this.isMuted = false;
+                    } else {
+                        this.previousVolume = this.volume;
+                        this.volume = 0;
+                        video.volume = 0;
+                        this.isMuted = true;
+                    }
+                },
+
+                updateVolume() {
+                    const video = this.$refs.video;
+                    video.volume = this.volume / 100;
+                    this.isMuted = this.volume === 0;
+                },
+
+                cycleSpeed() {
+                    const video = this.$refs.video;
+                    const currentIndex = this.speeds.indexOf(this.playbackSpeed);
+                    const nextIndex = (currentIndex + 1) % this.speeds.length;
+                    this.playbackSpeed = this.speeds[nextIndex];
+                    video.playbackRate = this.playbackSpeed;
+                },
+
+                toggleFullscreen() {
+                    const container = document.getElementById('preview-container-{{ $selectedIndex }}');
+                    if (!this.isFullscreen) {
+                        container.classList.add('fullscreen');
+                        this.isFullscreen = true;
+                        // Try native fullscreen API
+                        if (container.requestFullscreen) {
+                            container.requestFullscreen();
+                        }
+                    } else {
+                        this.exitFullscreen();
+                    }
+                },
+
+                exitFullscreen() {
+                    const container = document.getElementById('preview-container-{{ $selectedIndex }}');
+                    container.classList.remove('fullscreen');
+                    this.isFullscreen = false;
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen().catch(() => {});
+                    }
+                },
+
+                formatTime(seconds) {
+                    if (!seconds || isNaN(seconds)) return '0:00';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return mins + ':' + (secs < 10 ? '0' : '') + secs;
+                }
+            };
+        }
+
+        // Listen for fullscreen change events
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement) {
+                document.querySelectorAll('.vw-preview-container.fullscreen').forEach(el => {
+                    el.classList.remove('fullscreen');
+                });
+            }
+        });
+
+        // Escape key to exit fullscreen
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.vw-preview-container.fullscreen').forEach(el => {
+                    el.classList.remove('fullscreen');
+                });
+            }
+        });
+    </script>
 
     {{-- Keyboard Shortcuts Script --}}
     <script>
@@ -1813,6 +2435,40 @@
                 case 'End':
                     @this.set('animation.selectedSceneIndex', totalScenes - 1);
                     e.preventDefault();
+                    break;
+                case 'f':
+                case 'F':
+                    // Toggle fullscreen
+                    const container = document.querySelector('.vw-preview-container');
+                    if (container) {
+                        container.classList.toggle('fullscreen');
+                        if (container.classList.contains('fullscreen')) {
+                            if (container.requestFullscreen) {
+                                container.requestFullscreen();
+                            }
+                        } else {
+                            if (document.exitFullscreen) {
+                                document.exitFullscreen().catch(() => {});
+                            }
+                        }
+                        e.preventDefault();
+                    }
+                    break;
+                case 'l':
+                case 'L':
+                    // Toggle loop
+                    const vid = document.querySelector('.vw-preview-video');
+                    if (vid) {
+                        vid.loop = !vid.loop;
+                    }
+                    break;
+                case 'm':
+                case 'M':
+                    // Toggle mute
+                    const vidMute = document.querySelector('.vw-preview-video');
+                    if (vidMute) {
+                        vidMute.muted = !vidMute.muted;
+                    }
                     break;
             }
         });
