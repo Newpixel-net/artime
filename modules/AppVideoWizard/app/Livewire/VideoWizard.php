@@ -265,14 +265,41 @@ class VideoWizard extends Component
     public bool $showNarrativeAdvanced = false; // Toggle for advanced options
     public ?string $contentFormatOverride = null; // Manual override: 'short' or 'feature' (null = auto from duration)
 
-    // Multi-Shot Mode state
+    // Multi-Shot Mode state (Hollywood-style scene → shots architecture)
+    // Each scene is decomposed into multiple shots (5-10s clips)
+    // Structure matches original video-creation-wizard.html
     public array $multiShotMode = [
         'enabled' => false,
-        'defaultShotCount' => 3,
-        'decomposedScenes' => [],
-        'batchStatus' => null,
-        'globalVisualProfile' => null,
+        'defaultShotCount' => 3,          // Default shots per scene (2-6)
+        'autoDecompose' => false,         // Auto-decompose scenes when enabled
+        'decomposedScenes' => [],         // { sceneId: { shots: [], consistencyAnchors: {}, status: 'pending'|'ready' } }
+        'batchStatus' => null,            // Batch decomposition status
+        'globalVisualProfile' => null,    // Global visual style for all shots
     ];
+
+    /**
+     * Shot Structure Schema (for reference):
+     * [
+     *     'id' => 'shot-{sceneId}-{index}',
+     *     'sceneId' => 'scene_1',
+     *     'index' => 0,
+     *     'imagePrompt' => 'Visual description for image generation',
+     *     'videoPrompt' => 'Action description for video generation',
+     *     'cameraMovement' => 'Pan left',  // Camera movement for Minimax
+     *     'duration' => 5,                  // Shot duration: 5, 6, or 10 seconds
+     *     'durationClass' => 'short',       // 'short' (5s), 'standard' (6s), 'cinematic' (10s)
+     *     'imageUrl' => null,               // Generated image URL
+     *     'imageStatus' => 'pending',       // 'pending' | 'generating' | 'ready' | 'error'
+     *     'videoUrl' => null,               // Generated video URL
+     *     'videoStatus' => 'pending',       // 'pending' | 'generating' | 'ready' | 'error'
+     *     'fromSceneImage' => false,        // True if shot 1 uses scene's main image
+     *     'fromFrameCapture' => false,      // True if image from previous shot's last frame
+     *     'capturedFrameUrl' => null,       // URL of captured frame (for shot chaining)
+     *     'dialogue' => null,               // Dialogue/narration for this shot
+     *     'speakingCharacters' => [],       // Characters speaking in this shot
+     * ]
+     */
+
     public bool $showMultiShotModal = false;
     public int $multiShotSceneIndex = 0;
     public int $multiShotCount = 3;
@@ -2481,6 +2508,7 @@ class VideoWizard extends Component
 
     /**
      * Sanitize a single scene to ensure all fields are properly typed.
+     * Updated to include Hollywood-style scene architecture fields.
      */
     protected function sanitizeScene(array $scene, int $index = 0): array
     {
@@ -2496,14 +2524,15 @@ class VideoWizard extends Component
                 ''
             ),
             'visualPrompt' => $this->ensureString($scene['visualPrompt'] ?? null, ''),
+            'visual' => $this->ensureString($scene['visual'] ?? $scene['visualDescription'] ?? null, ''),
 
             // Metadata - must be strings
             'mood' => $this->ensureString($scene['mood'] ?? null, ''),
             'transition' => $this->ensureString($scene['transition'] ?? null, 'cut'),
             'status' => $this->ensureString($scene['status'] ?? null, 'draft'),
 
-            // Duration - must be numeric
-            'duration' => $this->ensureNumeric($scene['duration'] ?? null, 15, 5, 300),
+            // Duration - must be numeric (Hollywood scenes are 25-60 seconds)
+            'duration' => $this->ensureNumeric($scene['duration'] ?? null, 35, 10, 120),
 
             // Voiceover structure
             'voiceover' => $this->sanitizeVoiceover($scene['voiceover'] ?? []),
@@ -2517,6 +2546,34 @@ class VideoWizard extends Component
             // Image data (preserve as-is if exists)
             'image' => $scene['image'] ?? null,
             'imageUrl' => $this->ensureString($scene['imageUrl'] ?? null, ''),
+
+            // ================================================
+            // Hollywood-style scene architecture fields
+            // These enable multi-shot decomposition and video generation
+            // ================================================
+
+            // Scene type classification
+            'sceneType' => $this->ensureString($scene['sceneType'] ?? null, 'narrative'),
+
+            // Action blueprint for shot decomposition
+            'sceneAction' => $this->ensureString($scene['sceneAction'] ?? $scene['action'] ?? null, ''),
+            'actionBlueprint' => is_array($scene['actionBlueprint'] ?? null) ? $scene['actionBlueprint'] : null,
+
+            // Audio layer for dialogue distribution to shots
+            'audioLayer' => is_array($scene['audioLayer'] ?? null) ? $scene['audioLayer'] : [
+                'hasDialogue' => false,
+                'dialogueLines' => [],
+                'speakers' => [],
+            ],
+
+            // Characters in this scene
+            'charactersInScene' => is_array($scene['charactersInScene'] ?? null) ? $scene['charactersInScene'] : [],
+
+            // Location reference
+            'locationRef' => is_array($scene['locationRef'] ?? null) ? $scene['locationRef'] : null,
+
+            // Camera/direction hints
+            'cameraHints' => is_array($scene['cameraHints'] ?? null) ? $scene['cameraHints'] : [],
         ];
     }
 
@@ -6997,6 +7054,7 @@ class VideoWizard extends Component
 
     /**
      * Decompose scene into multiple shots.
+     * Uses Hollywood Math: shots = sceneDuration / clipDuration
      */
     public function decomposeScene(int $sceneIndex): void
     {
@@ -7010,53 +7068,97 @@ class VideoWizard extends Component
             }
 
             // Get visual description for decomposition
-            $visualDescription = $scene['visualDescription'] ?? $scene['narration'] ?? '';
+            $visualDescription = $scene['visualDescription'] ?? $scene['visual'] ?? $scene['narration'] ?? '';
 
-            // Use Gemini to decompose scene into shots
-            $imageService = app(ImageGenerationService::class);
+            // Hollywood-style timing from Phase 1
+            $clipDuration = $this->getClipDuration(); // 5s, 6s, or 10s
+            $sceneDuration = $scene['duration'] ?? ($this->script['timing']['sceneDuration'] ?? 35);
 
-            // Calculate duration per shot (default 6s each, adjustable)
-            $sceneDuration = $scene['duration'] ?? 30;
-            $baseShotDuration = max(5, min(10, intval($sceneDuration / $this->multiShotCount)));
+            // Hollywood Math: Calculate shot count based on scene duration and clip duration
+            // For a 35s scene with 10s clips = ~4 shots
+            $calculatedShotCount = max(2, min(6, (int) ceil($sceneDuration / $clipDuration)));
+
+            // Use calculated count or user-selected count (whichever is appropriate)
+            $shotCount = $this->multiShotCount > 0 ? $this->multiShotCount : $calculatedShotCount;
+            $baseShotDuration = $clipDuration;
 
             $shots = [];
-            for ($i = 0; $i < $this->multiShotCount; $i++) {
-                $shotType = $this->getShotTypeForIndex($i, $this->multiShotCount);
+            $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
+
+            for ($i = 0; $i < $shotCount; $i++) {
+                $shotType = $this->getShotTypeForIndex($i, $shotCount);
                 $cameraMovement = $this->getCameraMovementForShot($shotType['type'], $i);
 
+                // Build comprehensive shot structure matching original wizard schema
                 $shots[] = [
-                    'id' => uniqid('shot_'),
+                    // Identification
+                    'id' => "shot-{$sceneId}-{$i}",
+                    'sceneId' => $sceneId,
                     'index' => $i,
+
+                    // Shot type and description
                     'type' => $shotType['type'],
                     'shotType' => $shotType['type'],
                     'description' => $shotType['description'],
-                    'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+
+                    // Prompts for generation
+                    'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+                    'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
+                    'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i), // Legacy compat
+
+                    // Image state
                     'imageUrl' => null,
+                    'imageStatus' => 'pending',  // 'pending' | 'generating' | 'ready' | 'error'
+                    'status' => 'pending',       // Legacy compat
+
+                    // Video state
                     'videoUrl' => null,
-                    'status' => 'pending',
-                    'videoStatus' => 'pending',
-                    'fromSceneImage' => $i === 0, // First shot can use scene image
+                    'videoStatus' => 'pending',  // 'pending' | 'generating' | 'ready' | 'error'
+
+                    // Frame chain (Hollywood-style shot continuity)
+                    'fromSceneImage' => $i === 0,  // Shot 1 uses scene's main image
+                    'fromFrameCapture' => $i > 0,  // Shots 2+ use previous shot's last frame
+                    'capturedFrameUrl' => null,    // URL of captured frame for chaining
+
+                    // Timing
                     'duration' => $baseShotDuration,
                     'selectedDuration' => $baseShotDuration,
-                    'durationClass' => $baseShotDuration <= 5 ? 'quick' : ($baseShotDuration <= 6 ? 'short' : 'standard'),
+                    'durationClass' => $baseShotDuration <= 5 ? 'short' : ($baseShotDuration <= 6 ? 'standard' : 'cinematic'),
+
+                    // Camera movement
                     'cameraMovement' => $cameraMovement,
+
+                    // Audio layer (for dialogue distribution)
+                    'dialogue' => $this->getDialogueForShot($scene, $i, $shotCount),
+                    'speakingCharacters' => [],
+
+                    // Motion/Action description
                     'narrativeBeat' => [
                         'motionDescription' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
                     ],
                 ];
             }
 
-            // Store decomposed scene
+            // Calculate total duration for all shots
+            $totalDuration = array_sum(array_column($shots, 'duration'));
+
+            // Store decomposed scene with Hollywood-style structure
             $this->multiShotMode['decomposedScenes'][$sceneIndex] = [
-                'sceneId' => $scene['id'] ?? $sceneIndex,
+                'sceneId' => $sceneId,
+                'sceneIndex' => $sceneIndex,
                 'shots' => $shots,
+                'shotCount' => count($shots),
+                'totalDuration' => $totalDuration,
                 'selectedShot' => 0,
-                'status' => 'ready',
+                'status' => 'ready',  // 'pending' | 'decomposing' | 'ready' | 'error'
                 'consistencyAnchors' => [
                     'style' => $this->sceneMemory['styleBible']['style'] ?? '',
                     'characters' => $this->getCharactersForScene($sceneIndex),
                     'location' => $this->getLocationForScene($sceneIndex),
                 ],
+                // Scene metadata for reference
+                'sceneTitle' => $scene['title'] ?? '',
+                'sceneNarration' => $scene['narration'] ?? '',
             ];
 
             // If scene already has an image, use it for first shot
@@ -7155,6 +7257,148 @@ class VideoWizard extends Component
         }
 
         return $base;
+    }
+
+    /**
+     * Get dialogue portion for a specific shot.
+     * Distributes scene narration across shots.
+     */
+    protected function getDialogueForShot(array $scene, int $shotIndex, int $totalShots): ?string
+    {
+        $narration = $scene['narration'] ?? '';
+        if (empty($narration)) {
+            return null;
+        }
+
+        // Split narration into sentences
+        $sentences = preg_split('/(?<=[.!?])\s+/', trim($narration), -1, PREG_SPLIT_NO_EMPTY);
+        $sentenceCount = count($sentences);
+
+        if ($sentenceCount === 0) {
+            return null;
+        }
+
+        // Distribute sentences across shots
+        $sentencesPerShot = max(1, (int) ceil($sentenceCount / $totalShots));
+        $start = $shotIndex * $sentencesPerShot;
+        $end = min($start + $sentencesPerShot, $sentenceCount);
+
+        if ($start >= $sentenceCount) {
+            return null;
+        }
+
+        return implode(' ', array_slice($sentences, $start, $end - $start));
+    }
+
+    /**
+     * Enable multi-shot mode and auto-decompose all scenes.
+     */
+    public function enableMultiShotModeForAll(): void
+    {
+        $this->multiShotMode['enabled'] = true;
+        $this->multiShotMode['autoDecompose'] = true;
+
+        // Decompose all existing scenes
+        $this->decomposeAllScenes();
+    }
+
+    /**
+     * Decompose all scenes into shots.
+     */
+    public function decomposeAllScenes(): void
+    {
+        $sceneCount = count($this->script['scenes'] ?? []);
+        if ($sceneCount === 0) {
+            return;
+        }
+
+        $this->isLoading = true;
+        $decomposed = 0;
+
+        try {
+            foreach ($this->script['scenes'] as $index => $scene) {
+                // Skip already decomposed scenes
+                if (isset($this->multiShotMode['decomposedScenes'][$index])) {
+                    continue;
+                }
+
+                // Decompose this scene
+                $this->decomposeScene($index);
+                $decomposed++;
+            }
+
+            $this->saveProject();
+            $this->dispatch('scenes-decomposed', ['count' => $decomposed]);
+
+        } catch (\Exception $e) {
+            $this->error = __('Failed to decompose all scenes: ') . $e->getMessage();
+        } finally {
+            $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Clear all shot decompositions and reset to scene-only mode.
+     */
+    public function clearAllDecompositions(): void
+    {
+        $this->multiShotMode['decomposedScenes'] = [];
+        $this->multiShotMode['enabled'] = false;
+        $this->saveProject();
+    }
+
+    /**
+     * Get shot statistics for display.
+     */
+    public function getShotStatistics(): array
+    {
+        $totalShots = 0;
+        $shotsWithImages = 0;
+        $shotsWithVideos = 0;
+        $decomposedScenes = 0;
+
+        foreach ($this->multiShotMode['decomposedScenes'] as $decomposed) {
+            if (isset($decomposed['shots']) && is_array($decomposed['shots'])) {
+                $decomposedScenes++;
+                $totalShots += count($decomposed['shots']);
+
+                foreach ($decomposed['shots'] as $shot) {
+                    if (!empty($shot['imageUrl'])) {
+                        $shotsWithImages++;
+                    }
+                    if (!empty($shot['videoUrl'])) {
+                        $shotsWithVideos++;
+                    }
+                }
+            }
+        }
+
+        return [
+            'totalScenes' => count($this->script['scenes'] ?? []),
+            'decomposedScenes' => $decomposedScenes,
+            'totalShots' => $totalShots,
+            'shotsWithImages' => $shotsWithImages,
+            'shotsWithVideos' => $shotsWithVideos,
+            'imageProgress' => $totalShots > 0 ? round(($shotsWithImages / $totalShots) * 100) : 0,
+            'videoProgress' => $totalShots > 0 ? round(($shotsWithVideos / $totalShots) * 100) : 0,
+        ];
+    }
+
+    /**
+     * Check if a scene has been decomposed.
+     */
+    public function isSceneDecomposed(int $sceneIndex): bool
+    {
+        return isset($this->multiShotMode['decomposedScenes'][$sceneIndex])
+            && !empty($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots']);
+    }
+
+    /**
+     * Get shots for a decomposed scene.
+     */
+    public function getShotsForScene(int $sceneIndex): array
+    {
+        return $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'] ?? [];
     }
 
     /**
