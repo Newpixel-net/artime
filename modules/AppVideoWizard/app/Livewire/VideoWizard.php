@@ -9272,6 +9272,27 @@ class VideoWizard extends Component
     }
 
     /**
+     * Set global transition type for all scenes.
+     */
+    public function setGlobalTransition(string $transition): void
+    {
+        $validTransitions = ['cut', 'fade', 'slide-left', 'slide-right', 'zoom-in', 'zoom-out'];
+
+        if (!in_array($transition, $validTransitions)) {
+            return;
+        }
+
+        $this->assembly['transitions']['global'] = $transition;
+        $this->assembly['defaultTransition'] = $transition;
+
+        // Also update the default transition for compatibility
+        $this->saveProject();
+
+        // Dispatch event for preview engine refresh
+        $this->dispatch('transition-updated');
+    }
+
+    /**
      * Get assembly statistics for display.
      */
     public function getAssemblyStats(): array
