@@ -160,29 +160,15 @@
                     <div class="vw-shortcut"><kbd>Space</kbd> {{ __('Play/Pause') }}</div>
                     <div class="vw-shortcut"><kbd>←</kbd><kbd>→</kbd> {{ __('Seek 5s') }}</div>
                     <div class="vw-shortcut"><kbd>1-4</kbd> {{ __('Switch tabs') }}</div>
+                    <div class="vw-shortcut"><kbd>Ctrl+Z</kbd> {{ __('Undo') }}</div>
+                    <div class="vw-shortcut"><kbd>Ctrl+Y</kbd> {{ __('Redo') }}</div>
                     <div class="vw-shortcut"><kbd>Esc</kbd> {{ __('Close modal') }}</div>
                 </div>
             </div>
         </div>
 
-        {{-- Bottom Timeline (optional scene timeline) --}}
-        <div class="vw-timeline-bar">
-            <div class="vw-timeline-scenes">
-                @foreach($script['scenes'] ?? [] as $index => $scene)
-                    <div
-                        class="vw-timeline-scene"
-                        @click="seekToScene({{ $index }})"
-                        :class="{ 'active': currentSceneIndex === {{ $index }} }"
-                    >
-                        <span class="vw-scene-thumb">{{ $index + 1 }}</span>
-                        <span class="vw-scene-duration">{{ number_format(($storyboard['scenes'][$index]['duration'] ?? 5), 1) }}s</span>
-                    </div>
-                @endforeach
-            </div>
-            <div class="vw-timeline-actions">
-                <span class="vw-timeline-total" x-text="formatTime(totalDuration)">0:00</span>
-            </div>
-        </div>
+        {{-- Professional Timeline - Phase 5 --}}
+        @include('appvideowizard::livewire.steps.partials._timeline')
     </div>
 
     {{-- Export Modal Backdrop --}}
