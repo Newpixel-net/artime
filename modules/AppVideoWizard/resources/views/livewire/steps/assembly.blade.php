@@ -176,6 +176,10 @@
 </div>
 
 <style>
+    /* ========================================
+       ASSEMBLY STUDIO - Full Screen Layout
+       ======================================== */
+
     /* Full-Screen Layout */
     .vw-assembly-fullscreen {
         position: fixed;
@@ -183,9 +187,50 @@
         left: 0;
         right: 0;
         bottom: 0;
+        width: 100vw !important;
+        height: 100vh !important;
         background: #0a0a12;
-        z-index: 9999;
+        z-index: 999999;
         overflow: hidden;
+    }
+
+    /* CRITICAL: Force hide ALL app sidebars and navigation when Assembly Studio is active */
+    .sidebar,
+    .main-sidebar,
+    div.sidebar,
+    aside.sidebar,
+    .hide-scroll.sidebar {
+        z-index: 1 !important;
+    }
+
+    /* Ensure full-screen coverage - hide main app sidebar */
+    body.vw-assembly-active {
+        overflow: hidden !important;
+    }
+
+    body.vw-assembly-active .sidebar,
+    body.vw-assembly-active .main-sidebar,
+    body.vw-assembly-active div.sidebar,
+    body.vw-assembly-active .sidebar.hide-scroll,
+    body.vw-assembly-active [class*="sidebar"]:not(.vw-assembly-sidebar),
+    body.vw-assembly-active aside:not(.vw-assembly-fullscreen aside),
+    body.vw-assembly-active nav:not(.vw-assembly-fullscreen nav) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.vw-assembly-active .main-content,
+    body.vw-assembly-active .page-wrapper,
+    body.vw-assembly-active [class*="content"]:not(.vw-assembly-fullscreen *) {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        width: 100% !important;
+        max-width: 100vw !important;
     }
 
     .vw-studio-layout {
@@ -670,3 +715,42 @@
         display: none !important;
     }
 </style>
+
+<script>
+    (function() {
+        // Add body class when Assembly Studio is active
+        document.body.classList.add('vw-assembly-active');
+
+        // Function to aggressively hide all sidebars
+        function hideAllSidebars() {
+            const sidebars = document.querySelectorAll('.sidebar, .main-sidebar, [class*="sidebar"]:not(.vw-assembly-sidebar), aside:not(.vw-assembly-fullscreen aside)');
+            sidebars.forEach(function(el) {
+                if (!el.closest('.vw-assembly-fullscreen')) {
+                    el.style.cssText = 'display: none !important; width: 0 !important; visibility: hidden !important;';
+                }
+            });
+        }
+
+        // Run immediately and after a short delay (for lazy-loaded elements)
+        hideAllSidebars();
+        setTimeout(hideAllSidebars, 100);
+        setTimeout(hideAllSidebars, 500);
+
+        // Cleanup when component is removed
+        if (typeof Livewire !== 'undefined') {
+            Livewire.hook('element.removed', (el, component) => {
+                if (el.classList && el.classList.contains('vw-assembly-fullscreen')) {
+                    document.body.classList.remove('vw-assembly-active');
+                    document.querySelectorAll('.sidebar, .main-sidebar, [class*="sidebar"], aside').forEach(function(el) {
+                        el.style.cssText = '';
+                    });
+                }
+            });
+        }
+
+        // Also cleanup on page unload (for SPA navigation)
+        window.addEventListener('beforeunload', function() {
+            document.body.classList.remove('vw-assembly-active');
+        });
+    })();
+</script>

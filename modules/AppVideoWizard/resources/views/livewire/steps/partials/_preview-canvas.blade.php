@@ -96,16 +96,33 @@
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
+        flex: 1;
+        min-height: 0;
+        padding: 1rem;
+        justify-content: center;
+        align-items: center;
     }
 
     .vw-canvas-wrapper {
         position: relative;
         width: 100%;
+        max-width: 100%;
         aspect-ratio: 16/9;
         background: #000;
         border-radius: 0.75rem;
         overflow: hidden;
         border: 1px solid rgba(255,255,255,0.1);
+        max-height: calc(100% - 120px); /* Leave room for controls */
+    }
+
+    /* Ensure canvas fills wrapper properly */
+    .vw-canvas-wrapper canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
 
     .vw-canvas-wrapper.loading {
