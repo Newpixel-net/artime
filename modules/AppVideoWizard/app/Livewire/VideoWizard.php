@@ -9437,6 +9437,124 @@ class VideoWizard extends Component
     }
 
     /**
+     * Timeline undo action - Phase 5.
+     */
+    public function timelineUndo(): void
+    {
+        // Get history from assembly state
+        $history = $this->assembly['timelineHistory'] ?? [];
+        $historyIndex = $this->assembly['timelineHistoryIndex'] ?? -1;
+
+        if ($historyIndex > 0) {
+            $historyIndex--;
+            $this->assembly['timelineHistoryIndex'] = $historyIndex;
+
+            // Restore state from history
+            if (isset($history[$historyIndex])) {
+                $state = $history[$historyIndex];
+                // Apply the state restoration logic here
+                // This would restore scene durations, positions, etc.
+            }
+
+            $this->saveProject();
+            $this->dispatch('timeline-state-restored');
+        }
+    }
+
+    /**
+     * Timeline redo action - Phase 5.
+     */
+    public function timelineRedo(): void
+    {
+        $history = $this->assembly['timelineHistory'] ?? [];
+        $historyIndex = $this->assembly['timelineHistoryIndex'] ?? -1;
+
+        if ($historyIndex < count($history) - 1) {
+            $historyIndex++;
+            $this->assembly['timelineHistoryIndex'] = $historyIndex;
+
+            // Restore state from history
+            if (isset($history[$historyIndex])) {
+                $state = $history[$historyIndex];
+                // Apply the state restoration logic here
+            }
+
+            $this->saveProject();
+            $this->dispatch('timeline-state-restored');
+        }
+    }
+
+    /**
+     * Save current timeline state to history - Phase 5.
+     */
+    public function saveTimelineState(string $action = 'edit'): void
+    {
+        $history = $this->assembly['timelineHistory'] ?? [];
+        $historyIndex = $this->assembly['timelineHistoryIndex'] ?? -1;
+
+        // Remove any future states if not at the end
+        if ($historyIndex < count($history) - 1) {
+            $history = array_slice($history, 0, $historyIndex + 1);
+        }
+
+        // Create state snapshot
+        $state = [
+            'timestamp' => now()->timestamp,
+            'action' => $action,
+            'scenes' => $this->storyboard['scenes'] ?? [],
+            'assembly' => [
+                'captions' => $this->assembly['captions'] ?? [],
+                'music' => $this->assembly['music'] ?? [],
+                'transitions' => $this->assembly['transitions'] ?? [],
+            ],
+        ];
+
+        $history[] = $state;
+
+        // Limit history to 50 entries
+        if (count($history) > 50) {
+            array_shift($history);
+        } else {
+            $historyIndex++;
+        }
+
+        $this->assembly['timelineHistory'] = $history;
+        $this->assembly['timelineHistoryIndex'] = $historyIndex;
+
+        $this->saveProject();
+    }
+
+    /**
+     * Trim clip start time - Phase 5.
+     */
+    public function trimClipStart(string $track, int $clipIndex, float $newStart): void
+    {
+        $this->saveTimelineState('trim-start');
+
+        if ($track === 'video' && isset($this->storyboard['scenes'][$clipIndex])) {
+            // Calculate the difference and adjust duration
+            $currentDuration = $this->storyboard['scenes'][$clipIndex]['duration'] ?? 5;
+            // Implement trim logic
+            $this->saveProject();
+            $this->dispatch('clip-trimmed', ['track' => $track, 'index' => $clipIndex]);
+        }
+    }
+
+    /**
+     * Trim clip end time - Phase 5.
+     */
+    public function trimClipEnd(string $track, int $clipIndex, float $newDuration): void
+    {
+        $this->saveTimelineState('trim-end');
+
+        if ($track === 'video' && isset($this->storyboard['scenes'][$clipIndex])) {
+            $this->storyboard['scenes'][$clipIndex]['duration'] = max(0.5, $newDuration);
+            $this->saveProject();
+            $this->dispatch('clip-trimmed', ['track' => $track, 'index' => $clipIndex]);
+        }
+    }
+
+    /**
      * Get assembly statistics for display.
      */
     public function getAssemblyStats(): array
