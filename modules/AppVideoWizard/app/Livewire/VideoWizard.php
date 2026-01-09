@@ -111,28 +111,46 @@ class VideoWizard extends Component
 
     /**
      * Supported languages for content generation
+     * Country codes are ISO 3166-1 alpha-2 for flag images
      */
     public const SUPPORTED_LANGUAGES = [
-        'en' => ['name' => 'English', 'native' => 'English', 'flag' => '🇺🇸'],
-        'es' => ['name' => 'Spanish', 'native' => 'Español', 'flag' => '🇪🇸'],
-        'fr' => ['name' => 'French', 'native' => 'Français', 'flag' => '🇫🇷'],
-        'de' => ['name' => 'German', 'native' => 'Deutsch', 'flag' => '🇩🇪'],
-        'it' => ['name' => 'Italian', 'native' => 'Italiano', 'flag' => '🇮🇹'],
-        'pt' => ['name' => 'Portuguese', 'native' => 'Português', 'flag' => '🇵🇹'],
-        'ru' => ['name' => 'Russian', 'native' => 'Русский', 'flag' => '🇷🇺'],
-        'zh' => ['name' => 'Chinese', 'native' => '中文', 'flag' => '🇨🇳'],
-        'ja' => ['name' => 'Japanese', 'native' => '日本語', 'flag' => '🇯🇵'],
-        'ko' => ['name' => 'Korean', 'native' => '한국어', 'flag' => '🇰🇷'],
-        'ar' => ['name' => 'Arabic', 'native' => 'العربية', 'flag' => '🇸🇦'],
-        'hi' => ['name' => 'Hindi', 'native' => 'हिन्दी', 'flag' => '🇮🇳'],
-        'he' => ['name' => 'Hebrew', 'native' => 'עברית', 'flag' => '🇮🇱'],
-        'nl' => ['name' => 'Dutch', 'native' => 'Nederlands', 'flag' => '🇳🇱'],
-        'pl' => ['name' => 'Polish', 'native' => 'Polski', 'flag' => '🇵🇱'],
-        'tr' => ['name' => 'Turkish', 'native' => 'Türkçe', 'flag' => '🇹🇷'],
-        'vi' => ['name' => 'Vietnamese', 'native' => 'Tiếng Việt', 'flag' => '🇻🇳'],
-        'th' => ['name' => 'Thai', 'native' => 'ไทย', 'flag' => '🇹🇭'],
-        'id' => ['name' => 'Indonesian', 'native' => 'Bahasa Indonesia', 'flag' => '🇮🇩'],
-        'sv' => ['name' => 'Swedish', 'native' => 'Svenska', 'flag' => '🇸🇪'],
+        // Major Global Languages
+        'en' => ['name' => 'English', 'native' => 'English', 'country' => 'us'],
+        'es' => ['name' => 'Spanish', 'native' => 'Español', 'country' => 'es'],
+        'fr' => ['name' => 'French', 'native' => 'Français', 'country' => 'fr'],
+        'de' => ['name' => 'German', 'native' => 'Deutsch', 'country' => 'de'],
+        'it' => ['name' => 'Italian', 'native' => 'Italiano', 'country' => 'it'],
+        'pt' => ['name' => 'Portuguese', 'native' => 'Português', 'country' => 'pt'],
+        'pt-br' => ['name' => 'Portuguese (Brazil)', 'native' => 'Português (Brasil)', 'country' => 'br'],
+        'ru' => ['name' => 'Russian', 'native' => 'Русский', 'country' => 'ru'],
+        'zh' => ['name' => 'Chinese', 'native' => '中文', 'country' => 'cn'],
+        'ja' => ['name' => 'Japanese', 'native' => '日本語', 'country' => 'jp'],
+        'ko' => ['name' => 'Korean', 'native' => '한국어', 'country' => 'kr'],
+        'ar' => ['name' => 'Arabic', 'native' => 'العربية', 'country' => 'sa'],
+        'hi' => ['name' => 'Hindi', 'native' => 'हिन्दी', 'country' => 'in'],
+        // European Languages
+        'nl' => ['name' => 'Dutch', 'native' => 'Nederlands', 'country' => 'nl'],
+        'pl' => ['name' => 'Polish', 'native' => 'Polski', 'country' => 'pl'],
+        'uk' => ['name' => 'Ukrainian', 'native' => 'Українська', 'country' => 'ua'],
+        'el' => ['name' => 'Greek', 'native' => 'Ελληνικά', 'country' => 'gr'],
+        'cs' => ['name' => 'Czech', 'native' => 'Čeština', 'country' => 'cz'],
+        'ro' => ['name' => 'Romanian', 'native' => 'Română', 'country' => 'ro'],
+        'hu' => ['name' => 'Hungarian', 'native' => 'Magyar', 'country' => 'hu'],
+        'sv' => ['name' => 'Swedish', 'native' => 'Svenska', 'country' => 'se'],
+        'da' => ['name' => 'Danish', 'native' => 'Dansk', 'country' => 'dk'],
+        'no' => ['name' => 'Norwegian', 'native' => 'Norsk', 'country' => 'no'],
+        'fi' => ['name' => 'Finnish', 'native' => 'Suomi', 'country' => 'fi'],
+        // Middle East & Asia
+        'he' => ['name' => 'Hebrew', 'native' => 'עברית', 'country' => 'il'],
+        'tr' => ['name' => 'Turkish', 'native' => 'Türkçe', 'country' => 'tr'],
+        'fa' => ['name' => 'Persian', 'native' => 'فارسی', 'country' => 'ir'],
+        'th' => ['name' => 'Thai', 'native' => 'ไทย', 'country' => 'th'],
+        'vi' => ['name' => 'Vietnamese', 'native' => 'Tiếng Việt', 'country' => 'vn'],
+        'id' => ['name' => 'Indonesian', 'native' => 'Bahasa Indonesia', 'country' => 'id'],
+        'ms' => ['name' => 'Malay', 'native' => 'Bahasa Melayu', 'country' => 'my'],
+        'tl' => ['name' => 'Filipino', 'native' => 'Tagalog', 'country' => 'ph'],
+        'bn' => ['name' => 'Bengali', 'native' => 'বাংলা', 'country' => 'bd'],
+        'ta' => ['name' => 'Tamil', 'native' => 'தமிழ்', 'country' => 'in'],
     ];
 
     /**

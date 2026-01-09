@@ -428,56 +428,133 @@
         color: #7c3aed !important;
     }
 
-    /* Language Selector - Enhanced with Large Flags */
-    .vw-language-select {
+    /* Language Selector - Custom Dropdown with Flag Images */
+    .vw-lang-dropdown {
+        position: relative !important;
+    }
+
+    .vw-lang-trigger {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
         width: 100% !important;
-        padding: 0.875rem 1rem !important;
-        padding-left: 3rem !important;
+        padding: 0.75rem 1rem !important;
         border: 2px solid rgba(0, 0, 0, 0.08) !important;
         border-radius: 0.75rem !important;
         background: white !important;
-        font-size: 0.95rem !important;
-        font-weight: 500 !important;
-        color: rgba(0, 0, 0, 0.8) !important;
         cursor: pointer !important;
         transition: all 0.2s ease !important;
-        appearance: none !important;
-        -webkit-appearance: none !important;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
-        background-repeat: no-repeat !important;
-        background-position: right 0.75rem center !important;
-        padding-right: 2.5rem !important;
     }
 
-    .vw-language-select:hover {
+    .vw-lang-trigger:hover {
         border-color: rgba(139, 92, 246, 0.3) !important;
-        background-color: rgba(139, 92, 246, 0.02) !important;
+        background: rgba(139, 92, 246, 0.02) !important;
     }
 
-    .vw-language-select:focus {
-        outline: none !important;
+    .vw-lang-trigger.open {
         border-color: #8b5cf6 !important;
         box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1) !important;
     }
 
-    .vw-language-select option {
-        padding: 0.75rem !important;
-        font-size: 1rem !important;
+    .vw-lang-trigger-flag {
+        width: 28px !important;
+        height: 20px !important;
+        border-radius: 3px !important;
+        object-fit: cover !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
     }
 
-    .vw-language-wrapper {
-        position: relative !important;
+    .vw-lang-trigger-text {
+        flex: 1 !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+        text-align: left !important;
     }
 
-    .vw-language-wrapper::before {
-        content: attr(data-flag) !important;
+    .vw-lang-trigger-arrow {
+        width: 16px !important;
+        height: 16px !important;
+        color: rgba(0, 0, 0, 0.4) !important;
+        transition: transform 0.2s ease !important;
+    }
+
+    .vw-lang-trigger.open .vw-lang-trigger-arrow {
+        transform: rotate(180deg) !important;
+    }
+
+    .vw-lang-menu {
         position: absolute !important;
-        left: 0.875rem !important;
-        top: 50% !important;
-        transform: translateY(-50%) !important;
-        font-size: 1.5rem !important;
-        pointer-events: none !important;
-        z-index: 1 !important;
+        top: calc(100% + 4px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: white !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        border-radius: 0.75rem !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        z-index: 100 !important;
+        display: none !important;
+    }
+
+    .vw-lang-menu.open {
+        display: block !important;
+    }
+
+    .vw-lang-option {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        padding: 0.625rem 1rem !important;
+        cursor: pointer !important;
+        transition: background 0.15s ease !important;
+    }
+
+    .vw-lang-option:first-child {
+        border-radius: 0.75rem 0.75rem 0 0 !important;
+    }
+
+    .vw-lang-option:last-child {
+        border-radius: 0 0 0.75rem 0.75rem !important;
+    }
+
+    .vw-lang-option:hover {
+        background: rgba(139, 92, 246, 0.08) !important;
+    }
+
+    .vw-lang-option.selected {
+        background: rgba(139, 92, 246, 0.12) !important;
+    }
+
+    .vw-lang-option-flag {
+        width: 24px !important;
+        height: 16px !important;
+        border-radius: 2px !important;
+        object-fit: cover !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+    }
+
+    .vw-lang-option-text {
+        flex: 1 !important;
+        font-size: 0.85rem !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+    }
+
+    .vw-lang-option-native {
+        font-size: 0.75rem !important;
+        color: rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .vw-lang-option-check {
+        width: 16px !important;
+        height: 16px !important;
+        color: #8b5cf6 !important;
+        opacity: 0 !important;
+    }
+
+    .vw-lang-option.selected .vw-lang-option-check {
+        opacity: 1 !important;
     }
 
     .vw-language-preview {
@@ -492,8 +569,11 @@
     }
 
     .vw-language-flag {
-        font-size: 1.75rem !important;
-        line-height: 1 !important;
+        width: 32px !important;
+        height: 22px !important;
+        border-radius: 3px !important;
+        object-fit: cover !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
     }
 
     .vw-language-info {
@@ -600,16 +680,44 @@
                     <span class="vw-setting-icon">🌍</span>
                     <span class="vw-setting-title">{{ __('Content Language') }}</span>
                 </div>
-                <div class="vw-language-wrapper" data-flag="{{ $languages[$selectedLang]['flag'] ?? '🌐' }}">
-                    <select class="vw-language-select" wire:model.live="content.language">
+                <div class="vw-lang-dropdown" x-data="{ open: false }" @click.away="open = false">
+                    {{-- Dropdown Trigger --}}
+                    <div class="vw-lang-trigger" :class="{ 'open': open }" @click="open = !open">
+                        <img src="https://flagcdn.com/w40/{{ $languages[$selectedLang]['country'] ?? 'us' }}.png"
+                             srcset="https://flagcdn.com/w80/{{ $languages[$selectedLang]['country'] ?? 'us' }}.png 2x"
+                             class="vw-lang-trigger-flag"
+                             alt="{{ $languages[$selectedLang]['name'] ?? 'English' }}">
+                        <span class="vw-lang-trigger-text">{{ $languages[$selectedLang]['name'] ?? 'English' }} ({{ $languages[$selectedLang]['native'] ?? 'English' }})</span>
+                        <svg class="vw-lang-trigger-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </div>
+
+                    {{-- Dropdown Menu --}}
+                    <div class="vw-lang-menu" :class="{ 'open': open }">
                         @foreach($languages as $langCode => $lang)
-                            <option value="{{ $langCode }}">{{ $lang['flag'] }}  {{ $lang['name'] }} ({{ $lang['native'] }})</option>
+                            <div class="vw-lang-option {{ $selectedLang === $langCode ? 'selected' : '' }}"
+                                 wire:click="$set('content.language', '{{ $langCode }}')"
+                                 @click="open = false">
+                                <img src="https://flagcdn.com/w40/{{ $lang['country'] }}.png"
+                                     srcset="https://flagcdn.com/w80/{{ $lang['country'] }}.png 2x"
+                                     class="vw-lang-option-flag"
+                                     alt="{{ $lang['name'] }}">
+                                <span class="vw-lang-option-text">{{ $lang['name'] }}</span>
+                                <span class="vw-lang-option-native">{{ $lang['native'] }}</span>
+                                <svg class="vw-lang-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                    <path d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
                         @endforeach
-                    </select>
+                    </div>
                 </div>
                 @if(isset($languages[$selectedLang]))
                     <div class="vw-language-preview">
-                        <span class="vw-language-flag">{{ $languages[$selectedLang]['flag'] }}</span>
+                        <img src="https://flagcdn.com/w80/{{ $languages[$selectedLang]['country'] }}.png"
+                             srcset="https://flagcdn.com/w160/{{ $languages[$selectedLang]['country'] }}.png 2x"
+                             class="vw-language-flag"
+                             alt="{{ $languages[$selectedLang]['name'] }}">
                         <div class="vw-language-info">
                             <span class="vw-language-name">{{ $languages[$selectedLang]['name'] }}</span>
                             <span class="vw-language-desc">{{ __('Script & voiceover in :lang', ['lang' => $languages[$selectedLang]['native']]) }}</span>
