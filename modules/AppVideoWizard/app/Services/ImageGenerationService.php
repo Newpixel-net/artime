@@ -1384,22 +1384,40 @@ EOT;
 
     /**
      * Get characters that appear in a specific scene.
+     *
+     * IMPORTANT: Empty appliedScenes array means "applies to ALL scenes" (per UI design).
+     * This matches the behavior shown in the Character Bible modal.
      */
     protected function getCharactersForScene(array $characters, int $sceneIndex): array
     {
         return array_filter($characters, function ($character) use ($sceneIndex) {
             $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+
+            // Empty array means character applies to ALL scenes (per UI design)
+            if (empty($appliedScenes)) {
+                return true;
+            }
+
             return in_array($sceneIndex, $appliedScenes);
         });
     }
 
     /**
      * Get the primary location for a specific scene.
+     *
+     * IMPORTANT: Empty scenes array means "applies to ALL scenes" (per UI design).
+     * The Location Bible modal shows "Currently applies to ALL scenes" when no specific scenes are selected.
      */
     protected function getLocationForScene(array $locations, int $sceneIndex): ?array
     {
         foreach ($locations as $location) {
             $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+
+            // Empty array means location applies to ALL scenes (per UI design)
+            if (empty($scenes)) {
+                return $location;
+            }
+
             if (in_array($sceneIndex, $scenes)) {
                 return $location;
             }
