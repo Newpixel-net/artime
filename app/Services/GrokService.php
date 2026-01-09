@@ -26,7 +26,7 @@ class GrokService
     protected array $cachedModels = [];
 
     protected array $fallbacks = [
-        'text'   => 'grok-3-fast',
+        'text'   => 'grok-4-fast',  // Latest & best value: $0.20/$0.50 per 1M tokens
         'vision' => 'grok-2-vision-1212',
     ];
 

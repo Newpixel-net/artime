@@ -33,7 +33,25 @@ class GrokDeepSeekModelsSeeder extends Seeder
             // GROK (xAI) MODELS
             // ==========================================
 
-            // Grok Text Models
+            // Grok 4 Series (Latest - Jan 2026)
+            [
+                'provider' => 'grok',
+                'model_key' => 'grok-4-fast',
+                'name' => 'Grok 4 Fast - Latest, 2M context ($0.20/$0.50)',
+                'category' => 'text',
+                'is_active' => true,
+                'api_type' => 'chat',
+            ],
+            [
+                'provider' => 'grok',
+                'model_key' => 'grok-4',
+                'name' => 'Grok 4 - Frontier intelligence ($3/$15)',
+                'category' => 'text',
+                'is_active' => true,
+                'api_type' => 'chat',
+            ],
+
+            // Grok 3 Series
             [
                 'provider' => 'grok',
                 'model_key' => 'grok-3-fast',
@@ -58,6 +76,8 @@ class GrokDeepSeekModelsSeeder extends Seeder
                 'is_active' => true,
                 'api_type' => 'chat',
             ],
+
+            // Grok 2 Series
             [
                 'provider' => 'grok',
                 'model_key' => 'grok-2-1212',
@@ -71,7 +91,7 @@ class GrokDeepSeekModelsSeeder extends Seeder
             [
                 'provider' => 'grok',
                 'model_key' => 'grok-2-vision-1212',
-                'name' => 'Grok 2 Vision - Image understanding',
+                'name' => 'Grok 2 Vision - Image understanding ($2/$10)',
                 'category' => 'vision',
                 'is_active' => true,
                 'api_type' => 'chat',
