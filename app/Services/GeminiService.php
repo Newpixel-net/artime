@@ -413,7 +413,7 @@ EOT;
                 'model' => $model,
                 'promptLength' => strlen($imagePrompt),
                 'aspectRatio' => $requestedAspectRatio,
-                'style' => substr($style, 0, 50),
+                'mode' => $isDetailedPrompt ? 'DIRECT' : 'WRAPPED',
             ]);
 
             // Assume $this->sendGenerateContentRequest handles the model and config correctly
