@@ -989,11 +989,17 @@ EOT;
     /**
      * Build comprehensive image prompt integrating all Bibles.
      *
-     * Prompt Chain Architecture (4 Layers):
-     * 1. Style Bible - Visual DNA, style, color grade, atmosphere, camera
-     * 2. Character Bible - Character descriptions for this scene
-     * 3. Location Bible - Location descriptions for this scene
-     * 4. Scene Content - Visual description + visual style + technical specs
+     * OPTIMIZED FOR GEMINI PHOTOREALISTIC IMAGE GENERATION:
+     * - Uses narrative descriptions instead of keyword lists
+     * - Includes photography-specific terminology (camera, lens, lighting)
+     * - Applies cinematic quality modifiers for 8K photorealism
+     *
+     * Prompt Chain Architecture:
+     * 1. Photography Foundation - Camera, lens, shot type
+     * 2. Scene Description - Subject, action, environment (narrative style)
+     * 3. Lighting & Atmosphere - Direction, quality, mood
+     * 4. Style & Color Grade - Visual style, color palette
+     * 5. Quality Anchors - Technical excellence modifiers
      */
     protected function buildImagePrompt(
         string $visualDescription,
@@ -1003,265 +1009,377 @@ EOT;
         ?array $sceneMemory = null,
         ?int $sceneIndex = null
     ): string {
-        $parts = [];
-
         // =========================================================================
-        // LAYER 1: STYLE BIBLE (Visual DNA)
+        // EXTRACT ALL BIBLE DATA FIRST
         // =========================================================================
-        if ($styleBible && ($styleBible['enabled'] ?? false)) {
-            $styleParts = [];
 
-            // Core visual style
-            if (!empty($styleBible['style'])) {
-                $styleParts[] = $styleBible['style'];
-            }
-
-            // Color grading
-            if (!empty($styleBible['colorGrade'])) {
-                $styleParts[] = $styleBible['colorGrade'];
-            }
-
-            // Atmosphere/mood
-            if (!empty($styleBible['atmosphere'])) {
-                $styleParts[] = $styleBible['atmosphere'];
-            }
-
-            // Camera language (new field)
-            if (!empty($styleBible['camera'])) {
-                $styleParts[] = $styleBible['camera'];
-            }
-
-            if (!empty($styleParts)) {
-                $parts[] = 'STYLE: ' . implode(', ', $styleParts);
-            }
-
-            // Visual DNA as quality anchor
-            if (!empty($styleBible['visualDNA'])) {
-                $parts[] = 'QUALITY: ' . $styleBible['visualDNA'];
-            }
-        }
-
-        // =========================================================================
-        // LAYER 2: CHARACTER BIBLE (Characters in this scene)
-        // =========================================================================
+        // Extract character info for this scene
+        $characterDescription = '';
         if ($sceneMemory && $sceneIndex !== null) {
             $characterBible = $sceneMemory['characterBible'] ?? null;
             if ($characterBible && ($characterBible['enabled'] ?? false) && !empty($characterBible['characters'])) {
                 $sceneCharacters = $this->getCharactersForScene($characterBible['characters'], $sceneIndex);
                 if (!empty($sceneCharacters)) {
-                    $characterDescriptions = [];
+                    $charParts = [];
                     foreach ($sceneCharacters as $character) {
                         if (!empty($character['description'])) {
-                            $name = $character['name'] ?? 'Character';
-                            $charDesc = "{$name}: {$character['description']}";
-
-                            // Include traits if available for personality/expression guidance
-                            $traits = $character['traits'] ?? [];
-                            if (!empty($traits)) {
-                                $charDesc .= ' (personality: ' . implode(', ', array_slice($traits, 0, 4)) . ')';
-                            }
-
-                            $characterDescriptions[] = $charDesc;
+                            $name = $character['name'] ?? 'a person';
+                            $charParts[] = "{$name}, {$character['description']}";
                         }
                     }
-                    if (!empty($characterDescriptions)) {
-                        $parts[] = 'CHARACTERS: ' . implode('. ', $characterDescriptions);
-                    }
+                    $characterDescription = implode(', and ', $charParts);
                 }
             }
         }
 
-        // =========================================================================
-        // LAYER 3: LOCATION BIBLE (Location for this scene)
-        // =========================================================================
+        // Extract location info for this scene
+        $locationDescription = '';
+        $timeOfDay = 'day';
+        $weather = 'clear';
+        $locationAtmosphere = '';
         if ($sceneMemory && $sceneIndex !== null) {
             $locationBible = $sceneMemory['locationBible'] ?? null;
             if ($locationBible && ($locationBible['enabled'] ?? false) && !empty($locationBible['locations'])) {
                 $sceneLocation = $this->getLocationForScene($locationBible['locations'], $sceneIndex);
                 if ($sceneLocation) {
-                    $locationParts = [];
-
-                    // Location name and type
-                    $locName = $sceneLocation['name'] ?? '';
-                    $locType = $sceneLocation['type'] ?? '';
-                    if ($locName) {
-                        $locationParts[] = $locName . ($locType ? " ({$locType})" : '');
+                    $locParts = [];
+                    if (!empty($sceneLocation['name'])) {
+                        $locParts[] = $sceneLocation['name'];
                     }
-
-                    // Location description
                     if (!empty($sceneLocation['description'])) {
-                        $locationParts[] = $sceneLocation['description'];
+                        $locParts[] = $sceneLocation['description'];
                     }
+                    $locationDescription = implode(', ', $locParts);
+                    $timeOfDay = $sceneLocation['timeOfDay'] ?? 'day';
+                    $weather = $sceneLocation['weather'] ?? 'clear';
+                    $locationAtmosphere = $sceneLocation['atmosphere'] ?? '';
 
-                    // Time of day
-                    if (!empty($sceneLocation['timeOfDay'])) {
-                        $timeDescriptions = [
-                            'day' => 'daytime, natural daylight',
-                            'night' => 'nighttime, dark with artificial or moonlight',
-                            'dawn' => 'dawn, early morning light, soft colors',
-                            'dusk' => 'dusk, twilight, fading light',
-                            'golden-hour' => 'golden hour, warm sunset lighting',
-                        ];
-                        $locationParts[] = $timeDescriptions[$sceneLocation['timeOfDay']] ?? $sceneLocation['timeOfDay'];
-                    }
-
-                    // Weather
-                    if (!empty($sceneLocation['weather']) && $sceneLocation['weather'] !== 'clear') {
-                        $weatherDescriptions = [
-                            'cloudy' => 'overcast sky, diffused light',
-                            'rainy' => 'rain, wet surfaces, reflections',
-                            'foggy' => 'fog, mist, atmospheric haze',
-                            'stormy' => 'storm, dramatic clouds, lightning',
-                            'snowy' => 'snow, winter, frost',
-                        ];
-                        $locationParts[] = $weatherDescriptions[$sceneLocation['weather']] ?? $sceneLocation['weather'];
-                    }
-
-                    // Atmosphere if available
-                    if (!empty($sceneLocation['atmosphere'])) {
-                        $locationParts[] = $sceneLocation['atmosphere'] . ' atmosphere';
-                    }
-
-                    // Location state for this scene if available
+                    // Include location state if available
                     $locationState = $this->getLocationStateForScene($sceneLocation, $sceneIndex);
                     if ($locationState) {
-                        $locationParts[] = 'current state: ' . $locationState;
-                    }
-
-                    if (!empty($locationParts)) {
-                        $parts[] = 'LOCATION: ' . implode(', ', $locationParts);
+                        $locationDescription .= ", {$locationState}";
                     }
                 }
             }
         }
 
         // =========================================================================
-        // LAYER 4: SCENE CONTENT (Visual description + Visual Style)
+        // LAYER 1: PHOTOGRAPHY FOUNDATION
         // =========================================================================
+        $photographyParts = [];
 
-        // Visual Style parameters from storyboard UI
-        if ($visualStyle) {
-            $visualParts = [];
-
-            // Mood
-            if (!empty($visualStyle['mood'])) {
-                $moodDescriptions = [
-                    'epic' => 'epic, grand scale, dramatic atmosphere',
-                    'intimate' => 'intimate, personal, close emotional connection',
-                    'mysterious' => 'mysterious, atmospheric, enigmatic',
-                    'energetic' => 'energetic, dynamic, high energy',
-                    'contemplative' => 'contemplative, reflective, calm',
-                    'tense' => 'tense, suspenseful, high stakes',
-                    'hopeful' => 'hopeful, optimistic, warm',
-                    'professional' => 'professional, polished, business-like',
-                    'inspiring' => 'inspiring, uplifting, motivational',
-                    'dramatic' => 'dramatic, intense, emotionally charged',
-                    'playful' => 'playful, fun, lighthearted',
-                    'nostalgic' => 'nostalgic, warm memories, vintage feel',
-                    'dark' => 'dark, moody, brooding',
-                    'romantic' => 'romantic, intimate, tender',
-                ];
-                $visualParts[] = $moodDescriptions[$visualStyle['mood']] ?? $visualStyle['mood'];
-            }
-
-            // Lighting
-            if (!empty($visualStyle['lighting'])) {
-                $lightingDescriptions = [
-                    'natural' => 'natural daylight, soft shadows',
-                    'golden-hour' => 'golden hour lighting, warm sunset tones',
-                    'blue-hour' => 'blue hour, twilight, cool ambient light',
-                    'high-key' => 'high-key lighting, bright and minimal shadows',
-                    'low-key' => 'low-key lighting, dramatic shadows, noir style',
-                    'neon' => 'neon lighting, cyberpunk, vibrant colored lights',
-                    'studio' => 'studio lighting, controlled, professional',
-                    'dramatic' => 'dramatic lighting, strong contrast, shadows',
-                    'soft' => 'soft diffused lighting, gentle shadows',
-                    'bright' => 'bright, well-lit, clear visibility',
-                    'golden' => 'golden warm lighting, sun-kissed',
-                ];
-                $visualParts[] = $lightingDescriptions[$visualStyle['lighting']] ?? $visualStyle['lighting'];
-            }
-
-            // Color Palette
-            if (!empty($visualStyle['colorPalette'])) {
-                $colorDescriptions = [
-                    'teal-orange' => 'cinematic teal and orange color grading',
-                    'warm-tones' => 'warm color palette, reds and oranges',
-                    'warm' => 'warm color palette, inviting tones',
-                    'cool-tones' => 'cool color palette, blues and greens',
-                    'cool' => 'cool color palette, blues and teals',
-                    'desaturated' => 'desaturated colors, muted tones',
-                    'vibrant' => 'vibrant, saturated, bold colors',
-                    'pastel' => 'pastel colors, soft and gentle tones',
-                    'neutral' => 'neutral color palette, balanced tones',
-                    'rich' => 'rich, deep colors, luxurious palette',
-                    'dark' => 'dark color palette, shadowy tones',
-                ];
-                $visualParts[] = $colorDescriptions[$visualStyle['colorPalette']] ?? $visualStyle['colorPalette'];
-            }
-
-            // Composition/Shot
-            if (!empty($visualStyle['composition'])) {
-                $shotDescriptions = [
-                    'wide' => 'wide shot, establishing shot',
-                    'medium' => 'medium shot, character framing',
-                    'close-up' => 'close-up shot, facial detail',
-                    'extreme-close-up' => 'extreme close-up, detail focus',
-                    'low-angle' => 'low angle shot, powerful perspective',
-                    'birds-eye' => 'bird\'s eye view, overhead perspective',
-                    'over-shoulder' => 'over the shoulder shot',
-                    'tracking' => 'tracking shot perspective',
-                ];
-                $visualParts[] = $shotDescriptions[$visualStyle['composition']] ?? $visualStyle['composition'];
-            }
-
-            if (!empty($visualParts)) {
-                $parts[] = 'VISUAL: ' . implode(', ', $visualParts);
-            }
-        }
-
-        // Main visual description (the scene content)
-        if (!empty($visualDescription)) {
-            $parts[] = 'SCENE: ' . $visualDescription;
-        }
-
-        // =========================================================================
-        // LAYER 5: TECHNICAL SPECS
-        // =========================================================================
-        $technicalSpecs = $project->storyboard['technicalSpecs'] ?? null;
-        if ($technicalSpecs && ($technicalSpecs['enabled'] ?? true)) {
-            $techParts = [];
-
-            // Positive prompts
-            if (!empty($technicalSpecs['positive'])) {
-                $techParts[] = $technicalSpecs['positive'];
-            } else {
-                $techParts[] = 'high quality, detailed, professional, 8K resolution, sharp focus';
-            }
-
-            // Quality based on aspect ratio
-            $aspectRatio = $project->aspect_ratio ?? '16:9';
-            $techParts[] = "optimized for {$aspectRatio} aspect ratio";
-
-            $parts[] = implode(', ', $techParts);
+        // Camera and lens - Professional photography terminology
+        $cameraSetup = $styleBible['camera'] ?? null;
+        if ($cameraSetup) {
+            $photographyParts[] = $cameraSetup;
         } else {
-            // Default technical specs
-            $parts[] = '4K, ultra detailed, cinematic, professional composition';
+            // Default cinematic camera setup for photorealism
+            $photographyParts[] = 'shot on ARRI Alexa Mini with Zeiss Master Prime lenses';
         }
 
-        // Combine all parts with proper separation
-        $finalPrompt = implode('. ', array_filter($parts));
+        // Shot type/composition
+        $shotType = $this->getPhotographicShotType($visualStyle['composition'] ?? null);
+        if ($shotType) {
+            $photographyParts[] = $shotType;
+        }
+
+        // =========================================================================
+        // LAYER 2: SCENE DESCRIPTION (NARRATIVE STYLE)
+        // =========================================================================
+        $sceneNarrative = $this->buildSceneNarrative(
+            $visualDescription,
+            $characterDescription,
+            $locationDescription
+        );
+
+        // =========================================================================
+        // LAYER 3: LIGHTING & ATMOSPHERE
+        // =========================================================================
+        $lightingDescription = $this->buildLightingDescription(
+            $visualStyle['lighting'] ?? null,
+            $timeOfDay,
+            $weather,
+            $styleBible['atmosphere'] ?? $locationAtmosphere
+        );
+
+        // =========================================================================
+        // LAYER 4: STYLE & COLOR GRADE
+        // =========================================================================
+        $styleDescription = $this->buildStyleDescription(
+            $styleBible,
+            $visualStyle
+        );
+
+        // =========================================================================
+        // LAYER 5: QUALITY ANCHORS (PHOTOREALISM BOOSTERS)
+        // =========================================================================
+        $qualityAnchors = $this->buildQualityAnchors(
+            $project,
+            $styleBible
+        );
+
+        // =========================================================================
+        // ASSEMBLE FINAL NARRATIVE PROMPT
+        // =========================================================================
+        $promptParts = [];
+
+        // Start with photography context
+        if (!empty($photographyParts)) {
+            $promptParts[] = 'A photorealistic image ' . implode(', ', $photographyParts);
+        } else {
+            $promptParts[] = 'A photorealistic cinematic photograph';
+        }
+
+        // Add the scene narrative
+        $promptParts[] = $sceneNarrative;
+
+        // Add lighting and atmosphere
+        if ($lightingDescription) {
+            $promptParts[] = $lightingDescription;
+        }
+
+        // Add style and color grade
+        if ($styleDescription) {
+            $promptParts[] = $styleDescription;
+        }
+
+        // Add quality anchors at the end
+        $promptParts[] = $qualityAnchors;
+
+        // Combine with proper narrative flow
+        $finalPrompt = implode('. ', array_filter($promptParts));
 
         // Log for debugging
-        Log::debug('ImageGenerationService: Built prompt', [
+        Log::debug('ImageGenerationService: Built photorealistic prompt', [
             'sceneIndex' => $sceneIndex,
             'promptLength' => strlen($finalPrompt),
             'hasStyleBible' => !empty($styleBible['enabled']),
-            'hasCharacterBible' => !empty($sceneMemory['characterBible']['enabled']),
-            'hasLocationBible' => !empty($sceneMemory['locationBible']['enabled']),
+            'hasCharacterBible' => !empty($characterDescription),
+            'hasLocationBible' => !empty($locationDescription),
+            'promptPreview' => substr($finalPrompt, 0, 200) . '...',
         ]);
 
         return $finalPrompt;
+    }
+
+    /**
+     * Get photographic shot type description for Gemini.
+     */
+    protected function getPhotographicShotType(?string $composition): string
+    {
+        $shotTypes = [
+            'wide' => 'wide establishing shot capturing the full environment',
+            'medium' => 'medium shot with balanced framing of subject and surroundings',
+            'close-up' => 'intimate close-up shot with shallow depth of field, bokeh background',
+            'extreme-close-up' => 'extreme close-up macro shot with razor-sharp focus on fine details',
+            'low-angle' => 'dramatic low-angle shot looking upward, emphasizing power and scale',
+            'birds-eye' => 'overhead bird\'s eye view shot looking directly down',
+            'over-shoulder' => 'over-the-shoulder perspective creating depth and connection',
+            'tracking' => 'dynamic tracking shot with slight motion blur suggesting movement',
+        ];
+
+        return $shotTypes[$composition] ?? 'cinematic medium shot with natural framing';
+    }
+
+    /**
+     * Build scene narrative in natural language for Gemini.
+     */
+    protected function buildSceneNarrative(
+        string $visualDescription,
+        string $characterDescription,
+        string $locationDescription
+    ): string {
+        $narrative = [];
+
+        // Start with subject/character if available
+        if (!empty($characterDescription)) {
+            $narrative[] = "featuring {$characterDescription}";
+        }
+
+        // Add the main visual description
+        if (!empty($visualDescription)) {
+            $narrative[] = $visualDescription;
+        }
+
+        // Add location context
+        if (!empty($locationDescription)) {
+            $narrative[] = "set in {$locationDescription}";
+        }
+
+        if (empty($narrative)) {
+            return 'depicting a cinematic scene';
+        }
+
+        return implode(', ', $narrative);
+    }
+
+    /**
+     * Build professional lighting description for Gemini.
+     */
+    protected function buildLightingDescription(
+        ?string $lightingStyle,
+        string $timeOfDay,
+        string $weather,
+        string $atmosphere
+    ): string {
+        $parts = [];
+
+        // Time-based lighting foundation
+        $timeBasedLighting = [
+            'day' => 'natural daylight streaming through',
+            'night' => 'ambient night lighting with subtle artificial sources',
+            'dawn' => 'soft pre-dawn light with delicate pink and blue hues',
+            'dusk' => 'warm twilight glow with deep purple and orange tones',
+            'golden-hour' => 'magical golden hour sunlight with long warm shadows',
+        ];
+        $baseLighting = $timeBasedLighting[$timeOfDay] ?? 'natural lighting';
+
+        // Lighting style modifiers
+        $lightingDescriptions = [
+            'natural' => 'soft natural light with gentle shadows, diffused through clouds',
+            'golden-hour' => 'rich golden hour sunlight casting long warm shadows, backlit with lens flare',
+            'blue-hour' => 'ethereal blue hour light with cool ambient tones and city lights emerging',
+            'high-key' => 'bright high-key lighting with minimal shadows, clean and crisp',
+            'low-key' => 'dramatic low-key chiaroscuro lighting with deep shadows and highlights',
+            'neon' => 'vibrant neon lights reflecting off wet surfaces, cyberpunk atmosphere',
+            'studio' => 'professional three-point studio lighting with soft fill and rim light',
+            'dramatic' => 'dramatic directional lighting with strong contrast and volumetric rays',
+            'soft' => 'soft diffused lighting with gentle gradients and no harsh shadows',
+            'bright' => 'bright even lighting with clear visibility and vibrant colors',
+            'golden' => 'warm golden tones with sun-kissed highlights and soft vignette',
+        ];
+
+        if ($lightingStyle && isset($lightingDescriptions[$lightingStyle])) {
+            $parts[] = "illuminated by {$lightingDescriptions[$lightingStyle]}";
+        } else {
+            $parts[] = "illuminated by {$baseLighting}";
+        }
+
+        // Weather effects on lighting
+        $weatherEffects = [
+            'cloudy' => 'with overcast sky providing soft diffused lighting',
+            'rainy' => 'with rain creating reflections on wet surfaces and atmospheric haze',
+            'foggy' => 'with atmospheric fog adding depth and mystery, volumetric light rays',
+            'stormy' => 'with dramatic storm clouds and occasional lightning illumination',
+            'snowy' => 'with snow creating bright reflective surfaces and soft white ambiance',
+        ];
+        if ($weather && $weather !== 'clear' && isset($weatherEffects[$weather])) {
+            $parts[] = $weatherEffects[$weather];
+        }
+
+        // Atmosphere mood
+        if (!empty($atmosphere)) {
+            $parts[] = "creating a {$atmosphere} atmosphere";
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * Build style and color grade description for Gemini.
+     */
+    protected function buildStyleDescription(?array $styleBible, ?array $visualStyle): string
+    {
+        $parts = [];
+
+        // Style Bible visual style
+        if ($styleBible && ($styleBible['enabled'] ?? false)) {
+            if (!empty($styleBible['style'])) {
+                $parts[] = $styleBible['style'];
+            }
+            if (!empty($styleBible['colorGrade'])) {
+                $parts[] = "with {$styleBible['colorGrade']} color grading";
+            }
+        }
+
+        // Visual style mood
+        if ($visualStyle) {
+            $moodDescriptions = [
+                'epic' => 'epic and grandiose with sweeping visual scale',
+                'intimate' => 'intimate and personal with emotional depth',
+                'mysterious' => 'mysterious and enigmatic with hidden depths',
+                'energetic' => 'dynamic and energetic with visual momentum',
+                'contemplative' => 'contemplative and serene with thoughtful composition',
+                'tense' => 'tense and suspenseful with psychological weight',
+                'hopeful' => 'hopeful and optimistic with uplifting warmth',
+                'professional' => 'professional and polished with corporate elegance',
+                'inspiring' => 'inspiring and motivational with aspirational beauty',
+                'dramatic' => 'intensely dramatic with emotional power',
+                'playful' => 'playful and lighthearted with joyful energy',
+                'nostalgic' => 'nostalgic and wistful with vintage warmth',
+                'dark' => 'dark and moody with brooding intensity',
+                'romantic' => 'romantic and tender with soft emotional glow',
+            ];
+            if (!empty($visualStyle['mood']) && isset($moodDescriptions[$visualStyle['mood']])) {
+                $parts[] = $moodDescriptions[$visualStyle['mood']];
+            }
+
+            // Color palette as color grading
+            $colorGrading = [
+                'teal-orange' => 'cinematic teal and orange color grading like Hollywood blockbusters',
+                'warm-tones' => 'warm color temperature with amber and golden hues',
+                'warm' => 'inviting warm tones with cozy color palette',
+                'cool-tones' => 'cool color temperature with blue and cyan tones',
+                'cool' => 'crisp cool tones with professional color balance',
+                'desaturated' => 'slightly desaturated colors with muted artistic palette',
+                'vibrant' => 'vibrant saturated colors that pop with energy',
+                'pastel' => 'soft pastel color palette with gentle tones',
+                'neutral' => 'balanced neutral colors with true-to-life rendering',
+                'rich' => 'rich deep colors with luxurious color depth',
+                'dark' => 'dark moody color palette with shadowy tones',
+            ];
+            if (!empty($visualStyle['colorPalette']) && isset($colorGrading[$visualStyle['colorPalette']])) {
+                $parts[] = "with {$colorGrading[$visualStyle['colorPalette']]}";
+            }
+        }
+
+        if (empty($parts)) {
+            return 'with cinematic color grading and professional visual style';
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * Build quality anchor modifiers for photorealistic results.
+     */
+    protected function buildQualityAnchors(WizardProject $project, ?array $styleBible): string
+    {
+        $anchors = [];
+
+        // Custom quality from Style Bible
+        if ($styleBible && !empty($styleBible['visualDNA'])) {
+            $anchors[] = $styleBible['visualDNA'];
+        }
+
+        // Technical specs from project
+        $technicalSpecs = $project->storyboard['technicalSpecs'] ?? null;
+        if ($technicalSpecs && !empty($technicalSpecs['positive'])) {
+            $anchors[] = $technicalSpecs['positive'];
+        }
+
+        // Default photorealism quality anchors (essential for Gemini)
+        $defaultAnchors = [
+            'ultra high resolution 8K UHD',
+            'photorealistic',
+            'hyperdetailed',
+            'sharp focus with cinematic depth of field',
+            'HDR',
+            'professional color grading',
+            'masterful composition',
+            'award-winning photography',
+        ];
+
+        // Add defaults if custom is minimal
+        if (count($anchors) < 2) {
+            $anchors = array_merge($anchors, $defaultAnchors);
+        }
+
+        // Aspect ratio optimization
+        $aspectRatio = $project->aspect_ratio ?? '16:9';
+        $anchors[] = "optimized for {$aspectRatio} aspect ratio";
+
+        return implode(', ', array_unique($anchors));
     }
 
     /**
