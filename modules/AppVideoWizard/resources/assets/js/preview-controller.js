@@ -404,6 +404,23 @@ window.previewController = function(initialData = {}) {
         },
 
         /**
+         * Seek to start of a specific scene
+         */
+        seekToScene(sceneIndex) {
+            if (!this.engine || !this.isReady) return;
+            if (sceneIndex < 0 || sceneIndex >= this.engine.scenes.length) return;
+
+            // Calculate time to seek to
+            let time = 0;
+            for (let i = 0; i < sceneIndex; i++) {
+                time += this.engine.scenes[i].duration || 5;
+            }
+
+            this.seek(time);
+            this.currentSceneIndex = sceneIndex;
+        },
+
+        /**
          * Format time in seconds to MM:SS
          */
         formatTime(seconds) {

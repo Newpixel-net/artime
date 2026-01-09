@@ -1,4 +1,4 @@
-{{-- Step 6: Assembly --}}
+{{-- Step 6: Assembly Studio - Full-Screen Professional Editor --}}
 
 {{-- Load Video Preview Engine and Controller Scripts --}}
 @push('scripts')
@@ -6,715 +6,740 @@
 <script src="{{ asset('modules/appvideowizard/js/preview-controller.js') }}"></script>
 @endpush
 
-<style>
-    .vw-assembly-step {
-        width: 100%;
-    }
+@php
+    $assemblyStats = $this->getAssemblyStats();
+    $isMultiShot = $assemblyStats['mode'] === 'multi-shot';
+    $canExport = !$isMultiShot || $assemblyStats['isReady'];
+@endphp
 
-    .vw-assembly-card {
-        background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%) !important;
-        border: 1px solid rgba(139, 92, 246, 0.2) !important;
-        border-radius: 1rem !important;
-        padding: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-    }
+<div
+    class="vw-assembly-fullscreen"
+    x-data="{
+        ...previewController(@js($this->getPreviewInitData())),
+        activeTab: 'scenes',
+        musicEnabled: @js($assembly['music']['enabled'] ?? false),
+        captionsEnabled: @js($assembly['captions']['enabled'] ?? true),
+        showExportModal: false,
+        keyboardShortcuts: true,
 
-    .vw-assembly-header {
-        display: flex !important;
-        align-items: center !important;
-        gap: 1rem !important;
-        margin-bottom: 1rem !important;
-    }
+        handleKeyboard(e) {
+            if (!this.keyboardShortcuts) return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-    .vw-assembly-icon {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-        background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%) !important;
-        border-radius: 0.75rem !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 1.25rem !important;
-    }
-
-    .vw-assembly-title {
-        font-size: 1.1rem !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        margin: 0 !important;
-    }
-
-    .vw-assembly-subtitle {
-        font-size: 0.8rem !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-        margin-top: 0.15rem !important;
-    }
-
-    /* Grid Layout */
-    .vw-assembly-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-    }
-
-    @media (max-width: 1024px) {
-        .vw-assembly-grid {
-            grid-template-columns: 1fr;
+            switch(e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    this.togglePlay();
+                    break;
+                case 'escape':
+                    if (this.showExportModal) {
+                        this.showExportModal = false;
+                    }
+                    break;
+                case '1':
+                    this.activeTab = 'scenes';
+                    break;
+                case '2':
+                    this.activeTab = 'text';
+                    break;
+                case '3':
+                    this.activeTab = 'audio';
+                    break;
+                case '4':
+                    this.activeTab = 'transitions';
+                    break;
+                case 'arrowleft':
+                    if (this.engine) {
+                        this.seek(Math.max(0, this.currentTime - 5));
+                    }
+                    break;
+                case 'arrowright':
+                    if (this.engine) {
+                        this.seek(Math.min(this.totalDuration, this.currentTime + 5));
+                    }
+                    break;
+            }
         }
-    }
+    }"
+    x-init="
+        init();
+        window.addEventListener('keydown', (e) => handleKeyboard(e));
+    "
+    @open-export-modal.window="showExportModal = true"
+    @open-music-browser.window="activeTab = 'audio'"
+>
+    {{-- Full-Screen Layout Container --}}
+    <div class="vw-studio-layout">
+        {{-- Header --}}
+        @include('appvideowizard::livewire.steps.partials._assembly-header')
 
-    /* Preview Section */
-    .vw-preview-section {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 0.75rem;
+        {{-- Main Content Area --}}
+        <div class="vw-studio-main">
+            {{-- Left Sidebar --}}
+            @include('appvideowizard::livewire.steps.partials._assembly-sidebar')
+
+            {{-- Tabbed Panel --}}
+            @include('appvideowizard::livewire.steps.partials._assembly-tabs')
+
+            {{-- Center Preview Area --}}
+            <div class="vw-preview-area">
+                {{-- Preview Canvas --}}
+                @include('appvideowizard::livewire.steps.partials._preview-canvas')
+
+                {{-- Multi-Shot Status Bar (if applicable) --}}
+                @if($isMultiShot || ($multiShotMode['enabled'] ?? false))
+                    <div class="vw-multishot-bar">
+                        <div class="vw-multishot-info">
+                            <span class="vw-multishot-badge">🎬 {{ __('Multi-Shot') }}</span>
+                            <span class="vw-multishot-stats">
+                                {{ $assemblyStats['sceneCount'] }} {{ __('scenes') }} •
+                                {{ $assemblyStats['videoCount'] }} {{ __('clips') }} •
+                                {{ $assemblyStats['formattedDuration'] }}
+                            </span>
+                        </div>
+                        <div class="vw-multishot-progress">
+                            <div class="vw-progress-bar">
+                                <div class="vw-progress-fill" style="width: {{ $assemblyStats['progress'] }}%;"></div>
+                            </div>
+                            <span class="vw-progress-text">{{ $assemblyStats['progress'] }}%</span>
+                        </div>
+                        @if($assemblyStats['pendingShots'] > 0)
+                            <span class="vw-pending-badge">{{ $assemblyStats['pendingShots'] }} {{ __('pending') }}</span>
+                        @endif
+                    </div>
+                @endif
+            </div>
+
+            {{-- Right Properties Panel (compact) --}}
+            <div class="vw-properties-panel">
+                <div class="vw-properties-header">
+                    <span>⚙️</span> {{ __('Quick Settings') }}
+                </div>
+
+                {{-- Aspect Ratio Display --}}
+                <div class="vw-prop-item">
+                    <span class="vw-prop-label">{{ __('Format') }}</span>
+                    <span class="vw-prop-value">{{ $aspectRatio }}</span>
+                </div>
+
+                {{-- Transition Display --}}
+                <div class="vw-prop-item">
+                    <span class="vw-prop-label">{{ __('Transition') }}</span>
+                    <span class="vw-prop-value">{{ ucfirst($assembly['defaultTransition'] ?? 'fade') }}</span>
+                </div>
+
+                {{-- Captions Status --}}
+                <div class="vw-prop-item">
+                    <span class="vw-prop-label">{{ __('Captions') }}</span>
+                    <span class="vw-prop-value {{ ($assembly['captions']['enabled'] ?? true) ? 'active' : '' }}">
+                        {{ ($assembly['captions']['enabled'] ?? true) ? ucfirst($assembly['captions']['style'] ?? 'karaoke') : 'Off' }}
+                    </span>
+                </div>
+
+                {{-- Music Status --}}
+                <div class="vw-prop-item">
+                    <span class="vw-prop-label">{{ __('Music') }}</span>
+                    <span class="vw-prop-value {{ ($assembly['music']['enabled'] ?? false) ? 'active' : '' }}">
+                        {{ ($assembly['music']['enabled'] ?? false) ? ($assembly['music']['volume'] ?? 30) . '%' : 'Off' }}
+                    </span>
+                </div>
+
+                <div class="vw-prop-divider"></div>
+
+                {{-- Keyboard Shortcuts Toggle --}}
+                <div class="vw-prop-item toggle">
+                    <span class="vw-prop-label">{{ __('Shortcuts') }}</span>
+                    <label class="vw-mini-toggle">
+                        <input type="checkbox" x-model="keyboardShortcuts">
+                        <span class="vw-mini-slider"></span>
+                    </label>
+                </div>
+
+                {{-- Shortcuts Reference --}}
+                <div class="vw-shortcuts-ref" x-show="keyboardShortcuts" x-collapse>
+                    <div class="vw-shortcut"><kbd>Space</kbd> {{ __('Play/Pause') }}</div>
+                    <div class="vw-shortcut"><kbd>←</kbd><kbd>→</kbd> {{ __('Seek 5s') }}</div>
+                    <div class="vw-shortcut"><kbd>1-4</kbd> {{ __('Switch tabs') }}</div>
+                    <div class="vw-shortcut"><kbd>Esc</kbd> {{ __('Close modal') }}</div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Bottom Timeline (optional scene timeline) --}}
+        <div class="vw-timeline-bar">
+            <div class="vw-timeline-scenes">
+                @foreach($script['scenes'] ?? [] as $index => $scene)
+                    <div
+                        class="vw-timeline-scene"
+                        @click="seekToScene({{ $index }})"
+                        :class="{ 'active': currentSceneIndex === {{ $index }} }"
+                    >
+                        <span class="vw-scene-thumb">{{ $index + 1 }}</span>
+                        <span class="vw-scene-duration">{{ number_format(($storyboard['scenes'][$index]['duration'] ?? 5), 1) }}s</span>
+                    </div>
+                @endforeach
+            </div>
+            <div class="vw-timeline-actions">
+                <span class="vw-timeline-total" x-text="formatTime(totalDuration)">0:00</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- Export Modal Backdrop --}}
+    <div
+        x-show="showExportModal"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="vw-modal-backdrop"
+        @click.self="showExportModal = false"
+        x-cloak
+    >
+        <div class="vw-export-modal" @click.stop>
+            <div class="vw-modal-header">
+                <h3>🚀 {{ __('Export Video') }}</h3>
+                <button type="button" @click="showExportModal = false" class="vw-modal-close">×</button>
+            </div>
+            <div class="vw-modal-body">
+                @if($canExport)
+                    <p class="vw-modal-text">{{ __('Your video is ready for final rendering. Click Continue to proceed to export settings.') }}</p>
+                    <div class="vw-export-summary">
+                        <div class="vw-summary-item">
+                            <span class="vw-summary-icon">📹</span>
+                            <span>{{ count($script['scenes'] ?? []) }} {{ __('scenes') }}</span>
+                        </div>
+                        <div class="vw-summary-item">
+                            <span class="vw-summary-icon">⏱️</span>
+                            <span x-text="formatTime(totalDuration)">0:00</span>
+                        </div>
+                        <div class="vw-summary-item">
+                            <span class="vw-summary-icon">📐</span>
+                            <span>{{ $aspectRatio }}</span>
+                        </div>
+                    </div>
+                @else
+                    <div class="vw-export-warning">
+                        <span class="vw-warning-icon">⚠️</span>
+                        <div>
+                            <p class="vw-warning-title">{{ __('Videos Not Complete') }}</p>
+                            <p class="vw-warning-text">{{ $assemblyStats['pendingShots'] }} {{ __('shots still need video generation. Go back to Animation step to complete them.') }}</p>
+                        </div>
+                    </div>
+                @endif
+            </div>
+            <div class="vw-modal-footer">
+                <button type="button" @click="showExportModal = false" class="vw-modal-btn secondary">
+                    {{ __('Cancel') }}
+                </button>
+                @if($canExport)
+                    <button type="button" wire:click="nextStep" class="vw-modal-btn primary">
+                        {{ __('Continue to Export') }} →
+                    </button>
+                @else
+                    <button type="button" wire:click="previousStep" class="vw-modal-btn warning">
+                        ← {{ __('Back to Animation') }}
+                    </button>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Full-Screen Layout */
+    .vw-assembly-fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #0a0a12;
+        z-index: 9999;
         overflow: hidden;
     }
 
-    .vw-preview-video {
-        width: 100%;
-        aspect-ratio: 16/9;
-        background: #000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .vw-preview-placeholder {
+    .vw-studio-layout {
         display: flex;
         flex-direction: column;
+        height: 100%;
+        width: 100%;
+    }
+
+    .vw-studio-main {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+
+    /* Preview Area */
+    .vw-preview-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #000;
+        position: relative;
+    }
+
+    /* Multi-Shot Status Bar */
+    .vw-multishot-bar {
+        display: flex;
         align-items: center;
-        gap: 0.5rem;
-        color: rgba(255, 255, 255, 0.4);
+        gap: 1rem;
+        padding: 0.5rem 1rem;
+        background: linear-gradient(90deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1));
+        border-top: 1px solid rgba(139, 92, 246, 0.2);
     }
 
-    .vw-preview-placeholder-icon {
-        font-size: 2.5rem;
-    }
-
-    .vw-preview-placeholder-text {
-        font-size: 0.8rem;
-    }
-
-    .vw-preview-controls {
+    .vw-multishot-info {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        background: rgba(0, 0, 0, 0.5);
     }
 
-    .vw-play-btn {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-        border: none;
-        color: white;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.9rem;
-        transition: all 0.2s;
+    .vw-multishot-badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.25rem 0.5rem;
+        background: rgba(139, 92, 246, 0.3);
+        border-radius: 0.25rem;
+        color: #a78bfa;
     }
 
-    .vw-play-btn:hover {
-        transform: scale(1.05);
-    }
-
-    .vw-timeline-slider {
-        flex: 1;
-        -webkit-appearance: none;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
-        outline: none;
-    }
-
-    .vw-timeline-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 12px;
-        height: 12px;
-        background: #8b5cf6;
-        border-radius: 50%;
-        cursor: pointer;
-    }
-
-    .vw-time-display {
+    .vw-multishot-stats {
         font-size: 0.75rem;
         color: rgba(255, 255, 255, 0.6);
-        font-family: monospace;
     }
 
-    /* Settings Section */
-    .vw-settings-section {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .vw-setting-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 0.75rem;
-        padding: 1rem;
-        transition: all 0.2s;
-    }
-
-    .vw-setting-card:hover {
-        border-color: rgba(139, 92, 246, 0.3);
-    }
-
-    .vw-setting-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 0.75rem;
-    }
-
-    .vw-setting-title {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: white;
+    .vw-multishot-progress {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        flex: 1;
     }
 
-    .vw-setting-title-icon {
-        font-size: 1rem;
+    .vw-progress-bar {
+        flex: 1;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
     }
 
-    /* Toggle Switch */
-    .vw-toggle {
+    .vw-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+        border-radius: 3px;
+        transition: width 0.3s;
+    }
+
+    .vw-progress-text {
+        font-size: 0.7rem;
+        color: #a78bfa;
+        font-weight: 600;
+        min-width: 35px;
+    }
+
+    .vw-pending-badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+        background: rgba(245, 158, 11, 0.2);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 0.25rem;
+        color: #f59e0b;
+    }
+
+    /* Properties Panel */
+    .vw-properties-panel {
+        width: 180px;
+        min-width: 180px;
+        background: rgba(15, 15, 25, 0.98);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .vw-properties-header {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 0.25rem;
+    }
+
+    .vw-prop-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 0;
+    }
+
+    .vw-prop-item.toggle {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 0.4rem;
+    }
+
+    .vw-prop-label {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .vw-prop-value {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 500;
+    }
+
+    .vw-prop-value.active {
+        color: #10b981;
+    }
+
+    .vw-prop-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+        margin: 0.5rem 0;
+    }
+
+    /* Mini Toggle */
+    .vw-mini-toggle {
         position: relative;
-        width: 44px;
-        height: 24px;
+        display: inline-block;
+        width: 32px;
+        height: 18px;
     }
 
-    .vw-toggle input {
+    .vw-mini-toggle input {
         opacity: 0;
         width: 0;
         height: 0;
     }
 
-    .vw-toggle-slider {
+    .vw-mini-slider {
         position: absolute;
         cursor: pointer;
-        inset: 0;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.1);
         transition: 0.3s;
+        border-radius: 18px;
     }
 
-    .vw-toggle-slider:before {
+    .vw-mini-slider:before {
         position: absolute;
         content: "";
-        height: 18px;
-        width: 18px;
+        height: 12px;
+        width: 12px;
         left: 3px;
         bottom: 3px;
-        background: white;
-        border-radius: 50%;
+        background-color: white;
         transition: 0.3s;
+        border-radius: 50%;
     }
 
-    .vw-toggle input:checked + .vw-toggle-slider {
+    .vw-mini-toggle input:checked + .vw-mini-slider {
         background: linear-gradient(135deg, #8b5cf6, #06b6d4);
     }
 
-    .vw-toggle input:checked + .vw-toggle-slider:before {
-        transform: translateX(20px);
+    .vw-mini-toggle input:checked + .vw-mini-slider:before {
+        transform: translateX(14px);
     }
 
-    /* Select Input */
-    .vw-select {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 0.5rem;
-        color: white;
-        font-size: 0.8rem;
-        outline: none;
-        cursor: pointer;
+    /* Shortcuts Reference */
+    .vw-shortcuts-ref {
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0.4rem;
+        margin-top: 0.25rem;
     }
 
-    .vw-select:focus {
-        border-color: rgba(139, 92, 246, 0.5);
+    .vw-shortcut {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.5);
+        padding: 0.2rem 0;
     }
 
-    .vw-select option {
-        background: #1a1a2e;
-        color: white;
+    .vw-shortcut kbd {
+        padding: 0.1rem 0.3rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 0.2rem;
+        font-family: inherit;
+        font-size: 0.6rem;
     }
 
-    /* Subsetting Grid */
-    .vw-subsetting-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
-        margin-top: 0.75rem;
+    /* Timeline Bar */
+    .vw-timeline-bar {
+        height: 50px;
+        min-height: 50px;
+        background: rgba(15, 15, 25, 0.98);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
+        gap: 1rem;
     }
 
-    .vw-subsetting {
+    .vw-timeline-scenes {
+        flex: 1;
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding: 0.25rem 0;
+    }
+
+    .vw-timeline-scene {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        align-items: center;
+        padding: 0.35rem 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.4rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 50px;
     }
 
-    .vw-subsetting-label {
-        font-size: 0.7rem;
+    .vw-timeline-scene:hover {
+        background: rgba(139, 92, 246, 0.1);
+        border-color: rgba(139, 92, 246, 0.3);
+    }
+
+    .vw-timeline-scene.active {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.15));
+        border-color: #8b5cf6;
+    }
+
+    .vw-scene-thumb {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+    }
+
+    .vw-scene-duration {
+        font-size: 0.6rem;
         color: rgba(255, 255, 255, 0.5);
     }
 
-    /* Range Slider */
-    .vw-range-section {
-        margin-top: 0.75rem;
-    }
-
-    .vw-range-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-    }
-
-    .vw-range-label {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.6);
-    }
-
-    .vw-range-value {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #a78bfa;
-    }
-
-    .vw-range-slider {
-        width: 100%;
-        -webkit-appearance: none;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 2px;
-        outline: none;
-    }
-
-    .vw-range-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 14px;
-        height: 14px;
-        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
-        border-radius: 50%;
-        cursor: pointer;
-    }
-
-    /* Transition Options */
-    .vw-transition-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
-        margin-top: 0.75rem;
-    }
-
-    @media (max-width: 640px) {
-        .vw-transition-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    .vw-transition-btn {
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(255, 255, 255, 0.03);
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        font-size: 0.7rem;
-        text-align: center;
-        transition: all 0.2s;
-    }
-
-    .vw-transition-btn:hover {
-        border-color: rgba(139, 92, 246, 0.4);
-        background: rgba(139, 92, 246, 0.1);
-    }
-
-    .vw-transition-btn.selected {
-        border-color: #8b5cf6;
-        background: rgba(139, 92, 246, 0.2);
-        color: white;
-    }
-
-    .vw-transition-btn-icon {
-        font-size: 1rem;
-        margin-bottom: 0.25rem;
-    }
-
-    /* Caption Preview */
-    .vw-caption-preview {
-        margin-top: 0.75rem;
-        padding: 0.75rem;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 0.5rem;
-        text-align: center;
-    }
-
-    .vw-caption-preview-text {
-        font-size: 0.85rem;
-        color: white;
-        font-weight: 500;
-    }
-
-    .vw-caption-preview-text.karaoke {
-        background: linear-gradient(90deg, #fbbf24 30%, white 30%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-
-    .vw-caption-preview-text.typewriter {
-        animation: vw-typewriter 3s steps(20) infinite;
-        overflow: hidden;
-        white-space: nowrap;
-        border-right: 2px solid #8b5cf6;
-    }
-
-    @keyframes vw-typewriter {
-        0%, 100% { width: 0; }
-        50% { width: 100%; }
-    }
-
-    /* Ready Indicator */
-    .vw-ready-banner {
+    .vw-timeline-actions {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        padding: 1rem;
-        background: rgba(16, 185, 129, 0.15);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        border-radius: 0.5rem;
-        margin-top: 1rem;
     }
 
-    .vw-ready-icon {
+    .vw-timeline-total {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: white;
+        font-family: 'SF Mono', Monaco, monospace;
+        padding: 0.35rem 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0.4rem;
+    }
+
+    /* Modal Styles */
+    .vw-modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(4px);
+    }
+
+    .vw-export-modal {
+        background: linear-gradient(135deg, rgba(30, 30, 45, 0.98), rgba(20, 20, 35, 0.98));
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 1rem;
+        width: 90%;
+        max-width: 480px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .vw-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .vw-modal-header h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        margin: 0;
+    }
+
+    .vw-modal-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 0.5rem;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 1.25rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .vw-modal-close:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .vw-modal-body {
+        padding: 1.25rem;
+    }
+
+    .vw-modal-text {
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0 0 1rem 0;
+        line-height: 1.5;
+    }
+
+    .vw-export-summary {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0.5rem;
+    }
+
+    .vw-summary-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        color: white;
+    }
+
+    .vw-summary-icon {
+        font-size: 1rem;
+    }
+
+    .vw-export-warning {
+        display: flex;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 0.5rem;
+    }
+
+    .vw-warning-icon {
         font-size: 1.5rem;
     }
 
-    .vw-ready-text {
-        flex: 1;
-    }
-
-    .vw-ready-title {
+    .vw-warning-title {
         font-size: 0.9rem;
         font-weight: 600;
-        color: #10b981;
+        color: #f59e0b;
+        margin: 0 0 0.25rem 0;
     }
 
-    .vw-ready-subtitle {
+    .vw-warning-text {
         font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.6);
+        margin: 0;
     }
 
-    .vw-continue-btn {
-        padding: 0.5rem 1rem;
+    .vw-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .vw-modal-btn {
+        padding: 0.6rem 1.25rem;
         border-radius: 0.5rem;
-        background: linear-gradient(135deg, #10b981, #059669);
-        border: none;
-        color: white;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
         transition: all 0.2s;
+        border: none;
     }
 
-    .vw-continue-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    .vw-modal-btn.secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .vw-modal-btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .vw-modal-btn.primary {
+        background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+        color: white;
+    }
+
+    .vw-modal-btn.primary:hover {
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+    }
+
+    .vw-modal-btn.warning {
+        background: rgba(245, 158, 11, 0.2);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        color: #f59e0b;
+    }
+
+    .vw-modal-btn.warning:hover {
+        background: rgba(245, 158, 11, 0.3);
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .vw-properties-panel {
+            width: 160px;
+            min-width: 160px;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .vw-properties-panel {
+            display: none;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .vw-studio-main {
+            flex-direction: column;
+        }
+
+        .vw-timeline-bar {
+            flex-wrap: wrap;
+            height: auto;
+            padding: 0.5rem;
+        }
+
+        .vw-timeline-scenes {
+            order: 2;
+            width: 100%;
+        }
+    }
+
+    [x-cloak] {
+        display: none !important;
     }
 </style>
-
-<div
-    class="vw-assembly-step"
-    x-data="previewController(@js($this->getPreviewInitData()))"
-    x-init="init()"
->
-    {{-- Main Card --}}
-    <div class="vw-assembly-card">
-        {{-- Header --}}
-        <div class="vw-assembly-header">
-            <div class="vw-assembly-icon">🎞️</div>
-            <div style="flex: 1;">
-                <h2 class="vw-assembly-title">{{ __('Assembly Studio') }}</h2>
-                <p class="vw-assembly-subtitle">{{ __('Configure transitions, music, and captions') }}</p>
-            </div>
-        </div>
-
-        {{-- Grid Layout --}}
-        <div class="vw-assembly-grid">
-            {{-- Preview Section with VideoPreviewEngine --}}
-            <div class="vw-preview-section">
-                @include('appvideowizard::livewire.steps.partials._preview-canvas')
-            </div>
-
-            {{-- Settings Section --}}
-            <div class="vw-settings-section">
-                {{-- Transitions --}}
-                <div class="vw-setting-card">
-                    <div class="vw-setting-header">
-                        <div class="vw-setting-title">
-                            <span class="vw-setting-title-icon">🔀</span>
-                            <span>{{ __('Transitions') }}</span>
-                        </div>
-                    </div>
-                    <div class="vw-transition-grid">
-                        @php
-                            $transitions = [
-                                'cut' => ['icon' => '✂️', 'name' => 'Cut'],
-                                'fade' => ['icon' => '🌫️', 'name' => 'Fade'],
-                                'slide-left' => ['icon' => '⬅️', 'name' => 'Slide L'],
-                                'slide-right' => ['icon' => '➡️', 'name' => 'Slide R'],
-                                'zoom-in' => ['icon' => '🔍', 'name' => 'Zoom In'],
-                                'zoom-out' => ['icon' => '🔎', 'name' => 'Zoom Out'],
-                            ];
-                            $selectedTransition = $assembly['defaultTransition'] ?? 'fade';
-                        @endphp
-                        @foreach($transitions as $transId => $trans)
-                            <button type="button"
-                                    class="vw-transition-btn {{ $selectedTransition === $transId ? 'selected' : '' }}"
-                                    wire:click="$set('assembly.defaultTransition', '{{ $transId }}')">
-                                <div class="vw-transition-btn-icon">{{ $trans['icon'] }}</div>
-                                {{ $trans['name'] }}
-                            </button>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Captions --}}
-                <div class="vw-setting-card">
-                    <div class="vw-setting-header">
-                        <div class="vw-setting-title">
-                            <span class="vw-setting-title-icon">📝</span>
-                            <span>{{ __('Captions') }}</span>
-                        </div>
-                        <label class="vw-toggle">
-                            <input type="checkbox"
-                                   wire:model.live="assembly.captions.enabled"
-                                   x-on:change="updateCaptionSetting('enabled', $event.target.checked)"
-                                   {{ ($assembly['captions']['enabled'] ?? true) ? 'checked' : '' }}>
-                            <span class="vw-toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    @if($assembly['captions']['enabled'] ?? true)
-                        <div class="vw-subsetting-grid">
-                            <div class="vw-subsetting">
-                                <span class="vw-subsetting-label">{{ __('Style') }}</span>
-                                <select class="vw-select"
-                                        wire:model.live="assembly.captions.style"
-                                        x-on:change="updateCaptionSetting('style', $event.target.value)">
-                                    @foreach($captionStyles ?? [] as $styleId => $style)
-                                        <option value="{{ $styleId }}">{{ $style['name'] }}</option>
-                                    @endforeach
-                                    @if(empty($captionStyles))
-                                        <option value="karaoke">Karaoke</option>
-                                        <option value="beasty">Bold</option>
-                                        <option value="hormozi">Box</option>
-                                        <option value="ali">Glow</option>
-                                        <option value="minimal">Minimal</option>
-                                    @endif
-                                </select>
-                            </div>
-                            <div class="vw-subsetting">
-                                <span class="vw-subsetting-label">{{ __('Position') }}</span>
-                                <select class="vw-select"
-                                        wire:model.live="assembly.captions.position"
-                                        x-on:change="updateCaptionSetting('position', $event.target.value)">
-                                    <option value="top">{{ __('Top') }}</option>
-                                    <option value="middle">{{ __('Middle') }}</option>
-                                    <option value="bottom">{{ __('Bottom') }}</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="vw-range-section">
-                            <div class="vw-range-header">
-                                <span class="vw-range-label">{{ __('Size') }}</span>
-                                <span class="vw-range-value">{{ number_format($assembly['captions']['size'] ?? 1, 1) }}x</span>
-                            </div>
-                            <input type="range"
-                                   wire:model.live="assembly.captions.size"
-                                   x-on:input="updateCaptionSetting('size', parseFloat($event.target.value))"
-                                   min="0.5" max="2" step="0.1"
-                                   class="vw-range-slider">
-                        </div>
-
-                        <div class="vw-caption-preview">
-                            <span class="vw-caption-preview-text {{ $assembly['captions']['style'] ?? 'karaoke' }}">
-                                {{ __('Sample caption text preview') }}
-                            </span>
-                        </div>
-                    @endif
-                </div>
-
-                {{-- Background Music --}}
-                <div class="vw-setting-card">
-                    <div class="vw-setting-header">
-                        <div class="vw-setting-title">
-                            <span class="vw-setting-title-icon">🎵</span>
-                            <span>{{ __('Background Music') }}</span>
-                        </div>
-                        <label class="vw-toggle">
-                            <input type="checkbox"
-                                   wire:model.live="assembly.music.enabled"
-                                   x-on:change="updateMusicSetting('enabled', $event.target.checked)"
-                                   {{ ($assembly['music']['enabled'] ?? false) ? 'checked' : '' }}>
-                            <span class="vw-toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    @if($assembly['music']['enabled'] ?? false)
-                        <div class="vw-range-section">
-                            <div class="vw-range-header">
-                                <span class="vw-range-label">{{ __('Volume') }}</span>
-                                <span class="vw-range-value">{{ $assembly['music']['volume'] ?? 30 }}%</span>
-                            </div>
-                            <input type="range"
-                                   wire:model.live="assembly.music.volume"
-                                   x-on:input="updateMusicSetting('volume', parseInt($event.target.value))"
-                                   min="0" max="100" step="5"
-                                   class="vw-range-slider">
-                        </div>
-
-                        <div style="margin-top: 0.75rem;">
-                            <button type="button"
-                                    onclick="alert('Music browser coming soon!')"
-                                    style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px dashed rgba(255,255,255,0.2); background: transparent; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.75rem;">
-                                🎶 {{ __('Browse Music Library') }}
-                            </button>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        {{-- Shot-Based Assembly Status (Hollywood Multi-Shot Mode) --}}
-        @php
-            $assemblyStats = $this->getAssemblyStats();
-            $isMultiShot = $assemblyStats['mode'] === 'multi-shot';
-        @endphp
-        @if($isMultiShot || ($multiShotMode['enabled'] ?? false))
-            <div class="vw-setting-card" style="margin-top: 1rem; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1));">
-                <div class="vw-setting-header">
-                    <div class="vw-setting-title">
-                        <span class="vw-setting-title-icon">🎬</span>
-                        <span>{{ __('Hollywood Multi-Shot Assembly') }}</span>
-                    </div>
-                    <span style="font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 0.25rem; background: rgba(139, 92, 246, 0.3); color: #a78bfa;">
-                        {{ $assemblyStats['mode'] === 'multi-shot' ? __('Active') : __('Standard') }}
-                    </span>
-                </div>
-
-                {{-- Assembly Progress --}}
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
-                    <div style="text-align: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #a78bfa;">{{ $assemblyStats['sceneCount'] }}</div>
-                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase;">{{ __('Scenes') }}</div>
-                    </div>
-                    <div style="text-align: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #06b6d4;">{{ $assemblyStats['videoCount'] }}</div>
-                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase;">{{ __('Clips') }}</div>
-                    </div>
-                    <div style="text-align: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{{ $assemblyStats['formattedDuration'] }}</div>
-                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase;">{{ __('Duration') }}</div>
-                    </div>
-                    <div style="text-align: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
-                        <div style="font-size: 1.5rem; font-weight: 700; {{ $assemblyStats['isReady'] ? 'color: #10b981;' : 'color: #f59e0b;' }}">{{ $assemblyStats['progress'] }}%</div>
-                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase;">{{ __('Ready') }}</div>
-                    </div>
-                </div>
-
-                {{-- Video Progress Bar --}}
-                <div style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.75rem; color: rgba(255,255,255,0.6);">{{ __('Video Collection Progress') }}</span>
-                        <span style="font-size: 0.75rem; color: rgba(255,255,255,0.6);">
-                            @if($assemblyStats['pendingShots'] > 0)
-                                {{ $assemblyStats['pendingShots'] }} {{ __('pending') }}
-                            @else
-                                {{ __('All ready') }}
-                            @endif
-                        </span>
-                    </div>
-                    <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: {{ $assemblyStats['progress'] }}%; background: linear-gradient(90deg, #8b5cf6, #06b6d4); border-radius: 4px; transition: width 0.3s;"></div>
-                    </div>
-                </div>
-
-                {{-- Scene Clips Breakdown --}}
-                @if(!empty($assembly['sceneClips']))
-                    <div style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
-                        <div style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-bottom: 0.5rem;">{{ __('Clips by Scene') }}</div>
-                        @foreach($assembly['sceneClips'] as $sceneIndex => $sceneData)
-                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 0.7rem; color: #a78bfa; min-width: 60px;">{{ __('Scene') }} {{ $sceneIndex + 1 }}</span>
-                                <div style="flex: 1; display: flex; gap: 0.25rem;">
-                                    @foreach($sceneData['clips'] as $clip)
-                                        <div style="width: 24px; height: 24px; border-radius: 4px; background: linear-gradient(135deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: white;" title="{{ $clip['type'] ?? 'shot' }}">
-                                            ✓
-                                        </div>
-                                    @endforeach
-                                </div>
-                                <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5);">{{ $sceneData['clipCount'] }} {{ __('clips') }} • {{ $sceneData['totalDuration'] }}s</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-
-                {{-- Prepare for Export Button --}}
-                @if(!$assemblyStats['isReady'] && $assemblyStats['pendingShots'] > 0)
-                    <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.5rem; display: flex; align-items: center; gap: 0.75rem;">
-                        <span style="font-size: 1.25rem;">⚠️</span>
-                        <div style="flex: 1;">
-                            <div style="font-size: 0.85rem; color: #f59e0b; font-weight: 600;">{{ __('Videos Not Complete') }}</div>
-                            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.5);">{{ $assemblyStats['pendingShots'] }} {{ __('shots still need video generation') }}</div>
-                        </div>
-                        <button type="button" wire:click="$dispatch('switchToStep', { step: 5 })" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b; font-size: 0.75rem; cursor: pointer;">
-                            {{ __('Back to Animation') }}
-                        </button>
-                    </div>
-                @endif
-            </div>
-        @endif
-
-        {{-- Ready Banner --}}
-        @php
-            $canExport = !$isMultiShot || $assemblyStats['isReady'];
-        @endphp
-        <div class="vw-ready-banner" style="{{ !$canExport ? 'background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);' : '' }}">
-            <span class="vw-ready-icon">{{ $canExport ? '✅' : '⏳' }}</span>
-            <div class="vw-ready-text">
-                <div class="vw-ready-title" style="{{ !$canExport ? 'color: #f59e0b;' : '' }}">
-                    {{ $canExport ? __('Ready to Export') : __('Preparing Assembly') }}
-                </div>
-                <div class="vw-ready-subtitle">
-                    @if($canExport)
-                        {{ __('Your video is configured and ready for final export') }}
-                    @else
-                        {{ __('Complete video generation for all shots before export') }}
-                    @endif
-                </div>
-            </div>
-            <button type="button" class="vw-continue-btn" wire:click="nextStep" {{ !$canExport ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' }}>
-                {{ __('Continue') }} →
-            </button>
-        </div>
-    </div>
-</div>
