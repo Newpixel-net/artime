@@ -104,6 +104,14 @@ window.previewController = function(initialData = {}) {
                 }
             });
 
+            // Listen for caption preset changes (Phase 3)
+            Livewire.on('caption-preset-applied', (data) => {
+                if (this.engine && this.isReady) {
+                    // Refresh scenes to apply new preset styling
+                    this.refreshScenes();
+                }
+            });
+
             // Listen for seek events from timeline
             window.addEventListener('seek-preview', (e) => {
                 if (e.detail && typeof e.detail.time !== 'undefined') {
@@ -268,6 +276,66 @@ window.previewController = function(initialData = {}) {
                     break;
                 case 'highlightColor':
                     this.engine.captionHighlightColor = value;
+                    this.engine._renderFrame();
+                    break;
+                // Phase 3: Additional caption settings
+                case 'textTransform':
+                    this.engine.captionTextTransform = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'letterSpacing':
+                    this.engine.captionLetterSpacing = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'lineHeight':
+                    this.engine.captionLineHeight = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'backgroundEnabled':
+                    this.engine.captionBackgroundEnabled = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'backgroundColor':
+                    this.engine.captionBackgroundColor = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'backgroundOpacity':
+                    this.engine.captionBackgroundOpacity = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'shadowEnabled':
+                    this.engine.captionShadowEnabled = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'shadowBlur':
+                    this.engine.captionShadowBlur = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'shadowOffset':
+                    this.engine.captionShadowOffset = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'glowEnabled':
+                    this.engine.captionGlowEnabled = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'glowColor':
+                    this.engine.captionGlowColor = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'glowIntensity':
+                    this.engine.captionGlowIntensity = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'effect':
+                    this.engine.captionEffect = value;
+                    this.engine._renderFrame();
+                    break;
+                case 'wordDuration':
+                    this.engine.captionWordDuration = value;
+                    break;
+                case 'mode':
+                    this.engine.captionMode = value;
                     this.engine._renderFrame();
                     break;
             }

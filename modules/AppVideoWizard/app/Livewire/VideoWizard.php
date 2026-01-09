@@ -9293,6 +9293,104 @@ class VideoWizard extends Component
     }
 
     /**
+     * Apply a caption preset with predefined styling.
+     */
+    public function applyCaptionPreset(string $presetId): void
+    {
+        $presets = [
+            'karaoke' => [
+                'style' => 'karaoke',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#000000',
+                'strokeWidth' => 2,
+                'highlightColor' => '#FBBF24',
+                'fontFamily' => 'Montserrat',
+                'textTransform' => 'none',
+                'shadowEnabled' => true,
+                'shadowBlur' => 4,
+                'glowEnabled' => false,
+            ],
+            'beasty' => [
+                'style' => 'beasty',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#000000',
+                'strokeWidth' => 4,
+                'highlightColor' => '#EF4444',
+                'fontFamily' => 'Anton',
+                'textTransform' => 'uppercase',
+                'shadowEnabled' => true,
+                'shadowBlur' => 6,
+                'glowEnabled' => false,
+            ],
+            'hormozi' => [
+                'style' => 'hormozi',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#000000',
+                'strokeWidth' => 0,
+                'highlightColor' => '#FBBF24',
+                'fontFamily' => 'Poppins',
+                'textTransform' => 'none',
+                'backgroundEnabled' => false,
+                'shadowEnabled' => false,
+                'glowEnabled' => false,
+            ],
+            'ali' => [
+                'style' => 'ali',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#000000',
+                'strokeWidth' => 1,
+                'highlightColor' => '#8B5CF6',
+                'fontFamily' => 'Montserrat',
+                'textTransform' => 'none',
+                'shadowEnabled' => false,
+                'glowEnabled' => true,
+                'glowColor' => '#8B5CF6',
+                'glowIntensity' => 15,
+            ],
+            'minimal' => [
+                'style' => 'minimal',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#000000',
+                'strokeWidth' => 0,
+                'highlightColor' => '#FFFFFF',
+                'fontFamily' => 'Inter',
+                'textTransform' => 'none',
+                'shadowEnabled' => false,
+                'glowEnabled' => false,
+            ],
+            'neon' => [
+                'style' => 'neon',
+                'fillColor' => '#FFFFFF',
+                'strokeColor' => '#8B5CF6',
+                'strokeWidth' => 1,
+                'highlightColor' => '#06B6D4',
+                'fontFamily' => 'Bebas Neue',
+                'textTransform' => 'uppercase',
+                'shadowEnabled' => false,
+                'glowEnabled' => true,
+                'glowColor' => '#8B5CF6',
+                'glowIntensity' => 20,
+            ],
+        ];
+
+        if (!isset($presets[$presetId])) {
+            return;
+        }
+
+        $preset = $presets[$presetId];
+
+        // Apply all preset values to captions settings
+        foreach ($preset as $key => $value) {
+            $this->assembly['captions'][$key] = $value;
+        }
+
+        $this->saveProject();
+
+        // Dispatch event for preview engine refresh
+        $this->dispatch('caption-preset-applied', ['preset' => $presetId]);
+    }
+
+    /**
      * Get assembly statistics for display.
      */
     public function getAssemblyStats(): array
