@@ -1675,7 +1675,7 @@
                     </div>
                     <div class="vw-footer-stat">
                         <span class="vw-footer-stat-icon">🎬</span>
-                        <span class="vw-footer-stat-text">{{ $animatedScenes }}/{{ $totalScenes }} {{ __('animations') }}</span>
+                        <span class="vw-footer-stat-text">{{ $animatedCount }}/{{ $totalScenes }} {{ __('animations') }}</span>
                     </div>
                 </div>
             </div>
