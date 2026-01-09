@@ -1,8 +1,5 @@
 {{-- Step 6: Assembly Studio - Full-Screen Professional Editor --}}
-
-{{-- Load Video Preview Engine and Controller Scripts INLINE to ensure they're available before Alpine --}}
-<script src="{{ asset('modules/appvideowizard/js/video-preview-engine.js') }}"></script>
-<script src="{{ asset('modules/appvideowizard/js/preview-controller.js') }}"></script>
+{{-- Note: Video Preview Engine scripts are loaded in video-wizard.blade.php --}}
 
 @php
     $assemblyStats = $this->getAssemblyStats();
@@ -42,6 +39,8 @@
             seek(time) {},
             seekStart() {},
             seekEnd() {},
+            jumpToScene(index) { this.currentSceneIndex = index; },
+            seekToScene(index) { this.currentSceneIndex = index; },
             loadPreview() { console.warn('previewController not loaded'); }
         }),
         activeTab: 'scenes',

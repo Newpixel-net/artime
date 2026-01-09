@@ -272,12 +272,8 @@
                 stopPolling();
                 alert('Export failed: ' + (data.message || 'Unknown error'));
             });
-
-            // Cleanup on component destroy
-            $cleanup(() => {
-                stopPolling();
-            });
         "
+        x-on:destroy="stopPolling()"
         @click.stop
     >
         {{-- Modal Header --}}
