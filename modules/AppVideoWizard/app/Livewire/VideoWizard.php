@@ -9554,6 +9554,331 @@ class VideoWizard extends Component
         }
     }
 
+    // =========================================================================
+    // PHASE 6: EXPORT METHODS
+    // =========================================================================
+
+    /**
+     * Update export setting - Phase 6.
+     */
+    public function updateExportSetting(string $key, mixed $value): void
+    {
+        if (!isset($this->assembly['export'])) {
+            $this->assembly['export'] = $this->getDefaultExportSettings();
+        }
+
+        $this->assembly['export'][$key] = $value;
+
+        // If platform changed, apply platform preset
+        if ($key === 'platform' && $value !== 'custom') {
+            $preset = $this->getExportPlatformPreset($value);
+            if ($preset) {
+                $this->assembly['export']['quality'] = $preset['quality'] ?? '1080p';
+                $this->assembly['export']['fps'] = $preset['fps'] ?? 30;
+                $this->assembly['export']['bitrate'] = $preset['bitrate'] ?? 'auto';
+            }
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Get default export settings - Phase 6.
+     */
+    public function getDefaultExportSettings(): array
+    {
+        return [
+            'platform' => 'youtube',
+            'quality' => '1080p',
+            'format' => 'mp4',
+            'codec' => 'h264',
+            'fps' => 30,
+            'bitrate' => 'auto',
+            'audioCodec' => 'aac',
+            'audioBitrate' => 192,
+        ];
+    }
+
+    /**
+     * Get platform preset for export - Phase 6.
+     */
+    public function getExportPlatformPreset(string $platform): ?array
+    {
+        $presets = [
+            'youtube' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '12000',
+                'aspectRatio' => '16:9',
+                'maxDuration' => 43200,
+            ],
+            'tiktok' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '6000',
+                'aspectRatio' => '9:16',
+                'maxDuration' => 600,
+            ],
+            'instagram_reels' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '8000',
+                'aspectRatio' => '9:16',
+                'maxDuration' => 90,
+            ],
+            'instagram_feed' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '8000',
+                'aspectRatio' => '1:1',
+                'maxDuration' => 60,
+            ],
+            'twitter' => [
+                'quality' => '720p',
+                'fps' => 30,
+                'bitrate' => '5000',
+                'aspectRatio' => '16:9',
+                'maxDuration' => 140,
+            ],
+            'facebook' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '8000',
+                'aspectRatio' => '16:9',
+                'maxDuration' => 14400,
+            ],
+            'linkedin' => [
+                'quality' => '1080p',
+                'fps' => 30,
+                'bitrate' => '8000',
+                'aspectRatio' => '16:9',
+                'maxDuration' => 600,
+            ],
+        ];
+
+        return $presets[$platform] ?? null;
+    }
+
+    /**
+     * Start video export - Phase 6 + Phase 7.
+     */
+    public function startVideoExport(): void
+    {
+        // Validate export readiness
+        $readiness = $this->getAssemblyReadiness();
+        if (!$readiness['isReady']) {
+            $this->dispatch('export-error', [
+                'message' => 'Video is not ready for export. Some scenes are still pending.',
+            ]);
+            return;
+        }
+
+        // Generate unique job ID
+        $jobId = \Illuminate\Support\Str::uuid()->toString();
+
+        // Set assembly status to rendering
+        $this->assembly['assemblyStatus'] = 'rendering';
+        $this->assembly['renderProgress'] = 0;
+        $this->assembly['exportJobId'] = $jobId;
+        $this->saveProject();
+
+        // Get export settings
+        $exportSettings = $this->assembly['export'] ?? $this->getDefaultExportSettings();
+
+        // Build export manifest
+        $manifest = $this->buildExportManifest();
+
+        // Determine if we should use Cloud Run (based on config)
+        $useCloudRun = !empty(config('services.video_processor.url'))
+            && config('services.video_processor.parallel_scenes');
+
+        // Dispatch the export job
+        \Modules\AppVideoWizard\Jobs\VideoExportJob::dispatch(
+            $this->project->id,
+            $jobId,
+            $manifest,
+            $exportSettings,
+            auth()->id(),
+            $useCloudRun
+        );
+
+        $this->dispatch('export-started', [
+            'jobId' => $jobId,
+            'settings' => $exportSettings,
+            'totalScenes' => count($this->script['scenes'] ?? []),
+        ]);
+    }
+
+    /**
+     * Build export manifest from current project data - Phase 7.
+     */
+    protected function buildExportManifest(): array
+    {
+        $scenes = [];
+        $scriptScenes = $this->script['scenes'] ?? [];
+        $storyboardScenes = $this->storyboard['scenes'] ?? [];
+
+        foreach ($scriptScenes as $index => $scriptScene) {
+            $storyboardScene = $storyboardScenes[$index] ?? [];
+
+            $scenes[] = [
+                'index' => $index,
+                'narration' => $scriptScene['narration'] ?? '',
+                'imageUrl' => $storyboardScene['imageUrl'] ?? $storyboardScene['finalImageUrl'] ?? null,
+                'voiceoverUrl' => $storyboardScene['voiceoverUrl'] ?? null,
+                'duration' => $storyboardScene['duration'] ?? $scriptScene['duration'] ?? 5,
+                'voiceoverOffset' => $storyboardScene['voiceoverOffset'] ?? 0,
+                'transition' => $storyboardScene['transition'] ?? $this->assembly['defaultTransition'] ?? 'fade',
+                'kenBurns' => [
+                    'startScale' => $storyboardScene['kenBurns']['startScale'] ?? 1.0,
+                    'endScale' => $storyboardScene['kenBurns']['endScale'] ?? 1.2,
+                    'startX' => $storyboardScene['kenBurns']['startX'] ?? 0.5,
+                    'startY' => $storyboardScene['kenBurns']['startY'] ?? 0.5,
+                    'endX' => $storyboardScene['kenBurns']['endX'] ?? 0.5,
+                    'endY' => $storyboardScene['kenBurns']['endY'] ?? 0.5,
+                ],
+            ];
+        }
+
+        return [
+            'scenes' => $scenes,
+            'output' => $this->assembly['export'] ?? $this->getDefaultExportSettings(),
+            'music' => [
+                'enabled' => $this->assembly['music']['enabled'] ?? false,
+                'url' => $this->assembly['music']['url'] ?? null,
+                'volume' => ($this->assembly['music']['volume'] ?? 30) / 100,
+            ],
+            'captions' => [
+                'enabled' => $this->assembly['captions']['enabled'] ?? true,
+                'style' => $this->assembly['captions']['style'] ?? 'karaoke',
+                'position' => $this->assembly['captions']['position'] ?? 'bottom',
+                'size' => $this->assembly['captions']['size'] ?? 1.0,
+                'fontFamily' => $this->assembly['captions']['fontFamily'] ?? 'Arial',
+                'fillColor' => $this->assembly['captions']['fillColor'] ?? '#FFFFFF',
+            ],
+            'aspectRatio' => $this->aspectRatio ?? '16:9',
+        ];
+    }
+
+    /**
+     * Get export status - Phase 7.
+     * Called via polling from frontend.
+     */
+    public function getExportStatus(): array
+    {
+        $jobId = $this->assembly['exportJobId'] ?? null;
+
+        if (!$jobId) {
+            return [
+                'status' => $this->assembly['assemblyStatus'] ?? 'pending',
+                'progress' => $this->assembly['renderProgress'] ?? 0,
+                'message' => 'No export in progress',
+            ];
+        }
+
+        // Get status from cache
+        $status = \Illuminate\Support\Facades\Cache::get("video_export_status_{$jobId}");
+
+        if ($status) {
+            // If completed, update local state
+            if ($status['status'] === 'completed' && !empty($status['outputUrl'])) {
+                $this->assembly['assemblyStatus'] = 'complete';
+                $this->assembly['renderProgress'] = 100;
+                $this->assembly['finalVideoUrl'] = $status['outputUrl'];
+                $this->assembly['exported'] = true;
+                $this->saveProject();
+            }
+
+            return $status;
+        }
+
+        return [
+            'status' => $this->assembly['assemblyStatus'] ?? 'pending',
+            'progress' => $this->assembly['renderProgress'] ?? 0,
+            'message' => 'Processing...',
+        ];
+    }
+
+    /**
+     * Poll export status and dispatch event - Phase 7.
+     */
+    public function pollExportStatus(): void
+    {
+        $status = $this->getExportStatus();
+
+        $this->dispatch('export-progress', [
+            'progress' => $status['progress'] ?? 0,
+            'currentScene' => $status['currentScene'] ?? 0,
+            'complete' => ($status['status'] ?? '') === 'completed',
+            'videoUrl' => $status['outputUrl'] ?? null,
+            'message' => $status['message'] ?? 'Processing...',
+        ]);
+    }
+
+    /**
+     * Cancel video export - Phase 6.
+     */
+    public function cancelVideoExport(): void
+    {
+        $this->assembly['assemblyStatus'] = 'ready';
+        $this->assembly['renderProgress'] = 0;
+        $this->saveProject();
+
+        $this->dispatch('export-cancelled');
+    }
+
+    /**
+     * Update export progress (called from job) - Phase 6.
+     */
+    public function updateExportProgress(int $progress, int $currentScene = 0): void
+    {
+        $this->assembly['renderProgress'] = $progress;
+        $this->saveProject();
+
+        $this->dispatch('export-progress', [
+            'progress' => $progress,
+            'currentScene' => $currentScene,
+            'complete' => $progress >= 100,
+            'videoUrl' => $progress >= 100 ? $this->assembly['finalVideoUrl'] : null,
+        ]);
+    }
+
+    /**
+     * Complete export (called from job) - Phase 6.
+     */
+    public function completeExport(string $videoUrl): void
+    {
+        $this->assembly['assemblyStatus'] = 'complete';
+        $this->assembly['renderProgress'] = 100;
+        $this->assembly['finalVideoUrl'] = $videoUrl;
+        $this->assembly['exported'] = true;
+        $this->assembly['exportedAt'] = now()->toIso8601String();
+        $this->saveProject();
+
+        $this->dispatch('export-progress', [
+            'progress' => 100,
+            'currentScene' => count($this->script['scenes'] ?? []),
+            'complete' => true,
+            'videoUrl' => $videoUrl,
+        ]);
+    }
+
+    /**
+     * Get total video duration in seconds.
+     */
+    public function getTotalDuration(): float
+    {
+        $total = 0;
+        foreach ($this->storyboard['scenes'] ?? [] as $scene) {
+            $total += $scene['duration'] ?? 5;
+        }
+        return $total;
+    }
+
+    // =========================================================================
+    // END PHASE 6: EXPORT METHODS
+    // =========================================================================
+
     /**
      * Get assembly statistics for display.
      */

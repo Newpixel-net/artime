@@ -171,70 +171,15 @@
         @include('appvideowizard::livewire.steps.partials._timeline')
     </div>
 
-    {{-- Export Modal Backdrop --}}
-    <div
-        x-show="showExportModal"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="vw-modal-backdrop"
-        @click.self="showExportModal = false"
-        x-cloak
-    >
-        <div class="vw-export-modal" @click.stop>
-            <div class="vw-modal-header">
-                <h3>🚀 {{ __('Export Video') }}</h3>
-                <button type="button" @click="showExportModal = false" class="vw-modal-close">×</button>
-            </div>
-            <div class="vw-modal-body">
-                @if($canExport)
-                    <p class="vw-modal-text">{{ __('Your video is ready for final rendering. Click Continue to proceed to export settings.') }}</p>
-                    <div class="vw-export-summary">
-                        <div class="vw-summary-item">
-                            <span class="vw-summary-icon">📹</span>
-                            <span>{{ count($script['scenes'] ?? []) }} {{ __('scenes') }}</span>
-                        </div>
-                        <div class="vw-summary-item">
-                            <span class="vw-summary-icon">⏱️</span>
-                            <span x-text="formatTime(totalDuration)">0:00</span>
-                        </div>
-                        <div class="vw-summary-item">
-                            <span class="vw-summary-icon">📐</span>
-                            <span>{{ $aspectRatio }}</span>
-                        </div>
-                    </div>
-                @else
-                    <div class="vw-export-warning">
-                        <span class="vw-warning-icon">⚠️</span>
-                        <div>
-                            <p class="vw-warning-title">{{ __('Videos Not Complete') }}</p>
-                            <p class="vw-warning-text">{{ $assemblyStats['pendingShots'] }} {{ __('shots still need video generation. Go back to Animation step to complete them.') }}</p>
-                        </div>
-                    </div>
-                @endif
-            </div>
-            <div class="vw-modal-footer">
-                <button type="button" @click="showExportModal = false" class="vw-modal-btn secondary">
-                    {{ __('Cancel') }}
-                </button>
-                @if($canExport)
-                    <button type="button" wire:click="nextStep" class="vw-modal-btn primary">
-                        {{ __('Continue to Export') }} →
-                    </button>
-                @else
-                    <button type="button" wire:click="previousStep" class="vw-modal-btn warning">
-                        ← {{ __('Back to Animation') }}
-                    </button>
-                @endif
-            </div>
-        </div>
-    </div>
+    {{-- Export Modal - Phase 6 --}}
+    @include('appvideowizard::livewire.steps.partials._export-modal')
 </div>
 
 <style>
+    /* ========================================
+       ASSEMBLY STUDIO - Full Screen Layout
+       ======================================== */
+
     /* Full-Screen Layout */
     .vw-assembly-fullscreen {
         position: fixed;
@@ -242,9 +187,50 @@
         left: 0;
         right: 0;
         bottom: 0;
+        width: 100vw !important;
+        height: 100vh !important;
         background: #0a0a12;
-        z-index: 9999;
+        z-index: 999999;
         overflow: hidden;
+    }
+
+    /* CRITICAL: Force hide ALL app sidebars and navigation when Assembly Studio is active */
+    .sidebar,
+    .main-sidebar,
+    div.sidebar,
+    aside.sidebar,
+    .hide-scroll.sidebar {
+        z-index: 1 !important;
+    }
+
+    /* Ensure full-screen coverage - hide main app sidebar */
+    body.vw-assembly-active {
+        overflow: hidden !important;
+    }
+
+    body.vw-assembly-active .sidebar,
+    body.vw-assembly-active .main-sidebar,
+    body.vw-assembly-active div.sidebar,
+    body.vw-assembly-active .sidebar.hide-scroll,
+    body.vw-assembly-active [class*="sidebar"]:not(.vw-assembly-sidebar),
+    body.vw-assembly-active aside:not(.vw-assembly-fullscreen aside),
+    body.vw-assembly-active nav:not(.vw-assembly-fullscreen nav) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.vw-assembly-active .main-content,
+    body.vw-assembly-active .page-wrapper,
+    body.vw-assembly-active [class*="content"]:not(.vw-assembly-fullscreen *) {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        width: 100% !important;
+        max-width: 100vw !important;
     }
 
     .vw-studio-layout {
@@ -729,3 +715,42 @@
         display: none !important;
     }
 </style>
+
+<script>
+    (function() {
+        // Add body class when Assembly Studio is active
+        document.body.classList.add('vw-assembly-active');
+
+        // Function to aggressively hide all sidebars
+        function hideAllSidebars() {
+            const sidebars = document.querySelectorAll('.sidebar, .main-sidebar, [class*="sidebar"]:not(.vw-assembly-sidebar), aside:not(.vw-assembly-fullscreen aside)');
+            sidebars.forEach(function(el) {
+                if (!el.closest('.vw-assembly-fullscreen')) {
+                    el.style.cssText = 'display: none !important; width: 0 !important; visibility: hidden !important;';
+                }
+            });
+        }
+
+        // Run immediately and after a short delay (for lazy-loaded elements)
+        hideAllSidebars();
+        setTimeout(hideAllSidebars, 100);
+        setTimeout(hideAllSidebars, 500);
+
+        // Cleanup when component is removed
+        if (typeof Livewire !== 'undefined') {
+            Livewire.hook('element.removed', (el, component) => {
+                if (el.classList && el.classList.contains('vw-assembly-fullscreen')) {
+                    document.body.classList.remove('vw-assembly-active');
+                    document.querySelectorAll('.sidebar, .main-sidebar, [class*="sidebar"], aside').forEach(function(el) {
+                        el.style.cssText = '';
+                    });
+                }
+            });
+        }
+
+        // Also cleanup on page unload (for SPA navigation)
+        window.addEventListener('beforeunload', function() {
+            document.body.classList.remove('vw-assembly-active');
+        });
+    })();
+</script>
