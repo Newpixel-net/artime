@@ -291,6 +291,200 @@
         color: rgba(0, 0, 0, 0.4) !important;
         margin-top: 0.5rem !important;
     }
+
+    /* ========================================
+       PRODUCTION SETTINGS - Modern 3-Column Layout
+       ======================================== */
+
+    .vw-settings-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 1.5rem !important;
+    }
+
+    @media (max-width: 992px) {
+        .vw-settings-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1rem !important;
+        }
+    }
+
+    .vw-setting-section {
+        background: rgba(255, 255, 255, 0.6) !important;
+        border: 1px solid rgba(0, 0, 0, 0.06) !important;
+        border-radius: 1rem !important;
+        padding: 1.25rem !important;
+    }
+
+    .vw-setting-header {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .vw-setting-icon {
+        font-size: 1.25rem !important;
+    }
+
+    .vw-setting-title {
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+    }
+
+    /* AI Model Tier Cards */
+    .vw-tier-options {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    .vw-tier-card {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.75rem !important;
+        padding: 0.75rem !important;
+        border: 2px solid rgba(0, 0, 0, 0.08) !important;
+        border-radius: 0.75rem !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        background: white !important;
+    }
+
+    .vw-tier-card:hover {
+        border-color: rgba(139, 92, 246, 0.3) !important;
+        background: rgba(139, 92, 246, 0.02) !important;
+    }
+
+    .vw-tier-card.selected {
+        border-color: #8b5cf6 !important;
+        background: rgba(139, 92, 246, 0.08) !important;
+    }
+
+    .vw-tier-icon {
+        font-size: 1.25rem !important;
+        width: 32px !important;
+        text-align: center !important;
+    }
+
+    .vw-tier-info {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .vw-tier-name {
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+    }
+
+    .vw-tier-card.selected .vw-tier-name {
+        color: #8b5cf6 !important;
+    }
+
+    .vw-tier-price {
+        font-size: 0.7rem !important;
+        color: rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .vw-tier-badge {
+        font-size: 0.55rem !important;
+        font-weight: 700 !important;
+        padding: 0.15rem 0.4rem !important;
+        border-radius: 0.25rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+    }
+
+    .vw-tier-badge.green {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #059669 !important;
+    }
+
+    .vw-tier-badge.blue {
+        background: rgba(59, 130, 246, 0.15) !important;
+        color: #2563eb !important;
+    }
+
+    .vw-tier-badge.purple {
+        background: rgba(139, 92, 246, 0.15) !important;
+        color: #7c3aed !important;
+    }
+
+    /* Language Selector */
+    .vw-language-select {
+        width: 100% !important;
+        padding: 0.75rem 1rem !important;
+        border: 2px solid rgba(0, 0, 0, 0.08) !important;
+        border-radius: 0.75rem !important;
+        background: white !important;
+        font-size: 0.9rem !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        padding-right: 2.5rem !important;
+    }
+
+    .vw-language-select:focus {
+        outline: none !important;
+        border-color: #8b5cf6 !important;
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1) !important;
+    }
+
+    .vw-language-preview {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        padding: 0.5rem 0.75rem !important;
+        background: rgba(139, 92, 246, 0.08) !important;
+        border-radius: 0.5rem !important;
+        margin-top: 0.75rem !important;
+    }
+
+    .vw-language-flag {
+        font-size: 1.25rem !important;
+    }
+
+    .vw-language-name {
+        font-size: 0.8rem !important;
+        color: rgba(0, 0, 0, 0.7) !important;
+    }
+
+    /* Duration Section Enhancement */
+    .vw-duration-display {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        padding: 0.75rem !important;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%) !important;
+        border-radius: 0.75rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .vw-duration-value {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        background-clip: text !important;
+    }
+
+    .vw-duration-unit {
+        font-size: 0.8rem !important;
+        color: rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .vw-duration-slider-wrap {
+        padding: 0 0.25rem !important;
+    }
 </style>
 
 <div class="vw-platform-step">
@@ -383,40 +577,99 @@
         @endif
     </div>
 
-    {{-- Target Duration Card --}}
+    {{-- Production Settings Card - AI Model, Language, Duration --}}
     @if($productionType && $productionSubtype)
+        @php
+            $aiModelTiers = \Modules\AppVideoWizard\Livewire\VideoWizard::AI_MODEL_TIERS;
+            $languages = \Modules\AppVideoWizard\Livewire\VideoWizard::SUPPORTED_LANGUAGES;
+            $selectedTier = $content['aiModelTier'] ?? 'economy';
+            $selectedLang = $content['language'] ?? 'en';
+        @endphp
         <div class="vw-content-card">
             <div class="vw-card-header">
-                <div class="vw-card-icon">⏱️</div>
+                <div class="vw-card-icon">⚙️</div>
                 <div>
-                    <div class="vw-card-title">{{ __('Target Duration') }}</div>
+                    <div class="vw-card-title">{{ __('Production Settings') }}</div>
                     <div class="vw-card-subtitle">
-                        {{ __('Recommended for :type', ['type' => $productionTypes[$productionType]['subTypes'][$productionSubtype]['name'] ?? $productionTypes[$productionType]['name']]) }}
+                        {{ __('Configure AI model, language, and duration') }}
                     </div>
                 </div>
             </div>
 
-            <div>
-                <div class="vw-duration-header">
-                    <span class="vw-duration-label">{{ __('Video Length') }}</span>
-                    <span class="vw-duration-badge">
-                        @if($targetDuration >= 60)
-                            {{ floor($targetDuration / 60) }}:{{ str_pad($targetDuration % 60, 2, '0', STR_PAD_LEFT) }}
-                        @else
-                            {{ $targetDuration }}s
-                        @endif
-                    </span>
+            <div class="vw-settings-grid">
+                {{-- AI Model Tier Selection --}}
+                <div class="vw-setting-section">
+                    <div class="vw-setting-header">
+                        <span class="vw-setting-icon">🤖</span>
+                        <span class="vw-setting-title">{{ __('AI Model') }}</span>
+                    </div>
+                    <div class="vw-tier-options">
+                        @foreach($aiModelTiers as $tierKey => $tier)
+                            <div class="vw-tier-card {{ $selectedTier === $tierKey ? 'selected' : '' }}"
+                                 wire:click="$set('content.aiModelTier', '{{ $tierKey }}')">
+                                <span class="vw-tier-icon">{{ $tier['icon'] }}</span>
+                                <div class="vw-tier-info">
+                                    <div class="vw-tier-name">{{ $tier['label'] }}</div>
+                                    <div class="vw-tier-price">{{ $tier['pricing'] }}</div>
+                                </div>
+                                <span class="vw-tier-badge {{ $tier['badgeColor'] }}">{{ $tier['badge'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
 
-                <input type="range"
-                       wire:model.live="targetDuration"
-                       min="{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['min'] ?? 15 }}"
-                       max="{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['max'] ?? 300 }}"
-                       class="vw-range" />
+                {{-- Language Selection --}}
+                <div class="vw-setting-section">
+                    <div class="vw-setting-header">
+                        <span class="vw-setting-icon">🌍</span>
+                        <span class="vw-setting-title">{{ __('Content Language') }}</span>
+                    </div>
+                    <select class="vw-language-select" wire:model.live="content.language">
+                        @foreach($languages as $langCode => $lang)
+                            <option value="{{ $langCode }}">{{ $lang['flag'] }} {{ $lang['name'] }} ({{ $lang['native'] }})</option>
+                        @endforeach
+                    </select>
+                    @if(isset($languages[$selectedLang]))
+                        <div class="vw-language-preview">
+                            <span class="vw-language-flag">{{ $languages[$selectedLang]['flag'] }}</span>
+                            <span class="vw-language-name">{{ __('Script & voiceover in :lang', ['lang' => $languages[$selectedLang]['name']]) }}</span>
+                        </div>
+                    @endif
+                </div>
 
-                <div class="vw-range-labels">
-                    <span>{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['min'] ?? 15 }}s</span>
-                    <span>{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['max'] ?? 300 }}s</span>
+                {{-- Video Duration --}}
+                <div class="vw-setting-section">
+                    <div class="vw-setting-header">
+                        <span class="vw-setting-icon">⏱️</span>
+                        <span class="vw-setting-title">{{ __('Video Duration') }}</span>
+                    </div>
+                    <div class="vw-duration-display">
+                        <span class="vw-duration-value">
+                            @if($targetDuration >= 60)
+                                {{ floor($targetDuration / 60) }}:{{ str_pad($targetDuration % 60, 2, '0', STR_PAD_LEFT) }}
+                            @else
+                                {{ $targetDuration }}s
+                            @endif
+                        </span>
+                        <span class="vw-duration-unit">
+                            @if($targetDuration >= 60)
+                                {{ __('minutes') }}
+                            @else
+                                {{ __('seconds') }}
+                            @endif
+                        </span>
+                    </div>
+                    <div class="vw-duration-slider-wrap">
+                        <input type="range"
+                               wire:model.live="targetDuration"
+                               min="{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['min'] ?? 15 }}"
+                               max="{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['max'] ?? 300 }}"
+                               class="vw-range" />
+                        <div class="vw-range-labels">
+                            <span>{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['min'] ?? 15 }}s</span>
+                            <span>{{ $productionTypes[$productionType]['subTypes'][$productionSubtype]['suggestedDuration']['max'] ?? 300 }}s</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

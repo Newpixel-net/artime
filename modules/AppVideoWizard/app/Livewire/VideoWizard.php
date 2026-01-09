@@ -61,11 +61,78 @@ class VideoWizard extends Component
         // MASTER VISUAL MODE - Enforced across ALL AI generation (locations, characters, images)
         // This is the TOP-LEVEL style authority - prevents style conflicts
         'visualMode' => 'cinematic-realistic', // 'cinematic-realistic' | 'stylized-animation' | 'mixed-hybrid'
+        // AI Model Tier for script generation (cost vs quality)
+        'aiModelTier' => 'economy',     // 'economy' | 'standard' | 'premium'
+        // Content generation language
+        'language' => 'en',             // ISO 639-1 language code
         'videoModel' => [
             'model' => 'hailuo-2.3',
             'duration' => '10s',        // Clip duration: '5s' | '6s' | '10s'
             'resolution' => '768p',
         ],
+    ];
+
+    /**
+     * AI Model Tiers - Cost vs Quality options
+     * Users can choose based on their budget and quality needs.
+     */
+    public const AI_MODEL_TIERS = [
+        'economy' => [
+            'label' => 'Economy',
+            'description' => 'Best value, great quality',
+            'icon' => '💰',
+            'provider' => 'grok',
+            'model' => 'grok-4-fast',
+            'pricing' => '$0.20 / $0.50 per 1M tokens',
+            'badge' => 'BEST VALUE',
+            'badgeColor' => 'green',
+        ],
+        'standard' => [
+            'label' => 'Standard',
+            'description' => 'Balanced performance',
+            'icon' => '⚡',
+            'provider' => 'openai',
+            'model' => 'gpt-4o-mini',
+            'pricing' => '$0.15 / $0.60 per 1M tokens',
+            'badge' => 'POPULAR',
+            'badgeColor' => 'blue',
+        ],
+        'premium' => [
+            'label' => 'Premium',
+            'description' => 'Maximum quality',
+            'icon' => '👑',
+            'provider' => 'openai',
+            'model' => 'gpt-4o',
+            'pricing' => '$2.50 / $10 per 1M tokens',
+            'badge' => 'BEST QUALITY',
+            'badgeColor' => 'purple',
+        ],
+    ];
+
+    /**
+     * Supported languages for content generation
+     */
+    public const SUPPORTED_LANGUAGES = [
+        'en' => ['name' => 'English', 'native' => 'English', 'flag' => '🇺🇸'],
+        'es' => ['name' => 'Spanish', 'native' => 'Español', 'flag' => '🇪🇸'],
+        'fr' => ['name' => 'French', 'native' => 'Français', 'flag' => '🇫🇷'],
+        'de' => ['name' => 'German', 'native' => 'Deutsch', 'flag' => '🇩🇪'],
+        'it' => ['name' => 'Italian', 'native' => 'Italiano', 'flag' => '🇮🇹'],
+        'pt' => ['name' => 'Portuguese', 'native' => 'Português', 'flag' => '🇵🇹'],
+        'ru' => ['name' => 'Russian', 'native' => 'Русский', 'flag' => '🇷🇺'],
+        'zh' => ['name' => 'Chinese', 'native' => '中文', 'flag' => '🇨🇳'],
+        'ja' => ['name' => 'Japanese', 'native' => '日本語', 'flag' => '🇯🇵'],
+        'ko' => ['name' => 'Korean', 'native' => '한국어', 'flag' => '🇰🇷'],
+        'ar' => ['name' => 'Arabic', 'native' => 'العربية', 'flag' => '🇸🇦'],
+        'hi' => ['name' => 'Hindi', 'native' => 'हिन्दी', 'flag' => '🇮🇳'],
+        'he' => ['name' => 'Hebrew', 'native' => 'עברית', 'flag' => '🇮🇱'],
+        'nl' => ['name' => 'Dutch', 'native' => 'Nederlands', 'flag' => '🇳🇱'],
+        'pl' => ['name' => 'Polish', 'native' => 'Polski', 'flag' => '🇵🇱'],
+        'tr' => ['name' => 'Turkish', 'native' => 'Türkçe', 'flag' => '🇹🇷'],
+        'vi' => ['name' => 'Vietnamese', 'native' => 'Tiếng Việt', 'flag' => '🇻🇳'],
+        'th' => ['name' => 'Thai', 'native' => 'ไทย', 'flag' => '🇹🇭'],
+        'id' => ['name' => 'Indonesian', 'native' => 'Bahasa Indonesia', 'flag' => '🇮🇩'],
+        'sv' => ['name' => 'Swedish', 'native' => 'Svenska', 'flag' => '🇸🇪'],
     ];
 
     /**
