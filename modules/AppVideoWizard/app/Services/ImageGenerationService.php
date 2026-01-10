@@ -11,11 +11,13 @@ use Illuminate\Support\Str;
 use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\WizardAsset;
 use Modules\AppVideoWizard\Models\WizardProcessingJob;
+use Modules\AppVideoWizard\Services\StructuredPromptBuilderService;
 
 class ImageGenerationService
 {
     protected GeminiService $geminiService;
     protected RunPodService $runPodService;
+    protected StructuredPromptBuilderService $structuredPromptBuilder;
 
     /**
      * Model configurations with token costs matching reference implementation.
@@ -48,10 +50,11 @@ class ImageGenerationService
         ],
     ];
 
-    public function __construct(GeminiService $geminiService, RunPodService $runPodService)
+    public function __construct(GeminiService $geminiService, RunPodService $runPodService, StructuredPromptBuilderService $structuredPromptBuilder)
     {
         $this->geminiService = $geminiService;
         $this->runPodService = $runPodService;
+        $this->structuredPromptBuilder = $structuredPromptBuilder;
     }
 
     /**
@@ -330,11 +333,18 @@ class ImageGenerationService
             'guidance_scale' => 5.0,
         ];
 
+        // Add negative prompt if available (HiDream supports this natively)
+        $negativePrompt = $project->getAttribute('_lastNegativePrompt') ?? $options['negativePrompt'] ?? null;
+        if (!empty($negativePrompt)) {
+            $input['negative_prompt'] = $negativePrompt;
+        }
+
         Log::info('HiDream generation request', [
             'endpointId' => $endpointId,
             'prompt' => substr($prompt, 0, 100) . '...',
             'width' => $resolution['width'],
             'height' => $resolution['height'],
+            'hasNegativePrompt' => !empty($negativePrompt),
         ]);
 
         // Refresh API key in case it was recently updated
@@ -990,16 +1000,13 @@ EOT;
      * Build comprehensive image prompt integrating all Bibles.
      *
      * OPTIMIZED FOR GEMINI PHOTOREALISTIC IMAGE GENERATION:
+     * - Uses structured JSON-based prompts for realistic modes
+     * - Includes negative prompts to avoid AI artifacts
      * - Uses narrative descriptions instead of keyword lists
      * - Includes photography-specific terminology (camera, lens, lighting)
      * - Applies cinematic quality modifiers for 8K photorealism
      *
-     * Prompt Chain Architecture:
-     * 1. Photography Foundation - Camera, lens, shot type
-     * 2. Scene Description - Subject, action, environment (narrative style)
-     * 3. Lighting & Atmosphere - Direction, quality, mood
-     * 4. Style & Color Grade - Visual style, color palette
-     * 5. Quality Anchors - Technical excellence modifiers
+     * Returns array with 'prompt' and 'negativePrompt' when using structured mode.
      */
     protected function buildImagePrompt(
         string $visualDescription,
@@ -1008,6 +1015,145 @@ EOT;
         WizardProject $project,
         ?array $sceneMemory = null,
         ?int $sceneIndex = null
+    ): string {
+        // Determine visual mode from project settings
+        $visualMode = $this->getVisualMode($project, $visualStyle);
+
+        // For realistic modes, use the structured prompt builder
+        if ($this->shouldUseStructuredPrompt($visualMode)) {
+            return $this->buildStructuredImagePrompt(
+                $visualDescription,
+                $styleBible,
+                $visualStyle,
+                $project,
+                $sceneMemory,
+                $sceneIndex,
+                $visualMode
+            );
+        }
+
+        // Fall back to legacy prompt building for non-realistic modes
+        return $this->buildLegacyImagePrompt(
+            $visualDescription,
+            $styleBible,
+            $visualStyle,
+            $project,
+            $sceneMemory,
+            $sceneIndex
+        );
+    }
+
+    /**
+     * Determine the visual mode from project settings.
+     */
+    protected function getVisualMode(WizardProject $project, ?array $visualStyle): string
+    {
+        // Check storyboard for explicit visual mode
+        $storyboard = $project->storyboard ?? [];
+
+        // Check for visual mode in storyboard settings
+        if (!empty($storyboard['visualMode'])) {
+            return $storyboard['visualMode'];
+        }
+
+        // Infer from visual style settings
+        if ($visualStyle) {
+            // If style indicates realistic rendering
+            $style = $visualStyle['style'] ?? $visualStyle['renderStyle'] ?? '';
+            if (stripos($style, 'realistic') !== false || stripos($style, 'cinematic') !== false) {
+                return 'cinematic-realistic';
+            }
+            if (stripos($style, 'documentary') !== false) {
+                return 'documentary-realistic';
+            }
+            if (stripos($style, 'animation') !== false || stripos($style, 'stylized') !== false) {
+                return 'stylized-animation';
+            }
+        }
+
+        // Default to cinematic-realistic for best quality
+        return 'cinematic-realistic';
+    }
+
+    /**
+     * Determine if we should use structured prompts.
+     */
+    protected function shouldUseStructuredPrompt(string $visualMode): bool
+    {
+        // Use structured prompts for realistic modes
+        return in_array($visualMode, [
+            'cinematic-realistic',
+            'documentary-realistic',
+            'mixed-hybrid',
+        ]);
+    }
+
+    /**
+     * Build image prompt using structured JSON schema.
+     */
+    protected function buildStructuredImagePrompt(
+        string $visualDescription,
+        ?array $styleBible,
+        ?array $visualStyle,
+        WizardProject $project,
+        ?array $sceneMemory,
+        ?int $sceneIndex,
+        string $visualMode
+    ): string {
+        // Build options for structured prompt builder
+        $options = [
+            'visual_mode' => $visualMode,
+            'aspect_ratio' => $project->aspect_ratio ?? '16:9',
+            'scene_description' => $visualDescription,
+            'scene_index' => $sceneIndex ?? 0,
+            'style_bible' => $styleBible,
+            'character_bible' => $sceneMemory['characterBible'] ?? null,
+            'location_bible' => $sceneMemory['locationBible'] ?? null,
+        ];
+
+        // Build structured prompt
+        $structuredPrompt = $this->structuredPromptBuilder->build($options);
+
+        // Convert to prompt string
+        $promptString = $this->structuredPromptBuilder->toPromptString($structuredPrompt);
+
+        // Get negative prompts
+        $negativePromptString = $this->structuredPromptBuilder->getNegativePromptString($structuredPrompt);
+
+        // Append negative prompt instructions to the main prompt
+        // Since Gemini doesn't support separate negative prompts, we embed them as exclusions
+        if (!empty($negativePromptString)) {
+            $promptString .= "\n\nCRITICAL - AVOID these elements (they will ruin the image): {$negativePromptString}";
+        }
+
+        // Store negative prompt for HiDream/RunPod which supports it natively
+        $project->setAttribute('_lastNegativePrompt', $negativePromptString);
+
+        Log::info('ImageGenerationService: Built STRUCTURED prompt', [
+            'visualMode' => $visualMode,
+            'sceneIndex' => $sceneIndex,
+            'promptLength' => strlen($promptString),
+            'negativePromptLength' => strlen($negativePromptString),
+            'hasStyleBible' => !empty($styleBible['enabled']),
+            'hasCharacterBible' => !empty($sceneMemory['characterBible']['enabled']),
+            'hasLocationBible' => !empty($sceneMemory['locationBible']['enabled']),
+            'promptPreview' => substr($promptString, 0, 300) . '...',
+        ]);
+
+        return $promptString;
+    }
+
+    /**
+     * Legacy prompt building for non-realistic modes.
+     * Preserved for backward compatibility with stylized/animation modes.
+     */
+    protected function buildLegacyImagePrompt(
+        string $visualDescription,
+        ?array $styleBible,
+        ?array $visualStyle,
+        WizardProject $project,
+        ?array $sceneMemory,
+        ?int $sceneIndex
     ): string {
         // =========================================================================
         // EXTRACT ALL BIBLE DATA FIRST
@@ -1150,7 +1296,7 @@ EOT;
         $finalPrompt = implode('. ', array_filter($promptParts));
 
         // Log for debugging
-        Log::debug('ImageGenerationService: Built photorealistic prompt', [
+        Log::debug('ImageGenerationService: Built LEGACY photorealistic prompt', [
             'sceneIndex' => $sceneIndex,
             'promptLength' => strlen($finalPrompt),
             'hasStyleBible' => !empty($styleBible['enabled']),
