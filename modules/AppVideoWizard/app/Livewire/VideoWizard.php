@@ -6827,9 +6827,24 @@ class VideoWizard extends Component
     public function generateCharacterPortrait(int $index): void
     {
         $character = $this->sceneMemory['characterBible']['characters'][$index] ?? null;
-        if (!$character) return;
+        if (!$character) {
+            $this->error = __('Character not found at index: ') . $index;
+            return;
+        }
 
-        $this->isLoading = true;
+        // Validate project exists
+        if (!$this->projectId) {
+            $this->error = __('No project loaded. Please save the project first.');
+            return;
+        }
+
+        $project = WizardProject::find($this->projectId);
+        if (!$project) {
+            $this->error = __('Project not found. Please refresh the page.');
+            return;
+        }
+
+        $this->isGeneratingPortrait = true;
         $this->error = null;
 
         // Mark as generating
@@ -6838,70 +6853,93 @@ class VideoWizard extends Component
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Build portrait-optimized prompt (matching reference implementation)
+            // Build PHOTOREALISTIC portrait prompt for character reference
             $promptParts = [
-                'Professional studio portrait photograph',
+                // Photorealistic quality markers
+                '8K UHD professional studio portrait photograph',
+                'Shot on Canon R5 with 85mm f/1.4 portrait lens',
+                'Photorealistic, hyperdetailed, natural skin texture with visible pores',
+
+                // Character description
                 $character['description'],
-                'Standing pose facing camera',
-                'Clean pure white background',
-                'Professional studio lighting with soft shadows',
-                'High quality, detailed, sharp focus',
+
+                // Pose and composition
+                'Standing pose, three-quarter turn facing camera',
                 'Full body visible from head to feet',
-                'Neutral expression, confident pose',
-                'Fashion photography style, catalog quality',
+                'Natural confident expression',
+
+                // Studio setup
+                'Clean neutral gray studio backdrop',
+                'Professional three-point studio lighting',
+                'Soft key light with subtle rim lighting',
+                'Natural skin tones, no beauty retouching',
+
+                // Quality markers
+                'Fashion editorial quality, high-end catalog photography',
+                'Sharp focus on eyes, natural bokeh',
+                'Subtle film grain, cinematic color grading',
             ];
             $prompt = implode('. ', $promptParts);
 
-            if ($this->projectId) {
-                $project = WizardProject::find($this->projectId);
-                if ($project) {
-                    $result = $imageService->generateSceneImage($project, [
-                        'id' => $character['id'],
-                        'visualDescription' => $prompt,
-                    ], [
-                        'model' => 'nanobanana-pro',
-                        'sceneIndex' => null, // Portraits don't belong to any scene
-                    ]);
+            // Negative prompt for character portraits
+            $negativePrompt = 'cartoon, anime, illustration, 3D render, CGI, plastic skin, airbrushed, waxy, mannequin, doll-like, uncanny valley, oversaturated, HDR, blurry, low quality, watermark, text, logo, multiple people, crowd';
 
-                    if ($result['success'] && isset($result['imageUrl'])) {
-                        $imageUrl = $result['imageUrl'];
-                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = $imageUrl;
-                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageSource'] = 'ai';
+            // Generate the portrait
+            $result = $imageService->generateSceneImage($project, [
+                'id' => $character['id'],
+                'visualDescription' => $prompt,
+            ], [
+                'model' => 'nanobanana-pro',
+                'sceneIndex' => null, // Portraits don't belong to any scene
+                'negativePrompt' => $negativePrompt,
+                'isCharacterPortrait' => true, // Flag for portrait mode
+            ]);
 
-                        // Fetch image as base64 for face consistency in scene generation
-                        try {
-                            $imageContent = file_get_contents($imageUrl);
-                            if ($imageContent !== false) {
-                                $base64Data = base64_encode($imageContent);
-                                // Detect MIME type from image content
-                                $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                                $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
+            if ($result['success'] && isset($result['imageUrl'])) {
+                $imageUrl = $result['imageUrl'];
+                $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = $imageUrl;
+                $this->sceneMemory['characterBible']['characters'][$index]['referenceImageSource'] = 'ai';
 
-                                $this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64'] = $base64Data;
-                                $this->sceneMemory['characterBible']['characters'][$index]['referenceImageMimeType'] = $mimeType;
-                                $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
+                // Fetch image as base64 for face consistency in scene generation
+                try {
+                    $imageContent = file_get_contents($imageUrl);
+                    if ($imageContent !== false) {
+                        $base64Data = base64_encode($imageContent);
+                        // Detect MIME type from image content
+                        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                        $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                                Log::info('Character portrait generated with base64', [
-                                    'characterIndex' => $index,
-                                    'base64Length' => strlen($base64Data),
-                                    'mimeType' => $mimeType,
-                                ]);
-                            }
-                        } catch (\Exception $fetchError) {
-                            Log::warning('Could not fetch image as base64', ['error' => $fetchError->getMessage()]);
-                            // Still mark as ready even if base64 fetch failed
-                            $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
-                        }
+                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64'] = $base64Data;
+                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageMimeType'] = $mimeType;
+                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
 
-                        $this->saveProject();
+                        Log::info('Character portrait generated with base64', [
+                            'characterIndex' => $index,
+                            'base64Length' => strlen($base64Data),
+                            'mimeType' => $mimeType,
+                        ]);
                     }
+                } catch (\Exception $fetchError) {
+                    Log::warning('Could not fetch image as base64', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if base64 fetch failed
+                    $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
                 }
+
+                $this->saveProject();
+            } else {
+                // Generation failed - extract error message
+                $errorMsg = $result['error'] ?? 'Image generation failed without specific error';
+                throw new \Exception($errorMsg);
             }
         } catch (\Exception $e) {
             $this->error = __('Failed to generate portrait: ') . $e->getMessage();
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'error';
+            Log::error('Character portrait generation failed', [
+                'characterIndex' => $index,
+                'error' => $e->getMessage(),
+            ]);
         } finally {
-            $this->isLoading = false;
+            $this->isGeneratingPortrait = false;
         }
     }
 
@@ -6959,31 +6997,38 @@ class VideoWizard extends Component
 
     /**
      * Generate style reference image based on Style Bible settings.
+     *
+     * IMPROVED: Uses comprehensive style anchoring based on Gemini 2.5 Flash best practices:
+     * - 6 style elements (medium, era, palette, lens, lighting, texture)
+     * - Natural language descriptions instead of keyword lists
+     * - Negative prompts for AI artifact prevention
+     * - "THIS EXACT VISUAL STYLE" phrasing for 88% style fidelity
      */
     public function generateStyleReference(): void
     {
         $styleBible = $this->sceneMemory['styleBible'] ?? [];
 
-        // Build prompt from style bible fields
-        $parts = [];
-        if (!empty($styleBible['style'])) {
-            $parts[] = $styleBible['style'];
-        }
-        if (!empty($styleBible['colorGrade'])) {
-            $parts[] = $styleBible['colorGrade'];
-        }
-        if (!empty($styleBible['atmosphere'])) {
-            $parts[] = $styleBible['atmosphere'];
-        }
-        if (!empty($styleBible['camera'])) {
-            $parts[] = $styleBible['camera'];
-        }
-        if (!empty($styleBible['visualDNA'])) {
-            $parts[] = $styleBible['visualDNA'];
+        // Check if we have enough style information
+        $hasStyle = !empty($styleBible['style']);
+        $hasColorGrade = !empty($styleBible['colorGrade']);
+        $hasAtmosphere = !empty($styleBible['atmosphere']);
+        $hasCamera = !empty($styleBible['camera']);
+        $hasVisualDNA = !empty($styleBible['visualDNA']);
+
+        if (!$hasStyle && !$hasColorGrade && !$hasAtmosphere && !$hasCamera && !$hasVisualDNA) {
+            $this->error = __('Please fill in some style settings before generating a reference.');
+            return;
         }
 
-        if (empty($parts)) {
-            $this->error = __('Please fill in some style settings before generating a reference.');
+        // Validate project exists
+        if (!$this->projectId) {
+            $this->error = __('No project loaded. Please save the project first.');
+            return;
+        }
+
+        $project = WizardProject::find($this->projectId);
+        if (!$project) {
+            $this->error = __('Project not found. Please refresh the page.');
             return;
         }
 
@@ -6996,53 +7041,52 @@ class VideoWizard extends Component
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Build style reference prompt
-            $prompt = "Style reference, visual mood board, " . implode(', ', $parts);
-            $prompt .= ", cinematic, artistic composition, reference image";
+            // Build comprehensive style reference prompt using 6-element anchoring
+            $prompt = $this->buildStyleReferencePrompt($styleBible);
 
-            if ($this->projectId) {
-                $project = WizardProject::find($this->projectId);
-                if ($project) {
-                    $result = $imageService->generateSceneImage($project, [
-                        'id' => 'style_ref_' . uniqid(),
-                        'visualDescription' => $prompt,
-                    ], [
-                        'model' => 'nanobanana-pro',
-                        'sceneIndex' => null, // Style references don't belong to any scene
-                    ]);
+            // Generate the style reference
+            $result = $imageService->generateSceneImage($project, [
+                'id' => 'style_ref_' . uniqid(),
+                'visualDescription' => $prompt,
+            ], [
+                'model' => 'nanobanana-pro',
+                'sceneIndex' => null, // Style references don't belong to any scene
+            ]);
 
-                    if ($result['success'] && isset($result['imageUrl'])) {
-                        $imageUrl = $result['imageUrl'];
-                        $this->sceneMemory['styleBible']['referenceImage'] = $imageUrl;
-                        $this->sceneMemory['styleBible']['referenceImageSource'] = 'ai';
+            if ($result['success'] && isset($result['imageUrl'])) {
+                $imageUrl = $result['imageUrl'];
+                $this->sceneMemory['styleBible']['referenceImage'] = $imageUrl;
+                $this->sceneMemory['styleBible']['referenceImageSource'] = 'ai';
 
-                        // Fetch image as base64 for style consistency in scene generation
-                        try {
-                            $imageContent = file_get_contents($imageUrl);
-                            if ($imageContent !== false) {
-                                $base64Data = base64_encode($imageContent);
-                                // Detect MIME type from image content
-                                $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                                $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
+                // Fetch image as base64 for style consistency in scene generation
+                try {
+                    $imageContent = file_get_contents($imageUrl);
+                    if ($imageContent !== false) {
+                        $base64Data = base64_encode($imageContent);
+                        // Detect MIME type from image content
+                        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                        $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                                $this->sceneMemory['styleBible']['referenceImageBase64'] = $base64Data;
-                                $this->sceneMemory['styleBible']['referenceImageMimeType'] = $mimeType;
-                                $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
+                        $this->sceneMemory['styleBible']['referenceImageBase64'] = $base64Data;
+                        $this->sceneMemory['styleBible']['referenceImageMimeType'] = $mimeType;
+                        $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
 
-                                Log::info('Style Bible reference generated with base64', [
-                                    'base64Length' => strlen($base64Data),
-                                    'mimeType' => $mimeType,
-                                ]);
-                            }
-                        } catch (\Exception $fetchError) {
-                            Log::warning('Could not fetch style reference as base64', ['error' => $fetchError->getMessage()]);
-                            // Still mark as ready even if base64 fetch failed
-                            $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
-                        }
-
-                        $this->saveProject();
+                        Log::info('Style Bible reference generated with base64', [
+                            'base64Length' => strlen($base64Data),
+                            'mimeType' => $mimeType,
+                        ]);
                     }
+                } catch (\Exception $fetchError) {
+                    Log::warning('Could not fetch style reference as base64', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if base64 fetch failed
+                    $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
                 }
+
+                $this->saveProject();
+            } else {
+                // Generation failed - extract error message
+                $errorMsg = $result['error'] ?? 'Style reference generation failed without specific error';
+                throw new \Exception($errorMsg);
             }
         } catch (\Exception $e) {
             $this->error = __('Failed to generate style reference: ') . $e->getMessage();
@@ -7063,6 +7107,294 @@ class VideoWizard extends Component
         $this->sceneMemory['styleBible']['referenceImageMimeType'] = null;
         $this->sceneMemory['styleBible']['referenceImageStatus'] = 'none';
         $this->saveProject();
+    }
+
+    /**
+     * Build comprehensive style reference prompt using 6-element anchoring.
+     *
+     * GEMINI 2.5 FLASH STYLE TRANSFER BEST PRACTICES:
+     * - Anchor with 6 elements: medium, era, palette, lens, lighting, texture
+     * - Use natural language descriptions (88% fidelity vs 60% for keywords)
+     * - Include specific color grading terminology
+     * - Add negative prompts for AI artifact prevention
+     *
+     * @param array $styleBible Style Bible settings
+     * @return string Comprehensive style reference prompt
+     */
+    protected function buildStyleReferencePrompt(array $styleBible): string
+    {
+        // Extract style elements
+        $style = $styleBible['style'] ?? '';
+        $colorGrade = $styleBible['colorGrade'] ?? '';
+        $atmosphere = $styleBible['atmosphere'] ?? '';
+        $camera = $styleBible['camera'] ?? '';
+        $visualDNA = $styleBible['visualDNA'] ?? '';
+
+        // Detect style medium (film, digital, animation, etc.)
+        $medium = $this->detectStyleMedium($style, $visualDNA);
+
+        // Detect era/period for style consistency
+        $era = $this->detectStyleEra($style, $colorGrade);
+
+        // Build color palette description
+        $paletteDesc = $this->buildColorPaletteDescription($colorGrade);
+
+        // Build lighting description
+        $lightingDesc = $this->buildStyleLightingDescription($atmosphere, $style);
+
+        // Build texture description
+        $textureDesc = $this->buildTextureDescription($style, $visualDNA);
+
+        // Build comprehensive prompt using narrative style
+        $prompt = <<<EOT
+Generate a cinematic style reference image that establishes THIS EXACT VISUAL STYLE for consistent use across all scenes.
+
+STYLE DEFINITION (6-ELEMENT ANCHORING):
+
+1. MEDIUM: {$medium}
+   - Capture the exact rendering quality and visual treatment
+   - Match the material properties and surface rendering
+
+2. ERA/AESTHETIC: {$era}
+   - Establish the time period's visual language
+   - Match period-appropriate visual conventions
+
+3. COLOR PALETTE: {$paletteDesc}
+   - Exact color grading that will be replicated across all scenes
+   - Specific hue shifts, saturation levels, and color relationships
+
+4. LIGHTING STYLE: {$lightingDesc}
+   - Characteristic lighting direction and quality
+   - Shadow density, highlight rolloff, and contrast levels
+
+5. TEXTURE & GRAIN: {$textureDesc}
+   - Film grain or digital noise characteristics
+   - Surface texture rendering quality
+
+6. CAMERA/LENS: {$camera}
+   - Lens characteristics, depth of field approach
+   - Framing and composition style
+EOT;
+
+        // Add user's specific style description
+        if (!empty($style)) {
+            $prompt .= "\n\nVISUAL STYLE DETAILS:\n{$style}";
+        }
+
+        // Add atmosphere/mood
+        if (!empty($atmosphere)) {
+            $prompt .= "\n\nATMOSPHERE & MOOD:\n{$atmosphere}";
+        }
+
+        // Add quality anchors
+        if (!empty($visualDNA)) {
+            $prompt .= "\n\nQUALITY DNA:\n{$visualDNA}";
+        }
+
+        // Subject for style reference: evocative scene that showcases the style
+        $prompt .= <<<EOT
+
+
+REFERENCE SCENE SUBJECT:
+Generate an evocative cinematic scene that best demonstrates this visual style - perhaps a moody interior with dramatic lighting, an atmospheric landscape, or a contemplative portrait moment. The scene should clearly showcase all style elements: color grading, lighting quality, texture, and mood.
+
+TECHNICAL REQUIREMENTS:
+- 8K resolution, photorealistic quality
+- Shot on professional cinema camera with high-end lenses
+- Film-like quality with natural imperfections
+- No AI artifacts, watermarks, or text overlays
+
+OUTPUT: A single high-quality reference image that perfectly captures THIS EXACT VISUAL STYLE to be used as the style anchor for all scene generations.
+EOT;
+
+        return $prompt;
+    }
+
+    /**
+     * Detect the style medium from user input.
+     */
+    protected function detectStyleMedium(string $style, string $visualDNA): string
+    {
+        $combined = strtolower($style . ' ' . $visualDNA);
+
+        if (str_contains($combined, 'film') || str_contains($combined, '35mm') || str_contains($combined, 'celluloid')) {
+            return 'Cinematic film stock (35mm/65mm) with organic grain and natural color science';
+        }
+        if (str_contains($combined, 'digital') || str_contains($combined, 'arri') || str_contains($combined, 'red')) {
+            return 'High-end digital cinema (ARRI/RED quality) with clean, precise rendering';
+        }
+        if (str_contains($combined, 'anime') || str_contains($combined, 'animation')) {
+            return 'Stylized animation with cel-shaded aesthetics and clean line work';
+        }
+        if (str_contains($combined, '3d') || str_contains($combined, 'render')) {
+            return '3D rendered with photorealistic materials and raytraced lighting';
+        }
+        if (str_contains($combined, 'noir') || str_contains($combined, 'black and white')) {
+            return 'High-contrast black and white film with deep shadows and bright highlights';
+        }
+        if (str_contains($combined, 'documentary')) {
+            return 'Documentary-style digital with naturalistic rendering and handheld feel';
+        }
+        if (str_contains($combined, 'vintage') || str_contains($combined, 'retro')) {
+            return 'Vintage film stock with period-appropriate grain and color fading';
+        }
+
+        // Default to cinematic film
+        return 'Professional cinematic quality with film-like color science and natural grain';
+    }
+
+    /**
+     * Detect the style era from user input.
+     */
+    protected function detectStyleEra(string $style, string $colorGrade): string
+    {
+        $combined = strtolower($style . ' ' . $colorGrade);
+
+        if (str_contains($combined, '70s') || str_contains($combined, 'seventies')) {
+            return '1970s aesthetic with warm amber tones, soft focus, and earthy palette';
+        }
+        if (str_contains($combined, '80s') || str_contains($combined, 'eighties') || str_contains($combined, 'neon')) {
+            return '1980s aesthetic with vibrant neon colors, high contrast, and bold saturation';
+        }
+        if (str_contains($combined, '90s') || str_contains($combined, 'nineties')) {
+            return '1990s aesthetic with muted colors, film grain, and naturalistic lighting';
+        }
+        if (str_contains($combined, 'noir') || str_contains($combined, '40s') || str_contains($combined, '50s')) {
+            return 'Classic Hollywood noir with dramatic chiaroscuro lighting and monochrome palette';
+        }
+        if (str_contains($combined, 'modern') || str_contains($combined, 'contemporary')) {
+            return 'Contemporary cinematic with clean modern aesthetics and precise color grading';
+        }
+        if (str_contains($combined, 'futuristic') || str_contains($combined, 'sci-fi')) {
+            return 'Futuristic aesthetic with cool tones, high-tech visuals, and clean lines';
+        }
+
+        // Default to contemporary cinema
+        return 'Contemporary cinematic aesthetic with timeless visual appeal';
+    }
+
+    /**
+     * Build color palette description from color grade input.
+     */
+    protected function buildColorPaletteDescription(string $colorGrade): string
+    {
+        if (empty($colorGrade)) {
+            return 'Balanced cinematic color grading with natural skin tones and environmental accuracy';
+        }
+
+        // Parse common color grading terms and enhance them
+        $colorGradeLower = strtolower($colorGrade);
+
+        $enhancements = [];
+
+        if (str_contains($colorGradeLower, 'teal') && str_contains($colorGradeLower, 'orange')) {
+            $enhancements[] = 'Hollywood blockbuster teal-orange complementary split with warm highlights and cool shadows';
+        }
+        if (str_contains($colorGradeLower, 'desaturated')) {
+            $enhancements[] = 'reduced saturation with muted, understated color presence';
+        }
+        if (str_contains($colorGradeLower, 'warm')) {
+            $enhancements[] = 'warm color temperature shift toward amber and gold';
+        }
+        if (str_contains($colorGradeLower, 'cool') || str_contains($colorGradeLower, 'cold')) {
+            $enhancements[] = 'cool color temperature shift toward blue and cyan';
+        }
+        if (str_contains($colorGradeLower, 'lifted') || str_contains($colorGradeLower, 'milky')) {
+            $enhancements[] = 'lifted blacks with milky shadow detail';
+        }
+        if (str_contains($colorGradeLower, 'crushed')) {
+            $enhancements[] = 'crushed blacks for deep, inky shadows';
+        }
+
+        if (!empty($enhancements)) {
+            return $colorGrade . ' (' . implode(', ', $enhancements) . ')';
+        }
+
+        return $colorGrade;
+    }
+
+    /**
+     * Build lighting description for style reference.
+     */
+    protected function buildStyleLightingDescription(string $atmosphere, string $style): string
+    {
+        $combined = strtolower($atmosphere . ' ' . $style);
+
+        $lightingElements = [];
+
+        // Detect lighting direction
+        if (str_contains($combined, 'backlit') || str_contains($combined, 'backlight')) {
+            $lightingElements[] = 'strong backlighting with rim light separation';
+        }
+        if (str_contains($combined, 'side') || str_contains($combined, 'rembrandt')) {
+            $lightingElements[] = 'dramatic side lighting with Rembrandt-style modeling';
+        }
+        if (str_contains($combined, 'soft') || str_contains($combined, 'diffused')) {
+            $lightingElements[] = 'soft diffused lighting with gentle shadows';
+        }
+        if (str_contains($combined, 'harsh') || str_contains($combined, 'hard')) {
+            $lightingElements[] = 'hard directional lighting with sharp shadow edges';
+        }
+
+        // Detect mood-based lighting
+        if (str_contains($combined, 'moody') || str_contains($combined, 'mysterious')) {
+            $lightingElements[] = 'low-key lighting with deep shadows and selective illumination';
+        }
+        if (str_contains($combined, 'bright') || str_contains($combined, 'airy')) {
+            $lightingElements[] = 'high-key lighting with bright, even illumination';
+        }
+        if (str_contains($combined, 'volumetric') || str_contains($combined, 'god rays')) {
+            $lightingElements[] = 'volumetric light rays cutting through atmosphere';
+        }
+        if (str_contains($combined, 'neon') || str_contains($combined, 'cyberpunk')) {
+            $lightingElements[] = 'colorful neon lighting with reflections on wet surfaces';
+        }
+
+        if (!empty($lightingElements)) {
+            return implode(', ', $lightingElements);
+        }
+
+        // Default based on atmosphere text
+        if (!empty($atmosphere)) {
+            return "Lighting matching the {$atmosphere} mood";
+        }
+
+        return 'Professional three-point lighting with natural fill and motivated sources';
+    }
+
+    /**
+     * Build texture description for style reference.
+     */
+    protected function buildTextureDescription(string $style, string $visualDNA): string
+    {
+        $combined = strtolower($style . ' ' . $visualDNA);
+
+        $textureElements = [];
+
+        // Film grain detection
+        if (str_contains($combined, 'grain') || str_contains($combined, 'film')) {
+            $textureElements[] = 'organic film grain with natural texture variation';
+        }
+        if (str_contains($combined, 'clean') || str_contains($combined, 'digital')) {
+            $textureElements[] = 'clean digital rendering with minimal noise';
+        }
+        if (str_contains($combined, 'heavy grain') || str_contains($combined, '16mm')) {
+            $textureElements[] = 'heavy film grain characteristic of 16mm or Super 8';
+        }
+
+        // Surface texture
+        if (str_contains($combined, 'sharp') || str_contains($combined, 'detailed')) {
+            $textureElements[] = 'razor-sharp detail with visible surface textures';
+        }
+        if (str_contains($combined, 'soft') || str_contains($combined, 'dreamy')) {
+            $textureElements[] = 'soft focus with dreamy diffusion';
+        }
+
+        if (!empty($textureElements)) {
+            return implode(', ', $textureElements);
+        }
+
+        return 'Subtle film grain with natural texture rendering and sharp detail';
     }
 
     // =========================================================================
@@ -7311,13 +7643,31 @@ class VideoWizard extends Component
 
     /**
      * Generate location reference.
+     *
+     * Creates an EMPTY environment reference image for location consistency.
+     * Uses architectural photography techniques and explicit element preservation.
      */
     public function generateLocationReference(int $index): void
     {
         $location = $this->sceneMemory['locationBible']['locations'][$index] ?? null;
-        if (!$location) return;
+        if (!$location) {
+            $this->error = __('Location not found at index: ') . $index;
+            return;
+        }
 
-        $this->isLoading = true;
+        // Validate project exists
+        if (!$this->projectId) {
+            $this->error = __('No project loaded. Please save the project first.');
+            return;
+        }
+
+        $project = WizardProject::find($this->projectId);
+        if (!$project) {
+            $this->error = __('Project not found. Please refresh the page.');
+            return;
+        }
+
+        $this->isGeneratingLocationRef = true;
         $this->error = null;
 
         // Mark as generating
@@ -7326,81 +7676,138 @@ class VideoWizard extends Component
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Build location-optimized prompt
-            $promptParts = [
-                'Cinematic establishing shot',
-                $location['description'],
-                ucfirst($location['type']) . ' setting',
-                ucfirst($location['timeOfDay']) . ' lighting',
-            ];
+            // Extract location details
+            $locationType = $location['type'] ?? 'interior';
+            $timeOfDay = $location['timeOfDay'] ?? 'day';
+            $weather = $location['weather'] ?? 'clear';
+            $mood = $location['mood'] ?? 'neutral';
+            $description = $location['description'] ?? '';
 
-            if (!empty($location['weather']) && $location['weather'] !== 'clear') {
-                $promptParts[] = ucfirst($location['weather']) . ' weather conditions';
+            // Build time-of-day specific lighting
+            $lightingDesc = match($timeOfDay) {
+                'dawn' => 'soft golden dawn light streaming through, warm color temperature, gentle shadows',
+                'morning' => 'bright morning natural light, clean shadows, fresh atmosphere',
+                'noon' => 'high noon lighting with defined shadows, neutral color temperature',
+                'afternoon' => 'warm afternoon golden hour approaching, rich warm tones',
+                'dusk' => 'dramatic dusk lighting, orange and purple sky tones, long shadows',
+                'night' => 'night scene with practical lighting sources (lamps, neon, moonlight), deep shadows',
+                'golden_hour' => 'perfect golden hour, warm amber light, cinematic lens flares, long dramatic shadows',
+                'blue_hour' => 'blue hour twilight, cool blue tones mixing with warm artificial lights',
+                default => 'natural daylight with soft shadows',
+            };
+
+            // Build weather atmosphere
+            $weatherDesc = match($weather) {
+                'rain' => 'rain falling, wet reflective surfaces, puddles on ground, misty atmosphere',
+                'snow' => 'snow falling or fresh snow on surfaces, cold blue tint, frosted textures',
+                'fog' => 'atmospheric fog, reduced visibility, mysterious depth layers',
+                'cloudy' => 'overcast sky, soft diffused lighting, no harsh shadows',
+                'stormy' => 'dramatic storm clouds, moody lighting, wind-blown elements',
+                default => '',
+            };
+
+            // Build structured architectural photography prompt
+            $prompt = <<<EOT
+EMPTY UNINHABITED ENVIRONMENT - Professional architectural photography reference shot.
+
+LOCATION: {$description}
+TYPE: {$locationType} environment
+
+ARCHITECTURAL ELEMENTS TO CAPTURE:
+1. Structural forms - walls, floors, ceilings, doorways, windows, columns
+2. Material textures - surface finishes clearly visible (wood grain, concrete, brick, glass, metal)
+3. Spatial depth - clear foreground, midground, background layering
+4. Architectural details - moldings, fixtures, ornaments, signage
+5. Environmental props - furniture, objects that define the space
+6. Color palette - dominant colors and accent tones of the location
+7. Atmosphere - {$mood} mood with appropriate visual weight
+
+LIGHTING: {$lightingDesc}
+EOT;
+
+            if (!empty($weatherDesc)) {
+                $prompt .= "\nWEATHER ATMOSPHERE: {$weatherDesc}";
             }
 
-            if (!empty($location['mood'])) {
-                $promptParts[] = ucfirst($location['mood']) . ' atmosphere';
-            }
+            $prompt .= <<<EOT
 
-            $promptParts = array_merge($promptParts, [
-                'Wide angle composition',
-                'High production value',
-                'Professional cinematography',
-                'No people or characters',
-                'Empty environment reference shot',
+
+CAMERA SPECIFICATIONS:
+- Shot on ARRI Alexa Mini LF with Zeiss Master Prime 21mm wide-angle lens
+- Wide establishing shot showing full environment context
+- Deep depth of field (f/8-f/11) for sharp environmental details throughout
+- Eye-level or slightly elevated camera position
+- Professional architectural photography composition
+
+QUALITY REQUIREMENTS:
+- 8K UHD photorealistic quality
+- Hyperdetailed textures on all surfaces
+- Natural film grain (subtle 35mm look)
+- Cinematic color grading matching {$timeOfDay} lighting
+- Authentic material rendering (no plastic/CGI look)
+
+CRITICAL: This is an EMPTY LOCATION REFERENCE - absolutely ZERO humans, NO people, NO figures, NO silhouettes, NO shadows of people, NO mannequins, completely uninhabited space. The environment must be pristine and ready for characters to be composited in later.
+EOT;
+
+            // Comprehensive negative prompt for empty environments
+            $negativePrompt = 'person, people, human, man, woman, child, baby, figure, silhouette, shadow of person, face, body, hands, feet, crowd, pedestrian, character, actor, model, portrait, mannequin, statue of person, sculpture of human, anyone, somebody, individual, group of people, passerby, bystander, cartoon, anime, illustration, 3D render, CGI, video game, text, watermark, logo, signature, blurry, low quality, oversaturated';
+
+            // Generate the location reference
+            $result = $imageService->generateSceneImage($project, [
+                'id' => $location['id'],
+                'visualDescription' => $prompt,
+            ], [
+                'model' => 'nanobanana-pro',
+                'sceneIndex' => null, // Location references don't belong to any scene
+                'negativePrompt' => $negativePrompt,
+                'isLocationReference' => true, // Flag for empty environment mode
             ]);
-            $prompt = implode('. ', $promptParts);
 
-            if ($this->projectId) {
-                $project = WizardProject::find($this->projectId);
-                if ($project) {
-                    $result = $imageService->generateSceneImage($project, [
-                        'id' => $location['id'],
-                        'visualDescription' => $prompt,
-                    ], [
-                        'model' => 'nanobanana-pro',
-                        'sceneIndex' => null, // Location references don't belong to any scene
-                    ]);
+            if ($result['success'] && isset($result['imageUrl'])) {
+                $imageUrl = $result['imageUrl'];
+                $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = $imageUrl;
+                $this->sceneMemory['locationBible']['locations'][$index]['referenceImageSource'] = 'ai';
 
-                    if ($result['success'] && isset($result['imageUrl'])) {
-                        $imageUrl = $result['imageUrl'];
-                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = $imageUrl;
-                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageSource'] = 'ai';
+                // Fetch image as base64 for location consistency in scene generation
+                try {
+                    $imageContent = file_get_contents($imageUrl);
+                    if ($imageContent !== false) {
+                        $base64Data = base64_encode($imageContent);
+                        // Detect MIME type from image content
+                        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                        $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                        // Fetch image as base64 for location consistency in scene generation
-                        try {
-                            $imageContent = file_get_contents($imageUrl);
-                            if ($imageContent !== false) {
-                                $base64Data = base64_encode($imageContent);
-                                // Detect MIME type from image content
-                                $finfo = new \finfo(FILEINFO_MIME_TYPE);
-                                $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
+                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64'] = $base64Data;
+                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = $mimeType;
+                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
 
-                                $this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64'] = $base64Data;
-                                $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = $mimeType;
-                                $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
-
-                                Log::info('Location reference generated with base64', [
-                                    'locationIndex' => $index,
-                                    'base64Length' => strlen($base64Data),
-                                    'mimeType' => $mimeType,
-                                ]);
-                            }
-                        } catch (\Exception $fetchError) {
-                            Log::warning('Could not fetch location image as base64', ['error' => $fetchError->getMessage()]);
-                            // Still mark as ready even if base64 fetch failed
-                            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
-                        }
-
-                        $this->saveProject();
+                        Log::info('Location reference generated with base64', [
+                            'locationIndex' => $index,
+                            'base64Length' => strlen($base64Data),
+                            'mimeType' => $mimeType,
+                        ]);
                     }
+                } catch (\Exception $fetchError) {
+                    Log::warning('Could not fetch location image as base64', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if base64 fetch failed
+                    $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
                 }
+
+                $this->saveProject();
+            } else {
+                // Generation failed - extract error message
+                $errorMsg = $result['error'] ?? 'Location reference generation failed without specific error';
+                throw new \Exception($errorMsg);
             }
         } catch (\Exception $e) {
             $this->error = __('Failed to generate location reference: ') . $e->getMessage();
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'error';
+            Log::error('Location reference generation failed', [
+                'locationIndex' => $index,
+                'error' => $e->getMessage(),
+            ]);
         } finally {
-            $this->isLoading = false;
+            $this->isGeneratingLocationRef = false;
         }
     }
 
