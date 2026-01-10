@@ -398,6 +398,18 @@
                         this.isReady = true;
                         this.totalDuration = this.engine.totalDuration;
                         this.totalScenes = this.engine.scenes.length;
+
+                        // Apply saved playback speed preference
+                        if (this.playbackSpeed !== 1 && this.engine.setPlaybackRate) {
+                            this.engine.setPlaybackRate(this.playbackSpeed);
+                        }
+
+                        // Apply saved volume preference
+                        if (this.engine.setVolume) {
+                            const effectiveVolume = this.isMuted ? 0 : this.volume / 100;
+                            this.engine.setVolume(effectiveVolume, this.musicVolume / 100);
+                        }
+
                         window.dispatchEvent(new CustomEvent('preview-ready', {
                             detail: { duration: this.totalDuration, scenes: this.totalScenes }
                         }));
@@ -548,7 +560,8 @@
             return this.engine.scenes[this.currentSceneIndex];
         },
 
-        setVolume(voice, music) {
+        // Set engine volume directly (for music/voice balance)
+        setEngineVolume(voice, music) {
             if (this.engine) this.engine.setVolume(voice || 1.0, music || 0.3);
         },
 
