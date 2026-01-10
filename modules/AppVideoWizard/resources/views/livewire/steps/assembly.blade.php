@@ -534,10 +534,16 @@
         },
 
         seek(time) {
-            if (!this.engine || !this.isReady) return;
             const t = Math.max(0, Math.min(time, this.totalDuration));
-            this.engine.seek(t);
             this.currentTime = t;
+
+            // Always dispatch time update for timeline sync
+            window.dispatchEvent(new CustomEvent('preview-time-update', { detail: { time: t } }));
+
+            // If engine is ready, seek the actual video
+            if (this.engine && this.isReady) {
+                this.engine.seek(t);
+            }
         },
 
         seekStart() { this.seek(0); },
