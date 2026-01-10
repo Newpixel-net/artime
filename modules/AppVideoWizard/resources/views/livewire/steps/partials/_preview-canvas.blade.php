@@ -95,6 +95,20 @@
         <div class="vw-fullscreen-hint" x-show="!isFullscreen && isReady" x-cloak>
             {{ __('Double-click for fullscreen') }}
         </div>
+
+        {{-- Exit fullscreen hint (shown briefly in fullscreen) --}}
+        <div class="vw-exit-fullscreen-hint"
+             x-show="isFullscreen && controlsVisible"
+             x-cloak
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 -translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+            <span class="vw-exit-key">ESC</span>
+            <span>{{ __('to exit fullscreen') }}</span>
+        </div>
     </div>
 
     {{-- Modern Floating Controls --}}
@@ -674,8 +688,135 @@
     }
 
     .is-fullscreen .vw-controls-bar {
-        padding: 0.875rem 1.5rem;
-        border-radius: 1.25rem;
+        padding: 1rem 2rem;
+        border-radius: 1.5rem;
+        background: rgba(10, 10, 20, 0.85);
+    }
+
+    /* Fullscreen: Larger buttons */
+    .is-fullscreen .vw-ctrl-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.75rem;
+    }
+
+    .is-fullscreen .vw-ctrl-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .is-fullscreen .vw-play-pause-btn {
+        width: 56px;
+        height: 56px;
+    }
+
+    .is-fullscreen .vw-play-pause-btn svg {
+        width: 28px;
+        height: 28px;
+    }
+
+    /* Fullscreen: Larger center play button */
+    .is-fullscreen .vw-center-play-btn {
+        width: 100px;
+        height: 100px;
+    }
+
+    .is-fullscreen .vw-center-play-btn svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Fullscreen: Larger time display */
+    .is-fullscreen .vw-time-display {
+        font-size: 0.95rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    /* Fullscreen: Larger scene badge */
+    .is-fullscreen .vw-scene-badge {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+
+    /* Fullscreen: Thicker progress bar */
+    .is-fullscreen .vw-progress-track {
+        height: 6px;
+    }
+
+    .is-fullscreen .vw-progress-bar:hover .vw-progress-track {
+        height: 10px;
+    }
+
+    .is-fullscreen .vw-progress-thumb {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Fullscreen: Larger volume slider */
+    .is-fullscreen .vw-volume-control:hover .vw-volume-slider-wrapper {
+        width: 100px;
+    }
+
+    /* Exit fullscreen hint */
+    .vw-exit-fullscreen-hint {
+        position: absolute;
+        top: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.7);
+        pointer-events: none;
+        z-index: 100;
+    }
+
+    .vw-exit-key {
+        padding: 0.2rem 0.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.25rem;
+        font-family: 'SF Mono', Monaco, 'Consolas', monospace;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+    }
+
+    /* Fullscreen: Aspect ratio preservation */
+    .is-fullscreen .vw-canvas-frame {
+        width: auto;
+        height: calc(100vh - 140px);
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    /* Fullscreen: Center the canvas frame */
+    .vw-preview-container.is-fullscreen {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Fullscreen: Position controls at bottom */
+    .is-fullscreen .vw-controls-wrapper {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 0 3rem 2rem;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+    }
+
+    /* Fullscreen: Time tooltip larger */
+    .is-fullscreen .vw-time-tooltip {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.75rem;
     }
 
     .vw-controls-left,
@@ -683,6 +824,11 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
+    }
+
+    .is-fullscreen .vw-controls-left,
+    .is-fullscreen .vw-controls-right {
+        gap: 0.75rem;
     }
 
     /* Control Buttons */
