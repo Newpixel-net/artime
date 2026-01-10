@@ -235,12 +235,13 @@
 
         // ===== Reactive Scene Data (Phase A Fix) =====
         // Pre-computed scene metadata for reactive JS access
+        // Uses visualDuration first for consistency with preview engine
         scenesData: @js(collect($script['scenes'] ?? [])->map(function($scene, $index) use ($storyboard, $script) {
             $start = 0;
             for ($i = 0; $i < $index; $i++) {
-                $start += ($storyboard['scenes'][$i]['duration'] ?? $script['scenes'][$i]['duration'] ?? 5);
+                $start += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? $script['scenes'][$i]['duration'] ?? 5);
             }
-            $duration = $storyboard['scenes'][$index]['duration'] ?? $script['scenes'][$index]['duration'] ?? 5;
+            $duration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? $script['scenes'][$index]['duration'] ?? 5;
             return [
                 'index' => $index,
                 'start' => $start,
@@ -3673,9 +3674,9 @@
                         @php
                             $sceneStart = 0;
                             for ($i = 0; $i < $index; $i++) {
-                                $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                                $sceneStart += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? 5);
                             }
-                            $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                            $sceneDuration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? 5;
                             $thumbnail = $storyboard['scenes'][$index]['image'] ?? null;
                         @endphp
                         <div
@@ -3760,9 +3761,9 @@
                         @php
                             $sceneStart = 0;
                             for ($i = 0; $i < $index; $i++) {
-                                $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                                $sceneStart += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? 5);
                             }
-                            $voiceoverDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                            $voiceoverDuration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? 5;
                         @endphp
                         <div
                             class="vw-clip vw-clip-audio"
@@ -3866,9 +3867,9 @@
                             @php
                                 $sceneStart = 0;
                                 for ($i = 0; $i < $index; $i++) {
-                                    $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                                    $sceneStart += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? 5);
                                 }
-                                $captionDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                                $captionDuration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? 5;
                                 $captionText = Str::limit($scene['narration'] ?? '', 40);
                             @endphp
                             <div
@@ -4008,9 +4009,9 @@
                     @php
                         $sceneStart = 0;
                         for ($i = 0; $i < $index; $i++) {
-                            $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                            $sceneStart += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? 5);
                         }
-                        $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                        $sceneDuration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? 5;
                     @endphp
                     <div
                         class="vw-minimap-clip"
@@ -4028,9 +4029,9 @@
                     @php
                         $sceneStart = 0;
                         for ($i = 0; $i < $index; $i++) {
-                            $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                            $sceneStart += ($script['scenes'][$i]['visualDuration'] ?? $storyboard['scenes'][$i]['duration'] ?? 5);
                         }
-                        $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                        $sceneDuration = $script['scenes'][$index]['visualDuration'] ?? $storyboard['scenes'][$index]['duration'] ?? 5;
                     @endphp
                     <div
                         class="vw-minimap-clip"
