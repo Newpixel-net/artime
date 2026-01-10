@@ -102,18 +102,43 @@ class AnimationService
         string $prompt,
         int $duration
     ): array {
+        // Check if MiniMax API key is configured
+        $apiKey = (string) get_option('ai_minimax_api_key', '');
+        if (empty($apiKey)) {
+            return $this->errorResponse('MiniMax API key not configured. Please add your API key in Admin Panel > AI Configuration > MiniMax.');
+        }
+
+        // Validate API key format (MiniMax keys typically start with 'ey')
+        if (strlen($apiKey) < 20) {
+            Log::warning("AnimationService: MiniMax API key appears invalid", [
+                'key_length' => strlen($apiKey),
+            ]);
+            return $this->errorResponse('MiniMax API key appears to be invalid. Please verify your API key in Admin Panel > AI Configuration > MiniMax.');
+        }
+
         Log::info("AnimationService: Generating with MiniMax", [
             'project_id' => $project->id,
             'duration' => $duration,
+            'key_length' => strlen($apiKey),
+            'key_prefix' => substr($apiKey, 0, 4),
         ]);
 
-        $result = $this->miniMaxService->generateVideo($prompt, [
+        // Create fresh MiniMaxService instance to ensure current API key is used
+        // (Laravel's DI container may cache an instance with old/empty API key)
+        $miniMaxService = new MiniMaxService();
+
+        $result = $miniMaxService->generateVideo($prompt, [
             'first_frame_image' => $imageUrl,
             'model' => 'video-01',
         ]);
 
         if (!empty($result['error'])) {
-            return $this->errorResponse($result['error']);
+            // Add more context to the error
+            $errorMsg = $result['error'];
+            if (stripos($errorMsg, 'invalid api key') !== false) {
+                $errorMsg .= ' (Key length: ' . strlen($apiKey) . ', prefix: ' . substr($apiKey, 0, 4) . '...)';
+            }
+            return $this->errorResponse($errorMsg);
         }
 
         $data = $result['data'] ?? [];
@@ -209,7 +234,9 @@ class AnimationService
      */
     protected function getMiniMaxStatus(string $taskId): array
     {
-        $status = $this->miniMaxService->getVideoTaskStatus($taskId);
+        // Create fresh instance to ensure current API key is used
+        $miniMaxService = new MiniMaxService();
+        $status = $miniMaxService->getVideoTaskStatus($taskId);
 
         $statusMap = [
             'Queueing' => 'queued',
@@ -227,7 +254,7 @@ class AnimationService
         ];
 
         if ($normalizedStatus === 'completed' && !empty($status['file_id'])) {
-            $downloadUrl = $this->miniMaxService->getVideoDownloadUrl($status['file_id']);
+            $downloadUrl = $miniMaxService->getVideoDownloadUrl($status['file_id']);
             if ($downloadUrl) {
                 $result['videoUrl'] = $downloadUrl;
             }
