@@ -198,6 +198,43 @@
         // ===== Phase 3: Keyboard Shortcuts Modal =====
         showShortcutsModal: false,
 
+        // ===== Phase 5: Navigation & Zoom =====
+        // Enhanced Zoom
+        zoomPresets: [
+            { label: '25%', value: 0.25 },
+            { label: '50%', value: 0.5 },
+            { label: '75%', value: 0.75 },
+            { label: '100%', value: 1 },
+            { label: '150%', value: 1.5 },
+            { label: '200%', value: 2 },
+            { label: '400%', value: 4 }
+        ],
+        showZoomMenu: false,
+        isPinchZooming: false,
+        pinchStartZoom: 1,
+        pinchStartDistance: 0,
+        zoomFocusPoint: null,
+
+        // Timeline Minimap
+        showMinimap: true,
+        minimapHeight: 40,
+        minimapDragging: false,
+        minimapDragStartX: 0,
+        minimapDragStartScroll: 0,
+        minimapViewportWidth: 0,
+        minimapViewportLeft: 0,
+
+        // Scrubbing
+        isScrubbing: false,
+        scrubStartX: 0,
+        scrubStartTime: 0,
+        audioScrubEnabled: false,
+        scrubPreviewActive: false,
+
+        // Shuttle Control (enhanced)
+        shuttleSpeed: 0,
+        shuttleRateDisplay: '',
+
         // Format time helper
         formatTime(seconds) {
             if (!seconds || isNaN(seconds)) return '0:00';
@@ -1243,6 +1280,339 @@
 
             path += ' Z';
             return path;
+        },
+
+        // ===== Phase 5: Enhanced Zoom Controls =====
+        setZoomLevel(level) {
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            // Store scroll center point for zoom focus
+            const scrollCenter = container.scrollLeft + container.offsetWidth / 2;
+            const timeAtCenter = this.pixelsToTime(scrollCenter);
+
+            // Apply new zoom
+            this.zoom = Math.max(0.25, Math.min(4, level));
+
+            // Recenter on the same time position
+            this.$nextTick(() => {
+                const newPixelPosition = this.timeToPixels(timeAtCenter);
+                container.scrollLeft = newPixelPosition - container.offsetWidth / 2;
+                this.updateMinimapViewport();
+            });
+        },
+
+        zoomToSelection() {
+            if (this.selectedClips.length === 0) return;
+
+            // Find bounds of selection
+            let minTime = Infinity;
+            let maxTime = 0;
+
+            // Get time bounds from selected clips
+            @foreach($script['scenes'] ?? [] as $index => $scene)
+                @php
+                    $sceneStart = 0;
+                    for ($i = 0; $i < $index; $i++) {
+                        $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                    }
+                    $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                    $sceneEnd = $sceneStart + $sceneDuration;
+                @endphp
+                if (this.selectedClips.some(c => c.index === {{ $index }})) {
+                    minTime = Math.min(minTime, {{ $sceneStart }});
+                    maxTime = Math.max(maxTime, {{ $sceneEnd }});
+                }
+            @endforeach
+
+            if (minTime === Infinity || maxTime === 0) return;
+
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            const selectionDuration = maxTime - minTime;
+            const availableWidth = container.offsetWidth - 100; // Padding
+            const idealZoom = availableWidth / (selectionDuration * 60);
+
+            // Find closest zoom level
+            let closest = this.zoomLevels[0];
+            for (const level of this.zoomLevels) {
+                if (Math.abs(level - idealZoom) < Math.abs(closest - idealZoom)) {
+                    closest = level;
+                }
+            }
+
+            this.zoom = closest;
+
+            // Center on selection
+            this.$nextTick(() => {
+                const centerTime = minTime + selectionDuration / 2;
+                const centerPixel = this.timeToPixels(centerTime);
+                container.scrollLeft = centerPixel - container.offsetWidth / 2;
+                this.updateMinimapViewport();
+            });
+        },
+
+        handleWheelZoom(e) {
+            if (!e.ctrlKey && !e.metaKey) return;
+
+            e.preventDefault();
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            // Get cursor position relative to timeline
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left + container.scrollLeft;
+            const timeAtMouse = this.pixelsToTime(mouseX);
+
+            // Calculate new zoom
+            const delta = e.deltaY > 0 ? -1 : 1;
+            const currentIdx = this.zoomLevels.indexOf(this.zoom);
+            const newIdx = Math.max(0, Math.min(this.zoomLevels.length - 1, currentIdx + delta));
+            const newZoom = this.zoomLevels[newIdx];
+
+            if (newZoom === this.zoom) return;
+
+            this.zoom = newZoom;
+
+            // Maintain mouse position after zoom
+            this.$nextTick(() => {
+                const newPixelPosition = this.timeToPixels(timeAtMouse);
+                const mouseOffsetFromLeft = e.clientX - rect.left;
+                container.scrollLeft = newPixelPosition - mouseOffsetFromLeft;
+                this.updateMinimapViewport();
+            });
+        },
+
+        startPinchZoom(e) {
+            if (e.touches.length !== 2) return;
+
+            this.isPinchZooming = true;
+            this.pinchStartZoom = this.zoom;
+            this.pinchStartDistance = Math.hypot(
+                e.touches[1].clientX - e.touches[0].clientX,
+                e.touches[1].clientY - e.touches[0].clientY
+            );
+
+            // Store focus point (midpoint between touches)
+            const container = this.$refs.timelineScroll;
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left + container.scrollLeft;
+                this.zoomFocusPoint = this.pixelsToTime(midX);
+            }
+        },
+
+        handlePinchZoom(e) {
+            if (!this.isPinchZooming || e.touches.length !== 2) return;
+
+            e.preventDefault();
+            const currentDistance = Math.hypot(
+                e.touches[1].clientX - e.touches[0].clientX,
+                e.touches[1].clientY - e.touches[0].clientY
+            );
+
+            const scale = currentDistance / this.pinchStartDistance;
+            const newZoom = Math.max(0.25, Math.min(4, this.pinchStartZoom * scale));
+
+            // Find closest zoom level
+            let closest = this.zoomLevels[0];
+            for (const level of this.zoomLevels) {
+                if (Math.abs(level - newZoom) < Math.abs(closest - newZoom)) {
+                    closest = level;
+                }
+            }
+
+            if (closest !== this.zoom) {
+                this.zoom = closest;
+
+                // Maintain focus point
+                if (this.zoomFocusPoint !== null) {
+                    const container = this.$refs.timelineScroll;
+                    if (container) {
+                        const newPixelPosition = this.timeToPixels(this.zoomFocusPoint);
+                        container.scrollLeft = newPixelPosition - container.offsetWidth / 2;
+                    }
+                }
+            }
+        },
+
+        endPinchZoom() {
+            this.isPinchZooming = false;
+            this.zoomFocusPoint = null;
+            this.updateMinimapViewport();
+        },
+
+        // ===== Phase 5: Timeline Minimap =====
+        get minimapScale() {
+            const container = this.$refs.timelineScroll;
+            if (!container) return 0.1;
+            return (container.offsetWidth - 20) / this.timelineWidth;
+        },
+
+        get minimapClips() {
+            const clips = [];
+            @foreach($script['scenes'] ?? [] as $index => $scene)
+                @php
+                    $sceneStart = 0;
+                    for ($i = 0; $i < $index; $i++) {
+                        $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                    }
+                    $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                @endphp
+                clips.push({
+                    track: 'video',
+                    left: {{ $sceneStart }} * this.minimapScale * this.pixelsPerSecond,
+                    width: {{ $sceneDuration }} * this.minimapScale * this.pixelsPerSecond
+                });
+            @endforeach
+            return clips;
+        },
+
+        updateMinimapViewport() {
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            const totalWidth = this.timelineWidth;
+            const minimapWidth = container.offsetWidth - 20; // Padding
+
+            this.minimapViewportWidth = (container.offsetWidth / totalWidth) * minimapWidth;
+            this.minimapViewportLeft = (container.scrollLeft / totalWidth) * minimapWidth;
+        },
+
+        startMinimapDrag(e) {
+            this.minimapDragging = true;
+            this.minimapDragStartX = e.clientX;
+            this.minimapDragStartScroll = this.$refs.timelineScroll?.scrollLeft || 0;
+
+            document.addEventListener('mousemove', this._boundHandleMinimapDrag = this.handleMinimapDrag.bind(this));
+            document.addEventListener('mouseup', this._boundEndMinimapDrag = this.endMinimapDrag.bind(this));
+            e.preventDefault();
+        },
+
+        handleMinimapDrag(e) {
+            if (!this.minimapDragging) return;
+
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            const minimapWidth = container.offsetWidth - 20;
+            const deltaX = e.clientX - this.minimapDragStartX;
+            const scrollDelta = (deltaX / minimapWidth) * this.timelineWidth;
+
+            container.scrollLeft = Math.max(0, Math.min(
+                this.timelineWidth - container.offsetWidth,
+                this.minimapDragStartScroll + scrollDelta
+            ));
+
+            this.updateMinimapViewport();
+        },
+
+        endMinimapDrag() {
+            this.minimapDragging = false;
+            document.removeEventListener('mousemove', this._boundHandleMinimapDrag);
+            document.removeEventListener('mouseup', this._boundEndMinimapDrag);
+        },
+
+        minimapNavigate(e) {
+            if (this.minimapDragging) return;
+
+            const container = this.$refs.timelineScroll;
+            const minimap = this.$refs.minimap;
+            if (!container || !minimap) return;
+
+            const rect = minimap.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const minimapWidth = container.offsetWidth - 20;
+
+            // Convert click position to scroll position
+            const scrollRatio = clickX / minimapWidth;
+            const targetScroll = scrollRatio * this.timelineWidth - container.offsetWidth / 2;
+
+            container.scrollLeft = Math.max(0, Math.min(
+                this.timelineWidth - container.offsetWidth,
+                targetScroll
+            ));
+
+            this.updateMinimapViewport();
+        },
+
+        // ===== Phase 5: Enhanced Scrubbing =====
+        startScrub(e) {
+            this.isScrubbing = true;
+            this.scrubStartX = e.clientX;
+            this.scrubStartTime = this.currentTime;
+
+            if (this.audioScrubEnabled) {
+                this.scrubPreviewActive = true;
+                this.$dispatch('scrub-preview-start');
+            }
+
+            document.addEventListener('mousemove', this._boundHandleScrub = this.handleScrub.bind(this));
+            document.addEventListener('mouseup', this._boundEndScrub = this.endScrub.bind(this));
+            e.preventDefault();
+        },
+
+        handleScrub(e) {
+            if (!this.isScrubbing) return;
+
+            const container = this.$refs.timelineScroll;
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left + container.scrollLeft;
+            let time = this.pixelsToTime(x);
+            time = Math.max(0, Math.min(this.totalDuration, time));
+
+            this.seek(time);
+
+            if (this.scrubPreviewActive) {
+                this.$dispatch('scrub-preview-update', { time });
+            }
+        },
+
+        endScrub() {
+            this.isScrubbing = false;
+            if (this.scrubPreviewActive) {
+                this.scrubPreviewActive = false;
+                this.$dispatch('scrub-preview-end');
+            }
+            document.removeEventListener('mousemove', this._boundHandleScrub);
+            document.removeEventListener('mouseup', this._boundEndScrub);
+        },
+
+        toggleAudioScrub() {
+            this.audioScrubEnabled = !this.audioScrubEnabled;
+        },
+
+        // ===== Phase 5: Enhanced Shuttle Control =====
+        updateShuttleDisplay() {
+            const rates = { '-4': '◀◀ 4x', '-2': '◀◀ 2x', '-1': '◀ 1x', '0': '▶ ||', '1': '▶ 1x', '2': '▶▶ 2x', '4': '▶▶ 4x' };
+            this.shuttleRateDisplay = rates[this.jklSpeed.toString()] || '▶ ||';
+        },
+
+        shuttleStop() {
+            this.jklSpeed = 0;
+            this.$dispatch('pause-preview');
+            this.updateShuttleDisplay();
+        },
+
+        shuttleForward() {
+            const speeds = [0, 1, 2, 4];
+            const currentIdx = speeds.indexOf(Math.max(0, this.jklSpeed));
+            if (currentIdx < speeds.length - 1) {
+                this.jklSpeed = speeds[currentIdx + 1];
+                this.$dispatch('jkl-playback', { speed: this.jklSpeed });
+            }
+            this.updateShuttleDisplay();
+        },
+
+        shuttleReverse() {
+            const speeds = [0, -1, -2, -4];
+            const currentIdx = speeds.indexOf(Math.min(0, this.jklSpeed));
+            if (currentIdx < speeds.length - 1) {
+                this.jklSpeed = speeds[currentIdx + 1];
+                this.$dispatch('jkl-playback', { speed: this.jklSpeed });
+            }
+            this.updateShuttleDisplay();
         }
     }"
     x-init="
@@ -1398,6 +1768,70 @@
                 e.preventDefault();
                 toggleRippleMode();
             }
+
+            // Toggle minimap
+            else if (key === 'm' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                showMinimap = !showMinimap;
+            }
+
+            // Zoom to selection
+            else if (key === 'f' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                if (selectedClips.length > 0) {
+                    zoomToSelection();
+                } else {
+                    zoomFit();
+                }
+            }
+        });
+
+        // ===== Phase 5: Wheel Zoom Handler =====
+        const timelineScroll = $refs.timelineScroll;
+        if (timelineScroll) {
+            timelineScroll.addEventListener('wheel', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    handleWheelZoom(e);
+                }
+            }, { passive: false });
+
+            // Track scroll for minimap
+            timelineScroll.addEventListener('scroll', () => {
+                updateMinimapViewport();
+            });
+
+            // Initialize minimap viewport on resize
+            new ResizeObserver(() => {
+                updateMinimapViewport();
+            }).observe(timelineScroll);
+        }
+
+        // ===== Phase 5: Touch/Pinch Zoom Handlers =====
+        const tracksContainer = $refs.tracksContainer;
+        if (tracksContainer) {
+            tracksContainer.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    startPinchZoom(e);
+                }
+            }, { passive: true });
+
+            tracksContainer.addEventListener('touchmove', (e) => {
+                if (isPinchZooming) {
+                    handlePinchZoom(e);
+                }
+            }, { passive: false });
+
+            tracksContainer.addEventListener('touchend', () => {
+                if (isPinchZooming) {
+                    endPinchZoom();
+                }
+            });
+        }
+
+        // Initialize minimap viewport
+        $nextTick(() => {
+            updateMinimapViewport();
+            updateShuttleDisplay();
         });
     "
     @click.away="deselectAll()"
@@ -1616,6 +2050,25 @@
 
         {{-- Right: Zoom & Time --}}
         <div class="vw-toolbar-section vw-toolbar-right">
+            {{-- Phase 5: Minimap Toggle --}}
+            <button
+                type="button"
+                @click="showMinimap = !showMinimap"
+                :class="{ 'is-active': showMinimap }"
+                class="vw-tool-btn vw-minimap-toggle"
+                title="{{ __('Toggle Minimap') }} (M)"
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M3 15h18"/>
+                    <rect x="5" y="5" width="4" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+                    <rect x="10" y="5" width="4" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+                    <rect x="15" y="5" width="4" height="8" rx="1" fill="currentColor" opacity="0.3"/>
+                </svg>
+            </button>
+
+            <div class="vw-toolbar-divider"></div>
+
             <div class="vw-zoom-control">
                 <button
                     type="button"
@@ -1631,6 +2084,50 @@
                     </svg>
                 </button>
 
+                {{-- Phase 5: Zoom Presets Dropdown --}}
+                <div class="vw-zoom-presets" x-data="{ open: false }" @click.away="open = false">
+                    <button
+                        type="button"
+                        @click="open = !open"
+                        class="vw-zoom-preset-btn"
+                        title="{{ __('Zoom Presets') }}"
+                    >
+                        <span x-text="Math.round(zoom * 100) + '%'">100%</span>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                    </button>
+                    <div class="vw-zoom-preset-menu" x-show="open" x-cloak x-transition>
+                        <template x-for="preset in zoomPresets" :key="preset.value">
+                            <button
+                                type="button"
+                                class="vw-zoom-preset-item"
+                                :class="{ 'is-active': zoom === preset.value }"
+                                @click="setZoomLevel(preset.value); open = false"
+                            >
+                                <span x-text="preset.label"></span>
+                                <svg x-show="zoom === preset.value" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                            </button>
+                        </template>
+                        <div class="vw-zoom-preset-divider"></div>
+                        <button
+                            type="button"
+                            class="vw-zoom-preset-item"
+                            @click="zoomFit(); open = false"
+                        >
+                            <span>{{ __('Fit Project') }}</span>
+                            <span class="vw-shortcut-hint">0</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="vw-zoom-preset-item"
+                            :disabled="selectedClips.length === 0"
+                            @click="zoomToSelection(); open = false"
+                        >
+                            <span>{{ __('Zoom to Selection') }}</span>
+                            <span class="vw-shortcut-hint">F</span>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="vw-zoom-slider-container">
                     <input
                         type="range"
@@ -1638,9 +2135,8 @@
                         min="0"
                         :max="zoomLevels.length - 1"
                         :value="zoomLevels.indexOf(zoom)"
-                        @input="zoom = zoomLevels[$event.target.value]"
+                        @input="setZoomLevel(zoomLevels[$event.target.value])"
                     >
-                    <span class="vw-zoom-value" x-text="Math.round(zoom * 100) + '%'">100%</span>
                 </div>
 
                 <button
@@ -1835,12 +2331,14 @@
 
         {{-- Scrollable Timeline Area --}}
         <div class="vw-timeline-scroll" x-ref="timelineScroll" @scroll="scrollLeft = $el.scrollLeft">
-            {{-- Time Ruler --}}
+            {{-- Time Ruler - Phase 5: Enhanced with Scrubbing --}}
             <div
                 class="vw-time-ruler"
                 x-ref="timelineRuler"
                 :style="{ width: timelineWidth + 'px' }"
+                :class="{ 'is-scrubbing': isScrubbing }"
                 @click="seekToPosition($event)"
+                @mousedown="startScrub($event)"
             >
                 {{-- Ruler Background Pattern --}}
                 <div class="vw-ruler-pattern"></div>
@@ -2193,6 +2691,250 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    {{-- ===== Phase 5: Timeline Minimap ===== --}}
+    <div
+        class="vw-timeline-minimap"
+        x-ref="minimap"
+        x-show="showMinimap"
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 transform translate-y-2"
+        x-transition:enter-end="opacity-100 transform translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 transform translate-y-0"
+        x-transition:leave-end="opacity-0 transform translate-y-2"
+        :style="{ height: minimapHeight + 'px' }"
+        @click="minimapNavigate($event)"
+    >
+        {{-- Minimap Header --}}
+        <div class="vw-minimap-header">
+            <span class="vw-minimap-label">{{ __('Overview') }}</span>
+            <span class="vw-minimap-time" x-text="formatTime(0) + ' - ' + formatTime(totalDuration)"></span>
+        </div>
+
+        {{-- Minimap Track Area --}}
+        <div class="vw-minimap-tracks">
+            {{-- Video Track Mini Clips --}}
+            <div class="vw-minimap-track vw-minimap-video">
+                @foreach($script['scenes'] ?? [] as $index => $scene)
+                    @php
+                        $sceneStart = 0;
+                        for ($i = 0; $i < $index; $i++) {
+                            $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                        }
+                        $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                    @endphp
+                    <div
+                        class="vw-minimap-clip"
+                        :style="{
+                            left: ({{ $sceneStart }} / totalDuration * 100) + '%',
+                            width: ({{ $sceneDuration }} / totalDuration * 100) + '%'
+                        }"
+                    ></div>
+                @endforeach
+            </div>
+
+            {{-- Audio Track Mini Clips --}}
+            <div class="vw-minimap-track vw-minimap-audio">
+                @foreach($script['scenes'] ?? [] as $index => $scene)
+                    @php
+                        $sceneStart = 0;
+                        for ($i = 0; $i < $index; $i++) {
+                            $sceneStart += ($storyboard['scenes'][$i]['duration'] ?? 5);
+                        }
+                        $sceneDuration = $storyboard['scenes'][$index]['duration'] ?? 5;
+                    @endphp
+                    <div
+                        class="vw-minimap-clip"
+                        :style="{
+                            left: ({{ $sceneStart }} / totalDuration * 100) + '%',
+                            width: ({{ $sceneDuration }} / totalDuration * 100) + '%'
+                        }"
+                    ></div>
+                @endforeach
+            </div>
+
+            {{-- Viewport Indicator --}}
+            <div
+                class="vw-minimap-viewport"
+                :class="{ 'is-dragging': minimapDragging }"
+                :style="{
+                    left: minimapViewportLeft + 'px',
+                    width: Math.max(20, minimapViewportWidth) + 'px'
+                }"
+                @mousedown.stop="startMinimapDrag($event)"
+            >
+                <div class="vw-viewport-handle vw-viewport-left"></div>
+                <div class="vw-viewport-handle vw-viewport-right"></div>
+            </div>
+
+            {{-- Playhead Position in Minimap --}}
+            <div
+                class="vw-minimap-playhead"
+                :style="{ left: (currentTime / totalDuration * 100) + '%' }"
+            ></div>
+
+            {{-- In/Out Points in Minimap --}}
+            <div
+                class="vw-minimap-in-point"
+                x-show="inPoint !== null"
+                x-cloak
+                :style="{ left: (inPoint / totalDuration * 100) + '%' }"
+            ></div>
+            <div
+                class="vw-minimap-out-point"
+                x-show="outPoint !== null"
+                x-cloak
+                :style="{ left: (outPoint / totalDuration * 100) + '%' }"
+            ></div>
+            <div
+                class="vw-minimap-range"
+                x-show="inPoint !== null && outPoint !== null"
+                x-cloak
+                :style="{
+                    left: (Math.min(inPoint, outPoint) / totalDuration * 100) + '%',
+                    width: (Math.abs(outPoint - inPoint) / totalDuration * 100) + '%'
+                }"
+            ></div>
+        </div>
+    </div>
+
+    {{-- ===== Phase 5: Shuttle & Transport Controls ===== --}}
+    <div class="vw-transport-bar">
+        {{-- Audio Scrub Toggle --}}
+        <button
+            type="button"
+            @click="toggleAudioScrub()"
+            :class="{ 'is-active': audioScrubEnabled }"
+            class="vw-transport-btn vw-audio-scrub-btn"
+            title="{{ __('Audio Scrub') }}"
+        >
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+            </svg>
+        </button>
+
+        <div class="vw-transport-divider"></div>
+
+        {{-- Shuttle Controls --}}
+        <div class="vw-shuttle-controls">
+            {{-- Reverse --}}
+            <button
+                type="button"
+                @click="shuttleReverse()"
+                class="vw-transport-btn vw-shuttle-btn"
+                :class="{ 'is-active': jklSpeed < 0 }"
+                title="{{ __('Reverse') }} (J)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+                </svg>
+            </button>
+
+            {{-- Stop/Pause --}}
+            <button
+                type="button"
+                @click="shuttleStop()"
+                class="vw-transport-btn vw-shuttle-stop"
+                :class="{ 'is-active': jklSpeed === 0 }"
+                title="{{ __('Stop') }} (K)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+            </button>
+
+            {{-- Forward --}}
+            <button
+                type="button"
+                @click="shuttleForward()"
+                class="vw-transport-btn vw-shuttle-btn"
+                :class="{ 'is-active': jklSpeed > 0 }"
+                title="{{ __('Forward') }} (L)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+                </svg>
+            </button>
+
+            {{-- Shuttle Speed Display --}}
+            <div class="vw-shuttle-display" :class="{ 'is-active': jklSpeed !== 0 }">
+                <span x-text="shuttleRateDisplay">▶ ||</span>
+            </div>
+        </div>
+
+        <div class="vw-transport-divider"></div>
+
+        {{-- Frame Step Controls --}}
+        <div class="vw-frame-controls">
+            <button
+                type="button"
+                @click="stepFrames(-1)"
+                class="vw-transport-btn"
+                title="{{ __('Previous Frame') }} (←)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+                </svg>
+            </button>
+            <button
+                type="button"
+                @click="stepFrames(1)"
+                class="vw-transport-btn"
+                title="{{ __('Next Frame') }} (→)"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="vw-transport-divider"></div>
+
+        {{-- In/Out Points --}}
+        <div class="vw-io-controls">
+            <button
+                type="button"
+                @click="setInPoint()"
+                :class="{ 'is-set': inPoint !== null }"
+                class="vw-transport-btn vw-in-btn"
+                title="{{ __('Set In Point') }} (I)"
+            >
+                <span>I</span>
+            </button>
+            <button
+                type="button"
+                @click="setOutPoint()"
+                :class="{ 'is-set': outPoint !== null }"
+                class="vw-transport-btn vw-out-btn"
+                title="{{ __('Set Out Point') }} (O)"
+            >
+                <span>O</span>
+            </button>
+            <button
+                type="button"
+                @click="clearInOutPoints()"
+                :disabled="inPoint === null && outPoint === null"
+                class="vw-transport-btn vw-clear-io"
+                title="{{ __('Clear In/Out') }}"
+            >
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+        </div>
+
+        {{-- Spacer --}}
+        <div class="vw-transport-spacer"></div>
+
+        {{-- Current Position --}}
+        <div class="vw-transport-time">
+            <span class="vw-current-time" x-text="formatTimeDetailed(currentTime)">0:00.0</span>
+            <span class="vw-time-separator">/</span>
+            <span class="vw-total-time" x-text="formatTime(totalDuration)">0:00</span>
         </div>
     </div>
 
@@ -4757,6 +5499,510 @@
     .vw-header-btn {
         width: 18px;
         height: 18px;
+    }
+}
+
+/* ==========================================================================
+   PHASE 5: ENHANCED ZOOM CONTROLS
+   ========================================================================== */
+
+.vw-minimap-toggle {
+    padding: 0.35rem;
+}
+
+.vw-minimap-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+
+.vw-minimap-toggle.is-active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: #a78bfa;
+}
+
+/* Zoom Presets Dropdown */
+.vw-zoom-presets {
+    position: relative;
+}
+
+.vw-zoom-preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.35rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-zoom-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.vw-zoom-preset-btn svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.6;
+}
+
+.vw-zoom-preset-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    min-width: 140px;
+    background: rgba(20, 20, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    z-index: 100;
+}
+
+.vw-zoom-preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.vw-zoom-preset-item:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.vw-zoom-preset-item.is-active {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+}
+
+.vw-zoom-preset-item svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vw-zoom-preset-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.vw-zoom-preset-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0.25rem 0;
+}
+
+.vw-shortcut-hint {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 0.2rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+/* ==========================================================================
+   PHASE 5: TIMELINE MINIMAP
+   ========================================================================== */
+
+.vw-timeline-minimap {
+    position: relative;
+    background: rgba(15, 15, 25, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.5rem 0.75rem;
+    overflow: hidden;
+}
+
+.vw-minimap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+}
+
+.vw-minimap-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.vw-minimap-time {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.vw-minimap-tracks {
+    position: relative;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.vw-minimap-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+}
+
+.vw-minimap-video {
+    top: 2px;
+}
+
+.vw-minimap-audio {
+    bottom: 2px;
+}
+
+.vw-minimap-clip {
+    position: absolute;
+    height: 100%;
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 2px;
+    transition: background 0.15s;
+}
+
+.vw-minimap-video .vw-minimap-clip {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+.vw-minimap-audio .vw-minimap-clip {
+    background: rgba(6, 182, 212, 0.5);
+}
+
+/* Viewport Indicator */
+.vw-minimap-viewport {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(139, 92, 246, 0.15);
+    border: 2px solid rgba(139, 92, 246, 0.6);
+    border-radius: 0.25rem;
+    cursor: grab;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.vw-minimap-viewport:hover {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.8);
+}
+
+.vw-minimap-viewport.is-dragging {
+    cursor: grabbing;
+    background: rgba(139, 92, 246, 0.3);
+    border-color: #a78bfa;
+}
+
+.vw-viewport-handle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.vw-minimap-viewport:hover .vw-viewport-handle {
+    opacity: 1;
+}
+
+.vw-viewport-left {
+    left: 4px;
+}
+
+.vw-viewport-right {
+    right: 4px;
+}
+
+/* Minimap Playhead */
+.vw-minimap-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* In/Out Points in Minimap */
+.vw-minimap-in-point,
+.vw-minimap-out-point {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    z-index: 5;
+}
+
+.vw-minimap-in-point {
+    background: #10b981;
+    border-radius: 0 0 0 2px;
+}
+
+.vw-minimap-out-point {
+    background: #f59e0b;
+    border-radius: 0 0 2px 0;
+}
+
+.vw-minimap-range {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(16, 185, 129, 0.15);
+    z-index: 4;
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   PHASE 5: TRANSPORT BAR
+   ========================================================================== */
+
+.vw-transport-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(10, 10, 20, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.vw-transport-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.35rem;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-transport-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.vw-transport-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.vw-transport-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vw-transport-btn.is-active {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #a78bfa;
+}
+
+.vw-transport-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Audio Scrub Button */
+.vw-audio-scrub-btn.is-active {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(6, 182, 212, 0.4);
+    color: #22d3ee;
+}
+
+/* Shuttle Controls */
+.vw-shuttle-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.vw-shuttle-btn.is-active {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #4ade80;
+}
+
+.vw-shuttle-stop.is-active {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.vw-shuttle-display {
+    min-width: 50px;
+    padding: 0.25rem 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+}
+
+.vw-shuttle-display.is-active {
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+}
+
+/* Frame Controls */
+.vw-frame-controls {
+    display: flex;
+    gap: 0.15rem;
+}
+
+/* In/Out Points */
+.vw-io-controls {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.vw-in-btn,
+.vw-out-btn {
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.vw-in-btn.is-set {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #34d399;
+}
+
+.vw-out-btn.is-set {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+}
+
+.vw-transport-spacer {
+    flex: 1;
+}
+
+.vw-transport-time {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0.35rem;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.vw-current-time {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: white;
+}
+
+.vw-time-separator {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.vw-total-time {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ==========================================================================
+   PHASE 5: SCRUBBING CURSOR
+   ========================================================================== */
+
+.vw-time-ruler.is-scrubbing {
+    cursor: ew-resize;
+}
+
+.vw-time-ruler.is-scrubbing::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(139, 92, 246, 0.05);
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   PHASE 5: RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .vw-zoom-presets {
+        display: none;
+    }
+
+    .vw-minimap-toggle {
+        display: none;
+    }
+
+    .vw-transport-bar {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        padding: 0.35rem 0.5rem;
+    }
+
+    .vw-transport-btn {
+        width: 24px;
+        height: 24px;
+    }
+
+    .vw-transport-btn svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .vw-shuttle-display {
+        display: none;
+    }
+
+    .vw-transport-time {
+        order: -1;
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 0.25rem;
+    }
+
+    .vw-timeline-minimap {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .vw-io-controls {
+        display: none;
+    }
+
+    .vw-frame-controls {
+        display: none;
     }
 }
 </style>
