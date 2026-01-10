@@ -9887,13 +9887,20 @@ class VideoWizard extends Component
         $this->collectAllShotVideos();
         $readiness = $this->getAssemblyReadiness();
 
+        // Get total scene count from script (always available)
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        // Calculate total duration from storyboard/script scenes (not just collected videos)
+        $totalDuration = $this->getTotalDuration();
+
         return [
             'mode' => $this->assembly['shotBased'] ? 'multi-shot' : 'standard',
             'status' => $this->assembly['assemblyStatus'],
             'videoCount' => count($this->assembly['collectedVideos']),
-            'sceneCount' => count($this->assembly['sceneClips']),
-            'totalDuration' => $this->assembly['totalDuration'],
-            'formattedDuration' => $this->formatDuration($this->assembly['totalDuration']),
+            'sceneCount' => $totalScenes, // Use total scenes, not just clips with videos
+            'readySceneCount' => count($this->assembly['sceneClips']), // Scenes with videos ready
+            'totalDuration' => $totalDuration,
+            'formattedDuration' => $this->formatDuration((int) $totalDuration),
             'isReady' => $readiness['isReady'],
             'progress' => $readiness['progress'],
             'pendingShots' => $readiness['pendingCount'],

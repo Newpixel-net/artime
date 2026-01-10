@@ -168,7 +168,7 @@
     }
 
     .vw-header-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 0.4rem;
         padding: 0.5rem 1rem;
@@ -178,6 +178,14 @@
         cursor: pointer;
         transition: all 0.2s ease;
         border: none;
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+    }
+
+    .vw-header-btn > span:first-child {
+        flex-shrink: 0;
+        line-height: 1;
     }
 
     .vw-header-btn.secondary {
