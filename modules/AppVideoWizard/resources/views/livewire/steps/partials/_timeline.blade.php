@@ -291,6 +291,47 @@
         showIORegion: true,
         ioRegionMode: 'highlight', // 'highlight', 'loop', 'export'
 
+        // ===== Phase 7: Performance & Polish =====
+        // Virtual Scrolling
+        virtualScrollEnabled: true,
+        visibleClipBuffer: 2, // Number of extra clips to render outside viewport
+        visibleClipRange: { start: 0, end: 100 },
+        lastScrollUpdate: 0,
+        scrollDebounceMs: 16, // ~60fps
+
+        // Web Workers
+        waveformWorker: null,
+        thumbnailWorker: null,
+        workerQueue: [],
+        isProcessingQueue: false,
+
+        // GPU Acceleration
+        useGPUAcceleration: true,
+        reducedMotion: false,
+
+        // Touch/Mobile Support
+        isTouchDevice: false,
+        touchStartX: 0,
+        touchStartY: 0,
+        touchStartTime: 0,
+        touchMoved: false,
+        longPressTimer: null,
+        longPressDuration: 500,
+        swipeThreshold: 50,
+        swipeVelocityThreshold: 0.3,
+        lastTouchX: 0,
+        lastTouchY: 0,
+        touchVelocity: 0,
+        isSwiping: false,
+        swipeDirection: null,
+        pinchDistance: 0,
+        isLongPressing: false,
+
+        // Performance Metrics (debug)
+        fpsCounter: 0,
+        lastFpsUpdate: 0,
+        currentFps: 60,
+
         // Format time helper
         formatTime(seconds) {
             if (!seconds || isNaN(seconds)) return '0:00';
@@ -1973,6 +2014,334 @@
 
             this.$dispatch('export-region', { start, end });
             this.showNotification('{{ __("Exporting selected region...") }}');
+        },
+
+        // ===== Phase 7: Virtual Scrolling =====
+        updateVisibleClipRange() {
+            if (!this.virtualScrollEnabled) return;
+
+            const now = performance.now();
+            if (now - this.lastScrollUpdate < this.scrollDebounceMs) return;
+            this.lastScrollUpdate = now;
+
+            const container = this.$refs.timelineScroll;
+            if (!container) return;
+
+            const scrollLeft = container.scrollLeft;
+            const viewportWidth = container.offsetWidth;
+
+            // Calculate visible time range with buffer
+            const bufferPixels = viewportWidth * 0.5;
+            const startTime = Math.max(0, this.pixelsToTime(scrollLeft - bufferPixels));
+            const endTime = this.pixelsToTime(scrollLeft + viewportWidth + bufferPixels);
+
+            this.visibleClipRange = { start: startTime, end: endTime };
+        },
+
+        isClipVisible(startTime, duration) {
+            if (!this.virtualScrollEnabled) return true;
+
+            const clipEnd = startTime + duration;
+            return !(clipEnd < this.visibleClipRange.start || startTime > this.visibleClipRange.end);
+        },
+
+        // ===== Phase 7: Web Workers =====
+        initWebWorkers() {
+            // Create waveform worker using inline blob
+            const waveformWorkerCode = `
+                self.onmessage = function(e) {
+                    const { id, audioData, width, height } = e.data;
+
+                    // Generate waveform path
+                    const points = Math.ceil(width / 3);
+                    let path = 'M 0 ' + (height / 2);
+                    const midY = height / 2;
+
+                    for (let i = 0; i <= points; i++) {
+                        const x = (i / points) * width;
+                        // Simulate audio amplitude with pseudo-random variation
+                        const seed = (id || 0) + i;
+                        const noise1 = Math.sin(seed * 0.3) * 0.3;
+                        const noise2 = Math.sin(seed * 0.7) * 0.2;
+                        const noise3 = Math.sin(seed * 0.1) * 0.4;
+                        const envelope = Math.sin((i / points) * Math.PI) * 0.3 + 0.7;
+                        const amplitude = (0.3 + noise1 + noise2 + noise3) * envelope;
+                        const y = midY - (amplitude * midY * 0.8);
+                        path += ' L ' + x.toFixed(2) + ' ' + y.toFixed(2);
+                    }
+
+                    // Mirror for bottom half
+                    for (let i = points; i >= 0; i--) {
+                        const x = (i / points) * width;
+                        const seed = (id || 0) + i;
+                        const noise1 = Math.sin(seed * 0.3) * 0.3;
+                        const noise2 = Math.sin(seed * 0.7) * 0.2;
+                        const noise3 = Math.sin(seed * 0.1) * 0.4;
+                        const envelope = Math.sin((i / points) * Math.PI) * 0.3 + 0.7;
+                        const amplitude = (0.3 + noise1 + noise2 + noise3) * envelope;
+                        const y = midY + (amplitude * midY * 0.8);
+                        path += ' L ' + x.toFixed(2) + ' ' + y.toFixed(2);
+                    }
+
+                    path += ' Z';
+                    self.postMessage({ id, path });
+                };
+            `;
+
+            try {
+                const waveformBlob = new Blob([waveformWorkerCode], { type: 'application/javascript' });
+                this.waveformWorker = new Worker(URL.createObjectURL(waveformBlob));
+                this.waveformWorker.onmessage = (e) => {
+                    this.$dispatch('waveform-generated', e.data);
+                };
+            } catch (err) {
+                console.warn('Web Workers not supported, using main thread');
+            }
+        },
+
+        generateWaveformAsync(id, width, height) {
+            if (this.waveformWorker) {
+                this.waveformWorker.postMessage({ id, width, height });
+            }
+        },
+
+        terminateWorkers() {
+            if (this.waveformWorker) {
+                this.waveformWorker.terminate();
+                this.waveformWorker = null;
+            }
+            if (this.thumbnailWorker) {
+                this.thumbnailWorker.terminate();
+                this.thumbnailWorker = null;
+            }
+        },
+
+        // ===== Phase 7: GPU Acceleration =====
+        getGPUTransform(x, y = 0) {
+            if (this.useGPUAcceleration) {
+                return `translate3d(${x}px, ${y}px, 0)`;
+            }
+            return `translate(${x}px, ${y}px)`;
+        },
+
+        requestAnimationFrameThrottled(callback) {
+            if (this._rafId) return;
+            this._rafId = requestAnimationFrame(() => {
+                callback();
+                this._rafId = null;
+            });
+        },
+
+        // ===== Phase 7: Touch/Mobile Support =====
+        initTouchSupport() {
+            this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+            // Check for reduced motion preference
+            this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            // Listen for motion preference changes
+            window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+                this.reducedMotion = e.matches;
+            });
+        },
+
+        handleTouchStart(e, trackId = null, clipIndex = null) {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                this.touchStartX = touch.clientX;
+                this.touchStartY = touch.clientY;
+                this.touchStartTime = performance.now();
+                this.touchMoved = false;
+                this.lastTouchX = touch.clientX;
+                this.lastTouchY = touch.clientY;
+
+                // Start long press timer for context menu
+                if (clipIndex !== null) {
+                    this.longPressTimer = setTimeout(() => {
+                        if (!this.touchMoved) {
+                            this.isLongPressing = true;
+                            // Trigger haptic feedback if available
+                            if (navigator.vibrate) {
+                                navigator.vibrate(50);
+                            }
+                            // Open context menu at touch position
+                            this.openContextMenu({
+                                clientX: touch.clientX,
+                                clientY: touch.clientY,
+                                preventDefault: () => {}
+                            }, trackId, clipIndex);
+                        }
+                    }, this.longPressDuration);
+                }
+            } else if (e.touches.length === 2) {
+                // Pinch zoom start
+                this.pinchDistance = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                );
+            }
+        },
+
+        handleTouchMove(e) {
+            if (this.isLongPressing) {
+                e.preventDefault();
+                return;
+            }
+
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - this.touchStartX;
+                const deltaY = touch.clientY - this.touchStartY;
+
+                // Calculate velocity
+                const now = performance.now();
+                const dt = now - this.touchStartTime;
+                if (dt > 0) {
+                    this.touchVelocity = Math.abs(deltaX) / dt;
+                }
+
+                // Check if moved enough to cancel long press
+                if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                    this.touchMoved = true;
+                    if (this.longPressTimer) {
+                        clearTimeout(this.longPressTimer);
+                        this.longPressTimer = null;
+                    }
+                }
+
+                // Detect swipe direction
+                if (!this.swipeDirection && this.touchMoved) {
+                    this.swipeDirection = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+                }
+
+                // Handle horizontal swipe for timeline scrolling
+                if (this.swipeDirection === 'horizontal') {
+                    const container = this.$refs.timelineScroll;
+                    if (container) {
+                        const scrollDelta = this.lastTouchX - touch.clientX;
+                        container.scrollLeft += scrollDelta;
+                        this.updateVisibleClipRange();
+                    }
+                }
+
+                this.lastTouchX = touch.clientX;
+                this.lastTouchY = touch.clientY;
+            } else if (e.touches.length === 2) {
+                // Pinch zoom
+                const newDistance = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                );
+
+                if (this.pinchDistance > 0) {
+                    const scale = newDistance / this.pinchDistance;
+                    if (scale > 1.1) {
+                        this.zoomIn();
+                        this.pinchDistance = newDistance;
+                    } else if (scale < 0.9) {
+                        this.zoomOut();
+                        this.pinchDistance = newDistance;
+                    }
+                }
+            }
+        },
+
+        handleTouchEnd(e) {
+            // Clear long press timer
+            if (this.longPressTimer) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+
+            if (this.isLongPressing) {
+                this.isLongPressing = false;
+                return;
+            }
+
+            // Check for swipe gesture
+            if (this.touchMoved && this.swipeDirection === 'horizontal') {
+                const deltaX = this.lastTouchX - this.touchStartX;
+
+                // Fast swipe navigation
+                if (this.touchVelocity > this.swipeVelocityThreshold && Math.abs(deltaX) > this.swipeThreshold) {
+                    const container = this.$refs.timelineScroll;
+                    if (container) {
+                        // Add momentum scrolling
+                        const momentum = deltaX * this.touchVelocity * 100;
+                        container.scrollBy({
+                            left: -momentum,
+                            behavior: this.reducedMotion ? 'auto' : 'smooth'
+                        });
+                    }
+                }
+            }
+
+            // Reset touch state
+            this.touchMoved = false;
+            this.swipeDirection = null;
+            this.touchVelocity = 0;
+            this.pinchDistance = 0;
+        },
+
+        handleTouchCancel() {
+            if (this.longPressTimer) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+            this.touchMoved = false;
+            this.swipeDirection = null;
+            this.isLongPressing = false;
+            this.pinchDistance = 0;
+        },
+
+        // Double tap to zoom
+        handleDoubleTap(e) {
+            if (this.zoom === 1) {
+                this.zoomIn();
+                this.zoomIn();
+            } else {
+                this.zoom = 1;
+            }
+        },
+
+        // ===== Phase 7: Performance Monitoring =====
+        updateFPS() {
+            const now = performance.now();
+            this.fpsCounter++;
+
+            if (now - this.lastFpsUpdate >= 1000) {
+                this.currentFps = this.fpsCounter;
+                this.fpsCounter = 0;
+                this.lastFpsUpdate = now;
+            }
+        },
+
+        // Debounced scroll handler
+        debouncedScroll: null,
+        setupScrollHandler() {
+            this.debouncedScroll = this.debounce(() => {
+                this.updateVisibleClipRange();
+                this.updateMinimapViewport();
+            }, 16);
+        },
+
+        debounce(func, wait) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        },
+
+        throttle(func, limit) {
+            let inThrottle;
+            return (...args) => {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
         }
     }"
     x-init="
@@ -2214,6 +2583,29 @@
         $nextTick(() => {
             updateMinimapViewport();
             updateShuttleDisplay();
+        });
+
+        // ===== Phase 7: Performance Initialization =====
+        // Initialize touch support
+        initTouchSupport();
+
+        // Initialize web workers
+        initWebWorkers();
+
+        // Initialize virtual scrolling
+        updateVisibleClipRange();
+        setupScrollHandler();
+
+        // Add optimized scroll handler
+        if (timelineScroll) {
+            timelineScroll.addEventListener('scroll', () => {
+                if (debouncedScroll) debouncedScroll();
+            }, { passive: true });
+        }
+
+        // Cleanup on unmount
+        window.addEventListener('beforeunload', () => {
+            terminateWorkers();
         });
     "
     @click.away="deselectAll()"
@@ -2865,6 +3257,10 @@
                  @mousemove="updateSplitCursor($event)"
                  @mousedown="if (currentTool === 'select' && !$event.target.closest('.vw-clip')) startMarquee($event)"
                  @click="if (currentTool === 'split' && splitCursorPosition) splitAtPosition(pixelsToTime(splitCursorPosition))"
+                 @touchstart.passive="handleTouchStart($event, null, null)"
+                 @touchmove.passive="handleTouchMove($event)"
+                 @touchend="handleTouchEnd($event)"
+                 @touchcancel="handleTouchCancel()"
             >
                 {{-- Video Track --}}
                 <div
@@ -7466,5 +7862,345 @@
     .vw-color-picker {
         display: none;
     }
+}
+
+/* ===== Phase 7: Performance & Polish CSS ===== */
+
+/* GPU Acceleration for smooth animations */
+.vw-clip,
+.vw-playhead,
+.vw-playhead-line,
+.vw-marker,
+.vw-io-marker,
+.vw-transition-indicator {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* GPU compositing for scrollable areas */
+.vw-timeline-scroll {
+    will-change: scroll-position;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Reduce repaints on hover states */
+.vw-clip:hover,
+.vw-track-header:hover,
+.vw-toolbar-btn:hover {
+    will-change: transform, box-shadow;
+}
+
+/* Touch-friendly targets - minimum 44px */
+@media (pointer: coarse) {
+    .vw-toolbar-btn,
+    .vw-track-control-btn,
+    .vw-zoom-btn,
+    .vw-nav-btn {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0.75rem;
+    }
+
+    .vw-track-header {
+        min-height: 48px;
+        padding: 0.75rem;
+    }
+
+    .vw-clip {
+        min-height: 44px;
+    }
+
+    .vw-resize-handle {
+        width: 16px;
+        touch-action: pan-y;
+    }
+
+    .vw-resize-handle-left {
+        left: -8px;
+    }
+
+    .vw-resize-handle-right {
+        right: -8px;
+    }
+
+    /* Larger touch targets for markers */
+    .vw-marker {
+        min-width: 20px;
+        min-height: 20px;
+    }
+
+    .vw-marker-flag {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Larger drag handles for transitions */
+    .vw-transition-handle {
+        width: 16px;
+        height: 100%;
+    }
+
+    /* Increase spacing for touch */
+    .vw-track {
+        margin-bottom: 4px;
+    }
+
+    .vw-clips-row {
+        gap: 4px;
+    }
+
+    /* Prevent text selection on touch */
+    .vw-timeline-container {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    /* Hide scrollbars on touch devices */
+    .vw-timeline-scroll::-webkit-scrollbar,
+    .vw-tracks-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    .vw-timeline-scroll,
+    .vw-tracks-scroll {
+        scrollbar-width: none;
+    }
+}
+
+/* Touch action for panning/zooming */
+.vw-tracks-container {
+    touch-action: pan-x pan-y pinch-zoom;
+}
+
+.vw-clip {
+    touch-action: manipulation;
+}
+
+.vw-resize-handle {
+    touch-action: pan-y;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .vw-clip,
+    .vw-playhead,
+    .vw-marker,
+    .vw-transition-indicator,
+    .vw-zoom-slider,
+    .vw-progress-bar {
+        transition: none !important;
+        animation: none !important;
+    }
+
+    .vw-timeline-scroll {
+        scroll-behavior: auto;
+    }
+
+    .vw-waveform-line,
+    .vw-beat-pulse {
+        animation: none !important;
+    }
+}
+
+/* Virtual scrolling placeholder styles */
+.vw-clip.vw-clip-placeholder {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.vw-clip.vw-clip-loading {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: vw-shimmer 1.5s infinite;
+}
+
+@keyframes vw-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Long-press visual feedback */
+.vw-clip.is-long-pressing {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Momentum scrolling indicator */
+.vw-timeline-scroll.is-momentum-scrolling {
+    scroll-snap-type: none;
+}
+
+/* Pinch zoom visual feedback */
+.vw-timeline-container.is-pinch-zooming {
+    outline: 2px solid rgba(139, 92, 246, 0.3);
+    outline-offset: -2px;
+}
+
+/* Swipe gesture hints */
+.vw-swipe-hint {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.vw-swipe-hint-left {
+    left: 8px;
+}
+
+.vw-swipe-hint-right {
+    right: 8px;
+}
+
+.vw-timeline-container.show-swipe-hints .vw-swipe-hint {
+    opacity: 1;
+}
+
+.vw-swipe-hint svg {
+    width: 20px;
+    height: 20px;
+    color: white;
+}
+
+/* Tablet responsive improvements */
+@media (min-width: 768px) and (max-width: 1024px) and (pointer: coarse) {
+    .vw-timeline-container {
+        padding: 0.5rem;
+    }
+
+    .vw-toolbar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .vw-toolbar-group {
+        gap: 0.375rem;
+    }
+
+    .vw-track-headers {
+        width: 100px;
+    }
+
+    .vw-track-header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .vw-track-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    /* Stack panels on tablets */
+    .vw-markers-panel,
+    .vw-transitions-panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 1rem 1rem 0 0;
+        max-height: 60vh;
+    }
+}
+
+/* Performance: content-visibility for off-screen elements */
+.vw-track:not(:focus-within) {
+    content-visibility: auto;
+    contain-intrinsic-height: 60px;
+}
+
+/* Layer promotion for animated elements */
+.vw-playhead-line {
+    transform: translateZ(0);
+    will-change: left;
+}
+
+.vw-clip.is-dragging {
+    transform: translate3d(var(--drag-x, 0), var(--drag-y, 0), 0);
+    will-change: transform;
+    z-index: 100;
+}
+
+/* Contain paint for track containers */
+.vw-tracks-wrapper {
+    contain: layout style;
+}
+
+.vw-track {
+    contain: layout;
+}
+
+/* Optimize clip rendering */
+.vw-clip-content {
+    contain: strict;
+}
+
+.vw-clip-thumbnail {
+    contain: layout paint;
+    content-visibility: auto;
+}
+
+.vw-waveform-canvas {
+    contain: strict;
+}
+
+/* Async image loading */
+.vw-clip-thumbnail img {
+    decoding: async;
+    loading: lazy;
+}
+
+/* Prevent layout thrashing */
+.vw-ruler-container,
+.vw-tracks-container {
+    contain: layout style;
+}
+
+/* FPS counter (debug mode) */
+.vw-fps-counter {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #10b981;
+    font-size: 10px;
+    font-family: monospace;
+    border-radius: 4px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.vw-fps-counter.fps-low {
+    color: #ef4444;
+}
+
+.vw-fps-counter.fps-medium {
+    color: #f59e0b;
 }
 </style>
