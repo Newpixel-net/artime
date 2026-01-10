@@ -82,7 +82,8 @@ class VideoPreviewEngine {
         let currentTime = 0;
         for (const scene of this.scenes) {
             scene.startTime = currentTime;
-            scene.endTime = currentTime + (scene.visualDuration || scene.duration || 5);
+            // Match getPreviewScenes() logic: visualDuration -> duration -> default 8
+            scene.endTime = currentTime + (scene.visualDuration ?? scene.duration ?? 8);
             currentTime = scene.endTime;
         }
         this.totalDuration = currentTime;
@@ -313,7 +314,8 @@ class VideoPreviewEngine {
 
         if (currentScene) {
             const audio = this.audioElements.get(currentScene.id);
-            if (audio) {
+            // Check audio exists and duration is valid (not NaN/Infinity)
+            if (audio && !isNaN(audio.duration) && isFinite(audio.duration)) {
                 const sceneLocalTime = this.currentTime - currentScene.startTime;
                 const voiceoverOffset = currentScene.voiceoverOffset || 0;
                 const audioTime = sceneLocalTime - voiceoverOffset;
@@ -327,7 +329,9 @@ class VideoPreviewEngine {
                     audio.volume = this.voiceVolume;
 
                     if (this.isPlaying && audio.paused) {
-                        audio.play().catch(() => {});
+                        audio.play().catch((err) => {
+                            console.warn('Audio playback failed:', err.message);
+                        });
                     }
                 } else {
                     if (!audio.paused) {
@@ -393,7 +397,12 @@ class VideoPreviewEngine {
     }
 
     _getSceneAtTime(time) {
-        return this.scenes.find(s => time >= s.startTime && time < s.endTime);
+        // Use inclusive end boundary to avoid gaps at scene transitions
+        // Last scene uses inclusive end, others use exclusive to avoid overlap
+        return this.scenes.find((s, idx) => {
+            const isLastScene = idx === this.scenes.length - 1;
+            return time >= s.startTime && (isLastScene ? time <= s.endTime : time < s.endTime);
+        });
     }
 
     _getPreviousScene(currentScene) {
@@ -403,11 +412,12 @@ class VideoPreviewEngine {
 
     _getTransitionProgress(scene) {
         if (!scene || !scene.transition) return null;
-        const transitionDuration = scene.transition.duration || 0.5;
+        // Ensure minimum duration to prevent division by zero
+        const transitionDuration = Math.max(0.01, scene.transition.duration || 0.5);
         const sceneProgress = this.currentTime - scene.startTime;
 
         if (sceneProgress < transitionDuration) {
-            return sceneProgress / transitionDuration;
+            return Math.min(1, sceneProgress / transitionDuration);
         }
         return null;
     }
@@ -504,10 +514,13 @@ class VideoPreviewEngine {
     }
 
     _renderFadeTransition(prevScene, nextScene, progress) {
+        // Render previous scene at full opacity
         this._renderScene(prevScene);
+        // Render next scene with fade-in alpha (wrapped in save/restore for clean state)
+        this.ctx.save();
         this.ctx.globalAlpha = progress;
         this._renderScene(nextScene);
-        this.ctx.globalAlpha = 1;
+        this.ctx.restore();
     }
 
     _renderSlideTransition(prevScene, nextScene, progress, direction) {
@@ -528,6 +541,7 @@ class VideoPreviewEngine {
         const scale = direction === 'in' ? 1 + progress * 0.5 : 1 - progress * 0.3;
         const alpha = 1 - progress;
 
+        // Render previous scene with zoom and fade-out
         this.ctx.save();
         this.ctx.translate(this.width / 2, this.height / 2);
         this.ctx.scale(scale, scale);
@@ -536,9 +550,11 @@ class VideoPreviewEngine {
         this._renderScene(prevScene);
         this.ctx.restore();
 
+        // Render next scene with fade-in (wrapped in save/restore for clean state)
+        this.ctx.save();
         this.ctx.globalAlpha = progress;
         this._renderScene(nextScene);
-        this.ctx.globalAlpha = 1;
+        this.ctx.restore();
     }
 
     _renderCaption(scene) {

@@ -9106,7 +9106,8 @@ class VideoWizard extends Component
         // Update assembly state
         $this->assembly['collectedVideos'] = $videos;
         $this->assembly['sceneClips'] = $sceneClips;
-        $this->assembly['totalDuration'] = array_sum(array_column($videos, 'duration'));
+        // Use getTotalDuration() for consistency with preview engine (not video durations)
+        $this->assembly['totalDuration'] = $this->getTotalDuration();
         $this->assembly['shotBased'] = $this->multiShotMode['enabled'];
 
         return $videos;
