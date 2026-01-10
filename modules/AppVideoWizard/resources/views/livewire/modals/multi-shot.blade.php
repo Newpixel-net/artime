@@ -602,3 +602,75 @@
     opacity: 1 !important;
 }
 </style>
+
+{{-- Video Job Polling Script --}}
+@if($showMultiShotModal)
+<script>
+(function() {
+    let videoPollingInterval = null;
+    const POLL_INTERVAL = 5000; // 5 seconds
+
+    function hasProcessingVideos() {
+        // Check if any shots are in generating/processing state
+        const decomposed = @json($multiShotMode['decomposedScenes'][$multiShotSceneIndex] ?? null);
+        if (!decomposed || !decomposed.shots) return false;
+
+        return decomposed.shots.some(shot =>
+            shot.videoStatus === 'generating' || shot.videoStatus === 'processing'
+        );
+    }
+
+    function startVideoPolling() {
+        if (videoPollingInterval) return;
+
+        console.log('[MultiShot] Starting video status polling');
+        videoPollingInterval = setInterval(() => {
+            if (hasProcessingVideos()) {
+                console.log('[MultiShot] Polling video status...');
+                Livewire.dispatch('poll-video-jobs');
+            } else {
+                console.log('[MultiShot] No processing videos, stopping poll');
+                stopVideoPolling();
+            }
+        }, POLL_INTERVAL);
+    }
+
+    function stopVideoPolling() {
+        if (videoPollingInterval) {
+            clearInterval(videoPollingInterval);
+            videoPollingInterval = null;
+            console.log('[MultiShot] Video polling stopped');
+        }
+    }
+
+    // Start polling if there are processing videos
+    if (hasProcessingVideos()) {
+        startVideoPolling();
+    }
+
+    // Listen for video generation start
+    Livewire.on('video-generation-started', () => {
+        console.log('[MultiShot] Video generation started');
+        startVideoPolling();
+    });
+
+    // Listen for all videos complete
+    Livewire.on('video-generation-complete', () => {
+        console.log('[MultiShot] Video generation complete');
+        stopVideoPolling();
+    });
+
+    // Cleanup when modal closes
+    document.addEventListener('livewire:navigating', () => {
+        stopVideoPolling();
+    });
+
+    // Also check periodically for new jobs
+    Livewire.hook('message.processed', (message, component) => {
+        if (hasProcessingVideos() && !videoPollingInterval) {
+            startVideoPolling();
+        }
+    });
+})();
+</script>
+@endif

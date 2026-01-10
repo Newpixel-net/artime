@@ -3487,6 +3487,99 @@ class VideoWizard extends Component
     }
 
     /**
+     * Poll for pending video generation jobs (multi-shot).
+     */
+    #[On('poll-video-jobs')]
+    public function pollVideoJobs(): void
+    {
+        if (empty($this->pendingJobs)) {
+            return;
+        }
+
+        \Log::info('Polling video jobs', ['count' => count($this->pendingJobs)]);
+
+        $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
+        $hasUpdates = false;
+
+        foreach ($this->pendingJobs as $jobKey => $job) {
+            $jobType = $job['type'] ?? '';
+
+            if ($jobType !== 'shot_video') {
+                continue;
+            }
+
+            $taskId = $job['taskId'] ?? null;
+            $provider = $job['provider'] ?? 'minimax';
+            $endpointId = $job['endpointId'] ?? null;
+            $sceneIndex = $job['sceneIndex'] ?? null;
+            $shotIndex = $job['shotIndex'] ?? null;
+
+            if (!$taskId || $sceneIndex === null || $shotIndex === null) {
+                continue;
+            }
+
+            try {
+                $result = $animationService->getTaskStatus($taskId, $provider, $endpointId);
+
+                \Log::info('Video job status', [
+                    'taskId' => $taskId,
+                    'provider' => $provider,
+                    'status' => $result['status'] ?? 'unknown',
+                ]);
+
+                if (!$result['success']) {
+                    continue;
+                }
+
+                $status = $result['status'];
+
+                if ($status === 'completed') {
+                    // Video generation completed
+                    if (isset($result['videoUrl'])) {
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
+                        $hasUpdates = true;
+
+                        \Log::info('Video ready', [
+                            'sceneIndex' => $sceneIndex,
+                            'shotIndex' => $shotIndex,
+                            'videoUrl' => $result['videoUrl'],
+                        ]);
+                    }
+                    unset($this->pendingJobs[$jobKey]);
+
+                } elseif (in_array($status, ['failed', 'cancelled', 'timeout', 'error'])) {
+                    // Video generation failed
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = $result['error'] ?? 'Generation failed';
+                    unset($this->pendingJobs[$jobKey]);
+                    $hasUpdates = true;
+
+                    \Log::warning('Video generation failed', [
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => $shotIndex,
+                        'error' => $result['error'] ?? 'Unknown error',
+                    ]);
+                }
+                // If queued or processing, keep polling
+
+            } catch (\Exception $e) {
+                \Log::error('Failed to poll video job: ' . $e->getMessage());
+            }
+        }
+
+        if ($hasUpdates) {
+            $this->saveProject();
+        }
+
+        // Dispatch completion event if no more pending video jobs
+        $hasVideoJobs = collect($this->pendingJobs)->contains(fn($job) => ($job['type'] ?? '') === 'shot_video');
+        if (!$hasVideoJobs) {
+            $this->dispatch('video-generation-complete');
+        }
+    }
+
+    /**
      * Get pending jobs count for a project.
      */
     public function getPendingJobsCount(): int
@@ -9560,6 +9653,9 @@ EOT;
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'processing';
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId'] = $result['taskId'];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider'] = $result['provider'] ?? 'minimax';
+
+                            // Dispatch event to start polling
+                            $this->dispatch('video-generation-started');
                         }
                         $this->saveProject();
                     } else {
