@@ -89,7 +89,14 @@ class ImageGenerationService
         $visualDescription = $scene['visualDescription'] ?? $scene['visual'] ?? '';
         $styleBible = $project->storyboard['styleBible'] ?? null;
         $visualStyle = $project->storyboard['visualStyle'] ?? null;
-        $sceneMemory = $project->storyboard['sceneMemory'] ?? null;
+
+        // SceneMemory contains Bible data (Character, Location, Style references)
+        // It can be stored in multiple locations depending on when it was saved
+        $contentConfig = $project->content_config ?? [];
+        $sceneMemory = $contentConfig['sceneMemory']
+            ?? $project->storyboard['sceneMemory']
+            ?? null;
+
         $sceneIndex = $options['sceneIndex'] ?? null;
         $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
 
@@ -1045,20 +1052,31 @@ EOT;
 
     /**
      * Determine the visual mode from project settings.
+     * Checks multiple locations where visualMode might be stored.
      */
     protected function getVisualMode(WizardProject $project, ?array $visualStyle): string
     {
-        // Check storyboard for explicit visual mode
-        $storyboard = $project->storyboard ?? [];
+        // Priority 1: Check concept for visual mode (this is where VideoWizard stores it)
+        $concept = $project->concept ?? [];
+        if (!empty($concept['visualMode'])) {
+            return $concept['visualMode'];
+        }
 
-        // Check for visual mode in storyboard settings
+        // Priority 2: Check storyboard for visual mode (fallback location)
+        $storyboard = $project->storyboard ?? [];
         if (!empty($storyboard['visualMode'])) {
             return $storyboard['visualMode'];
         }
 
-        // Infer from visual style settings
+        // Priority 3: Check content_config.content for visual mode
+        $contentConfig = $project->content_config ?? [];
+        $content = $contentConfig['content'] ?? [];
+        if (!empty($content['visualMode'])) {
+            return $content['visualMode'];
+        }
+
+        // Priority 4: Infer from visual style settings
         if ($visualStyle) {
-            // If style indicates realistic rendering
             $style = $visualStyle['style'] ?? $visualStyle['renderStyle'] ?? '';
             if (stripos($style, 'realistic') !== false || stripos($style, 'cinematic') !== false) {
                 return 'cinematic-realistic';

@@ -383,8 +383,11 @@ class StructuredPromptBuilderService
         $sceneCharacters = [];
 
         foreach ($characters as $character) {
-            $appliedScenes = $character['appliedScenes'] ?? [];
-            if (in_array($sceneIndex, $appliedScenes) || empty($appliedScenes)) {
+            // Support multiple field names for scene assignment (matching ImageGenerationService)
+            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+
+            // Empty array means character applies to ALL scenes (per UI design)
+            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
                 $sceneCharacters[] = $character;
             }
         }
@@ -467,8 +470,11 @@ class StructuredPromptBuilderService
         $sceneLocation = null;
 
         foreach ($locations as $location) {
-            $appliedScenes = $location['appliedScenes'] ?? [];
-            if (in_array($sceneIndex, $appliedScenes)) {
+            // Support multiple field names for scene assignment (matching ImageGenerationService)
+            $appliedScenes = $location['scenes'] ?? $location['appliedScenes'] ?? $location['appearsInScenes'] ?? [];
+
+            // Empty array means location applies to ALL scenes (per UI design)
+            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
                 $sceneLocation = $location;
                 break;
             }
