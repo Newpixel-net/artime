@@ -235,6 +235,62 @@
         shuttleSpeed: 0,
         shuttleRateDisplay: '',
 
+        // ===== Phase 6: Markers & Chapters =====
+        markers: [],
+        markerColors: [
+            { name: 'Red', value: '#ef4444' },
+            { name: 'Orange', value: '#f97316' },
+            { name: 'Yellow', value: '#eab308' },
+            { name: 'Green', value: '#22c55e' },
+            { name: 'Blue', value: '#3b82f6' },
+            { name: 'Purple', value: '#8b5cf6' },
+            { name: 'Pink', value: '#ec4899' }
+        ],
+        selectedMarker: null,
+        showMarkerPanel: false,
+        editingMarker: null,
+        showMarkerMenu: false,
+        markerMenuX: 0,
+        markerMenuY: 0,
+
+        // ===== Phase 6: Keyframes =====
+        showKeyframes: true,
+        selectedKeyframe: null,
+        keyframePreviewClip: null,
+        easingTypes: [
+            { name: 'Linear', value: 'linear', icon: '/' },
+            { name: 'Ease In', value: 'ease-in', icon: '⌒' },
+            { name: 'Ease Out', value: 'ease-out', icon: '⌒' },
+            { name: 'Ease In Out', value: 'ease-in-out', icon: '~' }
+        ],
+
+        // ===== Phase 6: Transitions Library =====
+        transitions: [
+            { id: 'fade', name: '{{ __("Fade") }}', icon: 'fade', duration: 0.5, category: 'basic' },
+            { id: 'dissolve', name: '{{ __("Dissolve") }}', icon: 'dissolve', duration: 0.5, category: 'basic' },
+            { id: 'wipe-left', name: '{{ __("Wipe Left") }}', icon: 'wipe', duration: 0.5, category: 'wipe' },
+            { id: 'wipe-right', name: '{{ __("Wipe Right") }}', icon: 'wipe', duration: 0.5, category: 'wipe' },
+            { id: 'wipe-up', name: '{{ __("Wipe Up") }}', icon: 'wipe', duration: 0.5, category: 'wipe' },
+            { id: 'wipe-down', name: '{{ __("Wipe Down") }}', icon: 'wipe', duration: 0.5, category: 'wipe' },
+            { id: 'slide-left', name: '{{ __("Slide Left") }}', icon: 'slide', duration: 0.5, category: 'slide' },
+            { id: 'slide-right', name: '{{ __("Slide Right") }}', icon: 'slide', duration: 0.5, category: 'slide' },
+            { id: 'zoom-in', name: '{{ __("Zoom In") }}', icon: 'zoom', duration: 0.5, category: 'zoom' },
+            { id: 'zoom-out', name: '{{ __("Zoom Out") }}', icon: 'zoom', duration: 0.5, category: 'zoom' },
+            { id: 'blur', name: '{{ __("Blur") }}', icon: 'blur', duration: 0.5, category: 'effect' },
+            { id: 'flash', name: '{{ __("Flash") }}', icon: 'flash', duration: 0.3, category: 'effect' }
+        ],
+        transitionCategories: ['basic', 'wipe', 'slide', 'zoom', 'effect'],
+        showTransitionLibrary: false,
+        selectedTransitionCategory: 'all',
+        draggingTransition: null,
+        transitionDropTarget: null,
+        previewingTransition: null,
+        clipTransitions: {}, // { clipKey: { in: transitionId, out: transitionId, inDuration: 0.5, outDuration: 0.5 } }
+
+        // ===== Phase 6: Enhanced In/Out Points =====
+        showIORegion: true,
+        ioRegionMode: 'highlight', // 'highlight', 'loop', 'export'
+
         // Format time helper
         formatTime(seconds) {
             if (!seconds || isNaN(seconds)) return '0:00';
@@ -1613,6 +1669,310 @@
                 this.$dispatch('jkl-playback', { speed: this.jklSpeed });
             }
             this.updateShuttleDisplay();
+        },
+
+        // ===== Phase 6: Markers & Chapters =====
+        addMarker(time = null, color = null, name = '') {
+            const markerTime = time !== null ? time : this.currentTime;
+            const marker = {
+                id: Date.now(),
+                time: markerTime,
+                color: color || this.markerColors[0].value,
+                name: name || '{{ __("Marker") }} ' + (this.markers.length + 1),
+                notes: ''
+            };
+            this.markers.push(marker);
+            this.markers.sort((a, b) => a.time - b.time);
+            this.saveHistory();
+            this.$dispatch('marker-added', { marker });
+            return marker;
+        },
+
+        addMarkerAtPlayhead() {
+            const marker = this.addMarker();
+            this.editingMarker = marker.id;
+            this.showMarkerPanel = true;
+        },
+
+        deleteMarker(markerId) {
+            const index = this.markers.findIndex(m => m.id === markerId);
+            if (index >= 0) {
+                this.markers.splice(index, 1);
+                this.saveHistory();
+                this.$dispatch('marker-deleted', { markerId });
+            }
+            if (this.selectedMarker === markerId) {
+                this.selectedMarker = null;
+            }
+            this.hideMarkerMenu();
+        },
+
+        updateMarker(markerId, updates) {
+            const marker = this.markers.find(m => m.id === markerId);
+            if (marker) {
+                Object.assign(marker, updates);
+                if (updates.time !== undefined) {
+                    this.markers.sort((a, b) => a.time - b.time);
+                }
+                this.$dispatch('marker-updated', { marker });
+            }
+        },
+
+        selectMarker(markerId) {
+            this.selectedMarker = markerId;
+            const marker = this.markers.find(m => m.id === markerId);
+            if (marker) {
+                this.seek(marker.time);
+            }
+        },
+
+        goToNextMarker() {
+            if (this.markers.length === 0) return;
+            const nextMarker = this.markers.find(m => m.time > this.currentTime + 0.1);
+            if (nextMarker) {
+                this.seek(nextMarker.time);
+                this.selectedMarker = nextMarker.id;
+            } else {
+                // Loop to first marker
+                this.seek(this.markers[0].time);
+                this.selectedMarker = this.markers[0].id;
+            }
+        },
+
+        goToPrevMarker() {
+            if (this.markers.length === 0) return;
+            const prevMarkers = this.markers.filter(m => m.time < this.currentTime - 0.1);
+            if (prevMarkers.length > 0) {
+                const prevMarker = prevMarkers[prevMarkers.length - 1];
+                this.seek(prevMarker.time);
+                this.selectedMarker = prevMarker.id;
+            } else {
+                // Loop to last marker
+                const lastMarker = this.markers[this.markers.length - 1];
+                this.seek(lastMarker.time);
+                this.selectedMarker = lastMarker.id;
+            }
+        },
+
+        openMarkerMenu(e, markerId) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showMarkerMenu = true;
+            this.markerMenuX = e.clientX;
+            this.markerMenuY = e.clientY;
+            this.selectedMarker = markerId;
+            setTimeout(() => {
+                document.addEventListener('click', this._boundHideMarkerMenu = this.hideMarkerMenu.bind(this), { once: true });
+            }, 10);
+        },
+
+        hideMarkerMenu() {
+            this.showMarkerMenu = false;
+        },
+
+        exportYouTubeChapters() {
+            if (this.markers.length === 0) return '';
+
+            let chapters = '';
+            const sortedMarkers = [...this.markers].sort((a, b) => a.time - b.time);
+
+            // Ensure first chapter starts at 0:00
+            if (sortedMarkers[0].time > 0) {
+                chapters += '0:00 {{ __("Intro") }}\n';
+            }
+
+            sortedMarkers.forEach(marker => {
+                const mins = Math.floor(marker.time / 60);
+                const secs = Math.floor(marker.time % 60);
+                const timestamp = mins + ':' + secs.toString().padStart(2, '0');
+                chapters += timestamp + ' ' + marker.name + '\n';
+            });
+
+            // Copy to clipboard
+            navigator.clipboard?.writeText(chapters.trim());
+            this.showNotification('{{ __("Chapters copied to clipboard!") }}');
+            return chapters;
+        },
+
+        // ===== Phase 6: Keyframe Methods =====
+        getClipKeyframes(track, clipIndex) {
+            // Mock keyframes for demo - in production these would come from clip data
+            const key = track + '-' + clipIndex;
+            // Return sample keyframes for visualization
+            return [
+                { time: 0, property: 'opacity', value: 1, easing: 'linear' },
+                { time: 0.5, property: 'scale', value: 1.1, easing: 'ease-in-out' },
+                { time: 1, property: 'opacity', value: 1, easing: 'ease-out' }
+            ];
+        },
+
+        selectKeyframe(track, clipIndex, keyframeIndex) {
+            this.selectedKeyframe = { track, clipIndex, keyframeIndex };
+            this.keyframePreviewClip = { track, clipIndex };
+        },
+
+        deselectKeyframe() {
+            this.selectedKeyframe = null;
+        },
+
+        // ===== Phase 6: Transitions Library =====
+        get filteredTransitions() {
+            if (this.selectedTransitionCategory === 'all') {
+                return this.transitions;
+            }
+            return this.transitions.filter(t => t.category === this.selectedTransitionCategory);
+        },
+
+        startTransitionDrag(e, transition) {
+            this.draggingTransition = transition;
+            document.addEventListener('mousemove', this._boundHandleTransitionDrag = this.handleTransitionDrag.bind(this));
+            document.addEventListener('mouseup', this._boundEndTransitionDrag = this.endTransitionDrag.bind(this));
+            e.preventDefault();
+        },
+
+        handleTransitionDrag(e) {
+            if (!this.draggingTransition) return;
+
+            // Find if we're over a clip edge
+            const clips = document.querySelectorAll('.vw-clip');
+            let nearestEdge = null;
+            let minDistance = 30; // Threshold in pixels
+
+            clips.forEach(clip => {
+                const rect = clip.getBoundingClientRect();
+                const leftEdgeDist = Math.abs(e.clientX - rect.left);
+                const rightEdgeDist = Math.abs(e.clientX - rect.right);
+
+                if (leftEdgeDist < minDistance) {
+                    minDistance = leftEdgeDist;
+                    nearestEdge = { clip, edge: 'in', x: rect.left };
+                }
+                if (rightEdgeDist < minDistance) {
+                    minDistance = rightEdgeDist;
+                    nearestEdge = { clip, edge: 'out', x: rect.right };
+                }
+            });
+
+            this.transitionDropTarget = nearestEdge;
+        },
+
+        endTransitionDrag() {
+            if (this.draggingTransition && this.transitionDropTarget) {
+                const clip = this.transitionDropTarget.clip;
+                const edge = this.transitionDropTarget.edge;
+                const track = clip.closest('.vw-track')?.dataset.track || 'video';
+                const clipIndex = parseInt(clip.dataset.clipIndex || '0');
+                const clipKey = track + '-' + clipIndex;
+
+                if (!this.clipTransitions[clipKey]) {
+                    this.clipTransitions[clipKey] = {};
+                }
+
+                if (edge === 'in') {
+                    this.clipTransitions[clipKey].in = this.draggingTransition.id;
+                    this.clipTransitions[clipKey].inDuration = this.draggingTransition.duration;
+                } else {
+                    this.clipTransitions[clipKey].out = this.draggingTransition.id;
+                    this.clipTransitions[clipKey].outDuration = this.draggingTransition.duration;
+                }
+
+                this.saveHistory();
+                this.$dispatch('transition-applied', {
+                    track,
+                    clipIndex,
+                    edge,
+                    transition: this.draggingTransition
+                });
+            }
+
+            this.draggingTransition = null;
+            this.transitionDropTarget = null;
+            document.removeEventListener('mousemove', this._boundHandleTransitionDrag);
+            document.removeEventListener('mouseup', this._boundEndTransitionDrag);
+        },
+
+        applyTransition(track, clipIndex, edge, transitionId) {
+            const clipKey = track + '-' + clipIndex;
+            const transition = this.transitions.find(t => t.id === transitionId);
+            if (!transition) return;
+
+            if (!this.clipTransitions[clipKey]) {
+                this.clipTransitions[clipKey] = {};
+            }
+
+            if (edge === 'in') {
+                this.clipTransitions[clipKey].in = transitionId;
+                this.clipTransitions[clipKey].inDuration = transition.duration;
+            } else {
+                this.clipTransitions[clipKey].out = transitionId;
+                this.clipTransitions[clipKey].outDuration = transition.duration;
+            }
+
+            this.saveHistory();
+        },
+
+        removeTransition(track, clipIndex, edge) {
+            const clipKey = track + '-' + clipIndex;
+            if (this.clipTransitions[clipKey]) {
+                if (edge === 'in') {
+                    delete this.clipTransitions[clipKey].in;
+                    delete this.clipTransitions[clipKey].inDuration;
+                } else {
+                    delete this.clipTransitions[clipKey].out;
+                    delete this.clipTransitions[clipKey].outDuration;
+                }
+            }
+            this.saveHistory();
+        },
+
+        getClipTransition(track, clipIndex, edge) {
+            const clipKey = track + '-' + clipIndex;
+            const transitions = this.clipTransitions[clipKey];
+            if (!transitions) return null;
+
+            const transitionId = edge === 'in' ? transitions.in : transitions.out;
+            if (!transitionId) return null;
+
+            return this.transitions.find(t => t.id === transitionId);
+        },
+
+        previewTransition(transition) {
+            this.previewingTransition = transition;
+            // Preview logic would trigger animation
+        },
+
+        stopTransitionPreview() {
+            this.previewingTransition = null;
+        },
+
+        // ===== Phase 6: Enhanced In/Out Points =====
+        toggleIORegion() {
+            this.showIORegion = !this.showIORegion;
+        },
+
+        setIORegionMode(mode) {
+            this.ioRegionMode = mode;
+            if (mode === 'loop' && this.inPoint !== null && this.outPoint !== null) {
+                this.$dispatch('loop-region', { start: this.inPoint, end: this.outPoint });
+            }
+        },
+
+        getIORegionDuration() {
+            if (this.inPoint === null || this.outPoint === null) return 0;
+            return Math.abs(this.outPoint - this.inPoint);
+        },
+
+        exportIORegion() {
+            if (this.inPoint === null || this.outPoint === null) {
+                this.showNotification('{{ __("Set In and Out points first") }}');
+                return;
+            }
+
+            const start = Math.min(this.inPoint, this.outPoint);
+            const end = Math.max(this.inPoint, this.outPoint);
+
+            this.$dispatch('export-region', { start, end });
+            this.showNotification('{{ __("Exporting selected region...") }}');
         }
     }"
     x-init="
@@ -1783,6 +2143,28 @@
                 } else {
                     zoomFit();
                 }
+            }
+
+            // ===== Phase 6: Marker shortcuts =====
+            // Add marker at playhead (Shift+M)
+            else if (key === 'm' && e.shiftKey) {
+                e.preventDefault();
+                addMarkerAtPlayhead();
+            }
+
+            // Navigate markers (Shift+Left/Right)
+            else if (key === 'arrowleft' && e.shiftKey && e.altKey) {
+                e.preventDefault();
+                goToPrevMarker();
+            } else if (key === 'arrowright' && e.shiftKey && e.altKey) {
+                e.preventDefault();
+                goToNextMarker();
+            }
+
+            // Toggle transitions panel (T)
+            else if (key === 't' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                e.preventDefault();
+                showTransitionLibrary = !showTransitionLibrary;
             }
         });
 
@@ -2031,6 +2413,47 @@
                     </svg>
                 </button>
             </div>
+
+            <div class="vw-toolbar-divider"></div>
+
+            {{-- ===== Phase 6: Markers Button ===== --}}
+            <div class="vw-marker-controls">
+                <button
+                    type="button"
+                    @click="addMarkerAtPlayhead()"
+                    class="vw-tool-btn vw-marker-btn"
+                    title="{{ __('Add Marker') }} (Shift+M)"
+                >
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    @click="showMarkerPanel = !showMarkerPanel"
+                    :class="{ 'is-active': showMarkerPanel || markers.length > 0 }"
+                    class="vw-tool-btn vw-markers-list-btn"
+                    title="{{ __('Markers Panel') }}"
+                >
+                    <span class="vw-marker-count" x-show="markers.length > 0" x-text="markers.length"></span>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                </button>
+            </div>
+
+            {{-- ===== Phase 6: Transitions Library Button ===== --}}
+            <button
+                type="button"
+                @click="showTransitionLibrary = !showTransitionLibrary"
+                :class="{ 'is-active': showTransitionLibrary }"
+                class="vw-tool-btn vw-transitions-btn"
+                title="{{ __('Transitions Library') }} (T)"
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    <path d="M10 7h4M14 7l-2 2-2-2M14 17h-4M10 17l2-2 2 2"/>
+                </svg>
+            </button>
 
             <div class="vw-toolbar-divider"></div>
 
@@ -2355,6 +2778,63 @@
                             x-show="mark.major && !mark.sub"
                             x-text="formatTime(mark.time)"
                         ></span>
+                    </div>
+                </template>
+
+                {{-- ===== Phase 6: In/Out Point Visual Markers on Ruler ===== --}}
+                <div
+                    class="vw-io-marker vw-in-marker"
+                    x-show="inPoint !== null && showIORegion"
+                    x-cloak
+                    :style="{ left: timeToPixels(inPoint) + 'px' }"
+                    @click.stop="seek(inPoint)"
+                    title="{{ __('In Point') }}"
+                >
+                    <svg viewBox="0 0 8 16" fill="currentColor">
+                        <path d="M0 0v16l8-8z"/>
+                    </svg>
+                </div>
+                <div
+                    class="vw-io-marker vw-out-marker"
+                    x-show="outPoint !== null && showIORegion"
+                    x-cloak
+                    :style="{ left: timeToPixels(outPoint) + 'px' }"
+                    @click.stop="seek(outPoint)"
+                    title="{{ __('Out Point') }}"
+                >
+                    <svg viewBox="0 0 8 16" fill="currentColor">
+                        <path d="M8 0v16l-8-8z"/>
+                    </svg>
+                </div>
+
+                {{-- I/O Region Highlight on Ruler --}}
+                <div
+                    class="vw-io-region-ruler"
+                    x-show="inPoint !== null && outPoint !== null && showIORegion"
+                    x-cloak
+                    :style="{
+                        left: timeToPixels(Math.min(inPoint, outPoint)) + 'px',
+                        width: (timeToPixels(Math.max(inPoint, outPoint)) - timeToPixels(Math.min(inPoint, outPoint))) + 'px'
+                    }"
+                ></div>
+
+                {{-- ===== Phase 6: Markers on Ruler ===== --}}
+                <template x-for="marker in markers" :key="marker.id">
+                    <div
+                        class="vw-ruler-marker"
+                        :class="{ 'is-selected': selectedMarker === marker.id }"
+                        :style="{ left: timeToPixels(marker.time) + 'px', '--marker-color': marker.color }"
+                        @click.stop="selectMarker(marker.id)"
+                        @dblclick.stop="editingMarker = marker.id; showMarkerPanel = true"
+                        @contextmenu="openMarkerMenu($event, marker.id)"
+                        :title="marker.name"
+                    >
+                        <div class="vw-marker-flag">
+                            <svg viewBox="0 0 10 14" fill="currentColor">
+                                <path d="M0 0h10l-3 5 3 5H0z"/>
+                            </svg>
+                        </div>
+                        <div class="vw-marker-line"></div>
                     </div>
                 </template>
 
@@ -3111,6 +3591,191 @@
     >
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/></svg>
         <span x-text="selectedClips.length + ' {{ __('clips selected') }}'"></span>
+    </div>
+
+    {{-- ===== Phase 6: Markers Panel ===== --}}
+    <div
+        class="vw-markers-panel"
+        x-show="showMarkerPanel"
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 transform translate-x-4"
+        x-transition:enter-end="opacity-100 transform translate-x-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 transform translate-x-0"
+        x-transition:leave-end="opacity-0 transform translate-x-4"
+    >
+        <div class="vw-markers-header">
+            <h3>{{ __('Markers & Chapters') }}</h3>
+            <div class="vw-markers-actions">
+                <button type="button" @click="addMarkerAtPlayhead()" class="vw-markers-add-btn" title="{{ __('Add Marker') }}">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <button type="button" @click="exportYouTubeChapters()" class="vw-markers-export-btn" :disabled="markers.length === 0" title="{{ __('Export YouTube Chapters') }}">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                    <span>{{ __('YT Chapters') }}</span>
+                </button>
+                <button type="button" @click="showMarkerPanel = false" class="vw-panel-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="vw-markers-list" x-show="markers.length > 0">
+            <template x-for="marker in markers" :key="marker.id">
+                <div
+                    class="vw-marker-item"
+                    :class="{ 'is-selected': selectedMarker === marker.id, 'is-editing': editingMarker === marker.id }"
+                    @click="selectMarker(marker.id)"
+                >
+                    <div class="vw-marker-color" :style="{ background: marker.color }"></div>
+                    <div class="vw-marker-info">
+                        <template x-if="editingMarker !== marker.id">
+                            <span class="vw-marker-name" x-text="marker.name"></span>
+                        </template>
+                        <template x-if="editingMarker === marker.id">
+                            <input
+                                type="text"
+                                class="vw-marker-name-input"
+                                :value="marker.name"
+                                @input="updateMarker(marker.id, { name: $event.target.value })"
+                                @keydown.enter="editingMarker = null"
+                                @keydown.escape="editingMarker = null"
+                                @blur="editingMarker = null"
+                                x-ref="markerNameInput"
+                                x-init="$nextTick(() => { if (editingMarker === marker.id) $el.focus() })"
+                            >
+                        </template>
+                        <span class="vw-marker-time" x-text="formatTime(marker.time)"></span>
+                    </div>
+                    <div class="vw-marker-item-actions">
+                        <div class="vw-color-picker">
+                            <template x-for="color in markerColors" :key="color.value">
+                                <button
+                                    type="button"
+                                    class="vw-color-option"
+                                    :class="{ 'is-selected': marker.color === color.value }"
+                                    :style="{ background: color.value }"
+                                    @click.stop="updateMarker(marker.id, { color: color.value })"
+                                    :title="color.name"
+                                ></button>
+                            </template>
+                        </div>
+                        <button type="button" @click.stop="editingMarker = marker.id" class="vw-marker-edit-btn" title="{{ __('Edit') }}">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        </button>
+                        <button type="button" @click.stop="deleteMarker(marker.id)" class="vw-marker-delete-btn" title="{{ __('Delete') }}">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div class="vw-markers-empty" x-show="markers.length === 0">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <p>{{ __('No markers yet') }}</p>
+            <span>{{ __('Press Shift+M to add a marker at the playhead') }}</span>
+        </div>
+
+        <div class="vw-markers-nav" x-show="markers.length > 1">
+            <button type="button" @click="goToPrevMarker()" title="{{ __('Previous Marker') }} (Shift+Alt+←)">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <span x-text="(markers.findIndex(m => m.id === selectedMarker) + 1) + ' / ' + markers.length"></span>
+            <button type="button" @click="goToNextMarker()" title="{{ __('Next Marker') }} (Shift+Alt+→)">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    {{-- ===== Phase 6: Marker Context Menu ===== --}}
+    <div
+        class="vw-marker-menu"
+        x-show="showMarkerMenu"
+        x-cloak
+        x-transition
+        :style="{ left: markerMenuX + 'px', top: markerMenuY + 'px' }"
+    >
+        <button type="button" @click="editingMarker = selectedMarker; showMarkerPanel = true; hideMarkerMenu()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            <span>{{ __('Edit Marker') }}</span>
+        </button>
+        <button type="button" @click="const m = markers.find(m => m.id === selectedMarker); if(m) seek(m.time); hideMarkerMenu()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <span>{{ __('Go to Marker') }}</span>
+        </button>
+        <div class="vw-marker-menu-divider"></div>
+        <button type="button" class="vw-danger" @click="deleteMarker(selectedMarker)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span>{{ __('Delete Marker') }}</span>
+        </button>
+    </div>
+
+    {{-- ===== Phase 6: Transitions Library Panel ===== --}}
+    <div
+        class="vw-transitions-panel"
+        x-show="showTransitionLibrary"
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 transform -translate-x-4"
+        x-transition:enter-end="opacity-100 transform translate-x-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 transform translate-x-0"
+        x-transition:leave-end="opacity-0 transform -translate-x-4"
+    >
+        <div class="vw-transitions-header">
+            <h3>{{ __('Transitions') }}</h3>
+            <button type="button" @click="showTransitionLibrary = false" class="vw-panel-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        {{-- Category Filter --}}
+        <div class="vw-transitions-categories">
+            <button
+                type="button"
+                @click="selectedTransitionCategory = 'all'"
+                :class="{ 'is-active': selectedTransitionCategory === 'all' }"
+            >{{ __('All') }}</button>
+            <template x-for="cat in transitionCategories" :key="cat">
+                <button
+                    type="button"
+                    @click="selectedTransitionCategory = cat"
+                    :class="{ 'is-active': selectedTransitionCategory === cat }"
+                    x-text="cat.charAt(0).toUpperCase() + cat.slice(1)"
+                ></button>
+            </template>
+        </div>
+
+        {{-- Transitions Grid --}}
+        <div class="vw-transitions-grid">
+            <template x-for="transition in filteredTransitions" :key="transition.id">
+                <div
+                    class="vw-transition-item"
+                    :class="{ 'is-previewing': previewingTransition?.id === transition.id }"
+                    @mousedown="startTransitionDrag($event, transition)"
+                    @mouseenter="previewTransition(transition)"
+                    @mouseleave="stopTransitionPreview()"
+                    :title="transition.name"
+                >
+                    <div class="vw-transition-preview">
+                        {{-- Transition icon based on type --}}
+                        <div class="vw-transition-icon" :class="'vw-trans-' + transition.icon">
+                            <div class="vw-trans-from"></div>
+                            <div class="vw-trans-to"></div>
+                        </div>
+                    </div>
+                    <span class="vw-transition-name" x-text="transition.name"></span>
+                    <span class="vw-transition-duration" x-text="transition.duration + 's'"></span>
+                </div>
+            </template>
+        </div>
+
+        <div class="vw-transitions-help">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
+            <span>{{ __('Drag a transition to a clip edge') }}</span>
+        </div>
     </div>
 
     {{-- ===== Phase 3: Keyboard Shortcuts Modal ===== --}}
@@ -6002,6 +6667,803 @@
     }
 
     .vw-frame-controls {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   PHASE 6: MARKERS & CHAPTERS
+   ========================================================================== */
+
+/* Toolbar Marker Controls */
+.vw-marker-controls {
+    display: flex;
+    align-items: center;
+}
+
+.vw-marker-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.vw-markers-list-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.3rem;
+}
+
+.vw-marker-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 0.3rem;
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #a78bfa;
+}
+
+.vw-markers-list-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Ruler Markers */
+.vw-ruler-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    cursor: pointer;
+    z-index: 15;
+    transform: translateX(-5px);
+}
+
+.vw-marker-flag {
+    position: relative;
+    color: var(--marker-color, #ef4444);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    transition: transform 0.15s;
+}
+
+.vw-marker-flag svg {
+    width: 10px;
+    height: 14px;
+}
+
+.vw-ruler-marker:hover .vw-marker-flag {
+    transform: scale(1.2);
+}
+
+.vw-ruler-marker.is-selected .vw-marker-flag {
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 4px var(--marker-color));
+}
+
+.vw-marker-line {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    width: 2px;
+    height: calc(100% + 200px);
+    background: var(--marker-color, #ef4444);
+    opacity: 0.3;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.vw-ruler-marker:hover .vw-marker-line,
+.vw-ruler-marker.is-selected .vw-marker-line {
+    opacity: 0.6;
+}
+
+/* I/O Point Visual Markers */
+.vw-io-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    cursor: pointer;
+    z-index: 12;
+}
+
+.vw-io-marker svg {
+    width: 8px;
+    height: 16px;
+}
+
+.vw-in-marker {
+    color: #10b981;
+    transform: translateX(-8px);
+}
+
+.vw-out-marker {
+    color: #f59e0b;
+}
+
+.vw-io-region-ruler {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(16, 185, 129, 0.1);
+    border-top: 2px solid rgba(16, 185, 129, 0.4);
+    z-index: 11;
+    pointer-events: none;
+}
+
+/* Markers Panel */
+.vw-markers-panel {
+    position: absolute;
+    top: 60px;
+    right: 10px;
+    width: 320px;
+    max-height: 400px;
+    background: rgba(20, 20, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vw-markers-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vw-markers-header h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.vw-markers-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.vw-markers-add-btn,
+.vw-markers-export-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.35rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-markers-add-btn:hover,
+.vw-markers-export-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+}
+
+.vw-markers-add-btn svg,
+.vw-markers-export-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vw-markers-export-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.vw-panel-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-panel-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.vw-panel-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Markers List */
+.vw-markers-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.vw-marker-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.vw-marker-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.vw-marker-item.is-selected {
+    background: rgba(139, 92, 246, 0.15);
+}
+
+.vw-marker-color {
+    width: 8px;
+    height: 24px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.vw-marker-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.vw-marker-name {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vw-marker-name-input {
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 0.25rem;
+    color: white;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.vw-marker-time {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.vw-marker-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.vw-marker-item:hover .vw-marker-item-actions {
+    opacity: 1;
+}
+
+.vw-color-picker {
+    display: flex;
+    gap: 0.15rem;
+}
+
+.vw-color-option {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.vw-color-option:hover {
+    transform: scale(1.2);
+}
+
+.vw-color-option.is-selected {
+    border-color: white;
+}
+
+.vw-marker-edit-btn,
+.vw-marker-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-radius: 0.25rem;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-marker-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.vw-marker-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.vw-marker-edit-btn svg,
+.vw-marker-delete-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Empty State */
+.vw-markers-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.vw-markers-empty svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.75rem;
+    opacity: 0.3;
+}
+
+.vw-markers-empty p {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.vw-markers-empty span {
+    font-size: 0.75rem;
+}
+
+/* Navigation */
+.vw-markers-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vw-markers-nav button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.35rem;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-markers-nav button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.vw-markers-nav button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.vw-markers-nav span {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Marker Context Menu */
+.vw-marker-menu {
+    position: fixed;
+    min-width: 160px;
+    background: rgba(20, 20, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 300;
+    padding: 0.35rem;
+}
+
+.vw-marker-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.35rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.vw-marker-menu button:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.vw-marker-menu button.vw-danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.vw-marker-menu button svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vw-marker-menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0.25rem 0;
+}
+
+/* ==========================================================================
+   PHASE 6: TRANSITIONS LIBRARY
+   ========================================================================== */
+
+.vw-transitions-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.vw-transitions-panel {
+    position: absolute;
+    top: 60px;
+    left: 10px;
+    width: 280px;
+    max-height: 450px;
+    background: rgba(20, 20, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vw-transitions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vw-transitions-header h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.vw-transitions-categories {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+}
+
+.vw-transitions-categories button {
+    padding: 0.3rem 0.6rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.vw-transitions-categories button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.vw-transitions-categories button.is-active {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #a78bfa;
+}
+
+.vw-transitions-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.75rem;
+    overflow-y: auto;
+}
+
+.vw-transition-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    cursor: grab;
+    transition: all 0.15s;
+}
+
+.vw-transition-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.vw-transition-item.is-previewing {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.vw-transition-item:active {
+    cursor: grabbing;
+}
+
+.vw-transition-preview {
+    width: 50px;
+    height: 35px;
+    margin-bottom: 0.35rem;
+    overflow: hidden;
+    border-radius: 0.25rem;
+}
+
+.vw-transition-icon {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.vw-trans-from,
+.vw-trans-to {
+    flex: 1;
+    transition: all 0.3s;
+}
+
+.vw-trans-from {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+}
+
+.vw-trans-to {
+    background: linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%);
+}
+
+/* Transition Animation Previews */
+.vw-trans-fade .vw-trans-from {
+    opacity: 1;
+}
+
+.vw-transition-item.is-previewing .vw-trans-fade .vw-trans-from {
+    opacity: 0;
+}
+
+.vw-trans-wipe .vw-trans-from {
+    transform: translateX(0);
+}
+
+.vw-transition-item.is-previewing .vw-trans-wipe .vw-trans-from {
+    transform: translateX(-100%);
+}
+
+.vw-trans-slide .vw-trans-to {
+    transform: translateX(100%);
+}
+
+.vw-transition-item.is-previewing .vw-trans-slide .vw-trans-to {
+    transform: translateX(0);
+}
+
+.vw-trans-zoom .vw-trans-from {
+    transform: scale(1);
+}
+
+.vw-transition-item.is-previewing .vw-trans-zoom .vw-trans-from {
+    transform: scale(0.5);
+    opacity: 0;
+}
+
+.vw-trans-dissolve {
+    background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+}
+
+.vw-trans-blur .vw-trans-from {
+    filter: blur(0);
+}
+
+.vw-transition-item.is-previewing .vw-trans-blur .vw-trans-from {
+    filter: blur(5px);
+    opacity: 0;
+}
+
+.vw-trans-flash {
+    background: white;
+    opacity: 0;
+}
+
+.vw-transition-item.is-previewing .vw-trans-flash {
+    animation: flash-preview 0.3s ease-out;
+}
+
+@keyframes flash-preview {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.vw-transition-name {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+}
+
+.vw-transition-duration {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.vw-transitions-help {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.vw-transitions-help svg {
+    width: 14px;
+    height: 14px;
+    color: rgba(255, 255, 255, 0.4);
+    flex-shrink: 0;
+}
+
+.vw-transitions-help span {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ==========================================================================
+   PHASE 6: KEYFRAMES (on clips)
+   ========================================================================== */
+
+.vw-clip-keyframes {
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    right: 0;
+    height: 10px;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.vw-keyframe {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #fbbf24;
+    transform: rotate(45deg) translateX(-50%);
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.15s, background 0.15s;
+}
+
+.vw-keyframe:hover {
+    transform: rotate(45deg) translateX(-50%) scale(1.3);
+    background: #f59e0b;
+}
+
+.vw-keyframe.is-selected {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+/* Transition indicators on clips */
+.vw-clip-transition {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.vw-clip-transition-in {
+    left: 0;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, transparent 100%);
+    border-left: 2px solid rgba(139, 92, 246, 0.6);
+}
+
+.vw-clip-transition-out {
+    right: 0;
+    background: linear-gradient(270deg, rgba(139, 92, 246, 0.3) 0%, transparent 100%);
+    border-right: 2px solid rgba(139, 92, 246, 0.6);
+}
+
+.vw-clip-transition svg {
+    width: 10px;
+    height: 10px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ==========================================================================
+   PHASE 6: RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .vw-markers-panel,
+    .vw-transitions-panel {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-height: 50vh;
+        border-radius: 1rem 1rem 0 0;
+    }
+
+    .vw-marker-controls {
+        display: none;
+    }
+
+    .vw-transitions-btn {
+        display: none;
+    }
+
+    .vw-transitions-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .vw-transitions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .vw-color-picker {
         display: none;
     }
 }
