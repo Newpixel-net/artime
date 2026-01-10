@@ -9865,13 +9865,21 @@ class VideoWizard extends Component
 
     /**
      * Get total video duration in seconds.
+     * Uses visualDuration if set, falling back to duration for consistency
+     * with the preview engine's timing calculations.
      */
     public function getTotalDuration(): float
     {
         $total = 0;
-        foreach ($this->storyboard['scenes'] ?? [] as $scene) {
-            $total += $scene['duration'] ?? 5;
+        $scriptScenes = $this->script['scenes'] ?? [];
+        $storyboardScenes = $this->storyboard['scenes'] ?? [];
+
+        foreach ($scriptScenes as $index => $scene) {
+            // Check visualDuration first (from script), then storyboard duration, then script duration
+            $storyboardDuration = $storyboardScenes[$index]['duration'] ?? null;
+            $total += $scene['visualDuration'] ?? $storyboardDuration ?? $scene['duration'] ?? 5;
         }
+
         return $total;
     }
 
