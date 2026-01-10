@@ -44,7 +44,7 @@
         showExportModal: false,
         keyboardShortcuts: true,
 
-        // Player UI State (Phase 1 & 2)
+        // Player UI State (Phase 1-4)
         isFullscreen: false,
         controlsVisible: true,
         controlsTimeout: null,
@@ -52,14 +52,45 @@
         cursorHidden: false,
         volume: 100,
         isMuted: false,
-        showPlayIcon: false,
         lastMouseMove: 0,
+
+        // Phase 4: Flash icon animation state
+        showFlashIcon: false,
+        flashIconType: 'play', // 'play' or 'pause'
+        flashTimeout: null,
 
         // Initialize
         init() {
             this.setAspectRatio(this.aspectRatio);
             this.setupLivewireListeners();
             this.setupFullscreenListeners();
+            this.loadVolumePreference();
+        },
+
+        // Load volume preference from localStorage
+        loadVolumePreference() {
+            try {
+                const savedVolume = localStorage.getItem('vw-player-volume');
+                const savedMuted = localStorage.getItem('vw-player-muted');
+                if (savedVolume !== null) {
+                    this.volume = parseInt(savedVolume, 10);
+                }
+                if (savedMuted !== null) {
+                    this.isMuted = savedMuted === 'true';
+                }
+            } catch (e) {
+                console.warn('[PreviewController] Could not load volume preference:', e);
+            }
+        },
+
+        // Save volume preference to localStorage
+        saveVolumePreference() {
+            try {
+                localStorage.setItem('vw-player-volume', this.volume.toString());
+                localStorage.setItem('vw-player-muted', this.isMuted.toString());
+            } catch (e) {
+                console.warn('[PreviewController] Could not save volume preference:', e);
+            }
         },
 
         // Fullscreen support
@@ -137,12 +168,35 @@
             }
         },
 
-        // Volume controls
+        // Flash play/pause animation (YouTube-style)
+        flashPlayPause() {
+            // Clear any existing flash timeout
+            if (this.flashTimeout) {
+                clearTimeout(this.flashTimeout);
+            }
+
+            // Determine what icon to flash based on NEXT state
+            this.flashIconType = this.isPlaying ? 'pause' : 'play';
+
+            // Show flash icon
+            this.showFlashIcon = true;
+
+            // Toggle playback
+            this.togglePlay();
+
+            // Hide flash icon after animation
+            this.flashTimeout = setTimeout(() => {
+                this.showFlashIcon = false;
+            }, 400);
+        },
+
+        // Volume controls with preference persistence
         toggleMute() {
             this.isMuted = !this.isMuted;
             if (this.engine && this.engine.setVolume) {
                 this.engine.setVolume(this.isMuted ? 0 : this.volume / 100, this.musicVolume / 100);
             }
+            this.saveVolumePreference();
         },
 
         setVolume(value) {
@@ -151,6 +205,7 @@
             if (this.engine && this.engine.setVolume) {
                 this.engine.setVolume(this.volume / 100, this.musicVolume / 100);
             }
+            this.saveVolumePreference();
         },
 
         // Seek by clicking on progress bar
@@ -401,7 +456,7 @@
             switch(e.key.toLowerCase()) {
                 case ' ':
                     e.preventDefault();
-                    this.togglePlay();
+                    this.flashPlayPause();
                     break;
                 case 'f':
                     e.preventDefault();
@@ -536,10 +591,11 @@
                 <div class="vw-shortcuts-ref" x-show="keyboardShortcuts" x-collapse>
                     <div class="vw-shortcut"><kbd>Space</kbd> {{ __('Play/Pause') }}</div>
                     <div class="vw-shortcut"><kbd>←</kbd><kbd>→</kbd> {{ __('Seek 5s') }}</div>
+                    <div class="vw-shortcut"><kbd>↑</kbd><kbd>↓</kbd> {{ __('Volume') }}</div>
+                    <div class="vw-shortcut"><kbd>M</kbd> {{ __('Mute') }}</div>
+                    <div class="vw-shortcut"><kbd>F</kbd> {{ __('Fullscreen') }}</div>
                     <div class="vw-shortcut"><kbd>1-4</kbd> {{ __('Switch tabs') }}</div>
-                    <div class="vw-shortcut"><kbd>Ctrl+Z</kbd> {{ __('Undo') }}</div>
-                    <div class="vw-shortcut"><kbd>Ctrl+Y</kbd> {{ __('Redo') }}</div>
-                    <div class="vw-shortcut"><kbd>Esc</kbd> {{ __('Close modal') }}</div>
+                    <div class="vw-shortcut"><kbd>Esc</kbd> {{ __('Exit/Close') }}</div>
                 </div>
             </div>
         </div>

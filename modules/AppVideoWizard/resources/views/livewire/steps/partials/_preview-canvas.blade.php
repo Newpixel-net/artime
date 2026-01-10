@@ -72,19 +72,41 @@
             <span class="vw-loading-text">{{ __('Loading preview') }} <span x-text="loadProgress">0</span>%</span>
         </div>
 
-        {{-- Click-to-Play Overlay (appears briefly on pause) --}}
+        {{-- Click-to-Play Overlay with YouTube-style flash animation --}}
         <div
             x-show="isReady"
-            @click="togglePlay()"
+            @click="flashPlayPause()"
             class="vw-play-overlay"
-            :class="{ 'is-visible': !isPlaying || showPlayIcon }"
+            :class="{ 'is-visible': !isPlaying && !showFlashIcon }"
             x-cloak
         >
+            {{-- Persistent center play button (when paused) --}}
             <div class="vw-center-play-btn" :class="{ 'is-paused': !isPlaying }">
-                <svg x-show="!isPlaying" viewBox="0 0 24 24" fill="currentColor">
+                <svg viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
-                <svg x-show="isPlaying" viewBox="0 0 24 24" fill="currentColor">
+            </div>
+        </div>
+
+        {{-- Flash Icon (YouTube-style brief animation on toggle) --}}
+        <div
+            x-show="showFlashIcon"
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="opacity-0 scale-50"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-300"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-150"
+            class="vw-flash-icon-overlay"
+            x-cloak
+        >
+            <div class="vw-flash-icon">
+                {{-- Show play icon when we just started playing --}}
+                <svg x-show="flashIconType === 'play'" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                {{-- Show pause icon when we just paused --}}
+                <svg x-show="flashIconType === 'pause'" viewBox="0 0 24 24" fill="currentColor">
                     <rect x="6" y="4" width="4" height="16"/>
                     <rect x="14" y="4" width="4" height="16"/>
                 </svg>
@@ -182,8 +204,8 @@
                 </button>
 
                 {{-- Volume --}}
-                <div class="vw-volume-control">
-                    <button @click="toggleMute()" class="vw-ctrl-btn" type="button" title="{{ __('Volume') }}">
+                <div class="vw-volume-control" :class="{ 'is-muted': isMuted }">
+                    <button @click="toggleMute()" class="vw-ctrl-btn" type="button" :title="isMuted ? '{{ __('Unmute') }}' : '{{ __('Mute') }}' + ' (M)'">
                         <svg x-show="!isMuted && volume > 50" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
                         </svg>
@@ -195,7 +217,14 @@
                         </svg>
                     </button>
                     <div class="vw-volume-slider-wrapper">
-                        <input type="range" class="vw-volume-slider" min="0" max="100" x-model="volume" @input="setVolume($event.target.value)">
+                        <input type="range"
+                               class="vw-volume-slider"
+                               min="0"
+                               max="100"
+                               x-model="volume"
+                               @input="setVolume($event.target.value)"
+                               :style="'--volume-percent: ' + volume + '%'"
+                               :title="volume + '%'">
                     </div>
                 </div>
 
@@ -515,8 +544,48 @@
         margin-left: 4px;
     }
 
-    .vw-center-play-btn svg:last-child {
-        margin-left: 0;
+    /* ===== Flash Icon Overlay (YouTube-style) ===== */
+    .vw-flash-icon-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 15;
+    }
+
+    .vw-flash-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .vw-flash-icon svg {
+        width: 36px;
+        height: 36px;
+        color: white;
+    }
+
+    .vw-flash-icon svg:first-child {
+        margin-left: 4px;
+    }
+
+    /* Fullscreen: Larger flash icon */
+    .is-fullscreen .vw-flash-icon {
+        width: 100px;
+        height: 100px;
+    }
+
+    .is-fullscreen .vw-flash-icon svg {
+        width: 44px;
+        height: 44px;
     }
 
     /* Fullscreen hint */
@@ -891,15 +960,19 @@
         display: flex;
         align-items: center;
         gap: 0.25rem;
+        position: relative;
     }
 
     .vw-volume-slider-wrapper {
         width: 0;
         overflow: hidden;
         transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
     }
 
-    .vw-volume-control:hover .vw-volume-slider-wrapper {
+    .vw-volume-control:hover .vw-volume-slider-wrapper,
+    .vw-volume-control:focus-within .vw-volume-slider-wrapper {
         width: 80px;
     }
 
@@ -911,26 +984,77 @@
         background: rgba(255, 255, 255, 0.2);
         border-radius: 2px;
         cursor: pointer;
+        transition: height 0.15s ease;
+    }
+
+    .vw-volume-slider:hover {
+        height: 6px;
+    }
+
+    /* WebKit browsers - Volume fill gradient */
+    .vw-volume-slider::-webkit-slider-runnable-track {
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(to right,
+            #8b5cf6 0%,
+            #8b5cf6 var(--volume-percent, 100%),
+            rgba(255, 255, 255, 0.2) var(--volume-percent, 100%),
+            rgba(255, 255, 255, 0.2) 100%
+        );
     }
 
     .vw-volume-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
         border-radius: 50%;
         background: white;
         cursor: pointer;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        margin-top: -5px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .vw-volume-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Firefox */
+    .vw-volume-slider::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .vw-volume-slider::-moz-range-progress {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #8b5cf6, #06b6d4);
     }
 
     .vw-volume-slider::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
         border-radius: 50%;
         background: white;
         cursor: pointer;
         border: none;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        transition: transform 0.15s ease;
+    }
+
+    .vw-volume-slider::-moz-range-thumb:hover {
+        transform: scale(1.15);
+    }
+
+    /* Muted state styling */
+    .vw-volume-control.is-muted .vw-volume-slider::-webkit-slider-runnable-track {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .vw-volume-control.is-muted .vw-volume-slider::-moz-range-progress {
+        background: rgba(255, 255, 255, 0.3);
     }
 
     /* Time Display */
