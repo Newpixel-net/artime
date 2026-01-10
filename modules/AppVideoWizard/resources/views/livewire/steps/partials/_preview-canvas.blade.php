@@ -234,15 +234,62 @@
                     <span class="vw-time-sep">/</span>
                     <span x-text="formatTime(totalDuration)">0:00</span>
                 </div>
+
+                {{-- Playback Speed Control --}}
+                <div class="vw-speed-control" x-data="{ showSpeedMenu: false }" @click.away="showSpeedMenu = false">
+                    <button @click="showSpeedMenu = !showSpeedMenu"
+                            class="vw-speed-btn"
+                            type="button"
+                            title="{{ __('Playback Speed') }}">
+                        <span x-text="playbackSpeed + 'x'">1x</span>
+                    </button>
+                    <div class="vw-speed-menu" x-show="showSpeedMenu" x-cloak
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-100"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95">
+                        <template x-for="speed in [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]" :key="speed">
+                            <button class="vw-speed-option"
+                                    :class="{ 'is-active': playbackSpeed === speed }"
+                                    @click="setPlaybackSpeed(speed); showSpeedMenu = false"
+                                    type="button">
+                                <span x-text="speed + 'x'"></span>
+                                <svg x-show="playbackSpeed === speed" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
             </div>
 
             {{-- Right Controls --}}
             <div class="vw-controls-right">
+                {{-- Resolution/Quality Indicator --}}
+                <div class="vw-quality-badge" x-show="isReady" title="{{ __('Video Quality') }}">
+                    <span class="vw-resolution" x-text="getResolutionLabel()">720p</span>
+                    <span class="vw-aspect" x-text="aspectRatio">16:9</span>
+                </div>
+
                 {{-- Scene Indicator --}}
                 <div x-show="totalScenes > 1" class="vw-scene-badge">
                     <span>{{ __('Scene') }}</span>
                     <span x-text="currentSceneIndex + 1">1</span>/<span x-text="totalScenes">1</span>
                 </div>
+
+                {{-- Picture-in-Picture Toggle --}}
+                <button @click="togglePictureInPicture()"
+                        x-show="isPiPSupported"
+                        class="vw-ctrl-btn"
+                        :class="{ 'is-active': isPiPActive }"
+                        type="button"
+                        :title="isPiPActive ? '{{ __('Exit Picture-in-Picture') }}' : '{{ __('Picture-in-Picture') }}'">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/>
+                    </svg>
+                </button>
 
                 {{-- Fullscreen Toggle --}}
                 <button @click="toggleFullscreen()" class="vw-ctrl-btn" type="button" title="{{ __('Fullscreen') }} (F)">
@@ -1086,6 +1133,137 @@
 
     .vw-scene-badge span:first-child {
         color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* ===== Playback Speed Control (Phase 5) ===== */
+    .vw-speed-control {
+        position: relative;
+    }
+
+    .vw-speed-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.35rem 0.6rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.5rem;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-width: 42px;
+    }
+
+    .vw-speed-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(139, 92, 246, 0.4);
+        color: white;
+    }
+
+    .vw-speed-menu {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 0.5rem;
+        background: rgba(15, 15, 25, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        min-width: 100px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        z-index: 50;
+    }
+
+    .vw-speed-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: transparent;
+        border: none;
+        border-radius: 0.5rem;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .vw-speed-option:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .vw-speed-option.is-active {
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+    }
+
+    .vw-speed-option svg {
+        width: 16px;
+        height: 16px;
+        color: #10b981;
+    }
+
+    /* Fullscreen: Larger speed control */
+    .is-fullscreen .vw-speed-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        min-width: 50px;
+    }
+
+    .is-fullscreen .vw-speed-menu {
+        min-width: 120px;
+    }
+
+    .is-fullscreen .vw-speed-option {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* ===== Quality/Resolution Badge (Phase 5) ===== */
+    .vw-quality-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        background: rgba(6, 182, 212, 0.15);
+        border: 1px solid rgba(6, 182, 212, 0.25);
+        border-radius: 2rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .vw-resolution {
+        color: #22d3ee;
+    }
+
+    .vw-aspect {
+        color: rgba(255, 255, 255, 0.5);
+        padding-left: 0.5rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Fullscreen: Larger quality badge */
+    .is-fullscreen .vw-quality-badge {
+        padding: 0.5rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    /* ===== Picture-in-Picture Button (Phase 5) ===== */
+    .vw-ctrl-btn.is-active {
+        background: rgba(139, 92, 246, 0.3);
+        border: 1px solid rgba(139, 92, 246, 0.5);
+        color: #a78bfa;
+    }
+
+    .vw-ctrl-btn.is-active:hover {
+        background: rgba(139, 92, 246, 0.4);
     }
 
     /* ===== Responsive ===== */

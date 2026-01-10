@@ -59,12 +59,123 @@
         flashIconType: 'play', // 'play' or 'pause'
         flashTimeout: null,
 
+        // Phase 5: Professional features
+        playbackSpeed: 1,
+        isPiPSupported: false,
+        isPiPActive: false,
+
         // Initialize
         init() {
             this.setAspectRatio(this.aspectRatio);
             this.setupLivewireListeners();
             this.setupFullscreenListeners();
             this.loadVolumePreference();
+            this.checkPiPSupport();
+            this.loadPlaybackSpeedPreference();
+        },
+
+        // Check Picture-in-Picture support
+        checkPiPSupport() {
+            this.isPiPSupported = 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
+        },
+
+        // Load playback speed preference
+        loadPlaybackSpeedPreference() {
+            try {
+                const savedSpeed = localStorage.getItem('vw-playback-speed');
+                if (savedSpeed !== null) {
+                    this.playbackSpeed = parseFloat(savedSpeed);
+                }
+            } catch (e) {
+                console.warn('[PreviewController] Could not load playback speed preference:', e);
+            }
+        },
+
+        // Save playback speed preference
+        savePlaybackSpeedPreference() {
+            try {
+                localStorage.setItem('vw-playback-speed', this.playbackSpeed.toString());
+            } catch (e) {
+                console.warn('[PreviewController] Could not save playback speed preference:', e);
+            }
+        },
+
+        // Set playback speed
+        setPlaybackSpeed(speed) {
+            this.playbackSpeed = speed;
+            if (this.engine && this.engine.setPlaybackRate) {
+                this.engine.setPlaybackRate(speed);
+            }
+            this.savePlaybackSpeedPreference();
+        },
+
+        // Get resolution label based on canvas dimensions
+        getResolutionLabel() {
+            const height = this.canvasHeight;
+            if (height >= 2160) return '4K';
+            if (height >= 1440) return '1440p';
+            if (height >= 1080) return '1080p';
+            if (height >= 720) return '720p';
+            if (height >= 480) return '480p';
+            return '360p';
+        },
+
+        // Toggle Picture-in-Picture mode
+        async togglePictureInPicture() {
+            if (!this.isPiPSupported) return;
+
+            try {
+                // For canvas-based preview, we need to create a video element
+                // that captures the canvas content
+                if (!this.pipVideo) {
+                    this.pipVideo = document.createElement('video');
+                    this.pipVideo.muted = true;
+                    this.pipVideo.playsInline = true;
+
+                    // Listen for PiP events
+                    this.pipVideo.addEventListener('enterpictureinpicture', () => {
+                        this.isPiPActive = true;
+                    });
+                    this.pipVideo.addEventListener('leavepictureinpicture', () => {
+                        this.isPiPActive = false;
+                        this.stopCanvasCapture();
+                    });
+                }
+
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                } else {
+                    // Start capturing canvas to video
+                    await this.startCanvasCapture();
+                    await this.pipVideo.requestPictureInPicture();
+                }
+            } catch (error) {
+                console.error('[PreviewController] PiP error:', error);
+                this.isPiPActive = false;
+            }
+        },
+
+        // Start capturing canvas to video for PiP
+        async startCanvasCapture() {
+            const canvas = this.$refs.previewCanvas;
+            if (!canvas) return;
+
+            try {
+                const stream = canvas.captureStream(30); // 30 FPS
+                this.pipVideo.srcObject = stream;
+                await this.pipVideo.play();
+            } catch (error) {
+                console.error('[PreviewController] Canvas capture error:', error);
+            }
+        },
+
+        // Stop canvas capture
+        stopCanvasCapture() {
+            if (this.pipVideo && this.pipVideo.srcObject) {
+                const tracks = this.pipVideo.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                this.pipVideo.srcObject = null;
+            }
         },
 
         // Load volume preference from localStorage
@@ -490,6 +601,33 @@
                     e.preventDefault();
                     this.setVolume(Math.max(0, this.volume - 10));
                     break;
+                case ',':
+                case '<':
+                    // Decrease playback speed
+                    e.preventDefault();
+                    const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+                    const currentIdx = speeds.indexOf(this.playbackSpeed);
+                    if (currentIdx > 0) {
+                        this.setPlaybackSpeed(speeds[currentIdx - 1]);
+                    }
+                    break;
+                case '.':
+                case '>':
+                    // Increase playback speed
+                    e.preventDefault();
+                    const speedsUp = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+                    const currentIdxUp = speedsUp.indexOf(this.playbackSpeed);
+                    if (currentIdxUp < speedsUp.length - 1) {
+                        this.setPlaybackSpeed(speedsUp[currentIdxUp + 1]);
+                    }
+                    break;
+                case 'p':
+                    // Toggle Picture-in-Picture
+                    if (this.isPiPSupported) {
+                        e.preventDefault();
+                        this.togglePictureInPicture();
+                    }
+                    break;
             }
         }
     }"
@@ -592,9 +730,10 @@
                     <div class="vw-shortcut"><kbd>Space</kbd> {{ __('Play/Pause') }}</div>
                     <div class="vw-shortcut"><kbd>←</kbd><kbd>→</kbd> {{ __('Seek 5s') }}</div>
                     <div class="vw-shortcut"><kbd>↑</kbd><kbd>↓</kbd> {{ __('Volume') }}</div>
+                    <div class="vw-shortcut"><kbd>&lt;</kbd><kbd>&gt;</kbd> {{ __('Speed') }}</div>
                     <div class="vw-shortcut"><kbd>M</kbd> {{ __('Mute') }}</div>
                     <div class="vw-shortcut"><kbd>F</kbd> {{ __('Fullscreen') }}</div>
-                    <div class="vw-shortcut"><kbd>1-4</kbd> {{ __('Switch tabs') }}</div>
+                    <div class="vw-shortcut"><kbd>P</kbd> {{ __('PiP') }}</div>
                     <div class="vw-shortcut"><kbd>Esc</kbd> {{ __('Exit/Close') }}</div>
                 </div>
             </div>
