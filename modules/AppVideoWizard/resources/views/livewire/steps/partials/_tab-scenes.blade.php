@@ -13,12 +13,15 @@
     <div class="vw-scenes-list">
         @forelse($script['scenes'] ?? [] as $index => $scene)
             @php
-                $sceneId = $scene['id'] ?? "scene-{$index}";
-                $storyboard = collect($storyboard['scenes'] ?? [])->firstWhere('sceneId', $sceneId);
-                $animation = collect($animation['scenes'] ?? [])->firstWhere('sceneId', $sceneId);
-                $hasImage = !empty($storyboard['imageUrl']);
-                $hasVideo = !empty($animation['videoUrl']);
-                $hasVoice = !empty($animation['voiceoverUrl']);
+                // Use direct index access - storyboard/animation scenes are indexed by number, not sceneId
+                $storyboardScene = $storyboard['scenes'][$index] ?? null;
+                $animationScene = $animation['scenes'][$index] ?? null;
+                $imageUrl = $storyboardScene['imageUrl'] ?? $storyboardScene['image'] ?? null;
+                $hasImage = !empty($imageUrl);
+                $hasVideo = !empty($animationScene['videoUrl']);
+                $hasVoice = !empty($animationScene['voiceoverUrl']);
+                // Match getPreviewScenes() logic for duration
+                $duration = $scene['visualDuration'] ?? $scene['duration'] ?? 8;
             @endphp
             <div
                 class="vw-scene-item"
@@ -27,14 +30,14 @@
             >
                 <div class="vw-scene-thumb">
                     @if($hasImage)
-                        <img src="{{ $storyboard['imageUrl'] }}" alt="Scene {{ $index + 1 }}">
+                        <img src="{{ $imageUrl }}" alt="Scene {{ $index + 1 }}">
                     @else
                         <div class="vw-scene-placeholder">{{ $index + 1 }}</div>
                     @endif
                     <div class="vw-scene-number">{{ $index + 1 }}</div>
                 </div>
                 <div class="vw-scene-info">
-                    <div class="vw-scene-duration">{{ $scene['duration'] ?? 8 }}s</div>
+                    <div class="vw-scene-duration">{{ $duration }}s</div>
                     <div class="vw-scene-status">
                         <span class="status-dot {{ $hasImage ? 'green' : 'yellow' }}" title="{{ $hasImage ? 'Has image' : 'No image' }}"></span>
                         <span class="status-dot {{ $hasVideo ? 'green' : 'gray' }}" title="{{ $hasVideo ? 'Has video' : 'No video' }}"></span>
