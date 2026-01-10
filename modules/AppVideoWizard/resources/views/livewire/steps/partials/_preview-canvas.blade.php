@@ -143,7 +143,9 @@
                  @click="seekToPosition($event)"
                  @mousemove="updateHoverTime($event)"
                  @mouseleave="hideTimeTooltip()"
-                 @touchmove.prevent="updateHoverTime($event.touches[0])">
+                 @touchmove.prevent="updateHoverTime($event.touches[0])"
+                 @touchend="if ($event.changedTouches[0]) { const rect = $event.currentTarget.getBoundingClientRect(); const x = $event.changedTouches[0].clientX - rect.left; const pct = Math.max(0, Math.min(1, x / rect.width)); seek(pct * totalDuration); hideTimeTooltip(); }"
+                 @touchstart="updateHoverTime($event.touches[0])">
 
                 {{-- Time Tooltip --}}
                 <div class="vw-time-tooltip"
@@ -1270,6 +1272,13 @@
     @media (max-width: 768px) {
         .vw-controls-bar {
             padding: 0.5rem 0.75rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .vw-controls-left,
+        .vw-controls-right {
+            gap: 0.25rem;
         }
 
         .vw-ctrl-btn {
@@ -1284,6 +1293,7 @@
 
         .vw-time-display {
             font-size: 0.75rem;
+            padding: 0 0.25rem;
         }
 
         .vw-volume-control:hover .vw-volume-slider-wrapper {
@@ -1298,6 +1308,71 @@
         .vw-center-play-btn svg {
             width: 26px;
             height: 26px;
+        }
+
+        /* Phase 5: Mobile responsive */
+        .vw-speed-btn {
+            padding: 0.25rem 0.4rem;
+            font-size: 0.7rem;
+            min-width: 36px;
+        }
+
+        .vw-speed-menu {
+            min-width: 90px;
+        }
+
+        .vw-speed-option {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.75rem;
+        }
+
+        .vw-quality-badge {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.65rem;
+            gap: 0.35rem;
+        }
+
+        .vw-aspect {
+            padding-left: 0.35rem;
+        }
+
+        .vw-scene-badge {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            gap: 0.25rem;
+        }
+    }
+
+    /* Extra small screens - hide less important elements */
+    @media (max-width: 480px) {
+        .vw-quality-badge {
+            display: none;
+        }
+
+        .vw-speed-control {
+            order: 10;
+        }
+
+        .vw-scene-badge {
+            display: none;
+        }
+
+        .vw-time-display {
+            font-size: 0.7rem;
+        }
+
+        .vw-controls-bar {
+            padding: 0.4rem 0.5rem;
+        }
+
+        .vw-ctrl-btn {
+            width: 32px;
+            height: 32px;
+        }
+
+        .vw-play-pause-btn {
+            width: 36px;
+            height: 36px;
         }
     }
 
