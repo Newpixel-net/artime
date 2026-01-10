@@ -928,8 +928,19 @@ class VideoWizard extends Component
         // Skip save if nothing has changed (except for new projects)
         $currentHash = $this->computeSaveHash();
         if ($this->projectId && $this->lastSaveHash === $currentHash) {
+            Log::debug('VideoWizard: saveProject skipped (no changes)', [
+                'projectId' => $this->projectId,
+                'sceneCount' => count($this->script['scenes'] ?? []),
+            ]);
             return; // No changes to save
         }
+
+        Log::info('VideoWizard: saveProject executing', [
+            'projectId' => $this->projectId,
+            'sceneCount' => count($this->script['scenes'] ?? []),
+            'generatedSceneCount' => $this->scriptGeneration['generatedSceneCount'] ?? 0,
+            'status' => $this->scriptGeneration['status'] ?? 'unknown',
+        ]);
 
         $this->isSaving = true;
         $isNewProject = !$this->projectId;
@@ -2137,10 +2148,22 @@ class VideoWizard extends Component
 
             if ($result['success'] && !empty($result['scenes'])) {
                 // Sanitize and append new scenes
+                $scenesBeforeAdd = count($this->script['scenes']);
+                Log::info('VideoWizard: Adding scenes from batch', [
+                    'batch' => $currentBatchIndex,
+                    'scenesBeforeAdd' => $scenesBeforeAdd,
+                    'newScenesCount' => count($result['scenes']),
+                ]);
+
                 foreach ($result['scenes'] as $index => $scene) {
                     $sceneIndex = count($this->script['scenes']);
                     $this->script['scenes'][] = $this->sanitizeScene($scene, $sceneIndex);
                 }
+
+                Log::info('VideoWizard: Scenes added', [
+                    'batch' => $currentBatchIndex,
+                    'totalScenesNow' => count($this->script['scenes']),
+                ]);
 
                 // Update batch status
                 $this->scriptGeneration['batches'][$currentBatchIndex]['status'] = 'complete';
