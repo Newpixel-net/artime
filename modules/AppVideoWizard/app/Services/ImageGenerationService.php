@@ -99,9 +99,22 @@ class ImageGenerationService
 
         $sceneIndex = $options['sceneIndex'] ?? null;
         $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+        $isLocationReference = $options['isLocationReference'] ?? false;
+        $isCharacterPortrait = $options['isCharacterPortrait'] ?? false;
+        $customNegativePrompt = $options['negativePrompt'] ?? null;
 
-        // Build the image prompt with all Bible integrations (Style, Character, Location)
-        $prompt = $this->buildImagePrompt($visualDescription, $styleBible, $visualStyle, $project, $sceneMemory, $sceneIndex);
+        // For location references and character portraits, use the visual description directly
+        // These have specialized prompts that should not be modified by Bible integrations
+        if ($isLocationReference || $isCharacterPortrait) {
+            // Use prompt as-is, append negative prompt for Gemini
+            $prompt = $visualDescription;
+            if ($customNegativePrompt) {
+                $prompt .= "\n\nCRITICAL - MUST AVOID (will ruin the image): {$customNegativePrompt}";
+            }
+        } else {
+            // Regular scene: build prompt with all Bible integrations
+            $prompt = $this->buildImagePrompt($visualDescription, $styleBible, $visualStyle, $project, $sceneMemory, $sceneIndex);
+        }
 
         // Get resolution based on aspect ratio
         $resolution = $this->getResolution($project->aspect_ratio);
@@ -112,15 +125,24 @@ class ImageGenerationService
             throw new \Exception($quota['message']);
         }
 
-        // Get character reference for face consistency (if available)
-        $characterReference = $this->getCharacterReferenceForScene($sceneMemory, $sceneIndex);
+        // Initialize references as null
+        $characterReference = null;
+        $locationReference = null;
+        $styleReference = null;
 
-        // Get location reference for environment consistency (if available)
-        $locationReference = $this->getLocationReferenceForScene($sceneMemory, $sceneIndex);
-
-        // Get style reference for visual style consistency (if available)
-        // Style Bible reference is global (applies to all scenes)
-        $styleReference = $this->getStyleReference($sceneMemory);
+        // For location references: NO character references (empty environments only)
+        // For character portraits: NO location references (studio backdrop)
+        // For regular scenes: use all available references
+        if (!$isLocationReference && !$isCharacterPortrait) {
+            // Regular scene: get all references for consistency
+            $characterReference = $this->getCharacterReferenceForScene($sceneMemory, $sceneIndex);
+            $locationReference = $this->getLocationReferenceForScene($sceneMemory, $sceneIndex);
+            $styleReference = $this->getStyleReference($sceneMemory);
+        } elseif ($isCharacterPortrait) {
+            // Character portrait: only use style reference for visual consistency
+            $styleReference = $this->getStyleReference($sceneMemory);
+        }
+        // Location references: no references needed (pure environment)
 
         // Route to appropriate provider
         if ($modelConfig['provider'] === 'runpod') {

@@ -6838,19 +6838,36 @@ class VideoWizard extends Component
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Build portrait-optimized prompt (matching reference implementation)
+            // Build PHOTOREALISTIC portrait prompt for character reference
             $promptParts = [
-                'Professional studio portrait photograph',
+                // Photorealistic quality markers
+                '8K UHD professional studio portrait photograph',
+                'Shot on Canon R5 with 85mm f/1.4 portrait lens',
+                'Photorealistic, hyperdetailed, natural skin texture with visible pores',
+
+                // Character description
                 $character['description'],
-                'Standing pose facing camera',
-                'Clean pure white background',
-                'Professional studio lighting with soft shadows',
-                'High quality, detailed, sharp focus',
+
+                // Pose and composition
+                'Standing pose, three-quarter turn facing camera',
                 'Full body visible from head to feet',
-                'Neutral expression, confident pose',
-                'Fashion photography style, catalog quality',
+                'Natural confident expression',
+
+                // Studio setup
+                'Clean neutral gray studio backdrop',
+                'Professional three-point studio lighting',
+                'Soft key light with subtle rim lighting',
+                'Natural skin tones, no beauty retouching',
+
+                // Quality markers
+                'Fashion editorial quality, high-end catalog photography',
+                'Sharp focus on eyes, natural bokeh',
+                'Subtle film grain, cinematic color grading',
             ];
             $prompt = implode('. ', $promptParts);
+
+            // Negative prompt for character portraits
+            $negativePrompt = 'cartoon, anime, illustration, 3D render, CGI, plastic skin, airbrushed, waxy, mannequin, doll-like, uncanny valley, oversaturated, HDR, blurry, low quality, watermark, text, logo, multiple people, crowd';
 
             if ($this->projectId) {
                 $project = WizardProject::find($this->projectId);
@@ -6861,6 +6878,8 @@ class VideoWizard extends Component
                     ], [
                         'model' => 'nanobanana-pro',
                         'sceneIndex' => null, // Portraits don't belong to any scene
+                        'negativePrompt' => $negativePrompt,
+                        'isCharacterPortrait' => true, // Flag for portrait mode
                     ]);
 
                     if ($result['success'] && isset($result['imageUrl'])) {
@@ -7326,30 +7345,44 @@ class VideoWizard extends Component
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Build location-optimized prompt
+            // Build EMPTY ENVIRONMENT prompt - NO PEOPLE WHATSOEVER
+            // This is a location reference, characters will be composited in scene generation
             $promptParts = [
-                'Cinematic establishing shot',
+                // Strong opening emphasizing empty environment
+                'EMPTY ENVIRONMENT ONLY - Cinematic wide establishing shot of an uninhabited location',
+                'Architectural photography style with NO human presence',
+
+                // Location details
                 $location['description'],
-                ucfirst($location['type']) . ' setting',
-                ucfirst($location['timeOfDay']) . ' lighting',
+                ucfirst($location['type']) . ' environment',
+                ucfirst($location['timeOfDay']) . ' natural lighting',
             ];
 
             if (!empty($location['weather']) && $location['weather'] !== 'clear') {
-                $promptParts[] = ucfirst($location['weather']) . ' weather conditions';
+                $promptParts[] = ucfirst($location['weather']) . ' weather atmosphere';
             }
 
             if (!empty($location['mood'])) {
-                $promptParts[] = ucfirst($location['mood']) . ' atmosphere';
+                $promptParts[] = ucfirst($location['mood']) . ' mood and atmosphere';
             }
 
+            // Photorealistic quality markers
             $promptParts = array_merge($promptParts, [
-                'Wide angle composition',
-                'High production value',
-                'Professional cinematography',
-                'No people or characters',
-                'Empty environment reference shot',
+                'Ultra wide angle lens composition showing full environment',
+                '8K UHD, photorealistic, hyperdetailed environment',
+                'Shot on ARRI Alexa with Zeiss Master Prime wide lens',
+                'Professional architectural/landscape cinematography',
+                'Natural film grain, realistic textures, cinematic color grading',
+                'Deep depth of field showing environment details',
             ]);
+
+            // CRITICAL: Explicit empty environment requirements
+            $promptParts[] = 'CRITICAL REQUIREMENT: This is an EMPTY location reference - absolutely NO people, NO humans, NO characters, NO figures, NO silhouettes, NO shadows of people, completely uninhabited space';
+
             $prompt = implode('. ', $promptParts);
+
+            // Strong negative prompt for location references
+            $negativePrompt = 'person, people, human, man, woman, child, figure, silhouette, face, body, crowd, pedestrian, character, actor, model, portrait, hands, feet, anyone, somebody, individual, group, cartoon, anime, illustration, text, watermark, logo';
 
             if ($this->projectId) {
                 $project = WizardProject::find($this->projectId);
@@ -7360,6 +7393,8 @@ class VideoWizard extends Component
                     ], [
                         'model' => 'nanobanana-pro',
                         'sceneIndex' => null, // Location references don't belong to any scene
+                        'negativePrompt' => $negativePrompt, // Pass negative prompt for HiDream
+                        'isLocationReference' => true, // Flag for empty environment mode
                     ]);
 
                     if ($result['success'] && isset($result['imageUrl'])) {
