@@ -35,6 +35,10 @@ window.previewController = function(initialData = {}) {
         musicVolume: initialData.musicVolume || 30,
         musicUrl: initialData.musicUrl || null,
 
+        // Event handler references for cleanup
+        _seekHandler: null,
+        _togglePlaybackHandler: null,
+
         /**
          * Initialize the controller
          */
@@ -120,17 +124,19 @@ window.previewController = function(initialData = {}) {
                 }
             });
 
-            // Listen for seek events from timeline
-            window.addEventListener('seek-preview', (e) => {
+            // Listen for seek events from timeline (store reference for cleanup)
+            this._seekHandler = (e) => {
                 if (e.detail && typeof e.detail.time !== 'undefined') {
                     this.seek(e.detail.time);
                 }
-            });
+            };
+            window.addEventListener('seek-preview', this._seekHandler);
 
-            // Listen for toggle playback events
-            window.addEventListener('toggle-preview-playback', () => {
+            // Listen for toggle playback events (store reference for cleanup)
+            this._togglePlaybackHandler = () => {
                 this.togglePlay();
-            });
+            };
+            window.addEventListener('toggle-preview-playback', this._togglePlaybackHandler);
         },
 
         /**
@@ -487,9 +493,11 @@ window.previewController = function(initialData = {}) {
             if (sceneIndex < 0 || sceneIndex >= this.engine.scenes.length) return;
 
             // Calculate time to seek to
+            // Match getPreviewScenes() logic: visualDuration -> duration -> default 8
             let time = 0;
             for (let i = 0; i < sceneIndex; i++) {
-                time += this.engine.scenes[i].duration || 5;
+                const scene = this.engine.scenes[i];
+                time += scene.visualDuration ?? scene.duration ?? 8;
             }
 
             this.seek(time);
@@ -546,6 +554,16 @@ window.previewController = function(initialData = {}) {
          * Destroy the engine and cleanup
          */
         destroy() {
+            // Remove window event listeners to prevent memory leaks
+            if (this._seekHandler) {
+                window.removeEventListener('seek-preview', this._seekHandler);
+                this._seekHandler = null;
+            }
+            if (this._togglePlaybackHandler) {
+                window.removeEventListener('toggle-preview-playback', this._togglePlaybackHandler);
+                this._togglePlaybackHandler = null;
+            }
+
             if (this.engine) {
                 this.engine.destroy();
                 this.engine = null;

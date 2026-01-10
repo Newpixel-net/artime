@@ -558,7 +558,11 @@
         seekToScene(idx) {
             if (!this.engine || !this.isReady || idx < 0 || idx >= this.engine.scenes.length) return;
             let t = 0;
-            for (let i = 0; i < idx; i++) t += this.engine.scenes[i].duration || 5;
+            // Match getPreviewScenes() logic: visualDuration -> duration -> default 8
+            for (let i = 0; i < idx; i++) {
+                const scene = this.engine.scenes[i];
+                t += scene.visualDuration ?? scene.duration ?? 8;
+            }
             this.seek(t);
             this.currentSceneIndex = idx;
         },
