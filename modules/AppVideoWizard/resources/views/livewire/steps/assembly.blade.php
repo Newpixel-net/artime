@@ -64,6 +64,11 @@
         isPiPSupported: false,
         isPiPActive: false,
 
+        // Event handler references for cleanup
+        _keyboardHandler: null,
+        _fullscreenHandler: null,
+        _webkitFullscreenHandler: null,
+
         // Initialize
         init() {
             this.setAspectRatio(this.aspectRatio);
@@ -84,7 +89,12 @@
             try {
                 const savedSpeed = localStorage.getItem('vw-playback-speed');
                 if (savedSpeed !== null) {
-                    this.playbackSpeed = parseFloat(savedSpeed);
+                    const speed = parseFloat(savedSpeed);
+                    const validSpeeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+                    // Only apply if it's a valid speed value
+                    if (!isNaN(speed) && validSpeeds.includes(speed)) {
+                        this.playbackSpeed = speed;
+                    }
                 }
             } catch (e) {
                 console.warn('[PreviewController] Could not load playback speed preference:', e);
@@ -123,6 +133,8 @@
         // Toggle Picture-in-Picture mode
         async togglePictureInPicture() {
             if (!this.isPiPSupported) return;
+            // Only allow PiP when preview is ready (canvas has content)
+            if (!this.isReady && !document.pictureInPictureElement) return;
 
             try {
                 // For canvas-based preview, we need to create a video element
@@ -184,7 +196,11 @@
                 const savedVolume = localStorage.getItem('vw-player-volume');
                 const savedMuted = localStorage.getItem('vw-player-muted');
                 if (savedVolume !== null) {
-                    this.volume = parseInt(savedVolume, 10);
+                    const vol = parseInt(savedVolume, 10);
+                    // Only apply if it's a valid volume (0-100)
+                    if (!isNaN(vol) && vol >= 0 && vol <= 100) {
+                        this.volume = vol;
+                    }
                 }
                 if (savedMuted !== null) {
                     this.isMuted = savedMuted === 'true';
@@ -206,12 +222,14 @@
 
         // Fullscreen support
         setupFullscreenListeners() {
-            document.addEventListener('fullscreenchange', () => {
+            this._fullscreenHandler = () => {
                 this.isFullscreen = !!document.fullscreenElement;
-            });
-            document.addEventListener('webkitfullscreenchange', () => {
+            };
+            this._webkitFullscreenHandler = () => {
                 this.isFullscreen = !!document.webkitFullscreenElement;
-            });
+            };
+            document.addEventListener('fullscreenchange', this._fullscreenHandler);
+            document.addEventListener('webkitfullscreenchange', this._webkitFullscreenHandler);
         },
 
         toggleFullscreen() {
@@ -566,9 +584,42 @@
         },
 
         destroy() {
+            // Clean up engine
             if (this.engine) { this.engine.destroy(); this.engine = null; }
+
+            // Clean up PiP resources
+            if (this.isPiPActive && document.pictureInPictureElement) {
+                document.exitPictureInPicture().catch(() => {});
+            }
+            this.stopCanvasCapture();
+            if (this.pipVideo) {
+                this.pipVideo.remove();
+                this.pipVideo = null;
+            }
+
+            // Clean up event listeners
+            if (this._keyboardHandler) {
+                window.removeEventListener('keydown', this._keyboardHandler);
+                this._keyboardHandler = null;
+            }
+            if (this._fullscreenHandler) {
+                document.removeEventListener('fullscreenchange', this._fullscreenHandler);
+                this._fullscreenHandler = null;
+            }
+            if (this._webkitFullscreenHandler) {
+                document.removeEventListener('webkitfullscreenchange', this._webkitFullscreenHandler);
+                this._webkitFullscreenHandler = null;
+            }
+
+            // Clear timeouts
+            if (this.controlsTimeout) { clearTimeout(this.controlsTimeout); this.controlsTimeout = null; }
+            if (this.cursorTimeout) { clearTimeout(this.cursorTimeout); this.cursorTimeout = null; }
+            if (this.flashTimeout) { clearTimeout(this.flashTimeout); this.flashTimeout = null; }
+
+            // Reset state
             this.isReady = false;
             this.isPlaying = false;
+            this.isPiPActive = false;
             this.currentTime = 0;
             this.totalDuration = 0;
         },
@@ -619,7 +670,12 @@
                     // Decrease playback speed
                     e.preventDefault();
                     const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-                    const currentIdx = speeds.indexOf(this.playbackSpeed);
+                    let currentIdx = speeds.indexOf(this.playbackSpeed);
+                    // If current speed isn't in array (corrupted), find nearest lower
+                    if (currentIdx === -1) {
+                        currentIdx = speeds.findIndex(s => s >= this.playbackSpeed);
+                        if (currentIdx === -1) currentIdx = speeds.length; // Speed is > max
+                    }
                     if (currentIdx > 0) {
                         this.setPlaybackSpeed(speeds[currentIdx - 1]);
                     }
@@ -629,7 +685,12 @@
                     // Increase playback speed
                     e.preventDefault();
                     const speedsUp = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-                    const currentIdxUp = speedsUp.indexOf(this.playbackSpeed);
+                    let currentIdxUp = speedsUp.indexOf(this.playbackSpeed);
+                    // If current speed isn't in array (corrupted), find nearest higher
+                    if (currentIdxUp === -1) {
+                        currentIdxUp = speedsUp.findIndex(s => s > this.playbackSpeed) - 1;
+                        if (currentIdxUp < 0) currentIdxUp = -1; // Speed is < min
+                    }
                     if (currentIdxUp < speedsUp.length - 1) {
                         this.setPlaybackSpeed(speedsUp[currentIdxUp + 1]);
                     }
@@ -646,7 +707,8 @@
     }"
     x-init="
         init();
-        window.addEventListener('keydown', (e) => handleKeyboard(e));
+        _keyboardHandler = (e) => handleKeyboard(e);
+        window.addEventListener('keydown', _keyboardHandler);
     "
     @open-export-modal.window="showExportModal = true"
     @open-music-browser.window="activeTab = 'audio'"

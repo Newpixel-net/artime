@@ -143,7 +143,9 @@
                  @click="seekToPosition($event)"
                  @mousemove="updateHoverTime($event)"
                  @mouseleave="hideTimeTooltip()"
-                 @touchmove.prevent="updateHoverTime($event.touches[0])">
+                 @touchmove.prevent="updateHoverTime($event.touches[0])"
+                 @touchend="if ($event.changedTouches[0]) { const rect = $event.currentTarget.getBoundingClientRect(); const x = $event.changedTouches[0].clientX - rect.left; const pct = Math.max(0, Math.min(1, x / rect.width)); seek(pct * totalDuration); hideTimeTooltip(); }"
+                 @touchstart="updateHoverTime($event.touches[0])">
 
                 {{-- Time Tooltip --}}
                 <div class="vw-time-tooltip"
