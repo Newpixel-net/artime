@@ -23,8 +23,13 @@ class MiniMaxService
     public function __construct()
     {
         $this->apiKey = (string) get_option("ai_minimax_api_key", "");
+
+        // MiniMax API base URL - configurable for regional variants
+        // Primary: api.minimax.io, Regional: api.minimaxi.com
+        $baseUrl = (string) get_option("ai_minimax_api_url", "https://api.minimax.io/");
+
         $this->client = new Client([
-            'base_uri' => 'https://api.minimax.chat/',
+            'base_uri' => rtrim($baseUrl, '/') . '/',
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
