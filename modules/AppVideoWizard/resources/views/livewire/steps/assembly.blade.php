@@ -34,7 +34,7 @@
         captionSize: {{ $previewData['captionSize'] ?? 1.0 }},
         musicEnabled: {{ ($previewData['musicEnabled'] ?? false) ? 'true' : 'false' }},
         musicVolume: {{ $previewData['musicVolume'] ?? 30 }},
-        musicUrl: {{ $previewData['musicUrl'] ? \"'\" . $previewData['musicUrl'] . \"'\" : 'null' }},
+        musicUrl: @js($previewData['musicUrl'] ?? null),
 
         // Scenes data from server
         scenes: @js($previewData['scenes'] ?? []),
