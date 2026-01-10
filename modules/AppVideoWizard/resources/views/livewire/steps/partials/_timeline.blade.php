@@ -144,10 +144,44 @@
     - Livewire calls wrapped with .catch() for graceful degradation
     - Invalid inputs silently corrected rather than throwing errors
 
+    ========================================
+    ACCESSIBILITY (Phase D Compliance)
+    ========================================
+
+    ARIA Support:
+    - role="application" on main container with aria-label
+    - role="slider" on playhead with aria-valuenow/min/max/text
+    - role="radiogroup" on tool selector with aria-checked
+    - aria-pressed on toggle buttons (Snap, Ripple)
+    - aria-hidden on decorative SVG icons
+
+    Screen Reader Support:
+    - Live region (aria-live="polite") for dynamic announcements
+    - Hidden instructions describing keyboard navigation
+    - announceToScreenReader() method for action feedback
+    - Announcements for: selection, deletion, undo/redo, markers
+
+    Keyboard Navigation:
+    - Full keyboard support for all timeline operations
+    - Arrow keys for playhead navigation (when focused)
+    - Home/End to jump to start/end
+    - Tab navigation through interactive elements
+
+    Focus Management:
+    - High-contrast focus-visible rings (purple #8b5cf6)
+    - Different focus colors for different element types
+    - Focus rings respect OS-level preferences
+
+    Motion Preferences:
+    - @media (prefers-reduced-motion) disables animations
+
 --}}
 
 <div
     class="vw-pro-timeline"
+    role="application"
+    aria-label="{{ __('Video Timeline Editor') }}"
+    aria-describedby="timeline-instructions"
     x-data="{
         // Synced from parent previewController
         currentTime: 0,
@@ -1141,6 +1175,14 @@
             this.selectedClip = clipIndex;
             this.lastSelectedIndex = clipIndex;
             this.$dispatch('clip-selected', { track, clipIndex, multi: this.selectedClips.length > 1 });
+
+            // Screen reader announcement
+            const count = this.selectedClips.length;
+            if (count > 1) {
+                this.announceToScreenReader(`${count} clips selected`);
+            } else {
+                this.announceToScreenReader(`Clip ${clipIndex + 1} on ${track} track selected`);
+            }
         },
 
         isClipSelected(track, index) {
@@ -1291,6 +1333,7 @@
 
             this.saveHistory();
             const toDelete = this.selectedClips.length > 0 ? this.selectedClips : [{ track: this.selectedTrack, index: this.selectedClip }];
+            const deleteCount = toDelete.length;
 
             this.$dispatch('delete-clips', {
                 clips: toDelete,
@@ -1298,11 +1341,26 @@
             });
 
             this.deselectAll();
+
+            // Screen reader announcement
+            this.announceToScreenReader(`${deleteCount} clip${deleteCount > 1 ? 's' : ''} deleted`, 'assertive');
         },
 
         showNotification(message) {
             // Simple notification using custom event
             this.$dispatch('show-notification', { message });
+        },
+
+        // ===== Phase D: Accessibility - Screen Reader Announcements =====
+        announceToScreenReader(message, priority = 'polite') {
+            // Update the live region for screen reader announcement
+            const liveRegion = this.$refs.srAnnouncer;
+            if (liveRegion) {
+                liveRegion.setAttribute('aria-live', priority);
+                liveRegion.textContent = message;
+                // Clear after announcement to allow repeated messages
+                setTimeout(() => { liveRegion.textContent = ''; }, 1000);
+            }
         },
 
         // ===== Phase 3: Context Menu =====
@@ -1454,13 +1512,16 @@
             if (this.historyIndex > 0) {
                 const previousIndex = this.historyIndex;
                 this.historyIndex--;
-                $wire.call('timelineUndo').catch(error => {
+                $wire.call('timelineUndo').then(() => {
+                    this.announceToScreenReader('Undo');
+                }).catch(error => {
                     console.error('Timeline undo failed:', error);
                     this.historyIndex = previousIndex; // Revert on failure
                     this.$dispatch('show-notification', {
                         message: 'Undo failed. Please try again.',
                         type: 'error'
                     });
+                    this.announceToScreenReader('Undo failed', 'assertive');
                 });
             }
         },
@@ -1469,13 +1530,16 @@
             if (this.historyIndex < this.history.length - 1) {
                 const previousIndex = this.historyIndex;
                 this.historyIndex++;
-                $wire.call('timelineRedo').catch(error => {
+                $wire.call('timelineRedo').then(() => {
+                    this.announceToScreenReader('Redo');
+                }).catch(error => {
                     console.error('Timeline redo failed:', error);
                     this.historyIndex = previousIndex; // Revert on failure
                     this.$dispatch('show-notification', {
                         message: 'Redo failed. Please try again.',
                         type: 'error'
                     });
+                    this.announceToScreenReader('Redo failed', 'assertive');
                 });
             }
         },
@@ -1899,6 +1963,9 @@
             this.markers.sort((a, b) => a.time - b.time);
             this.saveHistory();
             this.$dispatch('marker-added', { marker });
+
+            // Screen reader announcement
+            this.announceToScreenReader(`Marker added at ${this.formatTime(markerTime)}`);
             return marker;
         },
 
@@ -2870,10 +2937,12 @@
                     type="button"
                     @click="snapEnabled = !snapEnabled"
                     :class="{ 'is-active': snapEnabled }"
+                    :aria-pressed="snapEnabled"
                     class="vw-tool-btn vw-snap-btn"
                     title="{{ __('Magnetic Snap') }}"
+                    aria-label="{{ __('Toggle Magnetic Snap') }}"
                 >
-                    <svg viewBox="0 0 24 24" fill="currentColor">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/>
                     </svg>
                     <span>{{ __('Snap') }}</span>
@@ -2909,10 +2978,12 @@
                 type="button"
                 @click="toggleRippleMode()"
                 :class="{ 'is-active': rippleMode }"
+                :aria-pressed="rippleMode"
                 class="vw-tool-btn vw-ripple-btn"
                 title="{{ __('Ripple Edit Mode') }} - Auto-shift clips"
+                aria-label="{{ __('Toggle Ripple Edit Mode') }}"
             >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M2 12h4l3-9 4 18 3-9h6"/>
                 </svg>
                 <span>{{ __('Ripple') }}</span>
@@ -2921,15 +2992,19 @@
             <div class="vw-toolbar-divider"></div>
 
             {{-- Phase 3: Tool Selection --}}
-            <div class="vw-tool-group vw-tool-selector">
+            <div class="vw-tool-group vw-tool-selector" role="radiogroup" aria-label="{{ __('Timeline Tools') }}">
                 <button
                     type="button"
                     @click="setTool('select')"
                     :class="{ 'is-active': currentTool === 'select' }"
+                    :aria-pressed="currentTool === 'select'"
                     class="vw-tool-btn"
                     title="{{ __('Selection Tool') }} (V)"
+                    aria-label="{{ __('Selection Tool') }}"
+                    role="radio"
+                    :aria-checked="currentTool === 'select'"
                 >
-                    <svg viewBox="0 0 24 24" fill="currentColor">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                     </svg>
                 </button>
@@ -2937,8 +3012,12 @@
                     type="button"
                     @click="setTool('split')"
                     :class="{ 'is-active': currentTool === 'split' }"
+                    :aria-pressed="currentTool === 'split'"
                     class="vw-tool-btn"
                     title="{{ __('Split Tool') }} (S)"
+                    aria-label="{{ __('Split Tool') }}"
+                    role="radio"
+                    :aria-checked="currentTool === 'split'"
                 >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="2" x2="12" y2="22"/>
@@ -3438,14 +3517,25 @@
                     :style="{ left: timeToPixels(currentTime) + 'px' }"
                     :class="{ 'is-dragging': isPlayheadDragging }"
                     @mousedown="startPlayheadDrag($event)"
+                    role="slider"
+                    tabindex="0"
+                    aria-label="{{ __('Timeline playhead') }}"
+                    :aria-valuenow="Math.round(currentTime * 100) / 100"
+                    aria-valuemin="0"
+                    :aria-valuemax="totalDuration"
+                    :aria-valuetext="formatTime(currentTime) + ' {{ __('of') }} ' + formatTime(totalDuration)"
+                    @keydown.left.prevent="seek(Math.max(0, currentTime - 1))"
+                    @keydown.right.prevent="seek(Math.min(totalDuration, currentTime + 1))"
+                    @keydown.home.prevent="seek(0)"
+                    @keydown.end.prevent="seek(totalDuration)"
                 >
                     <div class="vw-playhead-handle">
-                        <svg viewBox="0 0 12 16" fill="currentColor">
+                        <svg viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">
                             <path d="M0 0h12v10l-6 6-6-6z"/>
                         </svg>
                     </div>
                     {{-- Time tooltip during drag --}}
-                    <div class="vw-playhead-tooltip" x-show="isPlayheadDragging" x-cloak>
+                    <div class="vw-playhead-tooltip" x-show="isPlayheadDragging" x-cloak role="tooltip">
                         <span x-text="formatTimeDetailed(playheadTooltipTime)"></span>
                     </div>
                 </div>
@@ -4451,9 +4541,95 @@
             </div>
         </div>
     </div>
+
+    {{-- ===== Phase D: Accessibility - Screen Reader Support ===== --}}
+    {{-- Hidden instructions for screen readers --}}
+    <div id="timeline-instructions" class="sr-only">
+        {{ __('Use arrow keys to navigate the timeline. Press Space to play/pause. Press S to split clips. Press Delete to remove selected clips. Press ? for full keyboard shortcuts.') }}
+    </div>
+
+    {{-- Live region for dynamic announcements --}}
+    <div
+        x-ref="srAnnouncer"
+        class="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+    ></div>
 </div>
 
 <style>
+/* Screen reader only utility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ===== Phase D: Accessibility - Focus Visibility ===== */
+/* High-contrast focus rings for keyboard navigation */
+.vw-pro-timeline *:focus {
+    outline: none;
+}
+
+.vw-pro-timeline *:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.25);
+}
+
+.vw-tool-btn:focus-visible,
+.vw-track-toggle:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+}
+
+.vw-playhead-top:focus-visible {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25);
+}
+
+.vw-clip:focus-visible {
+    outline: 2px solid #10b981;
+    outline-offset: 1px;
+    z-index: 10;
+}
+
+/* Skip link for keyboard users */
+.vw-skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #8b5cf6;
+    color: white;
+    padding: 8px 16px;
+    z-index: 1000;
+    transition: top 0.2s;
+}
+
+.vw-skip-link:focus {
+    top: 0;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .vw-pro-timeline *,
+    .vw-pro-timeline *::before,
+    .vw-pro-timeline *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 /* ==========================================================================
    PROFESSIONAL TIMELINE - Phase 1 Redesign
    Modern glassmorphism design with enhanced visuals
