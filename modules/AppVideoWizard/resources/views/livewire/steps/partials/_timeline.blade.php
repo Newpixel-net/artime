@@ -9,6 +9,7 @@
         // Synced from parent previewController
         currentTime: 0,
         totalDuration: {{ $this->getTotalDuration() ?? 0 }},
+        frameRate: 30, // Default frame rate (can be 24, 25, 30, 60, etc.)
 
         // Timeline state
         zoom: 1,
@@ -332,6 +333,10 @@
         lastFpsUpdate: 0,
         currentFps: 60,
 
+        // Cleanup references
+        _resizeObserver: null,
+        _waveformWorkerUrl: null,
+
         // Format time helper
         formatTime(seconds) {
             if (!seconds || isNaN(seconds)) return '0:00';
@@ -419,8 +424,11 @@
         startPlayheadDrag(e) {
             this.isPlayheadDragging = true;
             this.playheadTooltipTime = this.currentTime;
-            document.addEventListener('mousemove', this.handlePlayheadDrag.bind(this));
-            document.addEventListener('mouseup', this.endPlayheadDrag.bind(this));
+            // Store bound references for proper cleanup
+            this._boundHandlePlayheadDrag = this.handlePlayheadDrag.bind(this);
+            this._boundEndPlayheadDrag = this.endPlayheadDrag.bind(this);
+            document.addEventListener('mousemove', this._boundHandlePlayheadDrag);
+            document.addEventListener('mouseup', this._boundEndPlayheadDrag);
             e.preventDefault();
         },
 
@@ -454,8 +462,8 @@
         endPlayheadDrag() {
             this.isPlayheadDragging = false;
             this.showSnapIndicator = false;
-            document.removeEventListener('mousemove', this.handlePlayheadDrag.bind(this));
-            document.removeEventListener('mouseup', this.endPlayheadDrag.bind(this));
+            document.removeEventListener('mousemove', this._boundHandlePlayheadDrag);
+            document.removeEventListener('mouseup', this._boundEndPlayheadDrag);
         },
 
         // ===== Enhanced Snap System =====
@@ -1261,8 +1269,7 @@
 
         // ===== Phase 3: Frame Stepping =====
         stepFrames(frames) {
-            // Assuming 30fps
-            const frameTime = 1/30;
+            const frameTime = 1 / this.frameRate;
             const newTime = Math.max(0, Math.min(this.totalDuration, this.currentTime + (frames * frameTime)));
             this.seek(newTime);
         },
@@ -2090,7 +2097,8 @@
 
             try {
                 const waveformBlob = new Blob([waveformWorkerCode], { type: 'application/javascript' });
-                this.waveformWorker = new Worker(URL.createObjectURL(waveformBlob));
+                this._waveformWorkerUrl = URL.createObjectURL(waveformBlob);
+                this.waveformWorker = new Worker(this._waveformWorkerUrl);
                 this.waveformWorker.onmessage = (e) => {
                     this.$dispatch('waveform-generated', e.data);
                 };
@@ -2109,6 +2117,10 @@
             if (this.waveformWorker) {
                 this.waveformWorker.terminate();
                 this.waveformWorker = null;
+            }
+            if (this._waveformWorkerUrl) {
+                URL.revokeObjectURL(this._waveformWorkerUrl);
+                this._waveformWorkerUrl = null;
             }
             if (this.thumbnailWorker) {
                 this.thumbnailWorker.terminate();
@@ -2449,15 +2461,15 @@
                 goToEnd();
             }
 
-            // Frame stepping
-            else if (key === 'arrowleft') {
+            // Frame stepping (exclude Alt for marker navigation)
+            else if (key === 'arrowleft' && !e.altKey) {
                 e.preventDefault();
                 if (e.shiftKey) {
                     stepFrames(-5); // 5 frames back
                 } else {
                     stepFrames(-1); // 1 frame back
                 }
-            } else if (key === 'arrowright') {
+            } else if (key === 'arrowright' && !e.altKey) {
                 e.preventDefault();
                 if (e.shiftKey) {
                     stepFrames(5); // 5 frames forward
@@ -2498,8 +2510,15 @@
                 toggleRippleMode();
             }
 
-            // Toggle minimap
-            else if (key === 'm' && !e.ctrlKey && !e.metaKey) {
+            // ===== Phase 6: Marker shortcuts =====
+            // Add marker at playhead (Shift+M) - must come before plain 'm'
+            else if (key === 'm' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                addMarkerAtPlayhead();
+            }
+
+            // Toggle minimap (plain M only)
+            else if (key === 'm' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
                 e.preventDefault();
                 showMinimap = !showMinimap;
             }
@@ -2512,13 +2531,6 @@
                 } else {
                     zoomFit();
                 }
-            }
-
-            // ===== Phase 6: Marker shortcuts =====
-            // Add marker at playhead (Shift+M)
-            else if (key === 'm' && e.shiftKey) {
-                e.preventDefault();
-                addMarkerAtPlayhead();
             }
 
             // Navigate markers (Shift+Left/Right)
@@ -2546,15 +2558,12 @@
                 }
             }, { passive: false });
 
-            // Track scroll for minimap
-            timelineScroll.addEventListener('scroll', () => {
+            // Initialize minimap viewport on resize
+            // Note: scroll handler is set up in Phase 7 initialization below
+            _resizeObserver = new ResizeObserver(() => {
                 updateMinimapViewport();
             });
-
-            // Initialize minimap viewport on resize
-            new ResizeObserver(() => {
-                updateMinimapViewport();
-            }).observe(timelineScroll);
+            _resizeObserver.observe(timelineScroll);
         }
 
         // ===== Phase 5: Touch/Pinch Zoom Handlers =====
@@ -2606,6 +2615,9 @@
         // Cleanup on unmount
         window.addEventListener('beforeunload', () => {
             terminateWorkers();
+            if (_resizeObserver) {
+                _resizeObserver.disconnect();
+            }
         });
     "
     @click.away="deselectAll()"
@@ -3265,6 +3277,7 @@
                 {{-- Video Track --}}
                 <div
                     class="vw-track vw-track-video"
+                    data-track="video"
                     :class="{ 'is-locked': tracks.video.locked, 'is-muted': tracks.video.muted, 'is-drop-target': isDragging && dropZoneTrack === 'video' }"
                     x-show="tracks.video.visible"
                     :style="{ height: tracks.video.height + 'px' }"
@@ -3286,7 +3299,8 @@
                                 'is-hovered': hoveredTrack === 'video' && hoveredClip === {{ $index }},
                                 'is-dragging': isDragging && dragTarget?.track === 'video' && dragTarget?.index === {{ $index }},
                                 'is-ripple-affected': rippleMode && affectedClips.some(c => c.track === 'video' && c.index === {{ $index }}),
-                                'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'video' && c.index === {{ $index }})
+                                'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'video' && c.index === {{ $index }}),
+                                'is-long-pressing': isLongPressing && hoveredTrack === 'video' && hoveredClip === {{ $index }}
                             }"
                             :style="{
                                 left: timeToPixels({{ $sceneStart }}) + 'px',
@@ -3297,6 +3311,7 @@
                             @mouseenter="hoveredTrack = 'video'; hoveredClip = {{ $index }}"
                             @mouseleave="hoveredTrack = null; hoveredClip = null"
                             @mousedown.stop="if (!tracks.video.locked && $event.target.closest('.vw-trim-handle') === null && $event.button === 0) startDrag($event, 'move', { track: 'video', index: {{ $index }} }, {{ $sceneStart }}, {{ $sceneDuration }}, {{ $sceneStart }})"
+                            @touchstart.stop="hoveredTrack = 'video'; hoveredClip = {{ $index }}; handleTouchStart($event, 'video', {{ $index }})"
                         >
                             {{-- Thumbnail Filmstrip --}}
                             <div class="vw-clip-filmstrip">
@@ -3350,6 +3365,7 @@
                 {{-- Voiceover Track --}}
                 <div
                     class="vw-track vw-track-voiceover"
+                    data-track="voiceover"
                     x-show="tracks.voiceover.visible"
                     :style="{ height: tracks.voiceover.height + 'px' }"
                 >
@@ -3367,7 +3383,8 @@
                             :class="{
                                 'is-selected': isClipSelected('voiceover', {{ $index }}),
                                 'is-hovered': hoveredTrack === 'voiceover' && hoveredClip === {{ $index }},
-                                'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'voiceover' && c.index === {{ $index }})
+                                'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'voiceover' && c.index === {{ $index }}),
+                                'is-long-pressing': isLongPressing && hoveredTrack === 'voiceover' && hoveredClip === {{ $index }}
                             }"
                             :style="{
                                 left: timeToPixels({{ $sceneStart }}) + 'px',
@@ -3377,6 +3394,7 @@
                             @contextmenu.prevent="openContextMenu($event, 'voiceover', {{ $index }})"
                             @mouseenter="hoveredTrack = 'voiceover'; hoveredClip = {{ $index }}"
                             @mouseleave="hoveredTrack = null; hoveredClip = null"
+                            @touchstart.stop="hoveredTrack = 'voiceover'; hoveredClip = {{ $index }}; handleTouchStart($event, 'voiceover', {{ $index }})"
                         >
                             {{-- Waveform SVG --}}
                             <svg class="vw-waveform-svg" preserveAspectRatio="none">
@@ -3400,6 +3418,7 @@
                 {{-- Music Track --}}
                 <div
                     class="vw-track vw-track-music"
+                    data-track="music"
                     x-show="tracks.music.visible"
                     :style="{ height: tracks.music.height + 'px' }"
                 >
@@ -3451,6 +3470,7 @@
                 {{-- Captions Track --}}
                 <div
                     class="vw-track vw-track-captions"
+                    data-track="captions"
                     x-show="tracks.captions.visible"
                     :style="{ height: tracks.captions.height + 'px' }"
                 >
@@ -3470,7 +3490,8 @@
                                 :class="{
                                     'is-selected': isClipSelected('captions', {{ $index }}),
                                     'is-hovered': hoveredTrack === 'captions' && hoveredClip === {{ $index }},
-                                    'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'captions' && c.index === {{ $index }})
+                                    'is-cut': clipboardOperation === 'cut' && clipboard.some(c => c.track === 'captions' && c.index === {{ $index }}),
+                                    'is-long-pressing': isLongPressing && hoveredTrack === 'captions' && hoveredClip === {{ $index }}
                                 }"
                                 :style="{
                                     left: timeToPixels({{ $sceneStart }}) + 'px',
@@ -3480,6 +3501,7 @@
                                 @contextmenu.prevent="openContextMenu($event, 'captions', {{ $index }})"
                                 @mouseenter="hoveredTrack = 'captions'; hoveredClip = {{ $index }}"
                                 @mouseleave="hoveredTrack = null; hoveredClip = null"
+                                @touchstart.stop="hoveredTrack = 'captions'; hoveredClip = {{ $index }}; handleTouchStart($event, 'captions', {{ $index }})"
                                 title="{{ $scene['narration'] ?? '' }}"
                             >
                                 <span class="vw-caption-text">{{ $captionText ?: __('Caption') . ' ' . ($index + 1) }}</span>
