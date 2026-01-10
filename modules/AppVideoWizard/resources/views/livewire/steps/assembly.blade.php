@@ -1,59 +1,278 @@
 {{-- Step 6: Assembly Studio - Full-Screen Professional Editor --}}
-{{-- Note: Video Preview Engine scripts are loaded in video-wizard.blade.php --}}
+{{-- Video Preview Engine script loaded via video-wizard.blade.php @assets --}}
 
 @php
     $assemblyStats = $this->getAssemblyStats();
     $isMultiShot = $assemblyStats['mode'] === 'multi-shot';
     $canExport = !$isMultiShot || $assemblyStats['isReady'];
+    $previewData = $this->getPreviewInitData();
 @endphp
 
 <div
     class="vw-assembly-fullscreen"
     x-data="{
-        ...(typeof previewController === 'function' ? previewController(@js($this->getPreviewInitData())) : {
-            // Fallback properties if previewController isn't loaded yet
-            engine: null,
-            isReady: false,
-            isLoading: false,
-            isPlaying: false,
-            currentTime: 0,
-            totalDuration: {{ $this->getTotalDuration() ?? 0 }},
-            loadProgress: 0,
-            currentSceneIndex: 0,
-            totalScenes: {{ count($script['scenes'] ?? []) }},
-            canvasWidth: 1280,
-            canvasHeight: 720,
-            aspectRatio: '{{ $aspectRatio ?? '16:9' }}',
-            captionsEnabled: {{ ($assembly['captions']['enabled'] ?? true) ? 'true' : 'false' }},
-            musicEnabled: {{ ($assembly['music']['enabled'] ?? false) ? 'true' : 'false' }},
-            scenes: @js($this->getPreviewScenes()),
-            init() {
-                console.warn('[Assembly] previewController not loaded, using fallback. Check if scripts are loaded.');
-            },
-            formatTime(seconds) {
-                if (!seconds || isNaN(seconds)) return '0:00';
-                const mins = Math.floor(seconds / 60);
-                const secs = Math.floor(seconds % 60);
-                return mins + ':' + secs.toString().padStart(2, '0');
-            },
-            togglePlay() { console.warn('[Assembly] togglePlay called but no engine'); },
-            play() { console.warn('[Assembly] play called but no engine'); },
-            pause() { console.warn('[Assembly] pause called but no engine'); },
-            seek(time) { console.warn('[Assembly] seek called but no engine'); },
-            seekStart() { this.seek(0); },
-            seekEnd() { this.seek(this.totalDuration); },
-            jumpToScene(index) { this.currentSceneIndex = index; },
-            seekToScene(index) { this.currentSceneIndex = index; },
-            loadPreview() {
-                console.error('[Assembly] loadPreview failed - previewController not loaded. Ensure video-preview-engine.js and preview-controller.js are included.');
-                alert('Preview could not load. Please refresh the page and try again.');
-            }
-        }),
+        // Preview Engine State
+        engine: null,
+        isReady: false,
+        isLoading: false,
+        isPlaying: false,
+        currentTime: 0,
+        totalDuration: {{ $previewData['totalDuration'] ?? 0 }},
+        loadProgress: 0,
+        currentSceneIndex: 0,
+        totalScenes: {{ count($previewData['scenes'] ?? []) }},
+
+        // Canvas dimensions
+        canvasWidth: 1280,
+        canvasHeight: 720,
+
+        // Settings from server
+        aspectRatio: '{{ $previewData['aspectRatio'] ?? '16:9' }}',
+        captionsEnabled: {{ ($previewData['captionsEnabled'] ?? true) ? 'true' : 'false' }},
+        captionStyle: '{{ $previewData['captionStyle'] ?? 'karaoke' }}',
+        captionPosition: '{{ $previewData['captionPosition'] ?? 'bottom' }}',
+        captionSize: {{ $previewData['captionSize'] ?? 1.0 }},
+        musicEnabled: {{ ($previewData['musicEnabled'] ?? false) ? 'true' : 'false' }},
+        musicVolume: {{ $previewData['musicVolume'] ?? 30 }},
+        musicUrl: @js($previewData['musicUrl'] ?? null),
+
+        // Scenes data from server
+        scenes: @js($previewData['scenes'] ?? []),
+
+        // UI State
         activeTab: 'scenes',
-        musicEnabled: @js($assembly['music']['enabled'] ?? false),
-        captionsEnabled: @js($assembly['captions']['enabled'] ?? true),
         showExportModal: false,
         keyboardShortcuts: true,
+
+        // Initialize
+        init() {
+            this.setAspectRatio(this.aspectRatio);
+            this.setupLivewireListeners();
+        },
+
+        setAspectRatio(ratio) {
+            const ratios = {
+                '16:9': { width: 1280, height: 720 },
+                '9:16': { width: 720, height: 1280 },
+                '1:1': { width: 1080, height: 1080 },
+                '4:5': { width: 1080, height: 1350 },
+                '4:3': { width: 1280, height: 960 }
+            };
+            const dims = ratios[ratio] || ratios['16:9'];
+            this.canvasWidth = dims.width;
+            this.canvasHeight = dims.height;
+            this.aspectRatio = ratio;
+            if (this.engine) {
+                this.engine.resize(dims.width, dims.height);
+            }
+            if (this.$refs && this.$refs.previewCanvas) {
+                const wrapper = this.$refs.previewCanvas.parentElement;
+                if (wrapper) {
+                    wrapper.style.aspectRatio = ratio.replace(':', '/');
+                }
+            }
+        },
+
+        setupLivewireListeners() {
+            if (typeof Livewire === 'undefined') return;
+            Livewire.on('caption-setting-updated', (data) => this.updateCaptionSetting(data.key, data.value));
+            Livewire.on('music-setting-updated', (data) => this.updateMusicSetting(data.key, data.value));
+            Livewire.on('preview-scenes-updated', (data) => { if (data && data.scenes) this.updateScenes(data.scenes); });
+            window.addEventListener('seek-preview', (e) => { if (e.detail && typeof e.detail.time !== 'undefined') this.seek(e.detail.time); });
+            window.addEventListener('toggle-preview-playback', () => this.togglePlay());
+        },
+
+        async loadPreview() {
+            if (this.isLoading || this.isReady) return;
+            this.isLoading = true;
+            this.loadProgress = 0;
+
+            try {
+                const canvas = this.$refs.previewCanvas;
+                if (!canvas) throw new Error('Canvas element not found');
+                if (typeof VideoPreviewEngine === 'undefined') throw new Error('VideoPreviewEngine not loaded. Please refresh the page.');
+                const scenes = this.scenes;
+                if (!scenes || scenes.length === 0) throw new Error('No scenes available');
+
+                console.log('[PreviewController] Loading preview with', scenes.length, 'scenes');
+
+                this.engine = new VideoPreviewEngine(canvas, {
+                    width: this.canvasWidth,
+                    height: this.canvasHeight,
+                    onTimeUpdate: (time) => {
+                        this.currentTime = time;
+                        window.dispatchEvent(new CustomEvent('preview-time-update', { detail: { time } }));
+                    },
+                    onSceneChange: (index) => {
+                        this.currentSceneIndex = index;
+                        window.dispatchEvent(new CustomEvent('preview-scene-change', { detail: { index } }));
+                    },
+                    onEnded: () => {
+                        this.isPlaying = false;
+                        window.dispatchEvent(new CustomEvent('preview-ended'));
+                    },
+                    onLoadProgress: (progress) => {
+                        this.loadProgress = Math.round(progress * 100);
+                    },
+                    onReady: () => {
+                        this.isLoading = false;
+                        this.isReady = true;
+                        this.totalDuration = this.engine.totalDuration;
+                        this.totalScenes = this.engine.scenes.length;
+                        window.dispatchEvent(new CustomEvent('preview-ready', {
+                            detail: { duration: this.totalDuration, scenes: this.totalScenes }
+                        }));
+                        console.log('[PreviewController] Preview ready. Duration:', this.totalDuration);
+                    }
+                });
+
+                await this.engine.loadScenes(scenes);
+                this.applyCaptionSettings();
+                if (this.musicEnabled && this.musicUrl) {
+                    await this.applyMusicSettings();
+                }
+            } catch (error) {
+                console.error('[PreviewController] Failed to load preview:', error);
+                this.isLoading = false;
+                window.dispatchEvent(new CustomEvent('preview-error', { detail: { message: error.message } }));
+                alert('Preview Error: ' + error.message);
+            }
+        },
+
+        updateScenes(newScenes) {
+            this.scenes = newScenes || [];
+            this.totalScenes = this.scenes.length;
+            if (this.engine && this.isReady) this.refreshScenes();
+        },
+
+        async refreshScenes() {
+            if (!this.engine || !this.isReady) return;
+            if (this.scenes && this.scenes.length > 0) {
+                await this.engine.loadScenes(this.scenes);
+                this.totalScenes = this.engine.scenes.length;
+                this.totalDuration = this.engine.totalDuration;
+            }
+        },
+
+        applyCaptionSettings() {
+            if (!this.engine) return;
+            this.engine.captionsEnabled = this.captionsEnabled;
+            this.engine.captionStyle = this.captionStyle;
+            this.engine.captionPosition = this.captionPosition;
+            this.engine.captionSize = this.captionSize;
+            if (this.isReady && !this.isPlaying) this.engine._renderFrame();
+        },
+
+        updateCaptionSetting(key, value) {
+            if (!this.engine) return;
+            switch (key) {
+                case 'enabled': this.captionsEnabled = value; this.engine.setCaptionsEnabled(value); break;
+                case 'style': this.captionStyle = value; this.engine.setCaptionStyle(value); break;
+                case 'position': this.captionPosition = value; this.engine.setCaptionPosition(value); break;
+                case 'size': this.captionSize = value; this.engine.setCaptionSize(value); break;
+            }
+        },
+
+        async applyMusicSettings() {
+            if (!this.engine) return;
+            if (this.musicEnabled && this.musicUrl) {
+                try { await this.engine.setBackgroundMusic(this.musicUrl, this.musicVolume / 100); }
+                catch (e) { console.warn('Failed to load music:', e); }
+            } else if (this.engine.stopBackgroundMusic) {
+                this.engine.stopBackgroundMusic();
+            }
+        },
+
+        updateMusicSetting(key, value) {
+            if (!this.engine) return;
+            switch (key) {
+                case 'enabled': this.musicEnabled = value; if (!value && this.engine.stopBackgroundMusic) this.engine.stopBackgroundMusic(); else if (this.musicUrl) this.applyMusicSettings(); break;
+                case 'volume': this.musicVolume = value; if (this.engine.musicElement) this.engine.musicElement.volume = value / 100; break;
+                case 'url': this.musicUrl = value; if (this.musicEnabled && value) this.applyMusicSettings(); break;
+            }
+        },
+
+        togglePlay() {
+            if (!this.engine || !this.isReady) return;
+            if (this.isPlaying) this.pause();
+            else this.play();
+        },
+
+        play() {
+            if (!this.engine || !this.isReady) return;
+            this.engine.play();
+            this.isPlaying = true;
+        },
+
+        pause() {
+            if (!this.engine) return;
+            this.engine.pause();
+            this.isPlaying = false;
+        },
+
+        stop() {
+            if (!this.engine) return;
+            this.engine.stop();
+            this.isPlaying = false;
+            this.currentTime = 0;
+        },
+
+        seek(time) {
+            if (!this.engine || !this.isReady) return;
+            const t = Math.max(0, Math.min(time, this.totalDuration));
+            this.engine.seek(t);
+            this.currentTime = t;
+        },
+
+        seekStart() { this.seek(0); },
+        seekEnd() { this.seek(this.totalDuration); },
+
+        jumpToScene(idx) {
+            if (!this.engine || !this.isReady) return;
+            this.engine.jumpToScene(idx);
+            this.currentSceneIndex = idx;
+        },
+
+        seekToScene(idx) {
+            if (!this.engine || !this.isReady || idx < 0 || idx >= this.engine.scenes.length) return;
+            let t = 0;
+            for (let i = 0; i < idx; i++) t += this.engine.scenes[i].duration || 5;
+            this.seek(t);
+            this.currentSceneIndex = idx;
+        },
+
+        formatTime(s) {
+            if (!s || isNaN(s)) return '0:00';
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return m + ':' + sec.toString().padStart(2, '0');
+        },
+
+        formatTimecode(s) {
+            if (!s || isNaN(s)) return '00:00:00';
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = Math.floor(s % 60);
+            if (h > 0) return h + ':' + m.toString().padStart(2, '0') + ':' + sec.toString().padStart(2, '0');
+            return m + ':' + sec.toString().padStart(2, '0');
+        },
+
+        getCurrentScene() {
+            if (!this.engine || !this.engine.scenes[this.currentSceneIndex]) return null;
+            return this.engine.scenes[this.currentSceneIndex];
+        },
+
+        setVolume(voice, music) {
+            if (this.engine) this.engine.setVolume(voice || 1.0, music || 0.3);
+        },
+
+        destroy() {
+            if (this.engine) { this.engine.destroy(); this.engine = null; }
+            this.isReady = false;
+            this.isPlaying = false;
+            this.currentTime = 0;
+            this.totalDuration = 0;
+        },
 
         handleKeyboard(e) {
             if (!this.keyboardShortcuts) return;
@@ -69,27 +288,15 @@
                         this.showExportModal = false;
                     }
                     break;
-                case '1':
-                    this.activeTab = 'scenes';
-                    break;
-                case '2':
-                    this.activeTab = 'text';
-                    break;
-                case '3':
-                    this.activeTab = 'audio';
-                    break;
-                case '4':
-                    this.activeTab = 'transitions';
-                    break;
+                case '1': this.activeTab = 'scenes'; break;
+                case '2': this.activeTab = 'text'; break;
+                case '3': this.activeTab = 'audio'; break;
+                case '4': this.activeTab = 'transitions'; break;
                 case 'arrowleft':
-                    if (this.engine) {
-                        this.seek(Math.max(0, this.currentTime - 5));
-                    }
+                    if (this.engine) this.seek(Math.max(0, this.currentTime - 5));
                     break;
                 case 'arrowright':
-                    if (this.engine) {
-                        this.seek(Math.min(this.totalDuration, this.currentTime + 5));
-                    }
+                    if (this.engine) this.seek(Math.min(this.totalDuration, this.currentTime + 5));
                     break;
             }
         }
