@@ -2955,8 +2955,8 @@
 
                 // DOM queries
                 getElements: () => ({
-                    toolbar: document.querySelector('[data-testid=\"timeline-toolbar\"]'),
-                    playhead: document.querySelector('[data-testid=\"playhead\"]'),
+                    toolbar: document.querySelector('[data-testid=timeline-toolbar]'),
+                    playhead: document.querySelector('[data-testid=playhead]'),
                     clips: document.querySelectorAll('.vw-clip'),
                     markers: document.querySelectorAll('.vw-timeline-marker')
                 })
