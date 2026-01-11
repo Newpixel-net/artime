@@ -6968,9 +6968,28 @@ class VideoWizard extends Component
                             'role' => $character['role'] ?? 'Supporting',
                             'appliedScenes' => $character['appearsInScenes'] ?? [],
                             'traits' => $character['traits'] ?? [],
+                            'defaultExpression' => $character['defaultExpression'] ?? '',
                             'referenceImage' => null,
                             'autoDetected' => true,
                             'aiGenerated' => true,
+                            // Character DNA fields - auto-extracted from script by AI
+                            'hair' => $character['hair'] ?? [
+                                'color' => '',
+                                'style' => '',
+                                'length' => '',
+                                'texture' => '',
+                            ],
+                            'wardrobe' => $character['wardrobe'] ?? [
+                                'outfit' => '',
+                                'colors' => '',
+                                'style' => '',
+                                'footwear' => '',
+                            ],
+                            'makeup' => $character['makeup'] ?? [
+                                'style' => '',
+                                'details' => '',
+                            ],
+                            'accessories' => $character['accessories'] ?? [],
                         ];
                     }
                 }
@@ -7206,6 +7225,9 @@ class VideoWizard extends Component
                             'timeOfDay' => $location['timeOfDay'] ?? 'day',
                             'weather' => $location['weather'] ?? 'clear',
                             'atmosphere' => $location['atmosphere'] ?? '',
+                            // Location DNA fields - auto-extracted from script by AI
+                            'mood' => $location['mood'] ?? '',
+                            'lightingStyle' => $location['lightingStyle'] ?? '',
                             'scenes' => $location['scenes'] ?? [],
                             'stateChanges' => $location['stateChanges'] ?? [],
                             'referenceImage' => null,

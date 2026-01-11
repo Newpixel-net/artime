@@ -220,26 +220,54 @@ Production Mode: {$productionMode}
 
 {$sceneContent}
 {$styleBibleContext}
-=== REQUIRED OUTPUT FORMAT ===
+=== REQUIRED OUTPUT FORMAT - LOCATION DNA EXTRACTION ===
+Extract DETAILED LOCATION DNA for Hollywood-level visual consistency.
+For each location, provide STRUCTURED environmental details that ensure every scene in this location looks consistent.
+
 {
   "locations": [
     {
       "name": "Location Name (e.g., 'Corporate Office', 'City Streets', 'The Forest')",
-      "description": "Detailed visual description for AI image generation: architectural style, materials, colors, textures, lighting, atmosphere, distinctive features. Be very specific and concrete.",
+      "description": "Detailed visual description for AI image generation: architectural style, materials, colors, textures, distinctive features. Be very specific and concrete.",
       "type": "interior/exterior/abstract",
       "timeOfDay": "day/night/dawn/dusk/golden-hour",
       "weather": "clear/cloudy/rainy/foggy/stormy/snowy",
       "atmosphere": "professional/mysterious/energetic/peaceful/tense/romantic",
+      "mood": "tense anticipation/hopeful optimism/melancholy reflection/high-energy action/quiet intimacy/ominous foreboding",
+      "lightingStyle": "Specific lighting description - e.g., 'soft diffused daylight from large windows', 'harsh overhead fluorescent', 'warm golden hour backlight', 'cool blue moonlight with practical lamps', 'dramatic rim lighting with deep shadows'",
       "appearsInScenes": [1, 2, 5],
       "stateChanges": [
-        {"scene": 1, "state": "pristine"},
-        {"scene": 5, "state": "damaged"}
+        {"sceneIndex": 1, "stateDescription": "pristine and organized"},
+        {"sceneIndex": 5, "stateDescription": "ransacked with overturned furniture"}
       ]
     }
   ],
   "hasDistinctLocations": true,
   "suggestedStyleNote": "Optional note about location style recommendations"
 }
+
+=== LOCATION DNA FIELD GUIDELINES ===
+
+MOOD - The emotional tone of the location (distinct from atmosphere):
+- "tense anticipation" - something is about to happen
+- "hopeful optimism" - positive, uplifting feel
+- "melancholy reflection" - sad, thoughtful
+- "high-energy action" - exciting, dynamic
+- "quiet intimacy" - close, personal moments
+- "ominous foreboding" - sense of danger or dread
+- "serene tranquility" - peaceful, calm
+- "chaotic urgency" - frantic, rushed
+
+LIGHTING STYLE - Be VERY SPECIFIC about lighting setup:
+- Include light direction: "from above", "side-lit", "backlit", "front-lit"
+- Include light quality: "soft diffused", "hard harsh", "dappled", "filtered"
+- Include light source: "natural sunlight", "fluorescent", "candlelight", "LED panels"
+- Include color temperature: "warm golden", "cool blue", "neutral white", "orange tungsten"
+- Example: "Soft diffused natural light from north-facing windows, supplemented by warm tungsten practicals on desks"
+
+STATE CHANGES - Track how location changes across scenes:
+- Use "sceneIndex" (1-based scene number) and "stateDescription"
+- Be specific about visual changes
 
 If the video is purely abstract/conceptual with no distinct locations, return:
 {
@@ -284,7 +312,7 @@ USER;
             ];
         }
 
-        // Normalize and validate locations
+        // Normalize and validate locations with full DNA extraction
         $locations = [];
         foreach ($result['locations'] ?? [] as $idx => $loc) {
             $locations[] = [
@@ -295,8 +323,11 @@ USER;
                 'timeOfDay' => $this->normalizeTimeOfDay($loc['timeOfDay'] ?? 'day'),
                 'weather' => $this->normalizeWeather($loc['weather'] ?? 'clear'),
                 'atmosphere' => $loc['atmosphere'] ?? '',
+                // Location DNA fields - auto-extracted from script by AI
+                'mood' => $loc['mood'] ?? '',
+                'lightingStyle' => $loc['lightingStyle'] ?? '',
                 'scenes' => $this->normalizeSceneIndices($loc['appearsInScenes'] ?? []),
-                'stateChanges' => $loc['stateChanges'] ?? [],
+                'stateChanges' => $this->normalizeStateChanges($loc['stateChanges'] ?? []),
                 'referenceImage' => null,
                 'autoDetected' => true,
                 'aiGenerated' => true,
@@ -390,5 +421,27 @@ USER;
             }
         }
         return array_unique($normalized);
+    }
+
+    /**
+     * Normalize state changes to use consistent field names.
+     * Supports both new format (sceneIndex/stateDescription) and legacy format (scene/state).
+     */
+    protected function normalizeStateChanges(array $stateChanges): array
+    {
+        $normalized = [];
+        foreach ($stateChanges as $change) {
+            // Support both field name formats
+            $sceneIndex = $change['sceneIndex'] ?? $change['scene'] ?? null;
+            $stateDescription = $change['stateDescription'] ?? $change['state'] ?? '';
+
+            if ($sceneIndex !== null) {
+                $normalized[] = [
+                    'sceneIndex' => (int) $sceneIndex,
+                    'stateDescription' => $stateDescription,
+                ];
+            }
+        }
+        return $normalized;
     }
 }

@@ -232,27 +232,95 @@ Production Mode: {$productionMode}
 
 {$sceneContent}
 {$styleBibleContext}
-=== REQUIRED OUTPUT FORMAT ===
+=== REQUIRED OUTPUT FORMAT - CHARACTER DNA EXTRACTION ===
+Extract DETAILED CHARACTER DNA for Hollywood-level visual consistency.
+For each character, provide STRUCTURED appearance details that can be used across all scenes.
+
 {
   "characters": [
     {
       "name": "Individual Character Name (e.g., 'Ayo', 'Sarah Chen', 'The CEO')",
-      "description": "Detailed INDIVIDUAL physical description: age (specific like '32 years old'), gender, ethnicity, build, hair color and style, eye color, distinctive features, specific clothing. ONE PERSON ONLY.",
+      "description": "Core identity: age (specific like '32 years old'), gender, ethnicity, build, face shape, distinctive features. This is the CHARACTER IDENTITY.",
       "role": "Main/Supporting/Background",
       "appearsInScenes": [1, 2, 5],
-      "traits": ["confident", "mysterious", "professional"]
+      "traits": ["confident", "mysterious", "professional"],
+      "defaultExpression": "confident and alert",
+
+      "hair": {
+        "color": "jet black",
+        "style": "sleek bob with side part",
+        "length": "chin-length",
+        "texture": "straight glossy"
+      },
+
+      "wardrobe": {
+        "outfit": "fitted black tactical jacket over dark gray t-shirt, slim dark pants",
+        "colors": "black, charcoal gray, silver accents",
+        "style": "tactical-tech",
+        "footwear": "black combat boots"
+      },
+
+      "makeup": {
+        "style": "minimal natural",
+        "details": "subtle smoky eye, nude lip, flawless skin"
+      },
+
+      "accessories": ["silver stud earrings", "tactical watch", "thin silver necklace"]
     }
   ],
   "hasHumanCharacters": true,
   "suggestedStyleNote": "Optional note about character style recommendations"
 }
 
-EXAMPLE - If script mentions "a group of diverse warriors":
-WRONG: {"name": "Warriors", "description": "A group of diverse warriors..."}
-CORRECT: Create SEPARATE entries for each individual:
-- {"name": "Ayo", "description": "28-year-old African female warrior, athletic build, short natural hair..."}
-- {"name": "Kenji", "description": "35-year-old Japanese male samurai, muscular, long black hair in topknot..."}
-- {"name": "Elena", "description": "24-year-old Eastern European female fighter, slim but strong, blonde braided hair..."}
+=== DNA FIELD GUIDELINES ===
+
+HAIR - Be specific about:
+- color: "jet black", "auburn red", "platinum blonde", "dark brown with highlights"
+- style: "sleek bob", "long flowing waves", "tight curls", "buzz cut", "messy bedhead"
+- length: "pixie-short", "chin-length", "shoulder-length", "mid-back", "waist-length"
+- texture: "straight glossy", "wavy", "curly voluminous", "coily natural", "fine wispy"
+
+WARDROBE - Match to genre and character:
+- outfit: Full description of what they wear (top, bottom, layers)
+- colors: Primary color palette of their clothing
+- style: "corporate professional", "tactical-tech", "casual streetwear", "elegant formal", "bohemian"
+- footwear: Specific shoes/boots
+
+MAKEUP - Appropriate to character:
+- style: "minimal natural", "glamorous", "no makeup", "bold dramatic", "professional polished"
+- details: Specific makeup elements if any
+
+ACCESSORIES - Items that identify the character:
+- List specific items: watches, jewelry, glasses, hats, bags, weapons, tech devices
+
+TRAITS - Personality characteristics visible in their demeanor
+DEFAULT EXPRESSION - Their typical facial expression/mood
+
+=== EXAMPLE EXTRACTIONS BY GENRE ===
+
+Corporate/Business Character:
+{
+  "name": "Marcus Chen",
+  "description": "45-year-old Asian-American male CEO, tall athletic build, sharp jawline, distinguished gray temples",
+  "hair": {"color": "black with distinguished gray temples", "style": "short executive cut", "length": "short", "texture": "straight neat"},
+  "wardrobe": {"outfit": "tailored navy three-piece suit, crisp white dress shirt, silk tie", "colors": "navy blue, white, burgundy accents", "style": "corporate executive", "footwear": "polished oxford dress shoes"},
+  "makeup": {"style": "none", "details": "clean-shaven, well-groomed"},
+  "accessories": ["luxury watch", "wedding band", "subtle cufflinks"],
+  "traits": ["authoritative", "composed", "strategic"],
+  "defaultExpression": "confident and thoughtful"
+}
+
+Action/Tactical Character:
+{
+  "name": "Maya Rodriguez",
+  "description": "28-year-old Latina female operative, athletic muscular build, determined eyes, small scar on left eyebrow",
+  "hair": {"color": "dark brown", "style": "tight ponytail", "length": "shoulder-length", "texture": "straight"},
+  "wardrobe": {"outfit": "black tactical vest over gray compression shirt, cargo pants with multiple pockets", "colors": "black, gray, olive green", "style": "tactical military", "footwear": "black tactical boots"},
+  "makeup": {"style": "minimal", "details": "natural brows, no visible makeup"},
+  "accessories": ["dog tags", "tactical watch", "utility belt", "fingerless gloves"],
+  "traits": ["fierce", "disciplined", "protective"],
+  "defaultExpression": "alert and focused"
+}
 
 If there are no human characters or the video is purely abstract/conceptual/nature footage, return:
 {
@@ -297,9 +365,21 @@ USER;
             ];
         }
 
-        // Normalize and validate characters
+        // Normalize and validate characters with full DNA extraction
         $characters = [];
         foreach ($result['characters'] ?? [] as $idx => $char) {
+            // Extract hair DNA (object with color, style, length, texture)
+            $hair = $this->normalizeHairDNA($char['hair'] ?? null);
+
+            // Extract wardrobe DNA (object with outfit, colors, style, footwear)
+            $wardrobe = $this->normalizeWardrobeDNA($char['wardrobe'] ?? null);
+
+            // Extract makeup DNA (object with style, details)
+            $makeup = $this->normalizeMakeupDNA($char['makeup'] ?? null);
+
+            // Extract accessories (array of strings)
+            $accessories = $this->normalizeAccessories($char['accessories'] ?? []);
+
             $characters[] = [
                 'id' => 'char_' . time() . '_' . $idx,
                 'name' => $char['name'] ?? 'Character ' . ($idx + 1),
@@ -307,9 +387,15 @@ USER;
                 'role' => $char['role'] ?? 'Supporting',
                 'appearsInScenes' => $this->normalizeSceneIndices($char['appearsInScenes'] ?? []),
                 'traits' => $char['traits'] ?? [],
+                'defaultExpression' => $char['defaultExpression'] ?? '',
                 'referenceImage' => null,
                 'autoDetected' => true,
                 'aiGenerated' => true,
+                // Character DNA fields - auto-extracted from script
+                'hair' => $hair,
+                'wardrobe' => $wardrobe,
+                'makeup' => $makeup,
+                'accessories' => $accessories,
             ];
         }
 
@@ -337,6 +423,96 @@ USER;
             }
         }
         return array_unique($normalized);
+    }
+
+    /**
+     * Normalize hair DNA from AI response.
+     * Expected structure: {color, style, length, texture}
+     */
+    protected function normalizeHairDNA($hair): array
+    {
+        if (empty($hair) || !is_array($hair)) {
+            return [
+                'color' => '',
+                'style' => '',
+                'length' => '',
+                'texture' => '',
+            ];
+        }
+
+        return [
+            'color' => $hair['color'] ?? '',
+            'style' => $hair['style'] ?? '',
+            'length' => $hair['length'] ?? '',
+            'texture' => $hair['texture'] ?? '',
+        ];
+    }
+
+    /**
+     * Normalize wardrobe DNA from AI response.
+     * Expected structure: {outfit, colors, style, footwear}
+     */
+    protected function normalizeWardrobeDNA($wardrobe): array
+    {
+        if (empty($wardrobe) || !is_array($wardrobe)) {
+            return [
+                'outfit' => '',
+                'colors' => '',
+                'style' => '',
+                'footwear' => '',
+            ];
+        }
+
+        return [
+            'outfit' => $wardrobe['outfit'] ?? '',
+            'colors' => $wardrobe['colors'] ?? '',
+            'style' => $wardrobe['style'] ?? '',
+            'footwear' => $wardrobe['footwear'] ?? '',
+        ];
+    }
+
+    /**
+     * Normalize makeup DNA from AI response.
+     * Expected structure: {style, details}
+     */
+    protected function normalizeMakeupDNA($makeup): array
+    {
+        if (empty($makeup) || !is_array($makeup)) {
+            return [
+                'style' => '',
+                'details' => '',
+            ];
+        }
+
+        return [
+            'style' => $makeup['style'] ?? '',
+            'details' => $makeup['details'] ?? '',
+        ];
+    }
+
+    /**
+     * Normalize accessories from AI response.
+     * Expected: array of strings
+     */
+    protected function normalizeAccessories($accessories): array
+    {
+        if (empty($accessories)) {
+            return [];
+        }
+
+        // If it's a string, split by comma
+        if (is_string($accessories)) {
+            return array_map('trim', explode(',', $accessories));
+        }
+
+        // If it's already an array, ensure all items are strings
+        if (is_array($accessories)) {
+            return array_values(array_filter(array_map(function ($item) {
+                return is_string($item) ? trim($item) : '';
+            }, $accessories)));
+        }
+
+        return [];
     }
 
     /**
