@@ -119,9 +119,11 @@ class AnimationService
         // (Laravel's DI container may cache an instance with old/empty API key)
         $miniMaxService = new MiniMaxService();
 
+        // Pass duration to MiniMax - it will automatically select the right model
+        // For 10s videos, MiniMaxService uses MiniMax-Hailuo-02 model
         $result = $miniMaxService->generateVideo($prompt, [
             'first_frame_image' => $imageUrl,
-            'model' => 'video-01',
+            'duration' => $duration,
         ]);
 
         if (!empty($result['error'])) {
