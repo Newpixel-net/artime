@@ -7017,16 +7017,25 @@ class VideoWizard extends Component
                 return; // AI extraction successful, no need for fallback
             }
 
-            // If AI returned no characters but was successful, check if video has no human characters
-            if ($result['success'] && empty($result['characters']) && !$result['hasHumanCharacters']) {
-                Log::info('CharacterExtraction: AI determined no human characters in video');
-                $this->dispatch('vw-debug', [
-                    'type' => 'character_extraction',
-                    'method' => 'ai',
-                    'count' => 0,
-                    'message' => 'No human characters detected',
-                ]);
-                return;
+            // If AI returned no characters but was successful
+            if ($result['success'] && empty($result['characters'])) {
+                // Check if script has substantial content - if so, fall back to pattern matching
+                // because empty AI results for a content-rich script likely indicates a parsing issue
+                $hasSubstantialContent = count($this->script['scenes'] ?? []) >= 2;
+
+                if ($hasSubstantialContent) {
+                    Log::info('CharacterExtraction: AI returned empty, falling back to patterns for content-rich script');
+                    // Fall through to pattern matching below
+                } else {
+                    Log::info('CharacterExtraction: AI determined no human characters in video');
+                    $this->dispatch('vw-debug', [
+                        'type' => 'character_extraction',
+                        'method' => 'ai',
+                        'count' => 0,
+                        'message' => 'No human characters detected',
+                    ]);
+                    return;
+                }
             }
 
         } catch (\Exception $e) {
