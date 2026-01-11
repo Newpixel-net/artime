@@ -94,6 +94,13 @@ class AnimationService
         string $prompt,
         int $duration
     ): array {
+        // Check app credits first (consistent with ImageGenerationService)
+        $teamId = $project->team_id ?? session('current_team_id', 0);
+        $quota = \Credit::checkQuota($teamId);
+        if (!$quota['can_use']) {
+            return $this->errorResponse($quota['message']);
+        }
+
         // Check if MiniMax API key is configured
         $apiKey = (string) get_option('ai_minimax_api_key', '');
         if (empty($apiKey)) {
@@ -127,9 +134,11 @@ class AnimationService
         ]);
 
         if (!empty($result['error'])) {
-            // Add more context to the error
+            // Translate MiniMax-specific errors to user-friendly messages
             $errorMsg = $result['error'];
-            if (stripos($errorMsg, 'invalid api key') !== false) {
+            if (stripos($errorMsg, 'insufficient balance') !== false || stripos($errorMsg, 'insufficient_balance') !== false) {
+                $errorMsg = 'MiniMax API account has insufficient balance. Please contact admin to add funds to the MiniMax account, or check API key configuration.';
+            } elseif (stripos($errorMsg, 'invalid api key') !== false) {
                 $errorMsg .= ' (Key length: ' . strlen($apiKey) . ', prefix: ' . substr($apiKey, 0, 4) . '...)';
             }
             return $this->errorResponse($errorMsg);
@@ -159,6 +168,13 @@ class AnimationService
         ?string $audioUrl,
         int $duration
     ): array {
+        // Check app credits first (consistent with ImageGenerationService)
+        $teamId = $project->team_id ?? session('current_team_id', 0);
+        $quota = \Credit::checkQuota($teamId);
+        if (!$quota['can_use']) {
+            return $this->errorResponse($quota['message']);
+        }
+
         $endpointId = (string) get_option('runpod_multitalk_endpoint', '');
 
         if (empty($endpointId)) {
