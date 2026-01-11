@@ -347,19 +347,27 @@ class ShotIntelligenceService
      */
     protected function normalizeShot(array $shotData, int $index, array $scene): array
     {
-        // Get available durations
+        // Get shot type first (needed for duration calculation)
+        $type = $shotData['type'] ?? $shotData['shot_type'] ?? 'medium';
+        $type = $this->normalizeTypeName($type);
+
+        // Determine if lip-sync is needed
         $needsLipSync = $shotData['needsLipSync'] ?? $shotData['needs_lip_sync'] ?? false;
         $model = $needsLipSync ? 'multitalk' : 'minimax';
 
+        // Get available durations for the model
         $availableDurations = $this->getAvailableDurations($model);
-        $duration = $shotData['duration'] ?? 6;
 
-        // Snap to nearest available duration
-        $duration = $this->snapToAvailableDuration($duration, $availableDurations);
+        // Get duration - use AI-provided or intelligent default based on shot type
+        $aiProvidedDuration = $shotData['duration'] ?? null;
 
-        // Get shot type
-        $type = $shotData['type'] ?? $shotData['shot_type'] ?? 'medium';
-        $type = $this->normalizeTypeName($type);
+        if ($aiProvidedDuration !== null && $aiProvidedDuration > 0) {
+            // AI provided a duration - snap it to available options
+            $duration = $this->snapToAvailableDuration((int) $aiProvidedDuration, $availableDurations);
+        } else {
+            // No AI duration - use intelligent shot-type based duration
+            $duration = $this->getOptimalDurationForShotType($type, $needsLipSync, $model);
+        }
 
         // Get shot type info if available
         $shotTypeInfo = $this->shotTypes[$type] ?? null;
@@ -478,6 +486,57 @@ class ShotIntelligenceService
     }
 
     /**
+     * Get optimal duration based on shot type.
+     * This provides intelligent defaults when AI doesn't specify or as fallback.
+     */
+    protected function getOptimalDurationForShotType(string $type, bool $needsLipSync = false, string $model = 'minimax'): int
+    {
+        // If needs lip-sync, use longer durations (multitalk supports 5-20s)
+        if ($needsLipSync) {
+            return 10; // Default dialogue duration
+        }
+
+        // Shot-type based durations (cinematography best practices)
+        $durationMap = [
+            // Opening/establishing shots - longer to set the scene
+            'establishing' => 6,
+            'extreme-wide' => 10,
+            'wide' => 6,
+
+            // Standard narrative shots
+            'medium' => 6,
+            'medium-wide' => 6,
+            'full' => 6,
+            'two-shot' => 6,
+            'over-shoulder' => 6,
+
+            // Close shots - quicker for impact
+            'close-up' => 5,
+            'extreme-close-up' => 5,
+            'detail' => 5,
+            'insert' => 5,
+
+            // Reaction and quick cuts
+            'reaction' => 5,
+            'cutaway' => 5,
+
+            // POV and special shots
+            'pov' => 6,
+            'dutch-angle' => 5,
+            'low-angle' => 6,
+            'high-angle' => 6,
+            'birds-eye' => 6,
+            'worms-eye' => 5,
+        ];
+
+        $duration = $durationMap[$type] ?? 6;
+
+        // Snap to available durations for the model
+        $availableDurations = $this->getAvailableDurations($model);
+        return $this->snapToAvailableDuration($duration, $availableDurations);
+    }
+
+    /**
      * Create a default shot for filling gaps.
      */
     protected function createDefaultShot(int $index, int $totalShots, array $scene): array
@@ -495,15 +554,21 @@ class ShotIntelligenceService
             $type = 'close-up';
         }
 
-        $defaultDuration = (int) VwSetting::getValue('duration_shot_default', 6);
+        // Check if this shot might have dialogue
+        $hasDialogue = $this->detectDialogue($scene['narration'] ?? '');
+        $needsLipSync = $hasDialogue && $position > 0.4; // Dialogue more likely in middle/end shots
+
+        // Get optimal duration based on shot type
+        $model = $needsLipSync ? 'multitalk' : 'minimax';
+        $duration = $this->getOptimalDurationForShotType($type, $needsLipSync, $model);
 
         return [
             'type' => $type,
-            'duration' => $defaultDuration,
+            'duration' => $duration,
             'purpose' => 'narrative',
             'cameraMovement' => $this->getDefaultCameraMovement($type),
-            'needsLipSync' => false,
-            'recommendedModel' => 'minimax',
+            'needsLipSync' => $needsLipSync,
+            'recommendedModel' => $model,
             'description' => '',
             'lens' => 'standard 50mm',
             'aiRecommended' => false,
@@ -597,22 +662,33 @@ GENRE: {{genre}}
 PACING: {{pacing}}
 HAS DIALOGUE: {{has_dialogue}}
 
+DURATION RULES (CRITICAL - vary durations based on shot type and content):
+- Establishing/Wide shots: 6s or 10s (longer to set the scene)
+- Medium shots: 6s (standard narrative)
+- Close-up shots: 5s (quick emotional impact)
+- Detail/Insert shots: 5s (brief focus)
+- Reaction shots: 5s (quick cut)
+- Dialogue shots with lip-sync: 10s, 15s, or 20s (match dialogue length)
+- Action sequences: 5s (fast pacing)
+- Emotional/contemplative moments: 6s or 10s (let it breathe)
+
 Consider:
-1. Pacing - faster cuts for action, longer shots for emotional moments
-2. Dialogue - shots with speaking characters may need lip-sync (needsLipSync: true)
-3. Visual variety - mix shot types for professional look
-4. Story beats - establish, develop, climax within the scene
+1. Pacing - {{pacing}} pacing affects shot duration (fast=shorter, slow=longer)
+2. Dialogue - shots with speaking characters need lip-sync (needsLipSync: true) and LONGER durations (10-20s)
+3. Visual variety - mix shot types AND durations for professional look
+4. Story beats - establish (6-10s), develop (5-6s), climax (5s for impact)
+5. Scene mood - {{mood}} mood affects rhythm
 
 Available shot types: {{available_shot_types}}
 
 Return ONLY valid JSON (no markdown, no explanation):
 {
   "shotCount": number,
-  "reasoning": "brief explanation of shot choices",
+  "reasoning": "brief explanation of shot and DURATION choices",
   "shots": [
     {
       "type": "shot_type_slug",
-      "duration": seconds (5, 6, 10 for standard, 5-20 for dialogue),
+      "duration": number (MUST vary: 5 for close-ups/action, 6 for medium/standard, 10 for establishing/dialogue, 15-20 for long dialogue),
       "purpose": "why this shot",
       "cameraMovement": "movement description",
       "needsLipSync": boolean

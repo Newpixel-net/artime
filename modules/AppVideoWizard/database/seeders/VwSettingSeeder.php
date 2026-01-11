@@ -82,7 +82,7 @@ class VwSettingSeeder extends Seeder
                 'slug' => 'shot_ai_prompt',
                 'name' => 'Shot Analysis AI Prompt',
                 'category' => 'shot_intelligence',
-                'description' => 'The prompt template used by AI to analyze scenes and determine shot breakdown. Variables: {{scene_description}}, {{narration}}, {{duration}}, {{mood}}, {{genre}}',
+                'description' => 'The prompt template used by AI to analyze scenes and determine shot breakdown. Variables: {{scene_description}}, {{narration}}, {{duration}}, {{mood}}, {{genre}}, {{pacing}}, {{has_dialogue}}, {{available_shot_types}}',
                 'value_type' => 'string',
                 'value' => 'Analyze this scene and determine the optimal cinematic shot breakdown.
 
@@ -91,20 +91,36 @@ NARRATION: {{narration}}
 DURATION: {{duration}} seconds
 MOOD: {{mood}}
 GENRE: {{genre}}
+PACING: {{pacing}}
+HAS DIALOGUE: {{has_dialogue}}
 
-Determine:
-1. Optimal number of shots (consider pacing, dialogue, action)
-2. For each shot: type (establishing, medium, close-up, etc.), recommended duration, camera movement
-3. Which shots need lip-sync (for dialogue with visible speakers)
+DURATION RULES (CRITICAL - vary durations based on shot type and content):
+- Establishing/Wide shots: 6s or 10s (longer to set the scene)
+- Medium shots: 6s (standard narrative)
+- Close-up shots: 5s (quick emotional impact)
+- Detail/Insert shots: 5s (brief focus)
+- Reaction shots: 5s (quick cut)
+- Dialogue shots with lip-sync: 10s, 15s, or 20s (match dialogue length)
+- Action sequences: 5s (fast pacing)
+- Emotional/contemplative moments: 6s or 10s (let it breathe)
 
-Return JSON:
+Consider:
+1. Pacing - {{pacing}} pacing affects shot duration (fast=shorter, slow=longer)
+2. Dialogue - shots with speaking characters need lip-sync (needsLipSync: true) and LONGER durations (10-20s)
+3. Visual variety - mix shot types AND durations for professional look
+4. Story beats - establish (6-10s), develop (5-6s), climax (5s for impact)
+5. Scene mood - {{mood}} mood affects rhythm
+
+Available shot types: {{available_shot_types}}
+
+Return ONLY valid JSON (no markdown, no explanation):
 {
   "shotCount": number,
-  "reasoning": "brief explanation",
+  "reasoning": "brief explanation of shot and DURATION choices",
   "shots": [
     {
       "type": "shot_type_slug",
-      "duration": seconds,
+      "duration": number (MUST vary: 5 for close-ups/action, 6 for medium/standard, 10 for establishing/dialogue, 15-20 for long dialogue),
       "purpose": "why this shot",
       "cameraMovement": "movement description",
       "needsLipSync": boolean
