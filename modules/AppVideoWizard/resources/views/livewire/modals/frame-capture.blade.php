@@ -243,24 +243,28 @@
     align-items: center;
     justify-content: center;
     z-index: 1002;
-    padding: 1rem;
+    padding: 0.5rem;
 }
 
 .fc-modal {
     width: 100%;
-    max-width: 720px;
+    max-width: 700px;
+    max-height: 96vh;
     background: linear-gradient(180deg, #1e2a3a 0%, #0f172a 100%);
-    border-radius: 12px;
+    border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .fc-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 16px 20px;
+    padding: 12px 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
 }
 
 .fc-header-left {
@@ -304,22 +308,24 @@
 }
 
 .fc-video-container {
-    padding: 16px 20px;
+    padding: 12px 16px;
     background: rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
 }
 
 .fc-video {
     width: 100%;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #000;
-    max-height: 340px;
+    max-height: 280px;
 }
 
 .fc-frames-section {
     display: flex;
     align-items: flex-start;
-    gap: 16px;
-    padding: 16px 20px;
+    gap: 12px;
+    padding: 12px 16px;
+    flex-shrink: 0;
 }
 
 .fc-frame-box {
@@ -381,16 +387,17 @@
 }
 
 .fc-server-info {
-    margin: 0 20px 12px;
-    padding: 8px 12px;
+    margin: 0 16px 10px;
+    padding: 6px 10px;
     background: rgba(99, 102, 241, 0.1);
     border: 1px solid rgba(99, 102, 241, 0.2);
-    border-radius: 6px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 11px;
     color: rgba(165, 180, 252, 0.8);
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .fc-loading-overlay {
@@ -422,9 +429,10 @@
 
 .fc-actions {
     display: flex;
-    gap: 12px;
-    padding: 16px 20px;
+    gap: 10px;
+    padding: 12px 16px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
 }
 
 .fc-btn {
@@ -432,10 +440,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 14px;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
