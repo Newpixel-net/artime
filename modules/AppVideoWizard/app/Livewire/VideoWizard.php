@@ -9335,6 +9335,16 @@ EOT;
     }
 
     /**
+     * Navigate to a different shot in the preview modal (for auto-play).
+     */
+    public function navigateToShot(int $sceneIndex, int $shotIndex): void
+    {
+        $this->shotPreviewSceneIndex = $sceneIndex;
+        $this->shotPreviewShotIndex = $shotIndex;
+        $this->shotPreviewTab = 'video'; // Auto-switch to video tab for auto-play
+    }
+
+    /**
      * Open frame capture modal.
      */
     public function openFrameCaptureModal(int $sceneIndex, int $shotIndex): void
