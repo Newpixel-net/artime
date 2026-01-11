@@ -4691,7 +4691,7 @@ class VideoWizard extends Component
     {
         $this->sceneMemory['locationBible']['locations'][] = [
             'id' => uniqid('loc_'),
-            'name' => $name,
+            'name' => $name ?: __('New Location'),
             'type' => 'exterior',
             'timeOfDay' => 'day',
             'weather' => 'clear',
@@ -4704,6 +4704,8 @@ class VideoWizard extends Component
             'referenceImageMimeType' => null,    // MIME type (e.g., 'image/png')
             'referenceImageStatus' => 'none',    // 'none' | 'generating' | 'ready' | 'error'
         ];
+        // Auto-select the newly added location for editing
+        $this->editingLocationIndex = count($this->sceneMemory['locationBible']['locations']) - 1;
         $this->saveProject();
     }
 
@@ -8051,14 +8053,14 @@ EOT;
 
     /**
      * Open Location Bible modal.
+     * Note: Does NOT auto-add placeholder location - let auto-detection populate
+     * or user can click "Add Location" button manually.
      */
     public function openLocationBibleModal(): void
     {
         $this->showLocationBibleModal = true;
-        if (empty($this->sceneMemory['locationBible']['locations'])) {
-            $this->addLocation('New Location', '');
-        }
-        $this->editingLocationIndex = 0;
+        // Set editing index to first location if exists, otherwise -1
+        $this->editingLocationIndex = !empty($this->sceneMemory['locationBible']['locations']) ? 0 : -1;
     }
 
     /**
