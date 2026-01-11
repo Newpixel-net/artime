@@ -167,7 +167,7 @@ CRITICAL RULES:
 3. Create SPECIFIC, CONSISTENT descriptions for each location
 4. Include: setting type (interior/exterior), time of day, weather, atmosphere, architectural details, colors, textures
 5. Track which scenes each location appears in
-6. Maximum 8 locations (focus on primary/recurring locations)
+6. **EXTRACT ALL LOCATIONS** - Do NOT artificially limit. Include every distinct environment.
 7. **STYLE CONSISTENCY IS PARAMOUNT** - ALL locations must match the Master Visual Style above
 8. If the visual mode is "cinematic-realistic", ALL locations must be real-world, photorealistic settings - NO fantasy, cartoon, or stylized imagery
 
@@ -220,61 +220,46 @@ Production Mode: {$productionMode}
 
 {$sceneContent}
 {$styleBibleContext}
-=== REQUIRED OUTPUT FORMAT - LOCATION DNA EXTRACTION ===
-Extract DETAILED LOCATION DNA for Hollywood-level visual consistency.
-For each location, provide STRUCTURED environmental details that ensure every scene in this location looks consistent.
+=== OUTPUT FORMAT ===
+Extract ALL distinct locations that appear in the script. PRIORITIZE finding every location.
 
 {
   "locations": [
     {
-      "name": "Location Name (e.g., 'Corporate Office', 'City Streets', 'The Forest')",
-      "description": "Detailed visual description for AI image generation: architectural style, materials, colors, textures, distinctive features. Be very specific and concrete.",
+      "name": "Location Name",
+      "description": "Detailed visual description: architecture, materials, colors, textures, key elements. Be specific.",
       "type": "interior/exterior/abstract",
       "timeOfDay": "day/night/dawn/dusk/golden-hour",
       "weather": "clear/cloudy/rainy/foggy/stormy/snowy",
       "atmosphere": "professional/mysterious/energetic/peaceful/tense/romantic",
-      "mood": "tense anticipation/hopeful optimism/melancholy reflection/high-energy action/quiet intimacy/ominous foreboding",
-      "lightingStyle": "Specific lighting description - e.g., 'soft diffused daylight from large windows', 'harsh overhead fluorescent', 'warm golden hour backlight', 'cool blue moonlight with practical lamps', 'dramatic rim lighting with deep shadows'",
+      "mood": "tense/hopeful/melancholy/energetic/intimate/ominous",
+      "lightingStyle": "e.g., soft daylight, harsh fluorescent, warm golden hour",
       "appearsInScenes": [1, 2, 5],
-      "stateChanges": [
-        {"sceneIndex": 1, "stateDescription": "pristine and organized"},
-        {"sceneIndex": 5, "stateDescription": "ransacked with overturned furniture"}
-      ]
+      "stateChanges": []
     }
   ],
   "hasDistinctLocations": true,
-  "suggestedStyleNote": "Optional note about location style recommendations"
+  "suggestedStyleNote": "Optional style note"
 }
 
-=== LOCATION DNA FIELD GUIDELINES ===
+=== CRITICAL RULES ===
+1. **EXTRACT ALL LOCATIONS** - Do NOT limit yourself. Every distinct environment should be a separate location.
+2. Each scene may have its own location - extract them all
+3. If the same location appears multiple times, list it once with all scene numbers
+4. DNA fields (mood, lightingStyle, stateChanges) are OPTIONAL - include if inferable
+5. Focus on QUANTITY first - basic descriptions for all locations is better than detailed DNA for few
 
-MOOD - The emotional tone of the location (distinct from atmosphere):
-- "tense anticipation" - something is about to happen
-- "hopeful optimism" - positive, uplifting feel
-- "melancholy reflection" - sad, thoughtful
-- "high-energy action" - exciting, dynamic
-- "quiet intimacy" - close, personal moments
-- "ominous foreboding" - sense of danger or dread
-- "serene tranquility" - peaceful, calm
-- "chaotic urgency" - frantic, rushed
+=== QUICK REFERENCE ===
+- name: Distinctive location name (e.g., "Corporate Boardroom", "Forest Clearing", "Space Station Bridge")
+- description: Visual details for AI image generation (REQUIRED)
+- type: interior/exterior/abstract
+- timeOfDay: day/night/dawn/dusk/golden-hour
+- weather: clear/cloudy/rainy/foggy/stormy/snowy
+- atmosphere: The general feel of the location
+- mood/lightingStyle: Optional DNA details
+- stateChanges: Optional - only if location visually changes across scenes
 
-LIGHTING STYLE - Be VERY SPECIFIC about lighting setup:
-- Include light direction: "from above", "side-lit", "backlit", "front-lit"
-- Include light quality: "soft diffused", "hard harsh", "dappled", "filtered"
-- Include light source: "natural sunlight", "fluorescent", "candlelight", "LED panels"
-- Include color temperature: "warm golden", "cool blue", "neutral white", "orange tungsten"
-- Example: "Soft diffused natural light from north-facing windows, supplemented by warm tungsten practicals on desks"
-
-STATE CHANGES - Track how location changes across scenes:
-- Use "sceneIndex" (1-based scene number) and "stateDescription"
-- Be specific about visual changes
-
-If the video is purely abstract/conceptual with no distinct locations, return:
-{
-  "locations": [],
-  "hasDistinctLocations": false,
-  "suggestedStyleNote": "This script is abstract/conceptual without distinct physical locations."
-}
+Return valid JSON only. Extract EVERY distinct location.
 USER;
 
         return "{$systemPrompt}\n\n{$userPrompt}";

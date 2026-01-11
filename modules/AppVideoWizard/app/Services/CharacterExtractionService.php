@@ -169,7 +169,7 @@ CRITICAL RULES:
 4. Make descriptions CONCRETE, not vague (e.g., "short dark brown hair" not "dark hair")
 5. Consider the genre and style to match character descriptions appropriately
 6. If the script is abstract/conceptual with no human characters, return empty array
-7. Maximum 5 characters (focus on main/recurring characters)
+7. **EXTRACT ALL CHARACTERS** - Do NOT artificially limit. Include every character that appears visually.
 8. **STYLE CONSISTENCY IS PARAMOUNT** - ALL character descriptions must match the Master Visual Style above
 9. If visual mode is "cinematic-realistic", ALL characters must be described as real people (photorealistic, live-action actors)
 
@@ -232,102 +232,45 @@ Production Mode: {$productionMode}
 
 {$sceneContent}
 {$styleBibleContext}
-=== REQUIRED OUTPUT FORMAT - CHARACTER DNA EXTRACTION ===
-Extract DETAILED CHARACTER DNA for Hollywood-level visual consistency.
-For each character, provide STRUCTURED appearance details that can be used across all scenes.
+=== OUTPUT FORMAT ===
+Extract ALL characters that appear visually in the script. PRIORITIZE finding every character.
 
 {
   "characters": [
     {
-      "name": "Individual Character Name (e.g., 'Ayo', 'Sarah Chen', 'The CEO')",
-      "description": "Core identity: age (specific like '32 years old'), gender, ethnicity, build, face shape, distinctive features. This is the CHARACTER IDENTITY.",
+      "name": "Character Name",
+      "description": "Detailed visual description: age, gender, ethnicity, build, face, hair, eyes, clothing. Be specific and concrete.",
       "role": "Main/Supporting/Background",
       "appearsInScenes": [1, 2, 5],
-      "traits": ["confident", "mysterious", "professional"],
+      "traits": ["confident", "mysterious"],
       "defaultExpression": "confident and alert",
-
-      "hair": {
-        "color": "jet black",
-        "style": "sleek bob with side part",
-        "length": "chin-length",
-        "texture": "straight glossy"
-      },
-
-      "wardrobe": {
-        "outfit": "fitted black tactical jacket over dark gray t-shirt, slim dark pants",
-        "colors": "black, charcoal gray, silver accents",
-        "style": "tactical-tech",
-        "footwear": "black combat boots"
-      },
-
-      "makeup": {
-        "style": "minimal natural",
-        "details": "subtle smoky eye, nude lip, flawless skin"
-      },
-
-      "accessories": ["silver stud earrings", "tactical watch", "thin silver necklace"]
+      "hair": {"color": "jet black", "style": "sleek bob", "length": "chin-length", "texture": "straight"},
+      "wardrobe": {"outfit": "black tactical jacket, slim pants", "colors": "black, gray", "style": "tactical", "footwear": "combat boots"},
+      "makeup": {"style": "minimal", "details": "subtle smoky eye"},
+      "accessories": ["silver watch", "earrings"]
     }
   ],
   "hasHumanCharacters": true,
-  "suggestedStyleNote": "Optional note about character style recommendations"
+  "suggestedStyleNote": "Optional style note"
 }
 
-=== DNA FIELD GUIDELINES ===
+=== CRITICAL RULES ===
+1. **EXTRACT ALL CHARACTERS** - Do NOT limit yourself. If script mentions 10 characters, extract 10.
+2. Each character MUST be an INDIVIDUAL person (never groups like "Warriors" or "People")
+3. If script mentions "a group of heroes" - extract EACH hero as separate character
+4. Include both main and supporting characters
+5. DNA fields (hair, wardrobe, makeup, accessories) are OPTIONAL - include if you can infer from script, otherwise leave empty objects/arrays
+6. Focus on QUANTITY first - it's better to have basic descriptions for all characters than detailed DNA for few
 
-HAIR - Be specific about:
-- color: "jet black", "auburn red", "platinum blonde", "dark brown with highlights"
-- style: "sleek bob", "long flowing waves", "tight curls", "buzz cut", "messy bedhead"
-- length: "pixie-short", "chin-length", "shoulder-length", "mid-back", "waist-length"
-- texture: "straight glossy", "wavy", "curly voluminous", "coily natural", "fine wispy"
+=== QUICK REFERENCE ===
+- name: Individual name (give distinct names like "Warrior 1 - Ayo", "The Hacker", "Young Woman")
+- description: Core identity - age, gender, ethnicity, build, distinctive features (REQUIRED)
+- role: Main/Supporting/Background
+- appearsInScenes: Scene numbers where character appears (1-based)
+- traits: Personality traits visible in demeanor (optional)
+- hair/wardrobe/makeup/accessories: Optional DNA details if inferable from script
 
-WARDROBE - Match to genre and character:
-- outfit: Full description of what they wear (top, bottom, layers)
-- colors: Primary color palette of their clothing
-- style: "corporate professional", "tactical-tech", "casual streetwear", "elegant formal", "bohemian"
-- footwear: Specific shoes/boots
-
-MAKEUP - Appropriate to character:
-- style: "minimal natural", "glamorous", "no makeup", "bold dramatic", "professional polished"
-- details: Specific makeup elements if any
-
-ACCESSORIES - Items that identify the character:
-- List specific items: watches, jewelry, glasses, hats, bags, weapons, tech devices
-
-TRAITS - Personality characteristics visible in their demeanor
-DEFAULT EXPRESSION - Their typical facial expression/mood
-
-=== EXAMPLE EXTRACTIONS BY GENRE ===
-
-Corporate/Business Character:
-{
-  "name": "Marcus Chen",
-  "description": "45-year-old Asian-American male CEO, tall athletic build, sharp jawline, distinguished gray temples",
-  "hair": {"color": "black with distinguished gray temples", "style": "short executive cut", "length": "short", "texture": "straight neat"},
-  "wardrobe": {"outfit": "tailored navy three-piece suit, crisp white dress shirt, silk tie", "colors": "navy blue, white, burgundy accents", "style": "corporate executive", "footwear": "polished oxford dress shoes"},
-  "makeup": {"style": "none", "details": "clean-shaven, well-groomed"},
-  "accessories": ["luxury watch", "wedding band", "subtle cufflinks"],
-  "traits": ["authoritative", "composed", "strategic"],
-  "defaultExpression": "confident and thoughtful"
-}
-
-Action/Tactical Character:
-{
-  "name": "Maya Rodriguez",
-  "description": "28-year-old Latina female operative, athletic muscular build, determined eyes, small scar on left eyebrow",
-  "hair": {"color": "dark brown", "style": "tight ponytail", "length": "shoulder-length", "texture": "straight"},
-  "wardrobe": {"outfit": "black tactical vest over gray compression shirt, cargo pants with multiple pockets", "colors": "black, gray, olive green", "style": "tactical military", "footwear": "black tactical boots"},
-  "makeup": {"style": "minimal", "details": "natural brows, no visible makeup"},
-  "accessories": ["dog tags", "tactical watch", "utility belt", "fingerless gloves"],
-  "traits": ["fierce", "disciplined", "protective"],
-  "defaultExpression": "alert and focused"
-}
-
-If there are no human characters or the video is purely abstract/conceptual/nature footage, return:
-{
-  "characters": [],
-  "hasHumanCharacters": false,
-  "suggestedStyleNote": "This script focuses on [type of content] without human characters."
-}
+Return valid JSON only. Extract EVERY character that appears visually.
 USER;
 
         return "{$systemPrompt}\n\n{$userPrompt}";
