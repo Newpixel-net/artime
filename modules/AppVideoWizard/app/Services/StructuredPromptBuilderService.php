@@ -349,6 +349,9 @@ class StructuredPromptBuilderService
         // Build scene summary
         $sceneSummary = $this->buildSceneSummary($sceneDescription, $subject, $environment);
 
+        // Build Character DNA for Hollywood-level consistency
+        $characterDNA = $this->buildCharacterDNA($characterBible, $sceneIndex);
+
         return [
             'scene_summary' => $sceneSummary,
             'subject' => $subject,
@@ -356,6 +359,7 @@ class StructuredPromptBuilderService
             'lighting_and_atmosphere' => $lighting,
             'authenticity_markers' => $template['global_rules']['authenticity_markers'],
             'mood' => $styleBible['atmosphere'] ?? $lighting['mood'] ?? 'cinematic, dramatic',
+            'character_dna' => $characterDNA, // Array of DNA blocks for each character
         ];
     }
 
@@ -738,7 +742,17 @@ class StructuredPromptBuilderService
             $parts[] = $techSpecs['focus'];
         }
 
-        return implode('. ', array_filter($parts));
+        // Combine base prompt
+        $basePrompt = implode('. ', array_filter($parts));
+
+        // Add Character DNA blocks for consistency enforcement
+        $characterDNA = $creative['character_dna'] ?? [];
+        if (!empty($characterDNA)) {
+            $dnaSection = "\n\n" . implode("\n\n", $characterDNA);
+            $basePrompt .= $dnaSection;
+        }
+
+        return $basePrompt;
     }
 
     /**
@@ -827,5 +841,107 @@ class StructuredPromptBuilderService
             }
         }
         return '';
+    }
+
+    // =========================================================================
+    // CHARACTER DNA METHODS - Hollywood-level consistency
+    // =========================================================================
+
+    /**
+     * Build Character DNA blocks for all characters in a scene.
+     * This ensures Hollywood-level visual consistency across shots.
+     */
+    protected function buildCharacterDNA(?array $characterBible, ?int $sceneIndex): array
+    {
+        if (!$characterBible || !($characterBible['enabled'] ?? false)) {
+            return [];
+        }
+
+        $characters = $characterBible['characters'] ?? [];
+        $dnaBlocks = [];
+
+        foreach ($characters as $character) {
+            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+
+            // Include if: no scene context, applies to all scenes, or matches this scene
+            if ($sceneIndex === null || empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
+                $dna = $this->buildSingleCharacterDNA($character);
+                if (!empty($dna)) {
+                    $dnaBlocks[] = $dna;
+                }
+            }
+        }
+
+        return $dnaBlocks;
+    }
+
+    /**
+     * Build DNA template for a single character.
+     */
+    protected function buildSingleCharacterDNA(array $character): string
+    {
+        $name = $character['name'] ?? 'Character';
+        $parts = [];
+
+        // Identity/Face section
+        $identityParts = [];
+        if (!empty($character['description'])) {
+            $identityParts[] = $character['description'];
+        }
+        $identityParts[] = "Same skin tone, same complexion, same facial proportions";
+        $identityParts[] = "Same body type and build";
+        $parts[] = "IDENTITY: " . implode('. ', $identityParts);
+
+        // Hair section - critical for visual consistency
+        $hair = $character['hair'] ?? [];
+        if (!empty(array_filter($hair))) {
+            $hairParts = [];
+            if (!empty($hair['color'])) $hairParts[] = $hair['color'];
+            if (!empty($hair['length'])) $hairParts[] = $hair['length'];
+            if (!empty($hair['style'])) $hairParts[] = $hair['style'];
+            if (!empty($hair['texture'])) $hairParts[] = $hair['texture'] . ' texture';
+            if (!empty($hairParts)) {
+                $parts[] = "HAIR (EXACT MATCH): " . implode(', ', $hairParts);
+            }
+        }
+
+        // Wardrobe section
+        $wardrobe = $character['wardrobe'] ?? [];
+        if (!empty(array_filter($wardrobe))) {
+            $wardrobeParts = [];
+            if (!empty($wardrobe['outfit'])) $wardrobeParts[] = $wardrobe['outfit'];
+            if (!empty($wardrobe['colors'])) $wardrobeParts[] = "in " . $wardrobe['colors'];
+            if (!empty($wardrobe['style'])) $wardrobeParts[] = $wardrobe['style'] . ' style';
+            if (!empty($wardrobe['footwear'])) $wardrobeParts[] = $wardrobe['footwear'];
+            if (!empty($wardrobeParts)) {
+                $parts[] = "WARDROBE (EXACT MATCH): " . implode(', ', $wardrobeParts);
+            }
+        }
+
+        // Makeup section
+        $makeup = $character['makeup'] ?? [];
+        if (!empty(array_filter($makeup))) {
+            $makeupParts = [];
+            if (!empty($makeup['style'])) $makeupParts[] = $makeup['style'];
+            if (!empty($makeup['details'])) $makeupParts[] = $makeup['details'];
+            if (!empty($makeupParts)) {
+                $parts[] = "MAKEUP (EXACT MATCH): " . implode(', ', $makeupParts);
+            }
+        }
+
+        // Accessories section
+        $accessories = $character['accessories'] ?? [];
+        if (!empty($accessories)) {
+            $accessoryList = is_array($accessories) ? implode(', ', $accessories) : $accessories;
+            if (!empty(trim($accessoryList))) {
+                $parts[] = "ACCESSORIES (EXACT MATCH): " . $accessoryList;
+            }
+        }
+
+        if (count($parts) <= 1) {
+            return ''; // Only identity, no detailed DNA
+        }
+
+        return "CHARACTER DNA - {$name} (MUST MATCH EXACTLY):\n" . implode("\n", $parts);
     }
 }

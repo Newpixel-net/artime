@@ -1427,21 +1427,39 @@ EOT;
         // EXTRACT ALL BIBLE DATA FIRST
         // =========================================================================
 
-        // Extract character info for this scene
+        // Extract character info for this scene - now uses full Character DNA
         $characterDescription = '';
+        $characterDNABlock = '';
         if ($sceneMemory && $sceneIndex !== null) {
             $characterBible = $sceneMemory['characterBible'] ?? null;
             if ($characterBible && ($characterBible['enabled'] ?? false) && !empty($characterBible['characters'])) {
                 $sceneCharacters = $this->getCharactersForScene($characterBible['characters'], $sceneIndex);
                 if (!empty($sceneCharacters)) {
                     $charParts = [];
+                    $dnaParts = [];
                     foreach ($sceneCharacters as $character) {
+                        $name = $character['name'] ?? 'a person';
+
+                        // Build basic description for narrative
                         if (!empty($character['description'])) {
-                            $name = $character['name'] ?? 'a person';
                             $charParts[] = "{$name}, {$character['description']}";
+                        }
+
+                        // Build full Character DNA for consistency enforcement
+                        $dna = $this->buildCharacterDNAForPrompt([
+                            'characterName' => $name,
+                            'characterDescription' => $character['description'] ?? '',
+                            'hair' => $character['hair'] ?? [],
+                            'wardrobe' => $character['wardrobe'] ?? [],
+                            'makeup' => $character['makeup'] ?? [],
+                            'accessories' => $character['accessories'] ?? [],
+                        ]);
+                        if (!empty($dna)) {
+                            $dnaParts[] = $dna;
                         }
                     }
                     $characterDescription = implode(', and ', $charParts);
+                    $characterDNABlock = implode("\n\n", $dnaParts);
                 }
             }
         }
@@ -1555,6 +1573,11 @@ EOT;
         // Add style and color grade
         if ($styleDescription) {
             $promptParts[] = $styleDescription;
+        }
+
+        // Add Character DNA for consistency enforcement (before quality anchors)
+        if (!empty($characterDNABlock)) {
+            $promptParts[] = "\n\n" . $characterDNABlock;
         }
 
         // Add quality anchors at the end

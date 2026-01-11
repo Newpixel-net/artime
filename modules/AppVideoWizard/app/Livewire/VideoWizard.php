@@ -7627,7 +7627,53 @@ class VideoWizard extends Component
 
                 // Character description
                 $character['description'],
+            ];
 
+            // Add Character DNA details if available (hair, wardrobe, makeup, accessories)
+            $hair = $character['hair'] ?? [];
+            if (!empty(array_filter($hair))) {
+                $hairParts = [];
+                if (!empty($hair['color'])) $hairParts[] = $hair['color'];
+                if (!empty($hair['length'])) $hairParts[] = $hair['length'];
+                if (!empty($hair['style'])) $hairParts[] = $hair['style'];
+                if (!empty($hair['texture'])) $hairParts[] = $hair['texture'] . ' texture';
+                if (!empty($hairParts)) {
+                    $promptParts[] = 'Hair: ' . implode(', ', $hairParts);
+                }
+            }
+
+            $wardrobe = $character['wardrobe'] ?? [];
+            if (!empty(array_filter($wardrobe))) {
+                $wardrobeParts = [];
+                if (!empty($wardrobe['outfit'])) $wardrobeParts[] = $wardrobe['outfit'];
+                if (!empty($wardrobe['colors'])) $wardrobeParts[] = 'in ' . $wardrobe['colors'];
+                if (!empty($wardrobe['style'])) $wardrobeParts[] = $wardrobe['style'] . ' style';
+                if (!empty($wardrobe['footwear'])) $wardrobeParts[] = $wardrobe['footwear'];
+                if (!empty($wardrobeParts)) {
+                    $promptParts[] = 'Wearing: ' . implode(', ', $wardrobeParts);
+                }
+            }
+
+            $makeup = $character['makeup'] ?? [];
+            if (!empty(array_filter($makeup))) {
+                $makeupParts = [];
+                if (!empty($makeup['style'])) $makeupParts[] = $makeup['style'];
+                if (!empty($makeup['details'])) $makeupParts[] = $makeup['details'];
+                if (!empty($makeupParts)) {
+                    $promptParts[] = 'Makeup: ' . implode(', ', $makeupParts);
+                }
+            }
+
+            $accessories = $character['accessories'] ?? [];
+            if (!empty($accessories)) {
+                $accessoryList = is_array($accessories) ? implode(', ', $accessories) : $accessories;
+                if (!empty(trim($accessoryList))) {
+                    $promptParts[] = 'Accessories: ' . $accessoryList;
+                }
+            }
+
+            // Add standard pose, studio setup, and quality markers
+            $promptParts = array_merge($promptParts, [
                 // Pose and composition
                 'Standing pose, three-quarter turn facing camera',
                 'Full body visible from head to feet',
@@ -7643,7 +7689,7 @@ class VideoWizard extends Component
                 'Fashion editorial quality, high-end catalog photography',
                 'Sharp focus on eyes, natural bokeh',
                 'Subtle film grain, cinematic color grading',
-            ];
+            ]);
             $prompt = implode('. ', $promptParts);
 
             // Negative prompt for character portraits
