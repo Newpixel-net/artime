@@ -3515,42 +3515,61 @@ class VideoWizard extends Component
     #[On('poll-video-jobs')]
     public function pollVideoJobs(): void
     {
+        \Log::info('📡 pollVideoJobs CALLED', [
+            'pendingJobsCount' => count($this->pendingJobs),
+            'pendingJobKeys' => array_keys($this->pendingJobs),
+        ]);
+
         if (empty($this->pendingJobs)) {
+            \Log::info('📡 No pending jobs to poll');
             return;
         }
 
-        \Log::info('Polling video jobs', ['count' => count($this->pendingJobs)]);
-
         $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
         $hasUpdates = false;
+        $videoJobsPolled = 0;
 
         foreach ($this->pendingJobs as $jobKey => $job) {
             $jobType = $job['type'] ?? '';
 
             if ($jobType !== 'shot_video') {
+                \Log::info('📡 Skipping non-video job', ['jobKey' => $jobKey, 'type' => $jobType]);
                 continue;
             }
 
+            $videoJobsPolled++;
             $taskId = $job['taskId'] ?? null;
             $provider = $job['provider'] ?? 'minimax';
             $endpointId = $job['endpointId'] ?? null;
             $sceneIndex = $job['sceneIndex'] ?? null;
             $shotIndex = $job['shotIndex'] ?? null;
 
+            \Log::info('📡 Polling video job', [
+                'jobKey' => $jobKey,
+                'taskId' => $taskId,
+                'provider' => $provider,
+                'sceneIndex' => $sceneIndex,
+                'shotIndex' => $shotIndex,
+            ]);
+
             if (!$taskId || $sceneIndex === null || $shotIndex === null) {
+                \Log::warning('📡 Invalid job data, skipping', ['job' => $job]);
                 continue;
             }
 
             try {
                 $result = $animationService->getTaskStatus($taskId, $provider, $endpointId);
 
-                \Log::info('Video job status', [
+                \Log::info('📡 Video job status response', [
                     'taskId' => $taskId,
-                    'provider' => $provider,
+                    'success' => $result['success'] ?? false,
                     'status' => $result['status'] ?? 'unknown',
+                    'hasVideoUrl' => isset($result['videoUrl']),
+                    'error' => $result['error'] ?? null,
                 ]);
 
                 if (!$result['success']) {
+                    \Log::warning('📡 Status check returned failure', ['result' => $result]);
                     continue;
                 }
 
@@ -3563,11 +3582,13 @@ class VideoWizard extends Component
                         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
                         $hasUpdates = true;
 
-                        \Log::info('Video ready', [
+                        \Log::info('📡 ✅ Video READY!', [
                             'sceneIndex' => $sceneIndex,
                             'shotIndex' => $shotIndex,
-                            'videoUrl' => $result['videoUrl'],
+                            'videoUrl' => substr($result['videoUrl'], 0, 100) . '...',
                         ]);
+                    } else {
+                        \Log::warning('📡 Completed but no videoUrl', ['result' => $result]);
                     }
                     unset($this->pendingJobs[$jobKey]);
 
@@ -3578,18 +3599,29 @@ class VideoWizard extends Component
                     unset($this->pendingJobs[$jobKey]);
                     $hasUpdates = true;
 
-                    \Log::warning('Video generation failed', [
+                    \Log::warning('📡 ❌ Video generation FAILED', [
                         'sceneIndex' => $sceneIndex,
                         'shotIndex' => $shotIndex,
+                        'status' => $status,
                         'error' => $result['error'] ?? 'Unknown error',
                     ]);
+                } else {
+                    \Log::info('📡 ⏳ Still processing...', ['status' => $status]);
                 }
-                // If queued or processing, keep polling
 
             } catch (\Exception $e) {
-                \Log::error('Failed to poll video job: ' . $e->getMessage());
+                \Log::error('📡 Exception polling video job: ' . $e->getMessage(), [
+                    'taskId' => $taskId,
+                    'trace' => $e->getTraceAsString(),
+                ]);
             }
         }
+
+        \Log::info('📡 Poll cycle complete', [
+            'videoJobsPolled' => $videoJobsPolled,
+            'hasUpdates' => $hasUpdates,
+            'remainingJobs' => count($this->pendingJobs),
+        ]);
 
         if ($hasUpdates) {
             $this->saveProject();
@@ -3598,6 +3630,7 @@ class VideoWizard extends Component
         // Dispatch completion event if no more pending video jobs
         $hasVideoJobs = collect($this->pendingJobs)->contains(fn($job) => ($job['type'] ?? '') === 'shot_video');
         if (!$hasVideoJobs) {
+            \Log::info('📡 All video jobs complete - dispatching video-generation-complete');
             $this->dispatch('video-generation-complete');
         }
     }
@@ -9618,15 +9651,22 @@ EOT;
      */
     public function generateShotVideo(int $sceneIndex, int $shotIndex): void
     {
+        \Log::info('🎬 generateShotVideo called', [
+            'sceneIndex' => $sceneIndex,
+            'shotIndex' => $shotIndex,
+        ]);
+
         $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
         if (!$decomposed || !isset($decomposed['shots'][$shotIndex])) {
             $this->error = __('Shot not found');
+            \Log::error('Shot not found', ['sceneIndex' => $sceneIndex, 'shotIndex' => $shotIndex]);
             return;
         }
 
         $shot = $decomposed['shots'][$shotIndex];
         if (empty($shot['imageUrl'])) {
             $this->error = __('Generate image first');
+            \Log::error('No image URL for shot');
             return;
         }
 
@@ -9638,6 +9678,12 @@ EOT;
             $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
             $duration = $shot['selectedDuration'] ?? $shot['duration'] ?? 6;
             $selectedModel = $shot['selectedVideoModel'] ?? 'minimax';
+
+            \Log::info('🎬 Animation request', [
+                'model' => $selectedModel,
+                'duration' => $duration,
+                'imageUrl' => substr($shot['imageUrl'], 0, 80) . '...',
+            ]);
 
             if ($this->projectId) {
                 $project = WizardProject::find($this->projectId);
@@ -9659,13 +9705,23 @@ EOT;
                         'audioUrl' => $audioUrl,
                     ]);
 
+                    \Log::info('🎬 Animation result', [
+                        'success' => $result['success'] ?? false,
+                        'hasVideoUrl' => isset($result['videoUrl']),
+                        'taskId' => $result['taskId'] ?? 'none',
+                        'provider' => $result['provider'] ?? 'unknown',
+                        'error' => $result['error'] ?? null,
+                    ]);
+
                     if ($result['success']) {
                         if (isset($result['videoUrl'])) {
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
+                            \Log::info('🎬 Video immediately ready', ['videoUrl' => substr($result['videoUrl'], 0, 80)]);
                         } elseif (isset($result['taskId'])) {
                             // Async job - store for polling
-                            $this->pendingJobs["shot_video_{$sceneIndex}_{$shotIndex}"] = [
+                            $jobKey = "shot_video_{$sceneIndex}_{$shotIndex}";
+                            $this->pendingJobs[$jobKey] = [
                                 'taskId' => $result['taskId'],
                                 'type' => 'shot_video',
                                 'sceneIndex' => $sceneIndex,
@@ -9677,8 +9733,19 @@ EOT;
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId'] = $result['taskId'];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider'] = $result['provider'] ?? 'minimax';
 
+                            \Log::info('🎬 Video task submitted - dispatching video-generation-started', [
+                                'taskId' => $result['taskId'],
+                                'jobKey' => $jobKey,
+                                'pendingJobsCount' => count($this->pendingJobs),
+                                'pendingJobKeys' => array_keys($this->pendingJobs),
+                            ]);
+
                             // Dispatch event to start polling
-                            $this->dispatch('video-generation-started');
+                            $this->dispatch('video-generation-started', [
+                                'taskId' => $result['taskId'],
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                            ]);
                         }
                         $this->saveProject();
                     } else {
@@ -9689,6 +9756,7 @@ EOT;
         } catch (\Exception $e) {
             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
             $this->error = __('Failed to generate shot video: ') . $e->getMessage();
+            \Log::error('🎬 Video generation error', ['error' => $e->getMessage()]);
         } finally {
             $this->isLoading = false;
         }

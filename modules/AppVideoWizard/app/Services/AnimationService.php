@@ -234,9 +234,18 @@ class AnimationService
      */
     protected function getMiniMaxStatus(string $taskId): array
     {
+        Log::info("AnimationService: Checking MiniMax status", ['taskId' => $taskId]);
+
         // Create fresh instance to ensure current API key is used
         $miniMaxService = new MiniMaxService();
         $status = $miniMaxService->getVideoTaskStatus($taskId);
+
+        Log::info("AnimationService: MiniMax raw status response", [
+            'taskId' => $taskId,
+            'status' => $status['status'] ?? 'none',
+            'file_id' => $status['file_id'] ?? 'none',
+            'error' => $status['error'] ?? 'none',
+        ]);
 
         $statusMap = [
             'Queueing' => 'queued',
@@ -254,9 +263,16 @@ class AnimationService
         ];
 
         if ($normalizedStatus === 'completed' && !empty($status['file_id'])) {
+            Log::info("AnimationService: Video completed, fetching download URL", [
+                'taskId' => $taskId,
+                'file_id' => $status['file_id'],
+            ]);
             $downloadUrl = $miniMaxService->getVideoDownloadUrl($status['file_id']);
             if ($downloadUrl) {
                 $result['videoUrl'] = $downloadUrl;
+                Log::info("AnimationService: Got video URL", ['url' => substr($downloadUrl, 0, 100) . '...']);
+            } else {
+                Log::warning("AnimationService: Failed to get download URL for file_id", ['file_id' => $status['file_id']]);
             }
         }
 

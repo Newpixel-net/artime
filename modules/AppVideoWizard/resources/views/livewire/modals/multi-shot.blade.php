@@ -203,6 +203,8 @@
 
                                 {{-- Shot Card --}}
                                 <div style="background: rgba(255,255,255,0.05); border: 1px solid {{ $wasTransferred ? 'rgba(16, 185, 129, 0.4)' : ($hasVideo ? 'rgba(6, 182, 212, 0.4)' : ($isSelected ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.15)')) }}; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 1; cursor: pointer;"
+                                     data-video-status="{{ $shot['videoStatus'] ?? 'pending' }}"
+                                     data-shot-index="{{ $shotIndex }}"
                                      wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $shotIndex }})">
 
                                     {{-- Shot Number Badge --}}
@@ -607,46 +609,66 @@
 @if($showMultiShotModal)
 <script>
 (function() {
-    console.log('[MultiShot] Initializing video polling script');
+    console.log('[MultiShot] 🚀 Initializing video polling script v2');
 
     let videoPollingInterval = null;
     let isPolling = false;
+    let pollCount = 0;
     const POLL_INTERVAL = 5000; // 5 seconds
 
     function checkForProcessingVideos() {
-        // Check DOM for rendering indicators (more reliable than static JSON)
-        const renderingElements = document.querySelectorAll('[style*="Rendering"]');
-        const generatingElements = document.querySelectorAll('[style*="Starting"]');
-
-        // Also check for the processing status text
+        // Check for the processing status text in the page
         const statusTexts = document.body.innerText;
         const hasRendering = statusTexts.includes('Rendering...') || statusTexts.includes('Starting...');
 
-        console.log('[MultiShot] Checking for processing videos:', {
-            renderingElements: renderingElements.length,
-            generatingElements: generatingElements.length,
-            hasRendering: hasRendering
+        // Check data attributes if present (more reliable)
+        const processingShots = document.querySelectorAll('[data-video-status="processing"], [data-video-status="generating"]');
+
+        console.log('[MultiShot] 🔍 Checking for processing videos:', {
+            hasRenderingText: hasRendering,
+            processingElements: processingShots.length
         });
 
-        return hasRendering || renderingElements.length > 0 || generatingElements.length > 0;
+        return hasRendering || processingShots.length > 0;
+    }
+
+    function dispatchPollEvent() {
+        pollCount++;
+        console.log('[MultiShot] 📡 Dispatching poll-video-jobs event #' + pollCount);
+
+        try {
+            // Use Livewire 3 dispatch syntax
+            if (typeof Livewire !== 'undefined') {
+                Livewire.dispatch('poll-video-jobs');
+                console.log('[MultiShot] ✅ Event dispatched successfully');
+            } else {
+                console.error('[MultiShot] ❌ Livewire not available!');
+            }
+        } catch (e) {
+            console.error('[MultiShot] ❌ Failed to dispatch event:', e);
+        }
     }
 
     function startVideoPolling() {
         if (isPolling) {
-            console.log('[MultiShot] Polling already active');
+            console.log('[MultiShot] ⚠️ Polling already active, skipping');
             return;
         }
 
         isPolling = true;
+        pollCount = 0;
         console.log('[MultiShot] ✅ Starting video status polling (every ' + POLL_INTERVAL/1000 + 's)');
 
-        // Immediate first poll
-        console.log('[MultiShot] 🔄 Dispatching initial poll-video-jobs');
-        Livewire.dispatch('poll-video-jobs');
+        // Immediate first poll after a short delay
+        setTimeout(() => {
+            console.log('[MultiShot] 🔄 First poll (delayed 1s)');
+            dispatchPollEvent();
+        }, 1000);
 
+        // Start interval polling
         videoPollingInterval = setInterval(() => {
-            console.log('[MultiShot] 🔄 Polling video status...');
-            Livewire.dispatch('poll-video-jobs');
+            console.log('[MultiShot] 🔄 Interval poll...');
+            dispatchPollEvent();
         }, POLL_INTERVAL);
     }
 
@@ -656,48 +678,59 @@
             videoPollingInterval = null;
         }
         isPolling = false;
-        console.log('[MultiShot] ⏹️ Video polling stopped');
+        console.log('[MultiShot] ⏹️ Video polling stopped after ' + pollCount + ' polls');
     }
 
-    // Check initial state
+    // Check initial state after DOM is ready
     setTimeout(() => {
+        console.log('[MultiShot] 🔍 Checking initial state...');
         if (checkForProcessingVideos()) {
-            console.log('[MultiShot] Found processing videos on load');
+            console.log('[MultiShot] 📹 Found processing videos on load - starting polling');
             startVideoPolling();
         } else {
-            console.log('[MultiShot] No processing videos found on load');
+            console.log('[MultiShot] ℹ️ No processing videos found on load');
         }
-    }, 500);
+    }, 1000);
 
     // Listen for video generation start event from Livewire
-    Livewire.on('video-generation-started', () => {
-        console.log('[MultiShot] 🎬 Received video-generation-started event');
-        startVideoPolling();
-    });
+    // Livewire 3 uses Livewire.on() with event data as parameter
+    if (typeof Livewire !== 'undefined') {
+        Livewire.on('video-generation-started', (data) => {
+            console.log('[MultiShot] 🎬 Received video-generation-started event', data);
+            startVideoPolling();
+        });
 
-    // Listen for all videos complete
-    Livewire.on('video-generation-complete', () => {
-        console.log('[MultiShot] ✅ Received video-generation-complete event');
-        stopVideoPolling();
-    });
+        // Listen for all videos complete
+        Livewire.on('video-generation-complete', () => {
+            console.log('[MultiShot] ✅ Received video-generation-complete event');
+            stopVideoPolling();
+        });
 
-    // Also listen for Livewire updates to check if we need to start/stop polling
-    Livewire.hook('message.processed', (message, component) => {
-        setTimeout(() => {
-            const hasProcessing = checkForProcessingVideos();
-            if (hasProcessing && !isPolling) {
-                console.log('[MultiShot] Detected processing videos after Livewire update');
-                startVideoPolling();
-            } else if (!hasProcessing && isPolling) {
-                console.log('[MultiShot] No more processing videos after Livewire update');
-                stopVideoPolling();
-            }
-        }, 100);
-    });
+        // Livewire 3 hook for after component updates
+        // Using request-commit hook to detect when Livewire processes updates
+        try {
+            Livewire.hook('commit', ({ component, commit, respond, succeed, fail }) => {
+                succeed(({ snapshot, effect }) => {
+                    // Check after each successful Livewire update
+                    setTimeout(() => {
+                        const hasProcessing = checkForProcessingVideos();
+                        if (hasProcessing && !isPolling) {
+                            console.log('[MultiShot] 📹 Detected processing videos after update - starting polling');
+                            startVideoPolling();
+                        }
+                    }, 200);
+                });
+            });
+        } catch (e) {
+            console.log('[MultiShot] ⚠️ Could not register commit hook (may be older Livewire):', e.message);
+        }
+    } else {
+        console.error('[MultiShot] ❌ Livewire not loaded!');
+    }
 
     // Cleanup when navigating away
     document.addEventListener('livewire:navigating', () => {
-        console.log('[MultiShot] Navigation detected, cleaning up');
+        console.log('[MultiShot] 🚪 Navigation detected, cleaning up');
         stopVideoPolling();
     });
 
@@ -705,10 +738,24 @@
     window.multiShotPolling = {
         start: startVideoPolling,
         stop: stopVideoPolling,
-        status: () => console.log('[MultiShot] Polling active:', isPolling)
+        poll: dispatchPollEvent,
+        status: () => {
+            console.log('[MultiShot] 📊 Status:', {
+                isPolling: isPolling,
+                pollCount: pollCount,
+                intervalActive: videoPollingInterval !== null
+            });
+            return { isPolling, pollCount };
+        },
+        check: checkForProcessingVideos
     };
 
-    console.log('[MultiShot] Video polling script ready. Debug with: window.multiShotPolling.status()');
+    console.log('[MultiShot] ✅ Video polling script ready.');
+    console.log('[MultiShot] 🔧 Debug commands:');
+    console.log('  - window.multiShotPolling.status() - Check polling status');
+    console.log('  - window.multiShotPolling.start() - Force start polling');
+    console.log('  - window.multiShotPolling.poll() - Trigger single poll');
+    console.log('  - window.multiShotPolling.check() - Check for processing videos');
 })();
 </script>
 @endif
