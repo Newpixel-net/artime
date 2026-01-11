@@ -958,6 +958,20 @@ class StructuredPromptBuilderService
             }
         }
 
+        // Traits section - personality and physical characteristics
+        $traits = $character['traits'] ?? [];
+        if (!empty($traits)) {
+            $traitList = is_array($traits) ? implode(', ', $traits) : $traits;
+            if (!empty(trim($traitList))) {
+                $parts[] = "TRAITS/CHARACTERISTICS: " . $traitList;
+            }
+        }
+
+        // Default expression if specified
+        if (!empty($character['defaultExpression'])) {
+            $parts[] = "DEFAULT EXPRESSION: " . $character['defaultExpression'];
+        }
+
         if (count($parts) <= 1) {
             return ''; // Only identity, no detailed DNA
         }
@@ -1129,11 +1143,16 @@ class StructuredPromptBuilderService
             $parts[] = "LIGHTING: " . $location['lightingStyle'];
         }
 
-        // Scene state if available
+        // Scene state if available (support both old and new field names for backwards compatibility)
         if ($sceneIndex !== null && !empty($location['stateChanges'])) {
             foreach ($location['stateChanges'] as $stateChange) {
-                if (($stateChange['sceneIndex'] ?? null) === $sceneIndex && !empty($stateChange['stateDescription'])) {
-                    $parts[] = "CURRENT STATE: " . $stateChange['stateDescription'];
+                // Support both 'sceneIndex' (new) and 'scene' (old) field names
+                $changeSceneIndex = $stateChange['sceneIndex'] ?? $stateChange['scene'] ?? null;
+                // Support both 'stateDescription' (new) and 'state' (old) field names
+                $changeDescription = $stateChange['stateDescription'] ?? $stateChange['state'] ?? '';
+
+                if ($changeSceneIndex === $sceneIndex && !empty($changeDescription)) {
+                    $parts[] = "CURRENT STATE: " . $changeDescription;
                     break;
                 }
             }

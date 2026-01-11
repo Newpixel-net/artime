@@ -4571,6 +4571,8 @@ class VideoWizard extends Component
             'role' => 'Supporting',
             'appliedScenes' => [],
             'traits' => [],
+            'defaultExpression' => '',           // Default facial expression (e.g., "confident", "thoughtful")
+            'attire' => '',                      // Legacy attire field for prompt compatibility
             'referenceImage' => null,
             'referenceImageBase64' => null,      // Base64 data for API calls (face consistency)
             'referenceImageMimeType' => null,    // MIME type (e.g., 'image/png')
@@ -4935,6 +4937,8 @@ class VideoWizard extends Component
             'timeOfDay' => 'day',
             'weather' => 'clear',
             'atmosphere' => '',
+            'mood' => '',                        // Location mood (e.g., "tense", "peaceful", "mysterious")
+            'lightingStyle' => '',               // Specific lighting for this location
             'description' => $description,
             'scenes' => [],
             'stateChanges' => [],
@@ -6366,6 +6370,13 @@ class VideoWizard extends Component
                 'atmosphere' => 'Dramatic atmosphere, volumetric lighting, lens flares',
                 'camera' => 'Anamorphic lenses, shallow depth of field, wide establishing shots',
                 'visualDNA' => 'Epic scale, professional cinematography, Marvel quality visuals',
+                'negativePrompt' => 'amateur, low quality, blurry, oversaturated, cartoon, anime',
+                'lighting' => [
+                    'setup' => 'three-point cinematic lighting',
+                    'intensity' => 'normal',
+                    'type' => 'mixed',
+                    'mood' => 'dramatic',
+                ],
             ],
             'documentary' => [
                 'style' => 'Documentary photography, authentic realism, natural lighting',
@@ -6373,6 +6384,13 @@ class VideoWizard extends Component
                 'atmosphere' => 'Authentic atmosphere, real-world environments',
                 'camera' => 'Handheld camera feel, natural framing, observational style',
                 'visualDNA' => 'Authentic, journalistic, National Geographic quality',
+                'negativePrompt' => 'staged, artificial, studio lighting, overly polished, fake',
+                'lighting' => [
+                    'setup' => 'natural available light',
+                    'intensity' => 'normal',
+                    'type' => 'natural',
+                    'mood' => 'ambient',
+                ],
             ],
             'anime' => [
                 'style' => 'Anime art style, cel-shaded, Japanese animation aesthetic',
@@ -6380,6 +6398,13 @@ class VideoWizard extends Component
                 'atmosphere' => 'Stylized atmosphere, dramatic lighting, expressive',
                 'camera' => 'Dynamic angles, action lines, anime cinematography',
                 'visualDNA' => 'Studio Ghibli quality, detailed backgrounds, expressive characters',
+                'negativePrompt' => 'photorealistic, 3D render, western cartoon, low quality',
+                'lighting' => [
+                    'setup' => 'stylized anime lighting',
+                    'intensity' => 'high-key',
+                    'type' => 'studio',
+                    'mood' => 'dramatic',
+                ],
             ],
             'noir' => [
                 'style' => 'Film noir style, black and white, high contrast',
@@ -6387,6 +6412,13 @@ class VideoWizard extends Component
                 'atmosphere' => 'Moody, mysterious, shadowy atmosphere',
                 'camera' => 'Low-key lighting, dramatic shadows, Dutch angles',
                 'visualDNA' => 'Classic film noir, 1940s aesthetic, detective movie quality',
+                'negativePrompt' => 'color, bright, cheerful, modern, flat lighting',
+                'lighting' => [
+                    'setup' => 'single source dramatic lighting',
+                    'intensity' => 'low-key',
+                    'type' => 'practical',
+                    'mood' => 'dramatic',
+                ],
             ],
             '3d' => [
                 'style' => 'Pixar-style 3D animation, stylized 3D rendering',
@@ -6394,6 +6426,27 @@ class VideoWizard extends Component
                 'atmosphere' => 'Whimsical atmosphere, clean environments',
                 'camera' => 'Smooth camera movements, 3D depth, cinematic framing',
                 'visualDNA' => 'Pixar quality, Disney animation, high-end 3D render',
+                'negativePrompt' => 'photorealistic, 2D, flat, low poly, uncanny valley',
+                'lighting' => [
+                    'setup' => 'soft global illumination',
+                    'intensity' => 'high-key',
+                    'type' => 'studio',
+                    'mood' => 'soft',
+                ],
+            ],
+            'photorealistic' => [
+                'style' => 'Ultra photorealistic, indistinguishable from photograph, DSLR quality',
+                'colorGrade' => 'Natural accurate colors, professional color correction',
+                'atmosphere' => 'Real-world atmosphere, authentic environments',
+                'camera' => 'Professional DSLR, sharp focus, natural bokeh',
+                'visualDNA' => '8K resolution, hyperdetailed, professional photography',
+                'negativePrompt' => 'cartoon, illustration, CGI, artificial, plastic skin, oversaturated',
+                'lighting' => [
+                    'setup' => 'natural motivated lighting',
+                    'intensity' => 'normal',
+                    'type' => 'natural',
+                    'mood' => 'soft',
+                ],
             ],
         ];
 

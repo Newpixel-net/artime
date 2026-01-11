@@ -1911,6 +1911,20 @@ EOT;
             $parts[] = "ACCESSORIES (these items MUST be visible):\n- " . implode("\n- ", $accessories);
         }
 
+        // Traits section - personality and physical characteristics
+        $traits = $characterReference['traits'] ?? [];
+        if (!empty($traits)) {
+            $traitList = is_array($traits) ? implode(', ', $traits) : $traits;
+            if (!empty(trim($traitList))) {
+                $parts[] = "TRAITS/CHARACTERISTICS:\n- " . $traitList;
+            }
+        }
+
+        // Default expression if specified
+        if (!empty($characterReference['defaultExpression'])) {
+            $parts[] = "DEFAULT EXPRESSION: {$characterReference['defaultExpression']}";
+        }
+
         return implode("\n\n", $parts);
     }
 
@@ -2021,11 +2035,16 @@ EOT;
             $parts[] = "MOOD: {$sceneLocation['mood']}";
         }
 
-        // Scene state if available
+        // Scene state if available (support both old and new field names for backwards compatibility)
         if ($sceneIndex !== null && !empty($sceneLocation['stateChanges'])) {
             foreach ($sceneLocation['stateChanges'] as $stateChange) {
-                if (($stateChange['sceneIndex'] ?? null) === $sceneIndex && !empty($stateChange['stateDescription'])) {
-                    $parts[] = "CURRENT STATE: {$stateChange['stateDescription']}";
+                // Support both 'sceneIndex' (new) and 'scene' (old) field names
+                $changeSceneIndex = $stateChange['sceneIndex'] ?? $stateChange['scene'] ?? null;
+                // Support both 'stateDescription' (new) and 'state' (old) field names
+                $changeDescription = $stateChange['stateDescription'] ?? $stateChange['state'] ?? '';
+
+                if ($changeSceneIndex === $sceneIndex && !empty($changeDescription)) {
+                    $parts[] = "CURRENT STATE: {$changeDescription}";
                     break;
                 }
             }
