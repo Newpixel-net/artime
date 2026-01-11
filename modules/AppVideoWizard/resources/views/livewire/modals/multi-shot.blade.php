@@ -1,6 +1,127 @@
 {{-- Multi-Shot Decomposition Modal --}}
+
+{{-- Define Alpine component for video polling --}}
+<script>
+// Define globally so Alpine can find it
+window.multiShotVideoPolling = function() {
+    return {
+        pollingInterval: null,
+        isPolling: false,
+        pollCount: 0,
+        POLL_INTERVAL: 5000,
+
+        initPolling() {
+            console.log('[MultiShot] 🚀 Alpine polling component initialized');
+
+            // Check initial state
+            this.$nextTick(() => {
+                if (this.checkForProcessingVideos()) {
+                    console.log('[MultiShot] 📹 Found processing videos on init');
+                    this.startPolling();
+                }
+            });
+
+            // Listen for Livewire events
+            Livewire.on('video-generation-started', (data) => {
+                console.log('[MultiShot] 🎬 video-generation-started event received', data);
+                this.startPolling();
+            });
+
+            Livewire.on('video-generation-complete', () => {
+                console.log('[MultiShot] ✅ video-generation-complete event received');
+                this.stopPolling();
+            });
+
+            // Make available globally for debugging
+            window.multiShotPolling = {
+                start: () => this.startPolling(),
+                stop: () => this.stopPolling(),
+                poll: () => this.dispatchPoll(),
+                status: () => {
+                    console.log('[MultiShot] 📊 Status:', {
+                        isPolling: this.isPolling,
+                        pollCount: this.pollCount
+                    });
+                },
+                check: () => this.checkForProcessingVideos()
+            };
+
+            console.log('[MultiShot] ✅ Ready. Debug: window.multiShotPolling.status()');
+        },
+
+        checkForProcessingVideos() {
+            const statusTexts = document.body.innerText;
+            const hasRendering = statusTexts.includes('Rendering...') || statusTexts.includes('Starting...');
+            const processingShots = document.querySelectorAll('[data-video-status="processing"], [data-video-status="generating"]');
+
+            console.log('[MultiShot] 🔍 Check:', { hasRendering, processingCount: processingShots.length });
+            return hasRendering || processingShots.length > 0;
+        },
+
+        dispatchPoll() {
+            this.pollCount++;
+            console.log('[MultiShot] 📡 Poll #' + this.pollCount);
+
+            try {
+                // Call Livewire method directly via $wire (more reliable than dispatch)
+                if (this.$wire) {
+                    this.$wire.pollVideoJobs().then((result) => {
+                        console.log('[MultiShot] ✅ pollVideoJobs result:', result);
+                        // Stop polling if no jobs
+                        if (result && result.pendingJobs === 0) {
+                            console.log('[MultiShot] ⚠️ No pending jobs - pendingJobs array is empty!');
+                        }
+                    }).catch((e) => {
+                        console.error('[MultiShot] ❌ pollVideoJobs() error:', e);
+                    });
+                } else {
+                    console.error('[MultiShot] ❌ $wire not available');
+                }
+            } catch (e) {
+                console.error('[MultiShot] ❌ Poll failed:', e);
+            }
+        },
+
+        startPolling() {
+            if (this.isPolling) {
+                console.log('[MultiShot] ⚠️ Already polling');
+                return;
+            }
+
+            this.isPolling = true;
+            this.pollCount = 0;
+            console.log('[MultiShot] ✅ Starting polling (every 5s)');
+
+            // First poll after 1s
+            setTimeout(() => this.dispatchPoll(), 1000);
+
+            // Then every 5 seconds
+            this.pollingInterval = setInterval(() => {
+                this.dispatchPoll();
+            }, this.POLL_INTERVAL);
+        },
+
+        stopPolling() {
+            if (this.pollingInterval) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+            this.isPolling = false;
+            console.log('[MultiShot] ⏹️ Polling stopped after ' + this.pollCount + ' polls');
+        },
+
+        // Cleanup when component is destroyed
+        destroy() {
+            this.stopPolling();
+        }
+    };
+};
+</script>
+
 @if($showMultiShotModal)
 <div class="vw-modal-overlay"
+     x-data="multiShotVideoPolling()"
+     x-init="initPolling()"
      style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem;">
     <div class="vw-modal"
          style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(139,92,246,0.3); border-radius: 1rem; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
@@ -203,6 +324,8 @@
 
                                 {{-- Shot Card --}}
                                 <div style="background: rgba(255,255,255,0.05); border: 1px solid {{ $wasTransferred ? 'rgba(16, 185, 129, 0.4)' : ($hasVideo ? 'rgba(6, 182, 212, 0.4)' : ($isSelected ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.15)')) }}; border-radius: 0.5rem; overflow: hidden; position: relative; z-index: 1; cursor: pointer;"
+                                     data-video-status="{{ $shot['videoStatus'] ?? 'pending' }}"
+                                     data-shot-index="{{ $shotIndex }}"
                                      wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $shotIndex }})">
 
                                     {{-- Shot Number Badge --}}
@@ -371,12 +494,17 @@
                                                     ▶️ {{ __('Play Video') }}
                                                 </button>
                                             @elseif($hasImage && !$isGeneratingVideo)
-                                                {{-- Animate Button with Model Indicator --}}
+                                                {{-- Animate Button - Opens Video Model Selector --}}
                                                 <button type="button"
-                                                        wire:click.stop="generateShotVideo({{ $multiShotSceneIndex }}, {{ $shotIndex }})"
+                                                        wire:click.stop="openVideoModelSelector({{ $multiShotSceneIndex }}, {{ $shotIndex }})"
                                                         style="width: 100%; padding: 0.3rem; background: linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(59, 130, 246, 0.3)); border: 1px solid rgba(6, 182, 212, 0.4); border-radius: 0.3rem; color: white; cursor: pointer; font-size: 0.6rem; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
                                                     🎬 {{ __('Animate') }}
-                                                    <span style="font-size: 0.45rem; background: rgba(59, 130, 246, 0.5); padding: 0.1rem 0.2rem; border-radius: 0.15rem;">{{ __('Standard') }}</span>
+                                                    @php
+                                                        $selectedModel = $shot['selectedVideoModel'] ?? 'minimax';
+                                                        $modelLabel = $selectedModel === 'multitalk' ? 'Lip-Sync' : 'Standard';
+                                                        $modelBg = $selectedModel === 'multitalk' ? 'rgba(251, 191, 36, 0.5)' : 'rgba(59, 130, 246, 0.5)';
+                                                    @endphp
+                                                    <span style="font-size: 0.45rem; background: {{ $modelBg }}; padding: 0.1rem 0.2rem; border-radius: 0.15rem;">{{ __($modelLabel) }}</span>
                                                 </button>
                                             @elseif($isGeneratingVideo)
                                                 {{-- Video Generation Status --}}
@@ -400,9 +528,9 @@
                                             @endif
 
                                             @if($hasVideo)
-                                                {{-- Re-Animate --}}
+                                                {{-- Re-Animate - Opens Video Model Selector --}}
                                                 <button type="button"
-                                                        wire:click.stop="generateShotVideo({{ $multiShotSceneIndex }}, {{ $shotIndex }})"
+                                                        wire:click.stop="openVideoModelSelector({{ $multiShotSceneIndex }}, {{ $shotIndex }})"
                                                         style="width: 100%; padding: 0.25rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.3rem; color: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.55rem;">
                                                     🔄 {{ __('Re-Animate') }}
                                                 </button>
@@ -438,6 +566,153 @@
 </div>
 @endif
 
+{{-- Video Model Selector Popup --}}
+@if($showVideoModelSelector ?? false)
+<div class="vw-popup-overlay"
+     style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000;"
+     wire:click.self="closeVideoModelSelector">
+    <div style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(6, 182, 212, 0.4); border-radius: 0.75rem; width: 320px; max-width: 95vw; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+        {{-- Popup Header --}}
+        <div style="padding: 0.75rem 1rem; background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2)); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h4 style="margin: 0; color: white; font-size: 0.95rem; font-weight: 600;">🎬 {{ __('Animation Model') }}</h4>
+                <p style="margin: 0.15rem 0 0 0; color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Shot') }} {{ ($videoModelSelectorShotIndex ?? 0) + 1 }}</p>
+            </div>
+            <button type="button" wire:click="closeVideoModelSelector" style="background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
+        </div>
+
+        {{-- Model Selection --}}
+        <div style="padding: 1rem;">
+            @php
+                $selectorShot = $multiShotMode['decomposedScenes'][$videoModelSelectorSceneIndex ?? 0]['shots'][$videoModelSelectorShotIndex ?? 0] ?? [];
+                $hasDialogue = !empty($selectorShot['dialogue']);
+                $hasAudio = !empty($selectorShot['audioUrl']) || !empty($selectorShot['voiceoverUrl']);
+                $currentModel = $selectorShot['selectedVideoModel'] ?? 'minimax';
+                $currentDuration = $selectorShot['selectedDuration'] ?? $selectorShot['duration'] ?? 6;
+                $multitalkAvailable = !empty(get_option('runpod_multitalk_endpoint', ''));
+            @endphp
+
+            {{-- MiniMax Option --}}
+            <label style="display: block; cursor: pointer; margin-bottom: 0.75rem;">
+                <div style="background: {{ $currentModel === 'minimax' ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.05)' }}; border: 2px solid {{ $currentModel === 'minimax' ? 'rgba(6, 182, 212, 0.6)' : 'rgba(255,255,255,0.15)' }}; border-radius: 0.5rem; padding: 0.75rem; transition: all 0.2s;"
+                     wire:click="setVideoModel('minimax')">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 18px; height: 18px; border: 2px solid {{ $currentModel === 'minimax' ? '#06b6d4' : 'rgba(255,255,255,0.3)' }}; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                @if($currentModel === 'minimax')
+                                    <div style="width: 10px; height: 10px; background: #06b6d4; border-radius: 50%;"></div>
+                                @endif
+                            </div>
+                            <div>
+                                <div style="color: white; font-weight: 600; font-size: 0.9rem;">MiniMax</div>
+                                <div style="color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('High quality I2V animation') }}</div>
+                            </div>
+                        </div>
+                        <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600;">{{ __('Recommended') }}</span>
+                    </div>
+                    <div style="margin-top: 0.5rem; padding-left: 1.75rem;">
+                        <div style="display: flex; gap: 0.25rem; font-size: 0.65rem; color: rgba(255,255,255,0.5);">
+                            <span style="background: rgba(59,130,246,0.2); padding: 0.1rem 0.3rem; border-radius: 0.2rem;">5-6s</span>
+                            <span style="background: rgba(139,92,246,0.2); padding: 0.1rem 0.3rem; border-radius: 0.2rem;">{{ __('Most scenes') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </label>
+
+            {{-- Multitalk Option --}}
+            <label style="display: block; cursor: {{ $multitalkAvailable ? 'pointer' : 'not-allowed' }}; opacity: {{ $multitalkAvailable ? '1' : '0.5' }}; margin-bottom: 1rem;">
+                <div style="background: {{ $currentModel === 'multitalk' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(255,255,255,0.05)' }}; border: 2px solid {{ $currentModel === 'multitalk' ? 'rgba(251, 191, 36, 0.6)' : 'rgba(255,255,255,0.15)' }}; border-radius: 0.5rem; padding: 0.75rem; transition: all 0.2s;"
+                     @if($multitalkAvailable) wire:click="setVideoModel('multitalk')" @endif>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="width: 18px; height: 18px; border: 2px solid {{ $currentModel === 'multitalk' ? '#fbbf24' : 'rgba(255,255,255,0.3)' }}; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                @if($currentModel === 'multitalk')
+                                    <div style="width: 10px; height: 10px; background: #fbbf24; border-radius: 50%;"></div>
+                                @endif
+                            </div>
+                            <div>
+                                <div style="color: white; font-weight: 600; font-size: 0.9rem;">Multitalk</div>
+                                <div style="color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Lip-sync for dialogue scenes') }}</div>
+                            </div>
+                        </div>
+                        @if($hasDialogue)
+                            <span style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600;">💬 {{ __('Dialogue') }}</span>
+                        @endif
+                    </div>
+                    <div style="margin-top: 0.5rem; padding-left: 1.75rem;">
+                        <div style="display: flex; gap: 0.25rem; font-size: 0.65rem; color: rgba(255,255,255,0.5);">
+                            <span style="background: rgba(251,191,36,0.2); padding: 0.1rem 0.3rem; border-radius: 0.2rem;">5-20s</span>
+                            <span style="background: rgba(251,191,36,0.2); padding: 0.1rem 0.3rem; border-radius: 0.2rem;">{{ __('Requires audio') }}</span>
+                        </div>
+                        @if(!$multitalkAvailable)
+                            <div style="margin-top: 0.35rem; font-size: 0.6rem; color: #ef4444;">⚠️ {{ __('RunPod Multitalk endpoint not configured') }}</div>
+                        @elseif(!$hasAudio && $currentModel === 'multitalk')
+                            <div style="margin-top: 0.35rem; font-size: 0.6rem; color: #f59e0b;">⚠️ {{ __('Generate voiceover first for lip-sync') }}</div>
+                        @endif
+                    </div>
+                </div>
+            </label>
+
+            {{-- Duration Selector --}}
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.75rem; margin-bottom: 0.4rem;">{{ __('Duration') }}</label>
+                @php
+                    $availableDurations = $currentModel === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+                @endphp
+                <div style="display: flex; gap: 0.35rem;">
+                    @foreach($availableDurations as $dur)
+                        @php
+                            $isSelected = $currentDuration == $dur;
+                            $durColor = $dur <= 5 ? 'rgba(34, 197, 94' : ($dur <= 6 ? 'rgba(234, 179, 8' : 'rgba(59, 130, 246');
+                        @endphp
+                        <button type="button"
+                                wire:click="setVideoModelDuration({{ $dur }})"
+                                style="flex: 1; padding: 0.5rem; font-size: 0.8rem; font-weight: 600; background: {{ $isSelected ? $durColor . ', 0.3)' : 'rgba(255,255,255,0.05)' }}; border: 1px solid {{ $isSelected ? $durColor . ', 0.5)' : 'rgba(255,255,255,0.15)' }}; border-radius: 0.35rem; color: white; cursor: pointer;">
+                            {{ $dur }}s
+                        </button>
+                    @endforeach
+                </div>
+                @if($currentModel === 'minimax')
+                    <div style="margin-top: 0.35rem; font-size: 0.6rem; color: rgba(255,255,255,0.5);">💡 {{ __('6s recommended for most shots') }}</div>
+                @endif
+            </div>
+
+            {{-- Generate Button --}}
+            <button type="button"
+                    wire:click="confirmVideoModelAndGenerate"
+                    wire:loading.attr="disabled"
+                    style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #06b6d4, #3b82f6); border: none; border-radius: 0.5rem; color: white; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <span wire:loading.remove wire:target="confirmVideoModelAndGenerate">
+                    🎬 {{ __('Generate Animation') }}
+                </span>
+                <span wire:loading wire:target="confirmVideoModelAndGenerate">
+                    <svg style="width: 16px; height: 16px; animation: spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                    </svg>
+                    {{ __('Starting...') }}
+                </span>
+            </button>
+
+            {{-- Pre-configure for waiting shots --}}
+            @php
+                $waitingShots = collect($multiShotMode['decomposedScenes'][$videoModelSelectorSceneIndex ?? 0]['shots'] ?? [])
+                    ->filter(fn($s, $i) => $i > ($videoModelSelectorShotIndex ?? 0) && empty($s['videoUrl']) && !empty($s['imageUrl']))
+                    ->count();
+            @endphp
+            @if($waitingShots > 0)
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.75rem; color: rgba(255,255,255,0.7);">
+                        <input type="checkbox" wire:model.live="preConfigureWaitingShots" style="accent-color: #06b6d4;">
+                        {{ __('Apply to :count waiting shots', ['count' => $waitingShots]) }}
+                    </label>
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
+@endif
+
 <style>
 @keyframes spin {
     to { transform: rotate(360deg); }
@@ -450,3 +725,5 @@
     opacity: 1 !important;
 }
 </style>
+
+{{-- Video polling is now handled by Alpine component at the top --}}

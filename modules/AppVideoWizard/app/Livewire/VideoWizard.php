@@ -570,6 +570,18 @@ class VideoWizard extends Component
     public int $frameCaptureShotIndex = 0;
     public ?string $capturedFrame = null;
 
+    // Face Correction Panel state (inside Frame Capture modal)
+    public bool $showFaceCorrectionPanel = false;
+    public array $selectedFaceCorrectionCharacters = [];
+    public ?string $correctedFrameUrl = null;
+    public string $faceCorrectionStatus = 'idle'; // 'idle', 'processing', 'done', 'error'
+
+    // Video Model Selector Popup state
+    public bool $showVideoModelSelector = false;
+    public int $videoModelSelectorSceneIndex = 0;
+    public int $videoModelSelectorShotIndex = 0;
+    public bool $preConfigureWaitingShots = false;
+
     // Upscale Modal state
     public bool $showUpscaleModal = false;
     public int $upscaleSceneIndex = 0;
@@ -820,9 +832,21 @@ class VideoWizard extends Component
             $this->concept = array_merge($this->concept, $project->concept);
         }
         if ($project->script) {
+            // DEBUG: Log scenes before and after merge
+            $dbSceneCount = count($project->script['scenes'] ?? []);
+            $memorySceneCountBefore = count($this->script['scenes'] ?? []);
+
             $this->script = array_merge($this->script, $project->script);
             // Sanitize loaded script data to prevent type errors in views
             $this->sanitizeScriptData();
+
+            Log::info('VideoWizard: loadProject script data', [
+                'projectId' => $project->id,
+                'dbSceneCount' => $dbSceneCount,
+                'memorySceneCountBefore' => $memorySceneCountBefore,
+                'memorySceneCountAfter' => count($this->script['scenes'] ?? []),
+                'firstSceneId' => $this->script['scenes'][0]['id'] ?? 'N/A',
+            ]);
         }
         if ($project->storyboard) {
             $this->storyboard = array_merge($this->storyboard, $project->storyboard);
@@ -863,6 +887,18 @@ class VideoWizard extends Component
                             $batch['status'] = 'pending';
                         }
                     }
+                }
+
+                // DEBUG: Log mismatch between generation state and actual scenes
+                $generatedCount = $this->scriptGeneration['generatedSceneCount'] ?? 0;
+                $actualCount = count($this->script['scenes'] ?? []);
+                if ($generatedCount !== $actualCount) {
+                    Log::warning('VideoWizard: SCENE COUNT MISMATCH detected', [
+                        'projectId' => $project->id,
+                        'scriptGeneration.generatedSceneCount' => $generatedCount,
+                        'actual script.scenes count' => $actualCount,
+                        'scriptGeneration.status' => $this->scriptGeneration['status'] ?? 'unknown',
+                    ]);
                 }
             }
 
@@ -922,8 +958,19 @@ class VideoWizard extends Component
         // Skip save if nothing has changed (except for new projects)
         $currentHash = $this->computeSaveHash();
         if ($this->projectId && $this->lastSaveHash === $currentHash) {
+            Log::debug('VideoWizard: saveProject skipped (no changes)', [
+                'projectId' => $this->projectId,
+                'sceneCount' => count($this->script['scenes'] ?? []),
+            ]);
             return; // No changes to save
         }
+
+        Log::info('VideoWizard: saveProject executing', [
+            'projectId' => $this->projectId,
+            'sceneCount' => count($this->script['scenes'] ?? []),
+            'generatedSceneCount' => $this->scriptGeneration['generatedSceneCount'] ?? 0,
+            'status' => $this->scriptGeneration['status'] ?? 'unknown',
+        ]);
 
         $this->isSaving = true;
         $isNewProject = !$this->projectId;
@@ -2131,10 +2178,22 @@ class VideoWizard extends Component
 
             if ($result['success'] && !empty($result['scenes'])) {
                 // Sanitize and append new scenes
+                $scenesBeforeAdd = count($this->script['scenes']);
+                Log::info('VideoWizard: Adding scenes from batch', [
+                    'batch' => $currentBatchIndex,
+                    'scenesBeforeAdd' => $scenesBeforeAdd,
+                    'newScenesCount' => count($result['scenes']),
+                ]);
+
                 foreach ($result['scenes'] as $index => $scene) {
                     $sceneIndex = count($this->script['scenes']);
                     $this->script['scenes'][] = $this->sanitizeScene($scene, $sceneIndex);
                 }
+
+                Log::info('VideoWizard: Scenes added', [
+                    'batch' => $currentBatchIndex,
+                    'totalScenesNow' => count($this->script['scenes']),
+                ]);
 
                 // Update batch status
                 $this->scriptGeneration['batches'][$currentBatchIndex]['status'] = 'complete';
@@ -3481,6 +3540,142 @@ class VideoWizard extends Component
     }
 
     /**
+     * Poll for pending video generation jobs (multi-shot).
+     */
+    #[On('poll-video-jobs')]
+    public function pollVideoJobs(): array
+    {
+        $jobCount = count($this->pendingJobs);
+        $jobKeys = array_keys($this->pendingJobs);
+
+        \Log::info('📡 pollVideoJobs CALLED', [
+            'pendingJobsCount' => $jobCount,
+            'pendingJobKeys' => $jobKeys,
+        ]);
+
+        if (empty($this->pendingJobs)) {
+            \Log::info('📡 No pending jobs to poll');
+            return ['pendingJobs' => 0, 'polled' => 0, 'message' => 'No pending jobs'];
+        }
+
+        $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
+        $hasUpdates = false;
+        $videoJobsPolled = 0;
+
+        foreach ($this->pendingJobs as $jobKey => $job) {
+            $jobType = $job['type'] ?? '';
+
+            if ($jobType !== 'shot_video') {
+                \Log::info('📡 Skipping non-video job', ['jobKey' => $jobKey, 'type' => $jobType]);
+                continue;
+            }
+
+            $videoJobsPolled++;
+            $taskId = $job['taskId'] ?? null;
+            $provider = $job['provider'] ?? 'minimax';
+            $endpointId = $job['endpointId'] ?? null;
+            $sceneIndex = $job['sceneIndex'] ?? null;
+            $shotIndex = $job['shotIndex'] ?? null;
+
+            \Log::info('📡 Polling video job', [
+                'jobKey' => $jobKey,
+                'taskId' => $taskId,
+                'provider' => $provider,
+                'sceneIndex' => $sceneIndex,
+                'shotIndex' => $shotIndex,
+            ]);
+
+            if (!$taskId || $sceneIndex === null || $shotIndex === null) {
+                \Log::warning('📡 Invalid job data, skipping', ['job' => $job]);
+                continue;
+            }
+
+            try {
+                $result = $animationService->getTaskStatus($taskId, $provider, $endpointId);
+
+                \Log::info('📡 Video job status response', [
+                    'taskId' => $taskId,
+                    'success' => $result['success'] ?? false,
+                    'status' => $result['status'] ?? 'unknown',
+                    'hasVideoUrl' => isset($result['videoUrl']),
+                    'error' => $result['error'] ?? null,
+                ]);
+
+                if (!$result['success']) {
+                    \Log::warning('📡 Status check returned failure', ['result' => $result]);
+                    continue;
+                }
+
+                $status = $result['status'];
+
+                if ($status === 'completed') {
+                    // Video generation completed
+                    if (isset($result['videoUrl'])) {
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
+                        $hasUpdates = true;
+
+                        \Log::info('📡 ✅ Video READY!', [
+                            'sceneIndex' => $sceneIndex,
+                            'shotIndex' => $shotIndex,
+                            'videoUrl' => substr($result['videoUrl'], 0, 100) . '...',
+                        ]);
+                    } else {
+                        \Log::warning('📡 Completed but no videoUrl', ['result' => $result]);
+                    }
+                    unset($this->pendingJobs[$jobKey]);
+
+                } elseif (in_array($status, ['failed', 'cancelled', 'timeout', 'error'])) {
+                    // Video generation failed
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = $result['error'] ?? 'Generation failed';
+                    unset($this->pendingJobs[$jobKey]);
+                    $hasUpdates = true;
+
+                    \Log::warning('📡 ❌ Video generation FAILED', [
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => $shotIndex,
+                        'status' => $status,
+                        'error' => $result['error'] ?? 'Unknown error',
+                    ]);
+                } else {
+                    \Log::info('📡 ⏳ Still processing...', ['status' => $status]);
+                }
+
+            } catch (\Exception $e) {
+                \Log::error('📡 Exception polling video job: ' . $e->getMessage(), [
+                    'taskId' => $taskId,
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+        }
+
+        \Log::info('📡 Poll cycle complete', [
+            'videoJobsPolled' => $videoJobsPolled,
+            'hasUpdates' => $hasUpdates,
+            'remainingJobs' => count($this->pendingJobs),
+        ]);
+
+        if ($hasUpdates) {
+            $this->saveProject();
+        }
+
+        // Dispatch completion event if no more pending video jobs
+        $hasVideoJobs = collect($this->pendingJobs)->contains(fn($job) => ($job['type'] ?? '') === 'shot_video');
+        if (!$hasVideoJobs) {
+            \Log::info('📡 All video jobs complete - dispatching video-generation-complete');
+            $this->dispatch('video-generation-complete');
+        }
+
+        return [
+            'pendingJobs' => $jobCount,
+            'polled' => $videoJobsPolled,
+            'remaining' => count($this->pendingJobs),
+            'hasUpdates' => $hasUpdates,
+        ];
+    }
+
+    /**
      * Get pending jobs count for a project.
      */
     public function getPendingJobsCount(): int
@@ -4437,7 +4632,7 @@ class VideoWizard extends Component
     // =========================================================================
 
     /**
-     * Check status of pending RunPod jobs.
+     * Check status of pending jobs (images and videos).
      */
     public function pollPendingJobs(): void
     {
@@ -4446,38 +4641,96 @@ class VideoWizard extends Component
         }
 
         $imageService = app(ImageGenerationService::class);
+        $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
 
-        foreach ($this->pendingJobs as $sceneIndex => $job) {
+        foreach ($this->pendingJobs as $jobKey => $job) {
             try {
-                $result = $imageService->checkRunPodJobStatus($job['jobId']);
+                $jobType = $job['type'] ?? 'image';
 
-                if ($result['status'] === 'COMPLETED') {
-                    // Update storyboard scene with completed image
-                    if (isset($this->storyboard['scenes'][$sceneIndex])) {
-                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
-                        // Image URL should already be set
-                    }
-
-                    // Remove from pending
-                    unset($this->pendingJobs[$sceneIndex]);
-                    $this->saveProject();
-
-                } elseif ($result['status'] === 'FAILED') {
-                    // Mark as error
-                    if (isset($this->storyboard['scenes'][$sceneIndex])) {
-                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'error';
-                        $this->storyboard['scenes'][$sceneIndex]['error'] = $result['error'] ?? 'Generation failed';
-                    }
-
-                    unset($this->pendingJobs[$sceneIndex]);
-                    $this->saveProject();
+                if ($jobType === 'shot_video') {
+                    // Handle video generation jobs
+                    $this->pollVideoJob($jobKey, $job, $animationService);
+                } else {
+                    // Handle image generation jobs (legacy)
+                    $this->pollImageJob($jobKey, $job, $imageService);
                 }
-                // If IN_QUEUE or IN_PROGRESS, keep polling
 
             } catch (\Exception $e) {
                 \Log::error("Failed to poll job status: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Poll status of an image generation job.
+     */
+    protected function pollImageJob(string $jobKey, array $job, ImageGenerationService $imageService): void
+    {
+        $sceneIndex = is_numeric($jobKey) ? (int)$jobKey : null;
+        if ($sceneIndex === null || !isset($job['jobId'])) {
+            return;
+        }
+
+        $result = $imageService->checkRunPodJobStatus($job['jobId']);
+
+        if ($result['status'] === 'COMPLETED') {
+            // Update storyboard scene with completed image
+            if (isset($this->storyboard['scenes'][$sceneIndex])) {
+                $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
+            }
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+        } elseif ($result['status'] === 'FAILED') {
+            if (isset($this->storyboard['scenes'][$sceneIndex])) {
+                $this->storyboard['scenes'][$sceneIndex]['status'] = 'error';
+                $this->storyboard['scenes'][$sceneIndex]['error'] = $result['error'] ?? 'Generation failed';
+            }
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Poll status of a video generation job.
+     */
+    protected function pollVideoJob(string $jobKey, array $job, $animationService): void
+    {
+        $taskId = $job['taskId'] ?? null;
+        $provider = $job['provider'] ?? 'minimax';
+        $endpointId = $job['endpointId'] ?? null;
+        $sceneIndex = $job['sceneIndex'] ?? null;
+        $shotIndex = $job['shotIndex'] ?? null;
+
+        if (!$taskId || $sceneIndex === null || $shotIndex === null) {
+            return;
+        }
+
+        $result = $animationService->getTaskStatus($taskId, $provider, $endpointId);
+
+        if (!$result['success']) {
+            return;
+        }
+
+        $status = $result['status'];
+
+        if ($status === 'completed') {
+            // Video generation completed
+            if (isset($result['videoUrl'])) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
+            }
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+        } elseif (in_array($status, ['failed', 'cancelled', 'timeout', 'error'])) {
+            // Video generation failed
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = $result['error'] ?? 'Generation failed';
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+        }
+        // If queued or processing, keep polling
     }
 
     /**
@@ -8969,6 +9222,570 @@ EOT;
     {
         $this->showFrameCaptureModal = false;
         $this->capturedFrame = null;
+        $this->closeFaceCorrectionPanel();
+    }
+
+    /**
+     * Capture frame server-side (fallback for CORS-blocked videos).
+     * Uses FFmpeg to extract a frame at the specified timestamp.
+     */
+    public function captureFrameServerSide(float $timestamp): array
+    {
+        $sceneIndex = $this->frameCaptureSceneIndex;
+        $shotIndex = $this->frameCaptureShotIndex;
+
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        $shot = $decomposed['shots'][$shotIndex] ?? null;
+
+        if (!$shot || empty($shot['videoUrl'])) {
+            return ['success' => false, 'error' => __('No video URL available')];
+        }
+
+        $videoUrl = $shot['videoUrl'];
+
+        try {
+            // Create temp directory if needed
+            $tempDir = storage_path('app/temp/frames');
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $filename = "frame_{$sceneIndex}_{$shotIndex}_" . time() . '.png';
+            $tempPath = $tempDir . '/' . $filename;
+
+            // Use FFmpeg to extract frame
+            // Format timestamp as HH:MM:SS.mmm
+            $hours = floor($timestamp / 3600);
+            $minutes = floor(($timestamp % 3600) / 60);
+            $seconds = $timestamp % 60;
+            $timeString = sprintf('%02d:%02d:%06.3f', $hours, $minutes, $seconds);
+
+            $ffmpegCmd = sprintf(
+                'ffmpeg -y -ss %s -i %s -vframes 1 -f image2 %s 2>&1',
+                escapeshellarg($timeString),
+                escapeshellarg($videoUrl),
+                escapeshellarg($tempPath)
+            );
+
+            Log::info('[FrameCapture] FFmpeg command', ['cmd' => $ffmpegCmd]);
+
+            $output = [];
+            $returnCode = 0;
+            exec($ffmpegCmd, $output, $returnCode);
+
+            if ($returnCode !== 0 || !file_exists($tempPath)) {
+                Log::error('[FrameCapture] FFmpeg failed', [
+                    'returnCode' => $returnCode,
+                    'output' => implode("\n", $output)
+                ]);
+
+                // Try alternative: download video and extract locally
+                return $this->captureFrameViaDownload($videoUrl, $timestamp, $sceneIndex, $shotIndex);
+            }
+
+            // Move to public storage
+            $frameContent = file_get_contents($tempPath);
+            unlink($tempPath);
+
+            if ($this->projectId) {
+                $project = WizardProject::find($this->projectId);
+                if ($project) {
+                    $storagePath = "wizard-projects/{$project->id}/frames/{$filename}";
+                    Storage::disk('public')->put($storagePath, $frameContent);
+                    $frameUrl = Storage::disk('public')->url($storagePath);
+
+                    Log::info('[FrameCapture] Server-side capture successful', ['url' => $frameUrl]);
+
+                    return [
+                        'success' => true,
+                        'frameUrl' => $frameUrl
+                    ];
+                }
+            }
+
+            // Fallback: return as base64
+            $base64 = 'data:image/png;base64,' . base64_encode($frameContent);
+            return [
+                'success' => true,
+                'frameUrl' => $base64
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('[FrameCapture] Server-side capture error', [
+                'error' => $e->getMessage()
+            ]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Alternative frame capture via video download (for problematic URLs).
+     */
+    protected function captureFrameViaDownload(string $videoUrl, float $timestamp, int $sceneIndex, int $shotIndex): array
+    {
+        try {
+            $tempDir = storage_path('app/temp/frames');
+            $tempVideoPath = $tempDir . '/temp_video_' . time() . '.mp4';
+            $filename = "frame_{$sceneIndex}_{$shotIndex}_" . time() . '.png';
+            $tempFramePath = $tempDir . '/' . $filename;
+
+            // Download video
+            $client = new \GuzzleHttp\Client(['timeout' => 60, 'verify' => false]);
+            $response = $client->get($videoUrl, ['sink' => $tempVideoPath]);
+
+            if (!file_exists($tempVideoPath)) {
+                throw new \Exception('Failed to download video');
+            }
+
+            // Extract frame
+            $hours = floor($timestamp / 3600);
+            $minutes = floor(($timestamp % 3600) / 60);
+            $seconds = $timestamp % 60;
+            $timeString = sprintf('%02d:%02d:%06.3f', $hours, $minutes, $seconds);
+
+            $ffmpegCmd = sprintf(
+                'ffmpeg -y -ss %s -i %s -vframes 1 -f image2 %s 2>&1',
+                escapeshellarg($timeString),
+                escapeshellarg($tempVideoPath),
+                escapeshellarg($tempFramePath)
+            );
+
+            exec($ffmpegCmd, $output, $returnCode);
+
+            // Cleanup temp video
+            if (file_exists($tempVideoPath)) {
+                unlink($tempVideoPath);
+            }
+
+            if ($returnCode !== 0 || !file_exists($tempFramePath)) {
+                throw new \Exception('FFmpeg frame extraction failed');
+            }
+
+            $frameContent = file_get_contents($tempFramePath);
+            unlink($tempFramePath);
+
+            if ($this->projectId) {
+                $project = WizardProject::find($this->projectId);
+                if ($project) {
+                    $storagePath = "wizard-projects/{$project->id}/frames/{$filename}";
+                    Storage::disk('public')->put($storagePath, $frameContent);
+                    $frameUrl = Storage::disk('public')->url($storagePath);
+
+                    return ['success' => true, 'frameUrl' => $frameUrl];
+                }
+            }
+
+            return [
+                'success' => true,
+                'frameUrl' => 'data:image/png;base64,' . base64_encode($frameContent)
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('[FrameCapture] Download capture failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    // =========================================================================
+    // FACE CORRECTION PANEL
+    // =========================================================================
+
+    /**
+     * Open face correction panel.
+     */
+    public function openFaceCorrectionPanel(): void
+    {
+        if (!$this->capturedFrame) {
+            $this->error = __('Capture a frame first');
+            return;
+        }
+
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+        $charsWithPortraits = collect($characters)
+            ->filter(fn($c) => !empty($c['referenceImage']) && ($c['referenceImageStatus'] ?? '') === 'ready')
+            ->keys()
+            ->all();
+
+        if (empty($charsWithPortraits)) {
+            $this->error = __('No character portraits available. Generate portraits in Character Bible first.');
+            return;
+        }
+
+        // Select all characters with portraits by default
+        $this->selectedFaceCorrectionCharacters = $charsWithPortraits;
+        $this->correctedFrameUrl = null;
+        $this->faceCorrectionStatus = 'idle';
+        $this->showFaceCorrectionPanel = true;
+    }
+
+    /**
+     * Close face correction panel.
+     */
+    public function closeFaceCorrectionPanel(): void
+    {
+        $this->showFaceCorrectionPanel = false;
+        $this->selectedFaceCorrectionCharacters = [];
+        $this->correctedFrameUrl = null;
+        $this->faceCorrectionStatus = 'idle';
+    }
+
+    /**
+     * Toggle character selection for face correction.
+     */
+    public function toggleFaceCorrectionCharacter(int $index): void
+    {
+        $key = array_search($index, $this->selectedFaceCorrectionCharacters);
+
+        if ($key !== false) {
+            unset($this->selectedFaceCorrectionCharacters[$key]);
+            $this->selectedFaceCorrectionCharacters = array_values($this->selectedFaceCorrectionCharacters);
+        } else {
+            $this->selectedFaceCorrectionCharacters[] = $index;
+        }
+    }
+
+    /**
+     * Apply face correction using Gemini AI.
+     * Uses Gemini's image generation with Character Bible portraits as reference.
+     * Mirrors the original Firebase creationWizardFixCharacterFaces function.
+     */
+    public function applyFaceCorrection(): void
+    {
+        if (!$this->capturedFrame) {
+            $this->error = __('No frame captured');
+            return;
+        }
+
+        if (empty($this->selectedFaceCorrectionCharacters)) {
+            $this->error = __('Select at least one character');
+            return;
+        }
+
+        $this->faceCorrectionStatus = 'processing';
+
+        try {
+            $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+            $selectedChars = [];
+
+            foreach ($this->selectedFaceCorrectionCharacters as $index) {
+                if (isset($characters[$index])) {
+                    $char = $characters[$index];
+                    if (!empty($char['referenceImage'])) {
+                        // Get base64 for reference image
+                        $refBase64 = $char['referenceImageBase64'] ?? null;
+                        if (!$refBase64 && !empty($char['referenceImage'])) {
+                            // Download and convert to base64
+                            try {
+                                $imageContent = file_get_contents($char['referenceImage']);
+                                $refBase64 = base64_encode($imageContent);
+                            } catch (\Exception $e) {
+                                Log::warning('[FaceCorrection] Failed to load reference image', [
+                                    'character' => $char['name'] ?? 'Unknown',
+                                    'error' => $e->getMessage()
+                                ]);
+                                continue;
+                            }
+                        }
+
+                        if ($refBase64) {
+                            $selectedChars[] = [
+                                'name' => $char['name'] ?? 'Character',
+                                'description' => $char['description'] ?? '',
+                                'base64' => $refBase64,
+                                'mimeType' => $char['referenceImageMimeType'] ?? 'image/png',
+                            ];
+                        }
+                    }
+                }
+            }
+
+            if (empty($selectedChars)) {
+                throw new \Exception(__('No valid character references found. Ensure characters have portrait images.'));
+            }
+
+            // Get the frame data as base64
+            $frameBase64 = $this->capturedFrame;
+            if (str_starts_with($frameBase64, 'data:')) {
+                $frameBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $frameBase64);
+            } elseif (str_starts_with($frameBase64, 'http')) {
+                // Download the image and convert to base64
+                $imageContent = file_get_contents($frameBase64);
+                $frameBase64 = base64_encode($imageContent);
+            }
+
+            Log::info('[FaceCorrection] Starting face correction', [
+                'characters' => count($selectedChars),
+                'characterNames' => collect($selectedChars)->pluck('name')->all(),
+            ]);
+
+            // Build the face correction prompt (matching original Firebase function)
+            $characterDescriptions = collect($selectedChars)->map(function($char, $idx) {
+                $charNum = $idx + 2; // +2 because image 1 is the scene
+                $desc = $char['description'] ? " ({$char['description']})" : '';
+                return "- Image {$charNum}: {$char['name']}{$desc}";
+            })->join("\n");
+
+            $aspectRatio = $this->aspectRatio ?? '16:9';
+
+            $faceFixPrompt = <<<PROMPT
+FACE CORRECTION TASK - LIGHTING CRITICAL:
+
+You have been given {$this->getCharacterCount($selectedChars)} images:
+- Image 1: The SCENE to preserve (composition, lighting, poses, background, clothing, everything EXCEPT faces)
+{$characterDescriptions}
+
+=== CRITICAL LIGHTING PRESERVATION ===
+BEFORE making ANY changes, ANALYZE Image 1's lighting:
+1. Color temperature (warm/cool/neutral)
+2. Light direction (front/side/back/above)
+3. Light intensity (bright/dim/dramatic shadows)
+4. Color grading (teal/orange, cool blues, warm ambers, etc.)
+5. Atmospheric effects (fog, haze, smoke, neon glow, volumetric light)
+6. Shadow depth and placement
+7. Rim lighting or backlight effects
+8. Any colored light sources (neon, fire, screens)
+
+The corrected faces MUST match ALL these lighting characteristics EXACTLY.
+The face should look like it was FILMED IN THAT SCENE, not pasted in from a studio.
+
+YOUR TASK:
+1. PRESERVE the EXACT scene from Image 1:
+   - Same composition, poses, camera angle, background, clothing, body positions
+   - Same color grading and color temperature
+   - Same atmospheric effects (fog, haze, smoke if present)
+   - Same lighting direction and shadow patterns
+   - Same overall mood and cinematic look
+
+2. REPLACE only the facial features with those from the character references:
+   - Eyes, nose, mouth, face shape, skin tone FROM the reference
+   - BUT the lighting ON the face must match Image 1's lighting EXACTLY
+   - Shadows should fall in the same direction as Image 1
+   - Skin should reflect the same color cast as Image 1
+   - If Image 1 has blue/cyan lighting, the face must have that blue/cyan tint
+   - If Image 1 has warm golden lighting, the face must have that warm glow
+
+CRITICAL DO NOT:
+- Do NOT flatten the lighting or make it look like studio lighting
+- Do NOT remove atmospheric effects (fog, haze, smoke, dust particles)
+- Do NOT change the color grading or color temperature
+- Do NOT create a "pasted on" look where the face doesn't match the environment
+- Do NOT make the face brighter or more evenly lit than the original
+
+CRITICAL DO:
+- Apply the SAME shadows to the new face that were on the original face
+- Match any rim light or backlight effects from the original
+- Preserve any color tints from environment lighting (neon, fire, etc.)
+- Keep the atmospheric density consistent
+- Maintain {$aspectRatio} aspect ratio
+
+Output a single corrected image where the face blends SEAMLESSLY with the scene's lighting.
+PROMPT;
+
+            // Prepare additional images (character references)
+            $additionalImages = collect($selectedChars)->map(function($char) {
+                return [
+                    'base64' => $char['base64'],
+                    'mimeType' => $char['mimeType'],
+                ];
+            })->all();
+
+            // Call Gemini Service for face correction
+            $geminiService = app(\App\Services\GeminiService::class);
+
+            $result = $geminiService->generateImageFromImage(
+                $frameBase64,
+                $faceFixPrompt,
+                [
+                    'model' => 'gemini-2.5-flash', // or 'gemini-2.5-pro' for higher quality
+                    'mimeType' => 'image/png',
+                    'aspectRatio' => $aspectRatio,
+                    'resolution' => '2K',
+                    'additionalImages' => $additionalImages,
+                ]
+            );
+
+            if (!$result['success']) {
+                throw new \Exception($result['error'] ?? __('Face correction generation failed'));
+            }
+
+            // Save the corrected image
+            $correctedBase64 = $result['imageData'];
+            $correctedMimeType = $result['mimeType'] ?? 'image/png';
+
+            // Save to storage
+            $filename = "face_correction_{$this->frameCaptureSceneIndex}_{$this->frameCaptureShotIndex}_" . time() . '.png';
+
+            if ($this->projectId) {
+                $project = WizardProject::find($this->projectId);
+                if ($project) {
+                    $storagePath = "wizard-projects/{$project->id}/face-corrections/{$filename}";
+                    Storage::disk('public')->put($storagePath, base64_decode($correctedBase64));
+                    $correctedUrl = Storage::disk('public')->url($storagePath);
+
+                    $this->correctedFrameUrl = $correctedUrl;
+                } else {
+                    // Fallback to data URL
+                    $this->correctedFrameUrl = "data:{$correctedMimeType};base64,{$correctedBase64}";
+                }
+            } else {
+                // No project, use data URL
+                $this->correctedFrameUrl = "data:{$correctedMimeType};base64,{$correctedBase64}";
+            }
+
+            $this->faceCorrectionStatus = 'done';
+
+            Log::info('[FaceCorrection] Face correction complete', [
+                'characters' => collect($selectedChars)->pluck('name')->all(),
+            ]);
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => __('Face correction complete! Review the result and save if satisfied.')
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[FaceCorrection] Error', ['error' => $e->getMessage()]);
+            $this->error = __('Face correction failed: ') . $e->getMessage();
+            $this->faceCorrectionStatus = 'error';
+        }
+    }
+
+    /**
+     * Helper to get character count for prompt.
+     */
+    private function getCharacterCount(array $chars): string
+    {
+        $count = count($chars) + 1; // +1 for the scene image
+        return "{$count}";
+    }
+
+    /**
+     * Save the corrected frame (replaces captured frame).
+     */
+    public function saveCorrectedFrame(): void
+    {
+        if (!$this->correctedFrameUrl) {
+            $this->error = __('No corrected frame available');
+            return;
+        }
+
+        // Update captured frame with corrected version
+        $this->capturedFrame = $this->correctedFrameUrl;
+        $this->closeFaceCorrectionPanel();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Corrected frame saved. You can now transfer it to the next shot.')
+        ]);
+    }
+
+    // =========================================================================
+    // VIDEO MODEL SELECTOR
+    // =========================================================================
+
+    /**
+     * Open video model selector popup.
+     */
+    public function openVideoModelSelector(int $sceneIndex, int $shotIndex): void
+    {
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        if (!$decomposed || !isset($decomposed['shots'][$shotIndex])) {
+            $this->error = __('Shot not found');
+            return;
+        }
+
+        $shot = $decomposed['shots'][$shotIndex];
+        if (empty($shot['imageUrl'])) {
+            $this->error = __('Generate image first');
+            return;
+        }
+
+        $this->videoModelSelectorSceneIndex = $sceneIndex;
+        $this->videoModelSelectorShotIndex = $shotIndex;
+        $this->preConfigureWaitingShots = false;
+        $this->showVideoModelSelector = true;
+    }
+
+    /**
+     * Close video model selector popup.
+     */
+    public function closeVideoModelSelector(): void
+    {
+        $this->showVideoModelSelector = false;
+    }
+
+    /**
+     * Set video model for selected shot.
+     */
+    public function setVideoModel(string $model): void
+    {
+        $sceneIndex = $this->videoModelSelectorSceneIndex;
+        $shotIndex = $this->videoModelSelectorShotIndex;
+
+        $validModels = ['minimax', 'multitalk'];
+        if (!in_array($model, $validModels)) {
+            return;
+        }
+
+        // Check Multitalk availability
+        if ($model === 'multitalk') {
+            $multitalkEndpoint = get_option('runpod_multitalk_endpoint', '');
+            if (empty($multitalkEndpoint)) {
+                $this->error = __('Multitalk endpoint not configured');
+                return;
+            }
+        }
+
+        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedVideoModel'] = $model;
+
+        // Adjust duration based on model
+        $currentDuration = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] ?? 6;
+        $validDurations = $model === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+
+        if (!in_array($currentDuration, $validDurations)) {
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] = $validDurations[0];
+        }
+    }
+
+    /**
+     * Set duration for video model selector.
+     */
+    public function setVideoModelDuration(int $duration): void
+    {
+        $sceneIndex = $this->videoModelSelectorSceneIndex;
+        $shotIndex = $this->videoModelSelectorShotIndex;
+
+        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] = $duration;
+    }
+
+    /**
+     * Confirm model selection and generate video.
+     */
+    public function confirmVideoModelAndGenerate(): void
+    {
+        $sceneIndex = $this->videoModelSelectorSceneIndex;
+        $shotIndex = $this->videoModelSelectorShotIndex;
+
+        // Pre-configure waiting shots if requested
+        if ($this->preConfigureWaitingShots) {
+            $shots = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'] ?? [];
+            $currentShot = $shots[$shotIndex] ?? [];
+            $selectedModel = $currentShot['selectedVideoModel'] ?? 'minimax';
+            $selectedDuration = $currentShot['selectedDuration'] ?? 6;
+
+            foreach ($shots as $idx => $shot) {
+                if ($idx > $shotIndex && empty($shot['videoUrl']) && !empty($shot['imageUrl'])) {
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$idx]['selectedVideoModel'] = $selectedModel;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$idx]['selectedDuration'] = $selectedDuration;
+                }
+            }
+        }
+
+        // Close popup
+        $this->showVideoModelSelector = false;
+
+        // Generate video
+        $this->generateShotVideo($sceneIndex, $shotIndex);
     }
 
     /**
@@ -9329,15 +10146,22 @@ EOT;
      */
     public function generateShotVideo(int $sceneIndex, int $shotIndex): void
     {
+        \Log::info('🎬 generateShotVideo called', [
+            'sceneIndex' => $sceneIndex,
+            'shotIndex' => $shotIndex,
+        ]);
+
         $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
         if (!$decomposed || !isset($decomposed['shots'][$shotIndex])) {
             $this->error = __('Shot not found');
+            \Log::error('Shot not found', ['sceneIndex' => $sceneIndex, 'shotIndex' => $shotIndex]);
             return;
         }
 
         $shot = $decomposed['shots'][$shotIndex];
         if (empty($shot['imageUrl'])) {
             $this->error = __('Generate image first');
+            \Log::error('No image URL for shot');
             return;
         }
 
@@ -9346,8 +10170,15 @@ EOT;
         $this->error = null;
 
         try {
-            $animationService = app(\Starter\AppVideoWizard\Services\AnimationService::class);
+            $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
             $duration = $shot['selectedDuration'] ?? $shot['duration'] ?? 6;
+            $selectedModel = $shot['selectedVideoModel'] ?? 'minimax';
+
+            \Log::info('🎬 Animation request', [
+                'model' => $selectedModel,
+                'duration' => $duration,
+                'imageUrl' => substr($shot['imageUrl'], 0, 80) . '...',
+            ]);
 
             if ($this->projectId) {
                 $project = WizardProject::find($this->projectId);
@@ -9355,27 +10186,61 @@ EOT;
                     // Build motion description for the shot
                     $motionPrompt = $this->buildShotMotionPrompt($shot);
 
+                    // Get audio URL for Multitalk lip-sync
+                    $audioUrl = null;
+                    if ($selectedModel === 'multitalk') {
+                        $audioUrl = $shot['audioUrl'] ?? $shot['voiceoverUrl'] ?? null;
+                    }
+
                     $result = $animationService->generateAnimation($project, [
                         'imageUrl' => $shot['imageUrl'],
                         'prompt' => $motionPrompt,
-                        'model' => $this->animation['model'] ?? 'minimax',
+                        'model' => $selectedModel,
                         'duration' => $duration,
+                        'audioUrl' => $audioUrl,
+                    ]);
+
+                    \Log::info('🎬 Animation result', [
+                        'success' => $result['success'] ?? false,
+                        'hasVideoUrl' => isset($result['videoUrl']),
+                        'taskId' => $result['taskId'] ?? 'none',
+                        'provider' => $result['provider'] ?? 'unknown',
+                        'error' => $result['error'] ?? null,
                     ]);
 
                     if ($result['success']) {
                         if (isset($result['videoUrl'])) {
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
+                            \Log::info('🎬 Video immediately ready', ['videoUrl' => substr($result['videoUrl'], 0, 80)]);
                         } elseif (isset($result['taskId'])) {
                             // Async job - store for polling
-                            $this->pendingJobs["shot_video_{$sceneIndex}_{$shotIndex}"] = [
+                            $jobKey = "shot_video_{$sceneIndex}_{$shotIndex}";
+                            $this->pendingJobs[$jobKey] = [
                                 'taskId' => $result['taskId'],
                                 'type' => 'shot_video',
                                 'sceneIndex' => $sceneIndex,
                                 'shotIndex' => $shotIndex,
+                                'provider' => $result['provider'] ?? 'minimax',
+                                'endpointId' => $result['endpointId'] ?? null,
                             ];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'processing';
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId'] = $result['taskId'];
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider'] = $result['provider'] ?? 'minimax';
+
+                            \Log::info('🎬 Video task submitted - dispatching video-generation-started', [
+                                'taskId' => $result['taskId'],
+                                'jobKey' => $jobKey,
+                                'pendingJobsCount' => count($this->pendingJobs),
+                                'pendingJobKeys' => array_keys($this->pendingJobs),
+                            ]);
+
+                            // Dispatch event to start polling
+                            $this->dispatch('video-generation-started', [
+                                'taskId' => $result['taskId'],
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                            ]);
                         }
                         $this->saveProject();
                     } else {
@@ -9386,6 +10251,7 @@ EOT;
         } catch (\Exception $e) {
             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
             $this->error = __('Failed to generate shot video: ') . $e->getMessage();
+            \Log::error('🎬 Video generation error', ['error' => $e->getMessage()]);
         } finally {
             $this->isLoading = false;
         }
