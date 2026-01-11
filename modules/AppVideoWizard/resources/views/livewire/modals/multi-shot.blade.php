@@ -65,8 +65,12 @@ window.multiShotVideoPolling = function() {
             try {
                 // Call Livewire method directly via $wire (more reliable than dispatch)
                 if (this.$wire) {
-                    this.$wire.pollVideoJobs().then(() => {
-                        console.log('[MultiShot] ✅ pollVideoJobs() called');
+                    this.$wire.pollVideoJobs().then((result) => {
+                        console.log('[MultiShot] ✅ pollVideoJobs result:', result);
+                        // Stop polling if no jobs
+                        if (result && result.pendingJobs === 0) {
+                            console.log('[MultiShot] ⚠️ No pending jobs - pendingJobs array is empty!');
+                        }
                     }).catch((e) => {
                         console.error('[MultiShot] ❌ pollVideoJobs() error:', e);
                     });

@@ -3513,16 +3513,19 @@ class VideoWizard extends Component
      * Poll for pending video generation jobs (multi-shot).
      */
     #[On('poll-video-jobs')]
-    public function pollVideoJobs(): void
+    public function pollVideoJobs(): array
     {
+        $jobCount = count($this->pendingJobs);
+        $jobKeys = array_keys($this->pendingJobs);
+
         \Log::info('📡 pollVideoJobs CALLED', [
-            'pendingJobsCount' => count($this->pendingJobs),
-            'pendingJobKeys' => array_keys($this->pendingJobs),
+            'pendingJobsCount' => $jobCount,
+            'pendingJobKeys' => $jobKeys,
         ]);
 
         if (empty($this->pendingJobs)) {
             \Log::info('📡 No pending jobs to poll');
-            return;
+            return ['pendingJobs' => 0, 'polled' => 0, 'message' => 'No pending jobs'];
         }
 
         $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
@@ -3633,6 +3636,13 @@ class VideoWizard extends Component
             \Log::info('📡 All video jobs complete - dispatching video-generation-complete');
             $this->dispatch('video-generation-complete');
         }
+
+        return [
+            'pendingJobs' => $jobCount,
+            'polled' => $videoJobsPolled,
+            'remaining' => count($this->pendingJobs),
+            'hasUpdates' => $hasUpdates,
+        ];
     }
 
     /**
