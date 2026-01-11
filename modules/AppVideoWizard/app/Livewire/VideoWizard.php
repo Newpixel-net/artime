@@ -9431,7 +9431,9 @@ EOT;
                 if ($project) {
                     $storagePath = "wizard-projects/{$project->id}/frames/{$filename}";
                     Storage::disk('public')->put($storagePath, $frameContent);
-                    $frameUrl = Storage::disk('public')->url($storagePath);
+
+                    // Generate clean URL (fix double slash issue)
+                    $frameUrl = asset('storage/' . $storagePath);
 
                     Log::info('[FrameCapture] Server-side capture successful', ['url' => $frameUrl]);
 
@@ -9535,7 +9537,9 @@ EOT;
                 if ($project) {
                     $storagePath = "wizard-projects/{$project->id}/frames/{$filename}";
                     Storage::disk('public')->put($storagePath, $frameContent);
-                    $frameUrl = Storage::disk('public')->url($storagePath);
+
+                    // Generate clean URL (fix double slash issue)
+                    $frameUrl = asset('storage/' . $storagePath);
 
                     return ['success' => true, 'frameUrl' => $frameUrl];
                 }
