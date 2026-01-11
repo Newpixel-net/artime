@@ -6728,33 +6728,61 @@ class VideoWizard extends Component
     protected function autoDetectLocationsWithPatterns(): void
     {
         $locationMap = [];
+        $assignedScenes = [];
+        $totalScenes = count($this->script['scenes']);
 
         foreach ($this->script['scenes'] as $sceneIndex => $scene) {
             $visual = $scene['visualDescription'] ?? $scene['visual'] ?? '';
             $narration = $scene['narration'] ?? '';
             $fullText = $visual . ' ' . $narration;
 
-            if (empty(trim($fullText))) {
-                continue;
+            // Even for empty scenes, try to infer a location or mark as needing assignment
+            $locationName = 'General Location';
+            $locationType = 'Exterior';
+            $timeOfDay = 'Day';
+            $weather = 'Clear';
+            $description = '';
+
+            if (!empty(trim($fullText))) {
+                // Infer location from visual description
+                $locationName = $this->inferLocationFromVisual($fullText);
+                $locationType = $this->inferLocationType($fullText);
+                $timeOfDay = $this->inferTimeOfDay($fullText);
+                $weather = $this->inferWeather($fullText);
+                $description = $this->extractLocationDescription($visual);
             }
 
-            // Infer location from visual description
-            $locationName = $this->inferLocationFromVisual($fullText);
+            // Track this scene as assigned
+            $assignedScenes[] = $sceneIndex;
+
             $normalizedName = strtolower(trim($locationName));
 
             if ($locationName && $locationName !== 'Unknown') {
                 if (!isset($locationMap[$normalizedName])) {
                     $locationMap[$normalizedName] = [
                         'name' => $locationName,
-                        'type' => $this->inferLocationType($fullText),
-                        'timeOfDay' => $this->inferTimeOfDay($fullText),
-                        'weather' => $this->inferWeather($fullText),
-                        'description' => $this->extractLocationDescription($visual),
+                        'type' => $locationType,
+                        'timeOfDay' => $timeOfDay,
+                        'weather' => $weather,
+                        'description' => $description,
                         'scenes' => [],
                     ];
                 }
                 $locationMap[$normalizedName]['scenes'][] = $sceneIndex;
             }
+        }
+
+        // Ensure all scenes have at least one location assignment
+        // If no locations were detected, create a General Location for all scenes
+        if (empty($locationMap)) {
+            $locationMap['general location'] = [
+                'name' => 'General Location',
+                'type' => 'Exterior',
+                'timeOfDay' => 'Day',
+                'weather' => 'Clear',
+                'description' => 'Default location for scenes without specific setting',
+                'scenes' => range(0, $totalScenes - 1),
+            ];
         }
 
         // Add detected locations to Location Bible
@@ -8129,6 +8157,10 @@ EOT;
      */
     public function closeMultiShotModal(): void
     {
+        // Dispatch event to stop polling BEFORE closing modal
+        // This allows the JavaScript polling to clean up properly
+        $this->dispatch('multi-shot-modal-closing');
+
         $this->showMultiShotModal = false;
     }
 
