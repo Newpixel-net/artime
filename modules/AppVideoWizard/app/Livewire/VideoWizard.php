@@ -7672,6 +7672,170 @@ class VideoWizard extends Component
     }
 
     /**
+     * Validate and fill missing scene assignments for locations.
+     * Ensures every scene has at least one location assigned.
+     */
+    protected function validateLocationSceneAssignments(): void
+    {
+        $totalScenes = count($this->script['scenes'] ?? []);
+        if ($totalScenes === 0) {
+            return;
+        }
+
+        $locations = &$this->sceneMemory['locationBible']['locations'];
+        if (empty($locations)) {
+            return;
+        }
+
+        // Track which scenes are covered
+        $coveredScenes = [];
+        foreach ($locations as $location) {
+            foreach ($location['scenes'] ?? [] as $sceneIndex) {
+                $coveredScenes[$sceneIndex] = true;
+            }
+        }
+
+        // Find uncovered scenes
+        $uncoveredScenes = [];
+        for ($i = 0; $i < $totalScenes; $i++) {
+            if (!isset($coveredScenes[$i])) {
+                $uncoveredScenes[] = $i;
+            }
+        }
+
+        // If there are uncovered scenes, assign them to the most relevant location
+        if (!empty($uncoveredScenes)) {
+            Log::info('LocationExtraction: Found uncovered scenes', [
+                'uncovered' => $uncoveredScenes,
+                'total' => $totalScenes,
+            ]);
+
+            foreach ($uncoveredScenes as $sceneIndex) {
+                // Try to assign to an adjacent scene's location
+                $assignedLocation = null;
+
+                // Check previous scene
+                if ($sceneIndex > 0 && isset($coveredScenes[$sceneIndex - 1])) {
+                    foreach ($locations as $idx => &$loc) {
+                        if (in_array($sceneIndex - 1, $loc['scenes'] ?? [])) {
+                            $loc['scenes'][] = $sceneIndex;
+                            $assignedLocation = $loc['name'];
+                            break;
+                        }
+                    }
+                }
+
+                // If not assigned, check next scene
+                if (!$assignedLocation && $sceneIndex < $totalScenes - 1 && isset($coveredScenes[$sceneIndex + 1])) {
+                    foreach ($locations as $idx => &$loc) {
+                        if (in_array($sceneIndex + 1, $loc['scenes'] ?? [])) {
+                            $loc['scenes'][] = $sceneIndex;
+                            $assignedLocation = $loc['name'];
+                            break;
+                        }
+                    }
+                }
+
+                // If still not assigned, use the first location (General Location or primary)
+                if (!$assignedLocation && !empty($locations)) {
+                    // Look for a "General Location" first
+                    $generalIdx = null;
+                    foreach ($locations as $idx => $loc) {
+                        if (stripos($loc['name'], 'general') !== false) {
+                            $generalIdx = $idx;
+                            break;
+                        }
+                    }
+
+                    $targetIdx = $generalIdx ?? 0;
+                    $locations[$targetIdx]['scenes'][] = $sceneIndex;
+                    $assignedLocation = $locations[$targetIdx]['name'];
+                }
+
+                if ($assignedLocation) {
+                    Log::info('LocationExtraction: Auto-assigned uncovered scene', [
+                        'scene' => $sceneIndex + 1,
+                        'location' => $assignedLocation,
+                    ]);
+                }
+            }
+
+            // Sort all scene arrays
+            foreach ($locations as &$loc) {
+                if (!empty($loc['scenes'])) {
+                    $loc['scenes'] = array_unique($loc['scenes']);
+                    sort($loc['scenes']);
+                }
+            }
+        }
+    }
+
+    /**
+     * Find if a location with a synonymous name already exists.
+     * Handles cases like "Office", "Corporate Office", "The Office" referring to the same location.
+     *
+     * @param string $name The location name to check
+     * @return int|null The index of the existing location, or null if not found
+     */
+    protected function findSynonymousLocation(string $name): ?int
+    {
+        $name = strtolower(trim($name));
+        $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+
+        // Synonymous location groups - names in the same group refer to the same location
+        $synonymGroups = [
+            ['office', 'corporate office', 'the office', 'business office', 'main office', 'headquarters'],
+            ['rooftop', 'rooftop scene', 'building rooftop', 'city rooftop', 'the rooftop', 'roof'],
+            ['street', 'city street', 'main street', 'urban street', 'the street', 'streets'],
+            ['forest', 'the forest', 'woods', 'the woods', 'woodland', 'forest area'],
+            ['beach', 'the beach', 'seaside', 'shore', 'oceanfront', 'beachfront'],
+            ['home', 'house', 'residence', 'apartment', 'living room', 'the home'],
+            ['city', 'downtown', 'urban area', 'city center', 'cityscape', 'urban'],
+            ['space', 'outer space', 'space scene', 'spacecraft', 'space station'],
+            ['general location', 'unknown location', 'unspecified', 'various'],
+        ];
+
+        // Remove common prefixes for better matching
+        $cleanedName = preg_replace('/^(the|a|an)\s+/i', '', $name);
+
+        // Find which group the input name belongs to
+        $nameGroup = null;
+        foreach ($synonymGroups as $group) {
+            if (in_array($name, $group) || in_array($cleanedName, $group)) {
+                $nameGroup = $group;
+                break;
+            }
+        }
+
+        foreach ($locations as $index => $location) {
+            $existingName = strtolower(trim($location['name']));
+            $cleanedExisting = preg_replace('/^(the|a|an)\s+/i', '', $existingName);
+
+            // Exact match
+            if ($existingName === $name || $cleanedExisting === $cleanedName) {
+                return $index;
+            }
+
+            // Check if names are in the same synonym group
+            if ($nameGroup !== null) {
+                if (in_array($existingName, $nameGroup) || in_array($cleanedExisting, $nameGroup)) {
+                    return $index;
+                }
+            }
+
+            // Fuzzy match: one name contains the other (e.g., "Rooftop" matches "City Rooftop")
+            if (strlen($cleanedName) >= 4 && strlen($cleanedExisting) >= 4) {
+                if (strpos($cleanedExisting, $cleanedName) !== false ||
+                    strpos($cleanedName, $cleanedExisting) !== false) {
+                    return $index;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Normalize character name from pattern match.
      */
     protected function normalizeCharacterName(string $match): ?string
@@ -7739,10 +7903,25 @@ class VideoWizard extends Component
 
                 // Add AI-extracted locations to Location Bible
                 foreach ($result['locations'] as $location) {
-                    // Check if already exists
-                    $exists = collect($this->sceneMemory['locationBible']['locations'])
-                        ->filter(fn($loc) => strtolower($loc['name'] ?? '') === strtolower($location['name']))
-                        ->isNotEmpty();
+                    // Check if already exists (including synonymous names)
+                    $existingIndex = $this->findSynonymousLocation($location['name']);
+                    $exists = $existingIndex !== null;
+
+                    // If synonymous location found, merge scenes instead of creating duplicate
+                    if ($exists && $existingIndex !== null) {
+                        $existingLoc = &$this->sceneMemory['locationBible']['locations'][$existingIndex];
+                        $newScenes = $location['scenes'] ?? [];
+                        $existingLoc['scenes'] = array_unique(array_merge(
+                            $existingLoc['scenes'] ?? [],
+                            $newScenes
+                        ));
+                        sort($existingLoc['scenes']);
+                        Log::info('LocationExtraction: Merged synonymous location', [
+                            'existing' => $existingLoc['name'],
+                            'merged' => $location['name'],
+                        ]);
+                        continue;
+                    }
 
                     if (!$exists) {
                         $this->sceneMemory['locationBible']['locations'][] = [
@@ -7768,6 +7947,9 @@ class VideoWizard extends Component
                 // Enable Location Bible if we detected any locations
                 if (!empty($result['locations'])) {
                     $this->sceneMemory['locationBible']['enabled'] = true;
+
+                    // Validate and fill missing scene assignments
+                    $this->validateLocationSceneAssignments();
                 }
 
                 // Dispatch event for debugging
