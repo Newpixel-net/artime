@@ -777,7 +777,7 @@ class VideoWizard extends Component
      * @param string $model 'minimax' or 'multitalk'
      * @return array Array of available durations in seconds
      */
-    protected function getAvailableDurations(string $model = 'minimax'): array
+    public function getAvailableDurations(string $model = 'minimax'): array
     {
         $settingSlug = $model === 'multitalk'
             ? 'animation_multitalk_durations'
@@ -801,7 +801,7 @@ class VideoWizard extends Component
      * @param string $model 'minimax' or 'multitalk'
      * @return int Default duration in seconds
      */
-    protected function getDefaultDuration(string $model = 'minimax'): int
+    public function getDefaultDuration(string $model = 'minimax'): int
     {
         $settingSlug = $model === 'multitalk'
             ? 'animation_multitalk_default_duration'

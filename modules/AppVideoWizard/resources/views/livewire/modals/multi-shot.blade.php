@@ -238,45 +238,74 @@ window.multiShotVideoPolling = function() {
                 </div>
 
                 @if(!$decomposed)
-                    {{-- Shot Count Selector --}}
+                    {{-- Shot Count Selector with AI Option --}}
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.75rem; margin-bottom: 0.35rem;">{{ __('Number of Shots') }}</label>
-                        <div style="display: flex; gap: 0.35rem;">
-                            @foreach([2, 3, 4, 5, 6] as $count)
+                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            {{-- AI Option --}}
+                            <button type="button"
+                                    wire:click="$set('multiShotCount', 0)"
+                                    style="flex: 1; min-width: 70px; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid {{ $multiShotCount === 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255,255,255,0.15)' }}; background: {{ $multiShotCount === 0 ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.2))' : 'rgba(255,255,255,0.05)' }}; color: white; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
+                                🤖 {{ __('AI') }}
+                            </button>
+                            @foreach([2, 3, 4, 5, 6, 8, 10] as $count)
                                 <button type="button"
                                         wire:click="$set('multiShotCount', {{ $count }})"
-                                        style="flex: 1; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid {{ $multiShotCount === $count ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.15)' }}; background: {{ $multiShotCount === $count ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)' }}; color: white; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                                        style="flex: 1; min-width: 40px; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid {{ $multiShotCount === $count ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.15)' }}; background: {{ $multiShotCount === $count ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)' }}; color: white; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
                                     {{ $count }}
                                 </button>
                             @endforeach
                         </div>
-                        <p style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.35rem;">
-                            💡 {{ __('More shots = more dynamic scene, but requires more generation') }}
-                        </p>
+                        @if($multiShotCount === 0)
+                            <p style="color: rgba(16, 185, 129, 0.8); font-size: 0.65rem; margin-top: 0.35rem;">
+                                🤖 {{ __('AI will analyze the scene and determine optimal shot count and durations') }}
+                            </p>
+                        @else
+                            <p style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.35rem;">
+                                💡 {{ __('Manual: :count shots with uniform duration', ['count' => $multiShotCount]) }}
+                            </p>
+                        @endif
                     </div>
 
                     {{-- Shot Types Preview --}}
                     <div style="margin-bottom: 0.75rem;">
                         <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.75rem; margin-bottom: 0.35rem;">{{ __('Shot Sequence Preview') }}</label>
-                        <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                            @php
-                                $shotTypes = [
-                                    ['type' => 'establishing', 'icon' => '🏔️', 'label' => 'Establishing'],
-                                    ['type' => 'medium', 'icon' => '👤', 'label' => 'Medium'],
-                                    ['type' => 'close-up', 'icon' => '🔍', 'label' => 'Close-up'],
-                                    ['type' => 'reaction', 'icon' => '😮', 'label' => 'Reaction'],
-                                    ['type' => 'detail', 'icon' => '✨', 'label' => 'Detail'],
-                                    ['type' => 'wide', 'icon' => '🌄', 'label' => 'Wide'],
-                                ];
-                            @endphp
-                            @for($i = 0; $i < $multiShotCount; $i++)
-                                @php $shot = $shotTypes[$i % count($shotTypes)]; @endphp
-                                <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.375rem; padding: 0.35rem 0.5rem; text-align: center;">
-                                    <div style="font-size: 1rem;">{{ $shot['icon'] }}</div>
-                                    <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">{{ __($shot['label']) }}</div>
+                        @if($multiShotCount === 0)
+                            {{-- AI Mode Preview --}}
+                            <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.5rem; padding: 0.75rem; text-align: center;">
+                                <div style="font-size: 1.5rem; margin-bottom: 0.35rem;">🤖</div>
+                                <div style="color: rgba(255,255,255,0.8); font-size: 0.75rem; font-weight: 500;">{{ __('AI Shot Intelligence') }}</div>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.25rem;">
+                                    {{ __('Analyzes scene content to determine:') }}
                                 </div>
-                            @endfor
-                        </div>
+                                <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.5rem; flex-wrap: wrap;">
+                                    <span style="background: rgba(139,92,246,0.2); color: #a78bfa; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.55rem;">📊 {{ __('Optimal shot count') }}</span>
+                                    <span style="background: rgba(6,182,212,0.2); color: #67e8f9; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.55rem;">⏱️ {{ __('Per-shot duration') }}</span>
+                                    <span style="background: rgba(251,191,36,0.2); color: #fbbf24; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.55rem;">💬 {{ __('Lip-sync needs') }}</span>
+                                </div>
+                            </div>
+                        @else
+                            {{-- Manual Mode Preview --}}
+                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                                @php
+                                    $shotTypes = [
+                                        ['type' => 'establishing', 'icon' => '🏔️', 'label' => 'Establishing'],
+                                        ['type' => 'medium', 'icon' => '👤', 'label' => 'Medium'],
+                                        ['type' => 'close-up', 'icon' => '🔍', 'label' => 'Close-up'],
+                                        ['type' => 'reaction', 'icon' => '😮', 'label' => 'Reaction'],
+                                        ['type' => 'detail', 'icon' => '✨', 'label' => 'Detail'],
+                                        ['type' => 'wide', 'icon' => '🌄', 'label' => 'Wide'],
+                                    ];
+                                @endphp
+                                @for($i = 0; $i < $multiShotCount; $i++)
+                                    @php $shot = $shotTypes[$i % count($shotTypes)]; @endphp
+                                    <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.375rem; padding: 0.35rem 0.5rem; text-align: center;">
+                                        <div style="font-size: 1rem;">{{ $shot['icon'] }}</div>
+                                        <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">{{ __($shot['label']) }}</div>
+                                    </div>
+                                @endfor
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Decompose Button --}}
@@ -307,12 +336,35 @@ window.multiShotVideoPolling = function() {
                         $videosReady = collect($decomposed['shots'])->filter(fn($s) => ($s['videoStatus'] ?? '') === 'ready' && !empty($s['videoUrl']))->count();
                     @endphp
 
-                    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.5rem; padding: 0.6rem; margin-bottom: 0.6rem;">
+                    @php
+                        // Check if this was AI-generated
+                        $firstShot = $decomposed['shots'][0] ?? [];
+                        $isAiGenerated = $firstShot['aiRecommended'] ?? false;
+                        $aiReasoning = $firstShot['aiReasoning'] ?? '';
+                        $hasVariableDurations = count(array_unique(array_column($decomposed['shots'], 'duration'))) > 1;
+                        $lipSyncCount = collect($decomposed['shots'])->filter(fn($s) => $s['needsLipSync'] ?? false)->count();
+                    @endphp
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid {{ $isAiGenerated ? 'rgba(16, 185, 129, 0.4)' : 'rgba(139,92,246,0.3)' }}; border-radius: 0.5rem; padding: 0.6rem; margin-bottom: 0.6rem;">
                         {{-- Header with stats --}}
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                                 <span style="color: white; font-weight: 600; font-size: 0.85rem;">📽️ {{ count($decomposed['shots']) }} SHOTS</span>
                                 <span style="color: rgba(255,255,255,0.5); font-size: 0.7rem;">• {{ $totalDuration }}s</span>
+                                @if($isAiGenerated)
+                                    <span style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(6, 182, 212, 0.3)); color: #10b981; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-size: 0.55rem; font-weight: 600;" title="{{ $aiReasoning }}">
+                                        🤖 AI
+                                    </span>
+                                @endif
+                                @if($hasVariableDurations)
+                                    <span style="background: rgba(139,92,246,0.2); color: #a78bfa; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-size: 0.55rem;">
+                                        ⏱️ {{ __('Variable') }}
+                                    </span>
+                                @endif
+                                @if($lipSyncCount > 0)
+                                    <span style="background: rgba(251,191,36,0.2); color: #fbbf24; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-size: 0.55rem;">
+                                        💬 {{ $lipSyncCount }} {{ __('lip-sync') }}
+                                    </span>
+                                @endif
                             </div>
                             <div style="display: flex; gap: 0.5rem;">
                                 <span style="font-size: 0.65rem; color: rgba(16, 185, 129, 0.9);">
@@ -323,6 +375,15 @@ window.multiShotVideoPolling = function() {
                                 </span>
                             </div>
                         </div>
+                        {{-- AI Reasoning (if available) --}}
+                        @if($isAiGenerated && $aiReasoning)
+                            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 0.35rem; padding: 0.4rem; margin-bottom: 0.5rem;">
+                                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.7);">
+                                    <span style="color: #10b981; font-weight: 600;">🤖 {{ __('AI Analysis:') }}</span>
+                                    {{ Str::limit($aiReasoning, 150) }}
+                                </div>
+                            </div>
+                        @endif
 
                         {{-- Duration Timeline Visual --}}
                         <div style="display: flex; height: 24px; border-radius: 0.375rem; overflow: hidden; background: rgba(0,0,0,0.4);">
@@ -419,10 +480,27 @@ window.multiShotVideoPolling = function() {
                                             'music' => ['icon' => '🎵', 'label' => __('Music'), 'bg' => 'rgba(59, 130, 246, 0.7)'],
                                         ];
                                         $audio = $audioConfig[$audioType];
+                                        $shotNeedsLipSync = $shot['needsLipSync'] ?? false;
+                                        $shotAiRecommended = $shot['aiRecommended'] ?? false;
+                                        $shotRecommendedModel = $shot['aiRecommendedModel'] ?? null;
                                     @endphp
                                     <div style="position: absolute; top: 1.5rem; right: 0.25rem; background: {{ $audio['bg'] }}; color: white; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.45rem; z-index: 2; display: flex; align-items: center; gap: 0.1rem;">
                                         {{ $audio['icon'] }} {{ $audio['label'] }}
                                     </div>
+
+                                    {{-- Lip-Sync Badge (AI detected this shot needs lip-sync) --}}
+                                    @if($shotNeedsLipSync)
+                                        <div style="position: absolute; top: 2.4rem; right: 0.25rem; background: rgba(251, 146, 60, 0.9); color: white; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.45rem; z-index: 2;" title="{{ __('AI recommends Multitalk for this dialogue shot') }}">
+                                            👄 {{ __('Lip-Sync') }}
+                                        </div>
+                                    @endif
+
+                                    {{-- AI Recommended Badge --}}
+                                    @if($shotAiRecommended)
+                                        <div style="position: absolute; bottom: 0.25rem; left: 0.25rem; background: rgba(16, 185, 129, 0.8); color: white; padding: 0.1rem 0.25rem; border-radius: 0.2rem; font-size: 0.4rem; z-index: 2;">
+                                            🤖
+                                        </div>
+                                    @endif
 
                                     {{-- Transferred Badge (positioned below audio badge) --}}
                                     @if($wasTransferred)
@@ -523,15 +601,19 @@ window.multiShotVideoPolling = function() {
                                         @endif
 
                                         {{-- Duration Control --}}
+                                        @php
+                                            $selectedModel = $shot['selectedVideoModel'] ?? 'minimax';
+                                            $shotAvailableDurations = $this->getAvailableDurations($selectedModel);
+                                        @endphp
                                         <div style="font-size: 0.5rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.25rem; padding: 0.25rem; margin-bottom: 0.3rem;">
                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
                                                 <span style="color: #3b82f6; font-weight: 600;">⏱️ {{ __('Duration') }}</span>
                                                 <span style="color: {{ $durationColor }}; font-weight: 500;">{{ $shotDuration }}s</span>
                                             </div>
                                             <div style="display: flex; gap: 0.2rem; margin-bottom: 0.15rem;">
-                                                @foreach([5, 6, 10] as $dur)
+                                                @foreach($shotAvailableDurations as $dur)
                                                     @php
-                                                        $durColor = $dur === 5 ? 'rgba(34, 197, 94' : ($dur === 6 ? 'rgba(234, 179, 8' : 'rgba(59, 130, 246');
+                                                        $durColor = $dur <= 5 ? 'rgba(34, 197, 94' : ($dur <= 6 ? 'rgba(234, 179, 8' : 'rgba(59, 130, 246');
                                                         $isSelected = $shotDuration === $dur;
                                                     @endphp
                                                     <button type="button"
@@ -766,9 +848,8 @@ window.multiShotVideoPolling = function() {
             <div style="margin-bottom: 1rem;">
                 <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.75rem; margin-bottom: 0.4rem;">{{ __('Duration') }}</label>
                 @php
-                    // MiniMax supports 5s, 6s, 10s durations
-                    // Multitalk supports variable durations up to 20s
-                    $availableDurations = $currentModel === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+                    // Get durations from dynamic settings
+                    $availableDurations = $this->getAvailableDurations($currentModel);
                 @endphp
                 <div style="display: flex; gap: 0.35rem;">
                     @foreach($availableDurations as $dur)
@@ -783,9 +864,10 @@ window.multiShotVideoPolling = function() {
                         </button>
                     @endforeach
                 </div>
-                @if($currentModel === 'minimax')
-                    <div style="margin-top: 0.35rem; font-size: 0.6rem; color: rgba(255,255,255,0.5);">💡 {{ __('6s recommended for most shots') }}</div>
-                @endif
+                @php
+                    $defaultDuration = $this->getDefaultDuration($currentModel);
+                @endphp
+                <div style="margin-top: 0.35rem; font-size: 0.6rem; color: rgba(255,255,255,0.5);">💡 {{ __(':duration s recommended for most shots', ['duration' => $defaultDuration]) }}</div>
             </div>
 
             {{-- Generate Button --}}
