@@ -832,9 +832,21 @@ class VideoWizard extends Component
             $this->concept = array_merge($this->concept, $project->concept);
         }
         if ($project->script) {
+            // DEBUG: Log scenes before and after merge
+            $dbSceneCount = count($project->script['scenes'] ?? []);
+            $memorySceneCountBefore = count($this->script['scenes'] ?? []);
+
             $this->script = array_merge($this->script, $project->script);
             // Sanitize loaded script data to prevent type errors in views
             $this->sanitizeScriptData();
+
+            Log::info('VideoWizard: loadProject script data', [
+                'projectId' => $project->id,
+                'dbSceneCount' => $dbSceneCount,
+                'memorySceneCountBefore' => $memorySceneCountBefore,
+                'memorySceneCountAfter' => count($this->script['scenes'] ?? []),
+                'firstSceneId' => $this->script['scenes'][0]['id'] ?? 'N/A',
+            ]);
         }
         if ($project->storyboard) {
             $this->storyboard = array_merge($this->storyboard, $project->storyboard);
@@ -875,6 +887,18 @@ class VideoWizard extends Component
                             $batch['status'] = 'pending';
                         }
                     }
+                }
+
+                // DEBUG: Log mismatch between generation state and actual scenes
+                $generatedCount = $this->scriptGeneration['generatedSceneCount'] ?? 0;
+                $actualCount = count($this->script['scenes'] ?? []);
+                if ($generatedCount !== $actualCount) {
+                    Log::warning('VideoWizard: SCENE COUNT MISMATCH detected', [
+                        'projectId' => $project->id,
+                        'scriptGeneration.generatedSceneCount' => $generatedCount,
+                        'actual script.scenes count' => $actualCount,
+                        'scriptGeneration.status' => $this->scriptGeneration['status'] ?? 'unknown',
+                    ]);
                 }
             }
 

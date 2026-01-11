@@ -1807,6 +1807,23 @@
         @endif
     </div>
 
+    {{-- DEBUG: Scene data diagnostics (remove after fixing) --}}
+    @if($scriptGeneration['status'] === 'complete')
+        <div style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; font-family: monospace; font-size: 0.8rem;">
+            <strong style="color: #f87171;">DEBUG - Scene Data Diagnostics:</strong><br>
+            <span style="color: rgba(255,255,255,0.8);">
+                scriptGeneration.generatedSceneCount: {{ $scriptGeneration['generatedSceneCount'] ?? 'N/A' }}<br>
+                script.scenes count: {{ count($script['scenes'] ?? []) }}<br>
+                script.scenes is_array: {{ is_array($script['scenes'] ?? null) ? 'true' : 'false' }}<br>
+                script.scenes empty check: {{ empty($script['scenes']) ? 'EMPTY' : 'HAS DATA' }}<br>
+                @if(!empty($script['scenes']))
+                    First scene ID: {{ $script['scenes'][0]['id'] ?? 'N/A' }}<br>
+                    First scene title: {{ $script['scenes'][0]['title'] ?? 'N/A' }}
+                @endif
+            </span>
+        </div>
+    @endif
+
     {{-- Script Results (shown after generation) --}}
     @if(!empty($script['scenes']) && count($script['scenes']) > 0)
         @php
@@ -2020,6 +2037,7 @@
                     $moodDisplay = is_array($moodDisplay) ? '' : strval($moodDisplay);
                 @endphp
                 <div class="vw-advanced-scene-card"
+                     wire:key="scene-card-{{ $sceneId }}"
                      x-data="{ expanded: false }"
                      :class="{ 'expanded': expanded }">
                     {{-- Scene Header (Clickable to expand) --}}
