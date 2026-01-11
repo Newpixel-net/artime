@@ -16,6 +16,8 @@ use Modules\AppVideoWizard\Services\CharacterExtractionService;
 use Modules\AppVideoWizard\Services\LocationExtractionService;
 use Modules\AppVideoWizard\Services\CinematographyService;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
+use Modules\AppVideoWizard\Models\VwSetting;
+use Modules\AppVideoWizard\Services\ShotIntelligenceService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -522,10 +524,11 @@ class VideoWizard extends Component
     // Multi-Shot Mode state (Hollywood-style scene → shots architecture)
     // Each scene is decomposed into multiple shots (5-10s clips)
     // Structure matches original video-creation-wizard.html
+    // NOTE: defaultShotCount is now loaded dynamically from VwSetting in mount()
     public array $multiShotMode = [
         'enabled' => false,
-        'defaultShotCount' => 3,          // Default shots per scene (2-6)
-        'autoDecompose' => false,         // Auto-decompose scenes when enabled
+        'defaultShotCount' => 3,          // Default shots per scene (dynamic from VwSetting)
+        'autoDecompose' => false,         // Auto-decompose scenes when enabled (dynamic from VwSetting)
         'decomposedScenes' => [],         // { sceneId: { shots: [], consistencyAnchors: {}, status: 'pending'|'ready' } }
         'batchStatus' => null,            // Batch decomposition status
         'globalVisualProfile' => null,    // Global visual style for all shots
@@ -556,7 +559,7 @@ class VideoWizard extends Component
 
     public bool $showMultiShotModal = false;
     public int $multiShotSceneIndex = 0;
-    public int $multiShotCount = 3;
+    public int $multiShotCount = 0; // 0 = AI mode (default), >0 = manual shot count
 
     // Shot Preview Modal state
     public bool $showShotPreviewModal = false;
@@ -702,11 +705,142 @@ class VideoWizard extends Component
      */
     public function mount($project = null)
     {
+        // Load dynamic settings from database (VwSetting)
+        $this->loadDynamicSettings();
+
         // Handle both WizardProject instance and null
         if ($project instanceof WizardProject && $project->exists) {
             $this->loadProject($project);
             $this->recoverPendingJobs($project);
         }
+    }
+
+    /**
+     * Load dynamic settings from VwSetting model.
+     * This initializes all configurable values from the admin panel.
+     */
+    protected function loadDynamicSettings(): void
+    {
+        try {
+            // Shot Intelligence settings
+            $this->multiShotMode['defaultShotCount'] = (int) VwSetting::getValue('shot_default_count', 3);
+            $this->multiShotMode['autoDecompose'] = (bool) VwSetting::getValue('scene_auto_decompose', false);
+            // Default to AI mode (0) instead of manual shot count
+            $this->multiShotCount = 0;
+
+            // Log that settings were loaded (helpful for debugging)
+            Log::debug('VideoWizard: Dynamic settings loaded', [
+                'defaultShotCount' => $this->multiShotMode['defaultShotCount'],
+                'autoDecompose' => $this->multiShotMode['autoDecompose'],
+            ]);
+        } catch (\Throwable $e) {
+            // If VwSetting table doesn't exist yet, use defaults
+            Log::warning('VideoWizard: Could not load dynamic settings, using defaults', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Get a dynamic setting value with fallback.
+     * This is the main entry point for accessing VwSetting values.
+     *
+     * @param string $slug Setting slug
+     * @param mixed $default Default value if setting not found
+     * @return mixed
+     */
+    protected function getDynamicSetting(string $slug, mixed $default = null): mixed
+    {
+        try {
+            return VwSetting::getValue($slug, $default);
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    }
+
+    /**
+     * Get shot count limits from dynamic settings.
+     *
+     * @return array ['min' => int, 'max' => int, 'default' => int]
+     */
+    protected function getShotCountLimits(): array
+    {
+        return [
+            'min' => (int) $this->getDynamicSetting('shot_min_per_scene', 1),
+            'max' => (int) $this->getDynamicSetting('shot_max_per_scene', 20),
+            'default' => (int) $this->getDynamicSetting('shot_default_count', 3),
+        ];
+    }
+
+    /**
+     * Get available durations for an animation model from dynamic settings.
+     *
+     * @param string $model 'minimax' or 'multitalk'
+     * @return array Array of available durations in seconds
+     */
+    public function getAvailableDurations(string $model = 'minimax'): array
+    {
+        $settingSlug = $model === 'multitalk'
+            ? 'animation_multitalk_durations'
+            : 'animation_minimax_durations';
+
+        $defaults = $model === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+
+        $durations = $this->getDynamicSetting($settingSlug, $defaults);
+
+        // Ensure we have an array of integers
+        if (is_string($durations)) {
+            $durations = json_decode($durations, true) ?? $defaults;
+        }
+
+        return array_map('intval', (array) $durations);
+    }
+
+    /**
+     * Get default duration for an animation model from dynamic settings.
+     *
+     * @param string $model 'minimax' or 'multitalk'
+     * @return int Default duration in seconds
+     */
+    public function getDefaultDuration(string $model = 'minimax'): int
+    {
+        $settingSlug = $model === 'multitalk'
+            ? 'animation_multitalk_default_duration'
+            : 'animation_minimax_default_duration';
+
+        $default = $model === 'multitalk' ? 10 : 6;
+
+        return (int) $this->getDynamicSetting($settingSlug, $default);
+    }
+
+    /**
+     * Check if AI Shot Intelligence is enabled.
+     *
+     * @return bool
+     */
+    protected function isAiShotIntelligenceEnabled(): bool
+    {
+        return (bool) $this->getDynamicSetting('shot_intelligence_enabled', true);
+    }
+
+    /**
+     * Check if per-shot duration is enabled.
+     *
+     * @return bool
+     */
+    protected function isPerShotDurationEnabled(): bool
+    {
+        return (bool) $this->getDynamicSetting('duration_per_shot_enabled', true);
+    }
+
+    /**
+     * Check if frame chaining is enabled.
+     *
+     * @return bool
+     */
+    protected function isFrameChainingEnabled(): bool
+    {
+        return (bool) $this->getDynamicSetting('frame_chaining_enabled', true);
     }
 
     /**
@@ -1999,7 +2133,9 @@ class VideoWizard extends Component
      */
     public function setClipDuration(string $duration): void
     {
-        $validDurations = ['5s', '6s', '10s'];
+        // Get valid durations dynamically from settings
+        $validDurations = array_map(fn($d) => $d . 's', $this->getAvailableDurations('minimax'));
+
         if (in_array($duration, $validDurations)) {
             $this->content['videoModel']['duration'] = $duration;
             $this->script['timing']['clipDuration'] = $this->getClipDuration();
@@ -4555,7 +4691,7 @@ class VideoWizard extends Component
     {
         $this->sceneMemory['locationBible']['locations'][] = [
             'id' => uniqid('loc_'),
-            'name' => $name,
+            'name' => $name ?: __('New Location'),
             'type' => 'exterior',
             'timeOfDay' => 'day',
             'weather' => 'clear',
@@ -4568,6 +4704,8 @@ class VideoWizard extends Component
             'referenceImageMimeType' => null,    // MIME type (e.g., 'image/png')
             'referenceImageStatus' => 'none',    // 'none' | 'generating' | 'ready' | 'error'
         ];
+        // Auto-select the newly added location for editing
+        $this->editingLocationIndex = count($this->sceneMemory['locationBible']['locations']) - 1;
         $this->saveProject();
     }
 
@@ -5542,10 +5680,16 @@ class VideoWizard extends Component
             ],
         ];
 
+        // Reset multiShotMode with dynamic defaults from settings
         $this->multiShotMode = [
             'enabled' => false,
-            'defaultShotCount' => 3,
+            'defaultShotCount' => (int) $this->getDynamicSetting('shot_default_count', 3),
+            'autoDecompose' => (bool) $this->getDynamicSetting('scene_auto_decompose', false),
+            'decomposedScenes' => [],
+            'batchStatus' => null,
+            'globalVisualProfile' => null,
         ];
+        $this->multiShotCount = 0; // Default to AI mode
 
         $this->conceptVariations = [];
         $this->selectedConceptIndex = 0;
@@ -7909,14 +8053,14 @@ EOT;
 
     /**
      * Open Location Bible modal.
+     * Note: Does NOT auto-add placeholder location - let auto-detection populate
+     * or user can click "Add Location" button manually.
      */
     public function openLocationBibleModal(): void
     {
         $this->showLocationBibleModal = true;
-        if (empty($this->sceneMemory['locationBible']['locations'])) {
-            $this->addLocation('New Location', '');
-        }
-        $this->editingLocationIndex = 0;
+        // Set editing index to first location if exists, otherwise -1
+        $this->editingLocationIndex = !empty($this->sceneMemory['locationBible']['locations']) ? 0 : -1;
     }
 
     /**
@@ -8220,7 +8364,9 @@ EOT;
      */
     public function setMultiShotCount(int $count): void
     {
-        $this->multiShotMode['defaultShotCount'] = max(2, min(6, $count));
+        // Use dynamic limits from VwSetting
+        $limits = $this->getShotCountLimits();
+        $this->multiShotMode['defaultShotCount'] = max($limits['min'], min($limits['max'], $count));
         $this->multiShotCount = $this->multiShotMode['defaultShotCount'];
         $this->saveProject();
     }
@@ -8231,7 +8377,8 @@ EOT;
     public function openMultiShotModal(int $sceneIndex): void
     {
         $this->multiShotSceneIndex = $sceneIndex;
-        $this->multiShotCount = $this->multiShotMode['defaultShotCount'];
+        // Default to AI mode (0) when opening modal
+        $this->multiShotCount = 0;
         $this->showMultiShotModal = true;
     }
 
@@ -8249,7 +8396,7 @@ EOT;
 
     /**
      * Decompose scene into multiple shots.
-     * Uses Hollywood Math: shots = sceneDuration / clipDuration
+     * Uses AI Shot Intelligence when enabled, otherwise Hollywood Math: shots = sceneDuration / clipDuration
      */
     public function decomposeScene(int $sceneIndex): void
     {
@@ -8264,77 +8411,17 @@ EOT;
 
             // Get visual description for decomposition
             $visualDescription = $scene['visualDescription'] ?? $scene['visual'] ?? $scene['narration'] ?? '';
-
-            // Hollywood-style timing from Phase 1
-            $clipDuration = $this->getClipDuration(); // 5s, 6s, or 10s
-            $sceneDuration = $scene['duration'] ?? ($this->script['timing']['sceneDuration'] ?? 35);
-
-            // Hollywood Math: Calculate shot count based on scene duration and clip duration
-            // For a 35s scene with 10s clips = ~4 shots
-            $calculatedShotCount = max(2, min(6, (int) ceil($sceneDuration / $clipDuration)));
-
-            // Use calculated count or user-selected count (whichever is appropriate)
-            $shotCount = $this->multiShotCount > 0 ? $this->multiShotCount : $calculatedShotCount;
-            $baseShotDuration = $clipDuration;
-
-            $shots = [];
             $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
 
-            for ($i = 0; $i < $shotCount; $i++) {
-                // Pass scene for narrative-based shot selection
-                $shotType = $this->getShotTypeForIndex($i, $shotCount, $scene);
-                $cameraMovement = $this->getCameraMovementForShot($shotType['type'], $i);
+            // Check if AI Shot Intelligence is enabled
+            $useAI = $this->isAiShotIntelligenceEnabled() && $this->multiShotCount <= 0;
 
-                // Build comprehensive shot structure matching original wizard schema
-                $shots[] = [
-                    // Identification
-                    'id' => "shot-{$sceneId}-{$i}",
-                    'sceneId' => $sceneId,
-                    'index' => $i,
-
-                    // Shot type and description
-                    'type' => $shotType['type'],
-                    'shotType' => $shotType['type'],
-                    'description' => $shotType['description'],
-                    'purpose' => $shotType['purpose'] ?? 'narrative',
-                    'lens' => $shotType['lens'] ?? 'standard 50mm',
-
-                    // Prompts for generation
-                    'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
-                    'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
-                    'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i), // Legacy compat
-
-                    // Image state
-                    'imageUrl' => null,
-                    'imageStatus' => 'pending',  // 'pending' | 'generating' | 'ready' | 'error'
-                    'status' => 'pending',       // Legacy compat
-
-                    // Video state
-                    'videoUrl' => null,
-                    'videoStatus' => 'pending',  // 'pending' | 'generating' | 'ready' | 'error'
-
-                    // Frame chain (Hollywood-style shot continuity)
-                    'fromSceneImage' => $i === 0,  // Shot 1 uses scene's main image
-                    'fromFrameCapture' => $i > 0,  // Shots 2+ use previous shot's last frame
-                    'capturedFrameUrl' => null,    // URL of captured frame for chaining
-
-                    // Timing
-                    'duration' => $baseShotDuration,
-                    'selectedDuration' => $baseShotDuration,
-                    'durationClass' => $baseShotDuration <= 5 ? 'short' : ($baseShotDuration <= 6 ? 'standard' : 'cinematic'),
-
-                    // Camera movement
-                    'cameraMovement' => $cameraMovement,
-
-                    // Audio layer (for dialogue distribution)
-                    'dialogue' => $this->getDialogueForShot($scene, $i, $shotCount),
-                    'speakingCharacters' => [],
-
-                    // Motion/Action description
-                    'narrativeBeat' => [
-                        'motionDescription' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
-                    ],
-                ];
+            if ($useAI) {
+                // Use AI-driven shot analysis
+                $shots = $this->decomposeSceneWithAI($scene, $sceneIndex, $visualDescription);
+            } else {
+                // Use traditional Hollywood Math calculation
+                $shots = $this->decomposeSceneTraditional($scene, $sceneIndex, $visualDescription);
             }
 
             // Calculate total duration for all shots
@@ -8368,13 +8455,238 @@ EOT;
             }
 
             $this->saveProject();
-            $this->showMultiShotModal = false;
+            // Keep modal open to show the decomposed results
+            $this->showMultiShotModal = true;
 
         } catch (\Exception $e) {
             $this->error = __('Failed to decompose scene: ') . $e->getMessage();
         } finally {
             $this->isLoading = false;
         }
+    }
+
+    /**
+     * Decompose scene using AI Shot Intelligence.
+     * Analyzes scene content to determine optimal shot breakdown.
+     */
+    protected function decomposeSceneWithAI(array $scene, int $sceneIndex, string $visualDescription): array
+    {
+        $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
+
+        // Build context for AI analysis
+        $context = [
+            'genre' => $this->content['genre'] ?? 'general',
+            'pacing' => $this->content['pacing'] ?? 'balanced',
+            'mood' => $scene['mood'] ?? 'neutral',
+            'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
+            'characters' => array_keys($this->sceneMemory['characterBible']['characters'] ?? []),
+        ];
+
+        // Call AI Shot Intelligence Service
+        $service = new ShotIntelligenceService();
+        $analysis = $service->analyzeScene($scene, $context);
+
+        Log::info('VideoWizard: AI Shot Intelligence analysis complete', [
+            'scene_id' => $sceneId,
+            'shot_count' => $analysis['shotCount'],
+            'source' => $analysis['source'] ?? 'ai',
+            'reasoning' => $analysis['reasoning'] ?? '',
+        ]);
+
+        // Convert AI analysis to shot structures
+        $shots = [];
+        foreach ($analysis['shots'] as $i => $aiShot) {
+            $shotType = $this->getShotTypeForIndex($i, $analysis['shotCount'], $scene);
+
+            // Override with AI recommendations
+            if (!empty($aiShot['type'])) {
+                $shotType['type'] = $aiShot['type'];
+            }
+            if (!empty($aiShot['description'])) {
+                $shotType['description'] = $aiShot['description'];
+            }
+            if (!empty($aiShot['purpose'])) {
+                $shotType['purpose'] = $aiShot['purpose'];
+            }
+            if (!empty($aiShot['lens'])) {
+                $shotType['lens'] = $aiShot['lens'];
+            }
+
+            $cameraMovement = $aiShot['cameraMovement'] ?? $this->getCameraMovementForShot($shotType['type'], $i);
+            $duration = $aiShot['duration'] ?? $this->getClipDuration();
+
+            // Determine video model based on AI recommendation
+            $needsLipSync = $aiShot['needsLipSync'] ?? false;
+            $recommendedModel = $aiShot['recommendedModel'] ?? ($needsLipSync ? 'multitalk' : 'minimax');
+
+            // Auto-select model if enabled
+            $autoSelectModel = (bool) $this->getDynamicSetting('animation_auto_select_model', true);
+            $selectedVideoModel = $autoSelectModel && $needsLipSync ? 'multitalk' : 'minimax';
+
+            $shots[] = [
+                // Identification
+                'id' => "shot-{$sceneId}-{$i}",
+                'sceneId' => $sceneId,
+                'index' => $i,
+
+                // Shot type and description
+                'type' => $shotType['type'],
+                'shotType' => $shotType['type'],
+                'description' => $shotType['description'],
+                'purpose' => $shotType['purpose'],
+                'lens' => $shotType['lens'],
+
+                // Prompts for generation
+                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+                'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
+                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+
+                // Image state
+                'imageUrl' => null,
+                'imageStatus' => 'pending',
+                'status' => 'pending',
+
+                // Video state
+                'videoUrl' => null,
+                'videoStatus' => 'pending',
+
+                // Frame chain
+                'fromSceneImage' => $i === 0,
+                'fromFrameCapture' => $i > 0,
+                'capturedFrameUrl' => null,
+
+                // Timing - uses AI-recommended duration
+                'duration' => $duration,
+                'selectedDuration' => $duration,
+                'durationClass' => $this->getDurationClass($duration),
+
+                // Camera movement
+                'cameraMovement' => $cameraMovement,
+
+                // Video model selection
+                'selectedVideoModel' => $selectedVideoModel,
+                'needsLipSync' => $needsLipSync,
+                'aiRecommendedModel' => $recommendedModel,
+
+                // Audio layer
+                'dialogue' => $this->getDialogueForShot($scene, $i, count($analysis['shots'])),
+                'speakingCharacters' => [],
+
+                // AI metadata
+                'aiRecommended' => $aiShot['aiRecommended'] ?? true,
+                'aiReasoning' => $analysis['reasoning'] ?? '',
+
+                // Motion/Action description
+                'narrativeBeat' => [
+                    'motionDescription' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
+                ],
+            ];
+        }
+
+        return $shots;
+    }
+
+    /**
+     * Decompose scene using traditional Hollywood Math.
+     * Fallback when AI is disabled or unavailable.
+     */
+    protected function decomposeSceneTraditional(array $scene, int $sceneIndex, string $visualDescription): array
+    {
+        $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
+        $clipDuration = $this->getClipDuration();
+        $sceneDuration = $scene['duration'] ?? ($this->script['timing']['sceneDuration'] ?? 35);
+
+        // Get dynamic shot count limits from VwSetting
+        $shotLimits = $this->getShotCountLimits();
+
+        // Hollywood Math: Calculate shot count based on scene duration and clip duration
+        $calculatedShotCount = max(
+            $shotLimits['min'],
+            min($shotLimits['max'], (int) ceil($sceneDuration / $clipDuration))
+        );
+
+        // Use calculated count or user-selected count
+        $shotCount = $this->multiShotCount > 0 ? $this->multiShotCount : $calculatedShotCount;
+        $baseShotDuration = $clipDuration;
+
+        $shots = [];
+
+        for ($i = 0; $i < $shotCount; $i++) {
+            $shotType = $this->getShotTypeForIndex($i, $shotCount, $scene);
+            $cameraMovement = $this->getCameraMovementForShot($shotType['type'], $i);
+
+            $shots[] = [
+                // Identification
+                'id' => "shot-{$sceneId}-{$i}",
+                'sceneId' => $sceneId,
+                'index' => $i,
+
+                // Shot type and description
+                'type' => $shotType['type'],
+                'shotType' => $shotType['type'],
+                'description' => $shotType['description'],
+                'purpose' => $shotType['purpose'] ?? 'narrative',
+                'lens' => $shotType['lens'] ?? 'standard 50mm',
+
+                // Prompts for generation
+                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+                'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
+                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i),
+
+                // Image state
+                'imageUrl' => null,
+                'imageStatus' => 'pending',
+                'status' => 'pending',
+
+                // Video state
+                'videoUrl' => null,
+                'videoStatus' => 'pending',
+
+                // Frame chain
+                'fromSceneImage' => $i === 0,
+                'fromFrameCapture' => $i > 0,
+                'capturedFrameUrl' => null,
+
+                // Timing
+                'duration' => $baseShotDuration,
+                'selectedDuration' => $baseShotDuration,
+                'durationClass' => $this->getDurationClass($baseShotDuration),
+
+                // Camera movement
+                'cameraMovement' => $cameraMovement,
+
+                // Video model (default)
+                'selectedVideoModel' => 'minimax',
+                'needsLipSync' => false,
+
+                // Audio layer
+                'dialogue' => $this->getDialogueForShot($scene, $i, $shotCount),
+                'speakingCharacters' => [],
+
+                // AI metadata
+                'aiRecommended' => false,
+
+                // Motion/Action description
+                'narrativeBeat' => [
+                    'motionDescription' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription),
+                ],
+            ];
+        }
+
+        return $shots;
+    }
+
+    /**
+     * Get duration class label based on duration in seconds.
+     */
+    protected function getDurationClass(int $duration): string
+    {
+        return match(true) {
+            $duration <= 5 => 'short',
+            $duration <= 6 => 'standard',
+            $duration <= 10 => 'cinematic',
+            default => 'extended',
+        };
     }
 
     /**
@@ -8781,9 +9093,23 @@ EOT;
             $parts[] = trim($lightingHint);
         }
 
-        // 5. Visual context snippet (keep under 100 chars for optimal AI processing)
+        // 5. Visual context from scene description
+        // Modern video AI models (MiniMax, Runway) handle longer prompts well
+        // Use word-boundary truncation to avoid cutting mid-word
         if (strlen($visualDescription) > 20) {
-            $contextSnippet = substr($visualDescription, 0, 80);
+            $maxLength = 250; // Generous limit for scene context
+            if (strlen($visualDescription) > $maxLength) {
+                // Find the last space before the limit to avoid cutting mid-word
+                $truncated = substr($visualDescription, 0, $maxLength);
+                $lastSpace = strrpos($truncated, ' ');
+                if ($lastSpace !== false && $lastSpace > $maxLength * 0.7) {
+                    $contextSnippet = substr($truncated, 0, $lastSpace);
+                } else {
+                    $contextSnippet = $truncated;
+                }
+            } else {
+                $contextSnippet = $visualDescription;
+            }
             $parts[] = $contextSnippet;
         }
 
@@ -9920,9 +10246,9 @@ PROMPT;
 
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedVideoModel'] = $model;
 
-        // Adjust duration based on model
+        // Adjust duration based on model - using dynamic durations from settings
         $currentDuration = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] ?? 6;
-        $validDurations = $model === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+        $validDurations = $this->getAvailableDurations($model);
 
         if (!in_array($currentDuration, $validDurations)) {
             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] = $validDurations[0];
@@ -10213,21 +10539,23 @@ PROMPT;
             return;
         }
 
-        // Validate duration (5s, 6s, or 10s for video models)
-        $validDurations = [5, 6, 10];
+        // Get valid durations dynamically based on selected model
+        $selectedModel = $decomposed['shots'][$shotIndex]['selectedVideoModel'] ?? 'minimax';
+        $validDurations = $this->getAvailableDurations($selectedModel);
+
         if (!in_array($duration, $validDurations)) {
-            $duration = 10; // Default to cinematic
+            $duration = $this->getDefaultDuration($selectedModel);
         }
 
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedDuration'] = $duration;
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['duration'] = $duration;
 
-        // Update duration class
-        $durationClass = match($duration) {
-            5 => 'short',
-            6 => 'standard',
-            10 => 'cinematic',
-            default => 'standard',
+        // Update duration class dynamically
+        $durationClass = match(true) {
+            $duration <= 5 => 'short',
+            $duration <= 6 => 'standard',
+            $duration <= 10 => 'cinematic',
+            default => 'extended', // For Multitalk 15s, 20s
         };
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['durationClass'] = $durationClass;
 
