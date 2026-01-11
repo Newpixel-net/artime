@@ -21,27 +21,23 @@ class AnimationService
 
     /**
      * Available animation models with their configurations.
+     *
+     * Note: MiniMax video-01 generates ~5-6 second videos.
+     * The API doesn't accept a duration parameter - duration is fixed by the model.
      */
     public const ANIMATION_MODELS = [
         'minimax' => [
             'name' => 'MiniMax',
-            'description' => 'High quality I2V, recommended for most scenes',
-            'durations' => [5, 6],
+            'description' => 'High quality I2V animation',
+            'durations' => [5, 6],  // video-01 generates 5-6s videos
             'defaultDuration' => 6,
             'supportsLipSync' => false,
             'provider' => 'minimax',
-        ],
-        'minimax-10s' => [
-            'name' => 'MiniMax (10s)',
-            'description' => 'Extended duration for longer scenes',
-            'durations' => [10],
-            'defaultDuration' => 10,
-            'supportsLipSync' => false,
-            'provider' => 'minimax',
+            'durationNote' => 'Generates 5-6 second videos',
         ],
         'multitalk' => [
             'name' => 'Multitalk',
-            'description' => 'Lip-sync animation for dialogue scenes',
+            'description' => 'Lip-sync for dialogue scenes',
             'durations' => [5, 10, 15, 20],
             'defaultDuration' => 5,
             'supportsLipSync' => true,

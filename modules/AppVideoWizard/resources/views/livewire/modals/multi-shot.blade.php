@@ -578,13 +578,84 @@ window.multiShotVideoPolling = function() {
                                                     <span style="font-size: 0.45rem; background: {{ $modelBg }}; padding: 0.1rem 0.2rem; border-radius: 0.15rem;">{{ __($modelLabel) }}</span>
                                                 </button>
                                             @elseif($isGeneratingVideo)
-                                                {{-- Video Generation Status --}}
-                                                <div style="text-align: center; padding: 0.35rem; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.3rem;">
-                                                    <div style="font-size: 0.6rem; color: #67e8f9; font-weight: 500;">
-                                                        {{ ($shot['videoStatus'] ?? '') === 'generating' ? '🎬 ' . __('Starting...') : '⏳ ' . __('Rendering...') }}
+                                                {{-- Enhanced Video Generation Progress --}}
+                                                @php
+                                                    $videoStatus = $shot['videoStatus'] ?? 'generating';
+                                                    $isQueued = $videoStatus === 'generating' || $videoStatus === 'queued';
+                                                    $isProcessing = $videoStatus === 'processing';
+                                                    $statusMessage = $isQueued ? __('Preparing...') : __('Rendering video...');
+                                                    $statusIcon = $isQueued ? '🎬' : '⏳';
+                                                @endphp
+                                                <div
+                                                    x-data="{
+                                                        progress: {{ $isQueued ? 10 : 40 }},
+                                                        stage: {{ $isQueued ? 1 : 2 }},
+                                                        startTime: Date.now(),
+                                                        init() {
+                                                            this.animateProgress();
+                                                        },
+                                                        animateProgress() {
+                                                            const interval = setInterval(() => {
+                                                                const elapsed = (Date.now() - this.startTime) / 1000;
+                                                                // Simulate progress over ~60 seconds
+                                                                if (elapsed < 10) {
+                                                                    this.progress = Math.min(30, 10 + (elapsed * 2));
+                                                                    this.stage = 1;
+                                                                } else if (elapsed < 30) {
+                                                                    this.progress = Math.min(70, 30 + ((elapsed - 10) * 2));
+                                                                    this.stage = 2;
+                                                                } else if (elapsed < 50) {
+                                                                    this.progress = Math.min(90, 70 + ((elapsed - 30) * 1));
+                                                                    this.stage = 3;
+                                                                } else {
+                                                                    this.progress = 95;
+                                                                    this.stage = 3;
+                                                                }
+                                                            }, 1000);
+                                                            // Store interval for cleanup
+                                                            this.$watch('$el', () => clearInterval(interval));
+                                                        }
+                                                    }"
+                                                    style="padding: 0.5rem; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.4rem;">
+                                                    {{-- Progress Header --}}
+                                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                                                        <span style="font-size: 0.6rem; color: #67e8f9; font-weight: 600;">
+                                                            {{ $statusIcon }} {{ $statusMessage }}
+                                                        </span>
+                                                        <span x-text="Math.round(progress) + '%'" style="font-size: 0.55rem; color: rgba(255,255,255,0.7); font-weight: 500;"></span>
                                                     </div>
-                                                    <div style="margin-top: 0.25rem; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
-                                                        <div style="height: 100%; width: 60%; background: linear-gradient(90deg, #06b6d4, #22d3ee); animation: pulse 1.5s ease-in-out infinite;"></div>
+
+                                                    {{-- Progress Bar --}}
+                                                    <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 0.4rem;">
+                                                        <div :style="'width: ' + progress + '%; transition: width 0.5s ease;'"
+                                                             style="height: 100%; background: linear-gradient(90deg, #06b6d4, #3b82f6); border-radius: 3px; position: relative;">
+                                                            <div style="position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); animation: shimmer 1.5s infinite;"></div>
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Stage Indicators --}}
+                                                    <div style="display: flex; gap: 0.25rem; font-size: 0.5rem;">
+                                                        <div :class="stage >= 1 ? 'opacity-100' : 'opacity-40'" style="flex: 1; text-align: center; padding: 0.2rem; border-radius: 0.2rem; transition: opacity 0.3s;"
+                                                             :style="stage >= 1 ? 'background: rgba(16, 185, 129, 0.3); color: #10b981;' : 'background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);'">
+                                                            <span x-show="stage > 1">✓</span>
+                                                            <span x-show="stage === 1">●</span>
+                                                            <span x-show="stage < 1">○</span>
+                                                            {{ __('Queue') }}
+                                                        </div>
+                                                        <div :class="stage >= 2 ? 'opacity-100' : 'opacity-40'" style="flex: 1; text-align: center; padding: 0.2rem; border-radius: 0.2rem; transition: opacity 0.3s;"
+                                                             :style="stage >= 2 ? 'background: rgba(6, 182, 212, 0.3); color: #06b6d4;' : 'background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);'">
+                                                            <span x-show="stage > 2">✓</span>
+                                                            <span x-show="stage === 2">●</span>
+                                                            <span x-show="stage < 2">○</span>
+                                                            {{ __('Render') }}
+                                                        </div>
+                                                        <div :class="stage >= 3 ? 'opacity-100' : 'opacity-40'" style="flex: 1; text-align: center; padding: 0.2rem; border-radius: 0.2rem; transition: opacity 0.3s;"
+                                                             :style="stage >= 3 ? 'background: rgba(139, 92, 246, 0.3); color: #8b5cf6;' : 'background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);'">
+                                                            <span x-show="stage > 3">✓</span>
+                                                            <span x-show="stage === 3">●</span>
+                                                            <span x-show="stage < 3">○</span>
+                                                            {{ __('Finish') }}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             @endif
@@ -728,7 +799,9 @@ window.multiShotVideoPolling = function() {
             <div style="margin-bottom: 1rem;">
                 <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.75rem; margin-bottom: 0.4rem;">{{ __('Duration') }}</label>
                 @php
-                    $availableDurations = $currentModel === 'multitalk' ? [5, 10, 15, 20] : [5, 6, 10];
+                    // MiniMax video-01 only supports 5-6 second videos
+                    // Multitalk supports variable durations
+                    $availableDurations = $currentModel === 'multitalk' ? [5, 10, 15, 20] : [5, 6];
                 @endphp
                 <div style="display: flex; gap: 0.35rem;">
                     @foreach($availableDurations as $dur)
@@ -791,6 +864,10 @@ window.multiShotVideoPolling = function() {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 .shot-hover-overlay:hover {
     opacity: 1 !important;
