@@ -140,25 +140,44 @@ class ShotIntelligenceService
 
     /**
      * Get AI configuration based on model tier.
+     * Uses VwSetting for provider/model configuration with fallback to defaults.
      */
     protected function getAIConfig(string $tier): array
     {
-        $configs = [
+        // Get provider and model from unified settings
+        $provider = VwSetting::getValue('ai_shot_analysis_provider', 'openai');
+        $model = VwSetting::getValue('ai_shot_analysis_model', 'gpt-4');
+
+        // Tier-based model overrides (user can still set base provider in admin)
+        $tierModels = [
             'economy' => [
-                'provider' => 'grok',
-                'model' => 'grok-4-fast',
+                'openai' => 'gpt-4o-mini',
+                'grok' => 'grok-2-fast',
+                'gemini' => 'gemini-1.5-flash',
+                'anthropic' => 'claude-3-haiku',
             ],
             'standard' => [
-                'provider' => 'openai',
-                'model' => 'gpt-4o-mini',
+                'openai' => 'gpt-4o-mini',
+                'grok' => 'grok-2',
+                'gemini' => 'gemini-1.5-pro',
+                'anthropic' => 'claude-3-5-sonnet',
             ],
             'premium' => [
-                'provider' => 'openai',
-                'model' => 'gpt-4o',
+                'openai' => 'gpt-4o',
+                'grok' => 'grok-3',
+                'gemini' => 'gemini-2.0-flash-exp',
+                'anthropic' => 'claude-3-5-opus',
             ],
         ];
 
-        return $configs[$tier] ?? $configs['economy'];
+        // Use tier-specific model if available, otherwise use the configured model
+        $tierConfig = $tierModels[$tier] ?? $tierModels['economy'];
+        $finalModel = $tierConfig[$provider] ?? $model;
+
+        return [
+            'provider' => $provider,
+            'model' => $finalModel,
+        ];
     }
 
     /**

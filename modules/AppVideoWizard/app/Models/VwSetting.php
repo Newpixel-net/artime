@@ -50,6 +50,20 @@ class VwSetting extends Model
     const CATEGORY_SCENE = 'scene';
     const CATEGORY_EXPORT = 'export';
     const CATEGORY_GENERAL = 'general';
+    const CATEGORY_API = 'api';
+    const CATEGORY_CREDITS = 'credits';
+    const CATEGORY_AI_PROVIDERS = 'ai_providers';
+
+    /**
+     * Mapping of VwSetting slugs to legacy get_option keys for backward compatibility.
+     */
+    protected static array $legacyOptionMapping = [
+        'api_runpod_key' => 'runpod_api_key',
+        'api_runpod_multitalk_endpoint' => 'runpod_multitalk_endpoint',
+        'api_runpod_hidream_endpoint' => 'runpod_hidream_endpoint',
+        'api_minimax_key' => 'ai_minimax_api_key',
+        'api_minimax_group_id' => 'minimax_group_id',
+    ];
 
     /**
      * Get all active settings with caching.
@@ -101,6 +115,82 @@ class VwSetting extends Model
             }
         }
         return $result;
+    }
+
+    /**
+     * Get a setting value with fallback to legacy get_option.
+     * This ensures backward compatibility during migration from get_option to VwSetting.
+     *
+     * @param string $slug The VwSetting slug
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public static function getValueWithFallback(string $slug, mixed $default = null): mixed
+    {
+        // First try VwSetting
+        $value = self::getValue($slug);
+
+        // If we got a value from VwSetting (not empty/null for strings), use it
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        // Check if there's a legacy option mapping
+        $legacyKey = self::$legacyOptionMapping[$slug] ?? null;
+
+        if ($legacyKey && function_exists('get_option')) {
+            $legacyValue = get_option($legacyKey, null);
+            if ($legacyValue !== null && $legacyValue !== '') {
+                return $legacyValue;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
+     * Migrate a legacy get_option value to VwSetting.
+     * Call this when you want to copy existing get_option values to VwSetting.
+     *
+     * @param string $slug The VwSetting slug
+     * @return bool True if migration occurred
+     */
+    public static function migrateFromLegacy(string $slug): bool
+    {
+        $legacyKey = self::$legacyOptionMapping[$slug] ?? null;
+
+        if (!$legacyKey || !function_exists('get_option')) {
+            return false;
+        }
+
+        $legacyValue = get_option($legacyKey, null);
+
+        if ($legacyValue !== null && $legacyValue !== '') {
+            return self::setValue($slug, $legacyValue);
+        }
+
+        return false;
+    }
+
+    /**
+     * Migrate all legacy options to VwSetting.
+     *
+     * @return array Results of migration ['migrated' => [...], 'skipped' => [...]]
+     */
+    public static function migrateAllFromLegacy(): array
+    {
+        $migrated = [];
+        $skipped = [];
+
+        foreach (self::$legacyOptionMapping as $slug => $legacyKey) {
+            if (self::migrateFromLegacy($slug)) {
+                $migrated[] = $slug;
+            } else {
+                $skipped[] = $slug;
+            }
+        }
+
+        return ['migrated' => $migrated, 'skipped' => $skipped];
     }
 
     /**
@@ -239,6 +329,9 @@ class VwSetting extends Model
             self::CATEGORY_SCENE => 'Scene Processing',
             self::CATEGORY_EXPORT => 'Export Settings',
             self::CATEGORY_GENERAL => 'General',
+            self::CATEGORY_API => 'API Endpoints',
+            self::CATEGORY_CREDITS => 'Credit Costs',
+            self::CATEGORY_AI_PROVIDERS => 'AI Providers',
         ];
     }
 
@@ -254,6 +347,27 @@ class VwSetting extends Model
             self::CATEGORY_SCENE => 'fa-solid fa-clapperboard',
             self::CATEGORY_EXPORT => 'fa-solid fa-download',
             self::CATEGORY_GENERAL => 'fa-solid fa-cog',
+            self::CATEGORY_API => 'fa-solid fa-plug',
+            self::CATEGORY_CREDITS => 'fa-solid fa-coins',
+            self::CATEGORY_AI_PROVIDERS => 'fa-solid fa-robot',
+        ];
+    }
+
+    /**
+     * Get categories ordered for display.
+     */
+    public static function getOrderedCategories(): array
+    {
+        return [
+            self::CATEGORY_SHOT_INTELLIGENCE,
+            self::CATEGORY_ANIMATION,
+            self::CATEGORY_DURATION,
+            self::CATEGORY_SCENE,
+            self::CATEGORY_AI_PROVIDERS,
+            self::CATEGORY_API,
+            self::CATEGORY_CREDITS,
+            self::CATEGORY_GENERAL,
+            self::CATEGORY_EXPORT,
         ];
     }
 }

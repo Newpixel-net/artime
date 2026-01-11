@@ -8,11 +8,11 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-2">
                         <li class="breadcrumb-item"><a href="{{ route('admin.video-wizard.index') }}">{{ __('Video Creator') }}</a></li>
-                        <li class="breadcrumb-item active">{{ __('Shot Intelligence Settings') }}</li>
+                        <li class="breadcrumb-item active">{{ __('Dynamic Settings') }}</li>
                     </ol>
                 </nav>
-                <div class="fw-7 fs-20 text-primary-700">{{ __('Shot Intelligence & Dynamic Settings') }}</div>
-                <p class="text-muted mb-0 small">{{ __('Configure AI shot decomposition, animation models, durations, and scene processing') }}</p>
+                <div class="fw-7 fs-20 text-primary-700">{{ __('Video Wizard Settings') }}</div>
+                <p class="text-muted mb-0 small">{{ __('Configure AI providers, API endpoints, credit costs, shot intelligence, animation, and more') }}</p>
             </div>
             <div class="d-flex gap-2">
                 <form action="{{ route('admin.video-wizard.dynamic-settings.seed-defaults') }}" method="POST" class="d-inline">
@@ -213,6 +213,32 @@
                                                         </div>
                                                         @break
 
+                                                    @case('password')
+                                                        <div class="input-group">
+                                                            <input type="password"
+                                                                   class="form-control"
+                                                                   id="setting-{{ $setting->slug }}"
+                                                                   name="settings[{{ $setting->slug }}]"
+                                                                   value="{{ $currentValue }}"
+                                                                   placeholder="{{ $setting->input_placeholder ?: '••••••••' }}"
+                                                                   autocomplete="new-password">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('setting-{{ $setting->slug }}')" title="{{ __('Toggle visibility') }}">
+                                                                <i class="fa fa-eye" id="eye-setting-{{ $setting->slug }}"></i>
+                                                            </button>
+                                                        </div>
+                                                        @if($currentValue)
+                                                            <small class="text-success d-block mt-1">
+                                                                <i class="fa fa-check-circle me-1"></i>
+                                                                {{ __('API key is configured') }}
+                                                            </small>
+                                                        @else
+                                                            <small class="text-warning d-block mt-1">
+                                                                <i class="fa fa-exclamation-triangle me-1"></i>
+                                                                {{ __('Not configured') }}
+                                                            </small>
+                                                        @endif
+                                                        @break
+
                                                     @case('textarea')
                                                         <textarea class="form-control font-monospace"
                                                                   id="setting-{{ $setting->slug }}"
@@ -290,6 +316,21 @@
             }
         });
     });
+
+    // Toggle password visibility
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const eyeIcon = document.getElementById('eye-' + inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            eyeIcon.classList.remove('fa-eye');
+            eyeIcon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            eyeIcon.classList.remove('fa-eye-slash');
+            eyeIcon.classList.add('fa-eye');
+        }
+    }
 
     // JSON validation for json_editor inputs
     document.querySelectorAll('textarea[id^="setting-"]').forEach(textarea => {
