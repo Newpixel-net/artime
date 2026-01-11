@@ -9091,9 +9091,23 @@ EOT;
             $parts[] = trim($lightingHint);
         }
 
-        // 5. Visual context snippet (keep under 100 chars for optimal AI processing)
+        // 5. Visual context from scene description
+        // Modern video AI models (MiniMax, Runway) handle longer prompts well
+        // Use word-boundary truncation to avoid cutting mid-word
         if (strlen($visualDescription) > 20) {
-            $contextSnippet = substr($visualDescription, 0, 80);
+            $maxLength = 250; // Generous limit for scene context
+            if (strlen($visualDescription) > $maxLength) {
+                // Find the last space before the limit to avoid cutting mid-word
+                $truncated = substr($visualDescription, 0, $maxLength);
+                $lastSpace = strrpos($truncated, ' ');
+                if ($lastSpace !== false && $lastSpace > $maxLength * 0.7) {
+                    $contextSnippet = substr($truncated, 0, $lastSpace);
+                } else {
+                    $contextSnippet = $truncated;
+                }
+            } else {
+                $contextSnippet = $visualDescription;
+            }
             $parts[] = $contextSnippet;
         }
 
