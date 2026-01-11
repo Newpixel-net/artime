@@ -9790,7 +9790,9 @@ PROMPT;
                 if ($project) {
                     $storagePath = "wizard-projects/{$project->id}/face-corrections/{$filename}";
                     Storage::disk('public')->put($storagePath, base64_decode($correctedBase64));
-                    $correctedUrl = Storage::disk('public')->url($storagePath);
+
+                    // Generate URL (use /public/storage/ path for shared hosting)
+                    $correctedUrl = url('/public/storage/' . $storagePath);
 
                     $this->correctedFrameUrl = $correctedUrl;
                 } else {
@@ -9999,7 +10001,9 @@ PROMPT;
                 if ($project) {
                     $path = "wizard-projects/{$project->id}/frames/{$filename}";
                     Storage::disk('public')->put($path, $frameData);
-                    $imageUrl = Storage::disk('public')->url($path);
+
+                    // Generate URL (use /public/storage/ path for shared hosting)
+                    $imageUrl = url('/public/storage/' . $path);
 
                     // Update next shot with transferred frame (Hollywood frame chain)
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$nextShotIndex]['imageUrl'] = $imageUrl;
@@ -10055,7 +10059,9 @@ PROMPT;
                 if ($project) {
                     $path = "wizard-projects/{$project->id}/frames/{$filename}";
                     Storage::disk('public')->put($path, $frameData);
-                    $imageUrl = Storage::disk('public')->url($path);
+
+                    // Generate URL (use /public/storage/ path for shared hosting)
+                    $imageUrl = url('/public/storage/' . $path);
 
                     // Auto-transfer to next shot
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$nextShotIndex]['imageUrl'] = $imageUrl;
