@@ -644,7 +644,7 @@ USER;
         foreach ($characters as $idx => $char) {
             $name = $char['name'] ?? 'Unknown';
             $role = $char['role'] ?? 'Supporting';
-            $scenes = $char['appearsInScenes'] ?? [];
+            $scenes = $char['appliedScenes'] ?? $char['appearsInScenes'] ?? [];
             $sceneStr = !empty($scenes) ? implode(', ', array_map(fn($s) => $s + 1, $scenes)) : 'various';
 
             $charList[] = "- {$name} ({$role}): appears in scenes {$sceneStr}";
