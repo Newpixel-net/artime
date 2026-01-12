@@ -669,9 +669,297 @@ class StructuredPromptBuilderService
     }
 
     /**
-     * Convert structured prompt to optimized string for API.
+     * Convert structured prompt to optimized JSON-format string for API.
+     *
+     * This format produces TRUE photorealistic results by using explicit
+     * camera specifications (aperture, focal length, DOF) and explicit
+     * "hyper-realistic" directives that Gemini responds to better than
+     * generic "photorealistic" prose.
      */
     public function toPromptString(array $structuredPrompt): string
+    {
+        $creative = $structuredPrompt['creative_prompt'] ?? [];
+        $techSpecs = $structuredPrompt['technical_specifications'] ?? [];
+        $visualMode = $structuredPrompt['meta_data']['visual_mode'] ?? 'cinematic-realistic';
+
+        // For non-photorealistic modes, use prose format
+        if ($visualMode === 'stylized-animation') {
+            return $this->toProseString($structuredPrompt);
+        }
+
+        // Build JSON-structured prompt for photorealistic modes
+        // This format produces TRUE photorealistic results
+        $jsonPrompt = $this->buildJsonPrompt($structuredPrompt);
+
+        // Add DNA blocks for character/style/location consistency
+        $dnaBlocks = $this->buildDnaBlocks($creative);
+
+        if (!empty($dnaBlocks)) {
+            $jsonPrompt .= "\n\n" . $dnaBlocks;
+        }
+
+        return $jsonPrompt;
+    }
+
+    /**
+     * Build JSON-structured prompt for photorealistic output.
+     * Based on proven prompts that produce TRUE photorealistic results.
+     */
+    protected function buildJsonPrompt(array $structuredPrompt): string
+    {
+        $creative = $structuredPrompt['creative_prompt'] ?? [];
+        $techSpecs = $structuredPrompt['technical_specifications'] ?? [];
+        $subject = $creative['subject'] ?? [];
+        $environment = $creative['environment'] ?? [];
+        $lighting = $creative['lighting_and_atmosphere'] ?? [];
+
+        // Build subject section
+        $subjectJson = $this->buildSubjectJson($subject);
+
+        // Build setting section
+        $settingJson = $this->buildSettingJson($environment, $lighting);
+
+        // Build camera section with explicit aperture and DOF
+        $cameraJson = $this->buildCameraJson($techSpecs);
+
+        // Build style section with hyper-realistic directive
+        $styleJson = $this->buildStyleJson($structuredPrompt);
+
+        // Scene summary for context
+        $sceneSummary = $creative['scene_summary'] ?? 'Cinematic photorealistic scene';
+
+        // Build the JSON-structured prompt
+        $jsonPrompt = <<<EOT
+{
+  "scene": "{$sceneSummary}",
+  "subject": {$subjectJson},
+  "setting": {$settingJson},
+  "camera": {$cameraJson},
+  "style": {$styleJson},
+  "critical_requirements": {
+    "realism": "HYPER-REALISTIC - must look like a real photograph, not AI-generated",
+    "skin": "high-fidelity skin detail with natural color variation, visible pores, micro-imperfections",
+    "texture": "real fabric texture, natural hair with individual strands visible",
+    "post_processing": "NO retouching, NO smoothing, NO airbrushing - preserve natural skin texture",
+    "lighting": "motivated natural or practical lighting only, realistic shadows with bounce light detail"
+  }
+}
+EOT;
+
+        return $jsonPrompt;
+    }
+
+    /**
+     * Build subject JSON section.
+     */
+    protected function buildSubjectJson(array $subject): string
+    {
+        $parts = [];
+
+        if (!empty($subject['description'])) {
+            $parts[] = '"description": "' . $this->escapeJson($subject['description']) . '"';
+        }
+
+        if (!empty($subject['physical_details'])) {
+            $parts[] = '"physical_details": "' . $this->escapeJson($subject['physical_details']) . '"';
+        }
+
+        if (!empty($subject['expression'])) {
+            $parts[] = '"expression": "' . $this->escapeJson($subject['expression']) . '"';
+        }
+
+        if (!empty($subject['attire'])) {
+            $parts[] = '"attire": "' . $this->escapeJson($subject['attire']) . '"';
+        }
+
+        if (!empty($subject['pose'])) {
+            $parts[] = '"pose": "' . $this->escapeJson($subject['pose']) . '"';
+        }
+
+        // CRITICAL: Add skin requirement for realism
+        $parts[] = '"skin": "high-fidelity detail with natural color variation and realistic pores, visible micro-texture"';
+
+        if (empty($parts)) {
+            return '{}';
+        }
+
+        return "{\n    " . implode(",\n    ", $parts) . "\n  }";
+    }
+
+    /**
+     * Build setting JSON section.
+     */
+    protected function buildSettingJson(array $environment, array $lighting): string
+    {
+        $parts = [];
+
+        $envDescription = [];
+        if (!empty($environment['location'])) {
+            $envDescription[] = $environment['location'];
+        }
+        if (!empty($environment['background'])) {
+            $envDescription[] = $environment['background'];
+        }
+        if (!empty($environment['details'])) {
+            $envDescription[] = $environment['details'];
+        }
+
+        if (!empty($envDescription)) {
+            $parts[] = '"environment": "' . $this->escapeJson(implode(', ', $envDescription)) . '"';
+        }
+
+        if (!empty($lighting['lighting'])) {
+            $parts[] = '"lighting": "' . $this->escapeJson($lighting['lighting']) . '"';
+        }
+
+        if (!empty($lighting['mood'])) {
+            $parts[] = '"atmosphere": "' . $this->escapeJson($lighting['mood']) . '"';
+        }
+
+        if (!empty($environment['time_of_day'])) {
+            $parts[] = '"time_of_day": "' . $this->escapeJson($environment['time_of_day']) . '"';
+        }
+
+        if (empty($parts)) {
+            return '{}';
+        }
+
+        return "{\n    " . implode(",\n    ", $parts) . "\n  }";
+    }
+
+    /**
+     * Build camera JSON section with EXPLICIT aperture and DOF settings.
+     * These explicit settings are CRITICAL for producing true photorealistic results.
+     */
+    protected function buildCameraJson(array $techSpecs): string
+    {
+        // Default to portrait lens settings for realistic output
+        // 85mm f/1.8 is proven to produce the most photorealistic results
+        $lens = '85mm portrait lens';
+        $aperture = 'f/1.8';
+        $dof = 'shallow depth of field with subject in sharp focus and background softly blurred';
+        $cameraType = 'Professional DSLR';
+
+        // Parse camera info from tech specs if available
+        $cameraInfo = $techSpecs['camera'] ?? '';
+
+        // Extract lens if mentioned
+        if (preg_match('/(\d+mm)/i', $cameraInfo, $matches)) {
+            $focalLength = $matches[1];
+            $lens = $focalLength . ' lens';
+
+            // Adjust aperture and DOF based on focal length
+            $focalNum = (int) filter_var($focalLength, FILTER_SANITIZE_NUMBER_INT);
+            if ($focalNum <= 35) {
+                // Wide angle - deeper DOF for establishing shots
+                $aperture = 'f/2.8';
+                $dof = 'medium depth of field with environmental context visible';
+                $lens = $focalLength . ' wide angle lens';
+            } elseif ($focalNum >= 85) {
+                // Portrait/telephoto - shallow DOF for subject isolation
+                $aperture = 'f/1.8';
+                $dof = 'very shallow depth of field with face in sharp focus and background softly blurred';
+                $lens = $focalLength . ' portrait lens';
+            } else {
+                // Standard 50mm - balanced DOF
+                $aperture = 'f/2.0';
+                $dof = 'shallow depth of field, natural bokeh';
+                $lens = $focalLength . ' standard lens';
+            }
+        }
+
+        // Check for anamorphic mentions
+        if (stripos($cameraInfo, 'anamorphic') !== false) {
+            $lens = 'anamorphic 40mm lens';
+            $aperture = 'f/2.0';
+            $dof = 'oval bokeh characteristic of anamorphic lenses, horizontal lens flares';
+        }
+
+        return <<<EOT
+{
+    "type": "{$cameraType}",
+    "lens": "{$lens}",
+    "aperture": "{$aperture}",
+    "dof": "{$dof}",
+    "angle": "eye level, natural perspective"
+  }
+EOT;
+    }
+
+    /**
+     * Build style JSON section with EXPLICIT hyper-realistic directive.
+     */
+    protected function buildStyleJson(array $structuredPrompt): string
+    {
+        $visualMode = $structuredPrompt['meta_data']['visual_mode'] ?? 'cinematic-realistic';
+
+        // CRITICAL: Use "hyper-realistic" not just "photorealistic"
+        // This stronger directive produces much better results
+        $realism = 'hyper-realistic';
+        $quality = '8K resolution, extremely detailed, masterful composition';
+        $colorGrade = 'subtle natural tones, accurate skin colors, cinematic color science';
+        $postProcessing = 'NO visible retouching or smoothing, preserves natural skin texture and imperfections';
+
+        // Adjust based on visual mode
+        if ($visualMode === 'documentary-realistic') {
+            $realism = 'documentary-realistic';
+            $colorGrade = 'restrained natural colors, documentary authenticity';
+        }
+
+        return <<<EOT
+{
+    "realism": "{$realism}",
+    "quality": "{$quality}",
+    "color_grade": "{$colorGrade}",
+    "post_processing": "{$postProcessing}"
+  }
+EOT;
+    }
+
+    /**
+     * Build DNA blocks for character/style/location consistency.
+     */
+    protected function buildDnaBlocks(array $creative): string
+    {
+        $blocks = [];
+
+        // Style DNA
+        $styleDNA = $creative['style_dna'] ?? '';
+        if (!empty($styleDNA)) {
+            $blocks[] = $styleDNA;
+        }
+
+        // Location DNA
+        $locationDNA = $creative['location_dna'] ?? '';
+        if (!empty($locationDNA)) {
+            $blocks[] = $locationDNA;
+        }
+
+        // Character DNA
+        $characterDNA = $creative['character_dna'] ?? [];
+        if (!empty($characterDNA)) {
+            $blocks = array_merge($blocks, $characterDNA);
+        }
+
+        return implode("\n\n", $blocks);
+    }
+
+    /**
+     * Escape string for JSON embedding.
+     */
+    protected function escapeJson(string $text): string
+    {
+        // Remove newlines and escape quotes
+        $text = str_replace(["\n", "\r", '"'], [' ', '', '\\"'], $text);
+        // Remove excessive whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        return trim($text);
+    }
+
+    /**
+     * Legacy prose format for non-photorealistic modes (e.g., stylized-animation).
+     */
+    protected function toProseString(array $structuredPrompt): string
     {
         $parts = [];
 
@@ -753,23 +1041,10 @@ class StructuredPromptBuilderService
         // Combine base prompt
         $basePrompt = implode('. ', array_filter($parts));
 
-        // Add Style DNA for visual consistency enforcement
-        $styleDNA = $creative['style_dna'] ?? '';
-        if (!empty($styleDNA)) {
-            $basePrompt .= "\n\n" . $styleDNA;
-        }
-
-        // Add Location DNA for environmental consistency enforcement
-        $locationDNA = $creative['location_dna'] ?? '';
-        if (!empty($locationDNA)) {
-            $basePrompt .= "\n\n" . $locationDNA;
-        }
-
-        // Add Character DNA blocks for consistency enforcement
-        $characterDNA = $creative['character_dna'] ?? [];
-        if (!empty($characterDNA)) {
-            $dnaSection = "\n\n" . implode("\n\n", $characterDNA);
-            $basePrompt .= $dnaSection;
+        // Add DNA blocks
+        $dnaBlocks = $this->buildDnaBlocks($creative);
+        if (!empty($dnaBlocks)) {
+            $basePrompt .= "\n\n" . $dnaBlocks;
         }
 
         return $basePrompt;
