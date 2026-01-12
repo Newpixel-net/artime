@@ -1158,6 +1158,10 @@ class VideoWizard extends Component
         $isNewProject = !$this->projectId;
 
         try {
+            // Ensure visualMode is also stored in storyboard for easier access during image generation
+            $storyboardWithVisualMode = $this->storyboard;
+            $storyboardWithVisualMode['visualMode'] = $this->content['visualMode'] ?? 'cinematic-realistic';
+
             $data = [
                 'name' => $this->projectName,
                 'current_step' => $this->currentStep,
@@ -1170,7 +1174,7 @@ class VideoWizard extends Component
                 'production_subtype' => $this->productionSubtype,
                 'concept' => $this->concept,
                 'script' => $this->script,
-                'storyboard' => $this->storyboard,
+                'storyboard' => $storyboardWithVisualMode,
                 'animation' => $this->animation,
                 'assembly' => $this->assembly,
                 // Save Scene Memory, Multi-Shot Mode, Concept Variations, Character Intelligence, Script Generation State,

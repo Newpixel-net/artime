@@ -1578,8 +1578,17 @@ EOT;
         // Determine visual mode from project settings
         $visualMode = $this->getVisualMode($project, $visualStyle);
 
+        // Log the visual mode decision for debugging
+        $useStructured = $this->shouldUseStructuredPrompt($visualMode);
+        Log::info('[buildImagePrompt] Visual mode determined', [
+            'visualMode' => $visualMode,
+            'useStructuredPrompt' => $useStructured,
+            'projectId' => $project->id,
+            'sceneIndex' => $sceneIndex,
+        ]);
+
         // For realistic modes, use the structured prompt builder
-        if ($this->shouldUseStructuredPrompt($visualMode)) {
+        if ($useStructured) {
             return $this->buildStructuredImagePrompt(
                 $visualDescription,
                 $styleBible,
@@ -1605,43 +1614,50 @@ EOT;
     /**
      * Determine the visual mode from project settings.
      * Checks multiple locations where visualMode might be stored.
+     *
+     * CRITICAL: For "Cinematic Realistic" mode, this MUST return 'cinematic-realistic'
+     * to ensure photorealistic image generation.
      */
     protected function getVisualMode(WizardProject $project, ?array $visualStyle): string
     {
-        // Priority 1: Check concept for visual mode (this is where VideoWizard stores it)
-        $concept = $project->concept ?? [];
-        if (!empty($concept['visualMode'])) {
-            return $concept['visualMode'];
-        }
-
-        // Priority 2: Check storyboard for visual mode (fallback location)
-        $storyboard = $project->storyboard ?? [];
-        if (!empty($storyboard['visualMode'])) {
-            return $storyboard['visualMode'];
-        }
-
-        // Priority 3: Check content_config.content for visual mode
+        // Priority 1: Check content_config.content.visualMode (PRIMARY STORAGE LOCATION)
+        // This is where VideoWizard.php stores the user's explicit visualMode selection
         $contentConfig = $project->content_config ?? [];
         $content = $contentConfig['content'] ?? [];
         if (!empty($content['visualMode'])) {
+            Log::debug('[getVisualMode] Found visualMode in content_config.content', [
+                'visualMode' => $content['visualMode'],
+            ]);
             return $content['visualMode'];
         }
 
-        // Priority 4: Infer from visual style settings
-        if ($visualStyle) {
-            $style = $visualStyle['style'] ?? $visualStyle['renderStyle'] ?? '';
-            if (stripos($style, 'realistic') !== false || stripos($style, 'cinematic') !== false) {
-                return 'cinematic-realistic';
-            }
-            if (stripos($style, 'documentary') !== false) {
-                return 'documentary-realistic';
-            }
-            if (stripos($style, 'animation') !== false || stripos($style, 'stylized') !== false) {
-                return 'stylized-animation';
-            }
+        // Priority 2: Check concept for visual mode (legacy location)
+        $concept = $project->concept ?? [];
+        if (!empty($concept['visualMode'])) {
+            Log::debug('[getVisualMode] Found visualMode in concept', [
+                'visualMode' => $concept['visualMode'],
+            ]);
+            return $concept['visualMode'];
         }
 
-        // Default to cinematic-realistic for best quality
+        // Priority 3: Check storyboard for visual mode (fallback location)
+        $storyboard = $project->storyboard ?? [];
+        if (!empty($storyboard['visualMode'])) {
+            Log::debug('[getVisualMode] Found visualMode in storyboard', [
+                'visualMode' => $storyboard['visualMode'],
+            ]);
+            return $storyboard['visualMode'];
+        }
+
+        // Priority 4: ALWAYS default to cinematic-realistic for best photorealistic quality
+        // DO NOT infer from visualStyle - this caused issues where 'stylized-animation' was returned
+        // even when user explicitly selected "Cinematic Realistic"
+        Log::info('[getVisualMode] No explicit visualMode found, defaulting to cinematic-realistic', [
+            'hasContentConfig' => !empty($contentConfig),
+            'hasContent' => !empty($content),
+            'hasConcept' => !empty($concept),
+            'hasStoryboard' => !empty($storyboard),
+        ]);
         return 'cinematic-realistic';
     }
 
