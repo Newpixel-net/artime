@@ -10,6 +10,8 @@ use Modules\AppVideoWizard\Models\VwEmotionalBeat;
 use Modules\AppVideoWizard\Models\VwStoryStructure;
 use Modules\AppVideoWizard\Models\VwCameraSpec;
 use Modules\AppVideoWizard\Models\VwCameraMovement;
+use Modules\AppVideoWizard\Models\VwSetting;
+use Modules\AppVideoWizard\Services\ShotContinuityService;
 
 class CinematographyController extends Controller
 {
@@ -144,10 +146,17 @@ class CinematographyController extends Controller
             ->orderBy('sort_order')
             ->pluck('name', 'slug');
 
+        // Get camera movements for Motion Intelligence section
+        $cameraMovements = VwCameraMovement::where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('name')
+            ->pluck('name', 'slug');
+
         return view('appvideowizard::admin.cinematography.shot-types.edit', compact(
             'shotType',
             'categories',
-            'emotionalBeats'
+            'emotionalBeats',
+            'cameraMovements'
         ));
     }
 
@@ -169,6 +178,12 @@ class CinematographyController extends Controller
             'prompt_template' => ['nullable', 'string'],
             'motion_description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
+            // Motion Intelligence fields (Phase 2)
+            'primary_movement' => ['nullable', 'string', 'max:100'],
+            'movement_intensity' => ['nullable', 'in:static,subtle,moderate,dynamic,intense'],
+            'stackable_movements' => ['nullable', 'array'],
+            'typical_ending' => ['nullable', 'string', 'max:255'],
+            'video_prompt_template' => ['nullable', 'string'],
         ]);
 
         // Convert arrays to JSON
@@ -177,6 +192,9 @@ class CinematographyController extends Controller
         }
         if (isset($validated['best_for_genres'])) {
             $validated['best_for_genres'] = json_encode($validated['best_for_genres']);
+        }
+        if (isset($validated['stackable_movements'])) {
+            $validated['stackable_movements'] = json_encode($validated['stackable_movements']);
         }
 
         $shotType->update($validated);
@@ -395,5 +413,42 @@ class CinematographyController extends Controller
 
         return response()->json($data)
             ->header('Content-Disposition', 'attachment; filename="cinematography-export-' . date('Y-m-d') . '.json"');
+    }
+
+    // =====================================
+    // SHOT CONTINUITY (Phase 3)
+    // =====================================
+
+    /**
+     * Display shot continuity rules and patterns.
+     */
+    public function continuity()
+    {
+        // Get continuity settings
+        $enabled = (bool) VwSetting::getValue('shot_continuity_enabled', true);
+        $minScore = (int) VwSetting::getValue('shot_continuity_min_score', 60);
+
+        // Get rules status
+        $rules = [
+            '30_degree' => (bool) VwSetting::getValue('shot_continuity_30_degree_rule', true),
+            'jump_cut' => (bool) VwSetting::getValue('shot_continuity_jump_cut_detection', true),
+            'movement_flow' => (bool) VwSetting::getValue('shot_continuity_movement_flow', true),
+            'coverage_patterns' => (bool) VwSetting::getValue('shot_continuity_coverage_patterns', true),
+            'auto_optimize' => (bool) VwSetting::getValue('shot_continuity_auto_optimize', false),
+        ];
+
+        // Get static data from service constants
+        $coveragePatterns = ShotContinuityService::COVERAGE_PATTERNS;
+        $shotCompatibility = ShotContinuityService::SHOT_COMPATIBILITY;
+        $movementContinuity = ShotContinuityService::MOVEMENT_CONTINUITY;
+
+        return view('appvideowizard::admin.cinematography.continuity.index', compact(
+            'enabled',
+            'minScore',
+            'rules',
+            'coveragePatterns',
+            'shotCompatibility',
+            'movementContinuity'
+        ));
     }
 }
