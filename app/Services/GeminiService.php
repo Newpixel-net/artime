@@ -361,22 +361,17 @@ class GeminiService
                 'aspectRatio' => $requestedAspectRatio,
             ]);
         } else {
-            // WRAPPED MODE: For simple prompts, add style guidance
-            $defaultStyles = [
-                'photorealistic, 8k professional photograph, cinematic lighting',
-                'hyper-detailed 3D render, subsurface scattering',
-                'cinematic digital painting, moody colors',
-            ];
+            // WRAPPED MODE: For simple prompts, add photorealistic style guidance
+            // IMPORTANT: Always default to photorealistic to maintain consistency
+            // Random style selection was causing unintended stylized/animated outputs
+            $defaultStyle = 'photorealistic, 8k professional photograph, cinematic lighting, realistic skin texture, natural lighting';
+            $defaultTone = 'professional, high-quality, sharp focus, cinematic depth of field';
 
-            $defaultTones = [
-                'professional, high-quality, sharp focus',
-                'dramatic, high contrast, chiaroscuro lighting',
-                'cozy, warm, shallow depth of field',
-            ];
+            $style = $options['style'] ?? $defaultStyle;
+            $tone  = $options['tone']  ?? $defaultTone;
 
-            $style = $options['style'] ?? $defaultStyles[array_rand($defaultStyles)];
-            $tone  = $options['tone']  ?? $defaultTones[array_rand($defaultTones)];
-            $negativePrompt = $options['negativePrompt'] ?? 'ugly, deformed, blurry, low resolution, watermark, text, signature, words, letters, numbers, logo, screenshot, out of frame';
+            // Always include anti-stylization in negative prompt
+            $negativePrompt = $options['negativePrompt'] ?? 'ugly, deformed, blurry, low resolution, watermark, text, signature, words, letters, numbers, logo, screenshot, out of frame, cartoon, anime, illustration, 3D render, CGI, digital art, painting, stylized, artificial';
 
             $imagePrompt = <<<EOT
 Generate a single, high-quality image based on the following content.

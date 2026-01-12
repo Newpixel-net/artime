@@ -866,8 +866,12 @@ QUALITY REQUIREMENTS:
 - Natural skin texture with visible pores (no airbrushing)
 - Professional cinematography lighting
 - Sharp focus on face, cinematic depth of field
+- Real-world photography look, NOT animation or illustration
 
-OUTPUT: Generate a single high-quality image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT appearance (same hair, same clothing, same accessories) in the described scene.
+CRITICAL - AVOID (these will RUIN the image):
+cartoon, anime, illustration, 3D render, CGI, digital art, painting, stylized, artificial look, plastic skin, doll-like, mannequin, comic book style, video game graphics, oversaturated colors, unnatural lighting
+
+OUTPUT: Generate a single high-quality PHOTOREALISTIC image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT appearance (same hair, same clothing, same accessories) in the described scene. The output MUST look like a real photograph, NOT a digital illustration or animated image.
 EOT;
 
             $result = $this->geminiService->generateImageFromImage(
@@ -983,8 +987,12 @@ CAMERA & QUALITY:
 - Professional cinematography with motivated lighting
 - Sharp environmental details, natural depth of field
 - Authentic material textures (no smoothing or AI artifacts)
+- Real-world photography look, NOT animation or illustration
 
-OUTPUT: Generate THIS EXACT SAME LOCATION (not similar, THE IDENTICAL environment) with the scene described above. The viewer must recognize this as the same place.
+CRITICAL - AVOID (these will RUIN the image):
+cartoon, anime, illustration, 3D render, CGI, digital art, painting, stylized, artificial look, video game environment, fantasy style, oversaturated colors, unnatural lighting
+
+OUTPUT: Generate THIS EXACT SAME LOCATION (not similar, THE IDENTICAL environment) with the scene described above. The viewer must recognize this as the same place. The output MUST look like a real photograph, NOT a digital illustration or rendered scene.
 EOT;
 
             $result = $this->geminiService->generateImageFromImage(
@@ -1118,10 +1126,14 @@ CAMERA & QUALITY:
 - 8K photorealistic quality with film-like aesthetics
 - Natural imperfections that match the reference (grain, texture)
 - No AI artifacts, watermarks, or unnatural smoothing
+- Real-world photography look, NOT animation or illustration
 
-CRITICAL: The generated image must be VISUALLY INDISTINGUISHABLE in style from the reference. A viewer should immediately recognize both images as having THE SAME visual treatment, color grading, and cinematic approach.
+CRITICAL - AVOID (these will RUIN the image):
+cartoon, anime, illustration, 3D render, CGI, digital art, painting, stylized, artificial look, plastic skin, doll-like, video game graphics, oversaturated colors, unnatural lighting
 
-OUTPUT: Generate a single high-quality image in THIS EXACT SAME VISUAL STYLE showing the described scene.
+CRITICAL: The generated image must be VISUALLY INDISTINGUISHABLE in style from the reference. A viewer should immediately recognize both images as having THE SAME visual treatment, color grading, and cinematic approach. The output MUST look like a real photograph.
+
+OUTPUT: Generate a single high-quality PHOTOREALISTIC image in THIS EXACT SAME VISUAL STYLE showing the described scene.
 EOT;
 
             $result = $this->geminiService->generateImageFromImage(
