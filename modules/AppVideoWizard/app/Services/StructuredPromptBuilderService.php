@@ -16,6 +16,29 @@ use Illuminate\Support\Facades\Log;
  * - Explicit negative prompts to avoid AI artifacts
  * - Authenticity markers for realistic output
  * - Technical specifications for quality control
+ *
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║  WARNING: DO NOT MODIFY THE PHOTOREALISTIC PROMPT STRUCTURE WITHOUT TESTING  ║
+ * ╠══════════════════════════════════════════════════════════════════════════════╣
+ * ║  The JSON-structured prompts in toPromptString(), buildJsonPrompt(),         ║
+ * ║  buildCameraJson(), and buildStyleJson() are CAREFULLY TUNED to produce      ║
+ * ║  TRUE PHOTOREALISTIC results. These were developed through extensive         ║
+ * ║  testing and regression fixes.                                               ║
+ * ║                                                                              ║
+ * ║  CRITICAL ELEMENTS THAT MUST NOT BE CHANGED:                                 ║
+ * ║  1. "hyper-realistic" directive (NOT "photorealistic" - it's weaker)         ║
+ * ║  2. Explicit aperture values (f/1.8, f/2.0, f/2.8)                           ║
+ * ║  3. Explicit DOF descriptions                                                ║
+ * ║  4. Skin texture requirements ("visible pores", "micro-imperfections")       ║
+ * ║  5. Anti-retouching directive ("NO smoothing, NO airbrushing")               ║
+ * ║  6. JSON structure format (Gemini responds better to JSON than prose)        ║
+ * ║                                                                              ║
+ * ║  Changing these WILL cause images to look cartoonish/stylized instead of     ║
+ * ║  photorealistic, even when "Cinematic Realistic" mode is selected.           ║
+ * ║                                                                              ║
+ * ║  If you must modify, TEST THOROUGHLY with multiple image generations         ║
+ * ║  to verify realism is maintained.                                            ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 class StructuredPromptBuilderService
 {
@@ -704,6 +727,10 @@ class StructuredPromptBuilderService
     /**
      * Build JSON-structured prompt for photorealistic output.
      * Based on proven prompts that produce TRUE photorealistic results.
+     *
+     * ⚠️  CRITICAL: DO NOT MODIFY without thorough testing!
+     *     This JSON structure produces TRUE photorealistic results.
+     *     Changing to prose or removing elements WILL cause cartoon-like output.
      */
     protected function buildJsonPrompt(array $structuredPrompt): string
     {
@@ -751,6 +778,9 @@ EOT;
 
     /**
      * Build subject JSON section.
+     *
+     * ⚠️  CRITICAL: The "skin" field with explicit pore/texture requirements
+     *     is ESSENTIAL for photorealism. DO NOT remove it!
      */
     protected function buildSubjectJson(array $subject): string
     {
@@ -830,6 +860,9 @@ EOT;
     /**
      * Build camera JSON section with EXPLICIT aperture and DOF settings.
      * These explicit settings are CRITICAL for producing true photorealistic results.
+     *
+     * ⚠️  CRITICAL: The aperture values (f/1.8, f/2.0, f/2.8) and DOF descriptions
+     *     are ESSENTIAL for photorealism. DO NOT remove or simplify them!
      */
     protected function buildCameraJson(array $techSpecs): string
     {
@@ -888,6 +921,10 @@ EOT;
 
     /**
      * Build style JSON section with EXPLICIT hyper-realistic directive.
+     *
+     * ⚠️  CRITICAL: Must use "hyper-realistic" NOT "photorealistic"!
+     *     "photorealistic" is a weaker directive and produces stylized/cartoon results.
+     *     This was discovered through extensive regression testing.
      */
     protected function buildStyleJson(array $structuredPrompt): string
     {
@@ -895,6 +932,7 @@ EOT;
 
         // CRITICAL: Use "hyper-realistic" not just "photorealistic"
         // This stronger directive produces much better results
+        // DO NOT CHANGE THIS - it will cause cartoon-like output!
         $realism = 'hyper-realistic';
         $quality = '8K resolution, extremely detailed, masterful composition';
         $colorGrade = 'subtle natural tones, accurate skin colors, cinematic color science';
