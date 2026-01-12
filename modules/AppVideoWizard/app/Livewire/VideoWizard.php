@@ -11142,12 +11142,41 @@ EOT;
                     // Use enhanced prompt with shot context
                     $enhancedPrompt = $this->buildEnhancedShotImagePrompt($sceneIndex, $shotIndex);
 
+                    // SHOT-TO-SHOT CONSISTENCY: Get previous shot's image as primary reference
+                    // This ensures visual continuity across all shots in the scene
+                    $previousShotImageUrl = null;
+                    if ($shotIndex > 0) {
+                        $prevShot = $decomposed['shots'][$shotIndex - 1] ?? null;
+                        if ($prevShot && !empty($prevShot['imageUrl']) && ($prevShot['imageStatus'] ?? '') === 'ready') {
+                            $previousShotImageUrl = $prevShot['imageUrl'];
+                            Log::info('Shot-to-shot consistency: Using previous shot as reference', [
+                                'sceneIndex' => $sceneIndex,
+                                'currentShot' => $shotIndex,
+                                'referenceShot' => $shotIndex - 1,
+                                'referenceUrl' => substr($previousShotImageUrl, 0, 100) . '...',
+                            ]);
+                        }
+                    }
+
+                    // Get shot metadata for the prompt
+                    $shotMetadata = [
+                        'shotType' => $shot['type'] ?? 'medium',
+                        'cameraMovement' => $shot['cameraMovement'] ?? '',
+                        'duration' => $shot['duration'] ?? 6,
+                        'shotIndex' => $shotIndex,
+                        'totalShots' => count($decomposed['shots']),
+                    ];
+
                     $result = $imageService->generateSceneImage($project, [
                         'id' => $shot['id'],
                         'visualDescription' => $enhancedPrompt,
                     ], [
-                        'model' => $this->storyboard['imageModel'] ?? 'hidream',
+                        'model' => $this->storyboard['imageModel'] ?? 'nanobanana',
                         'sceneIndex' => $sceneIndex,
+                        'shotIndex' => $shotIndex,
+                        'previousShotImageUrl' => $previousShotImageUrl,  // Shot-to-shot consistency
+                        'shotMetadata' => $shotMetadata,                  // Shot context for prompting
+                        'isMultiShotMode' => true,                        // Flag for special handling
                     ]);
 
                     if ($result['success']) {

@@ -108,10 +108,16 @@ class ImageGenerationService
             ?? null;
 
         $sceneIndex = $options['sceneIndex'] ?? null;
+        $shotIndex = $options['shotIndex'] ?? null;
         $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
         $isLocationReference = $options['isLocationReference'] ?? false;
         $isCharacterPortrait = $options['isCharacterPortrait'] ?? false;
         $customNegativePrompt = $options['negativePrompt'] ?? null;
+
+        // SHOT-TO-SHOT CONSISTENCY: Extract multi-shot mode options
+        $previousShotImageUrl = $options['previousShotImageUrl'] ?? null;
+        $shotMetadata = $options['shotMetadata'] ?? null;
+        $isMultiShotMode = $options['isMultiShotMode'] ?? false;
 
         // For location references and character portraits, use the visual description directly
         // These have specialized prompts that should not be modified by Bible integrations
@@ -139,6 +145,7 @@ class ImageGenerationService
         $characterReference = null;
         $locationReference = null;
         $styleReference = null;
+        $previousShotReference = null;
 
         // For location references: NO character references (empty environments only)
         // For character portraits: NO location references (studio backdrop)
@@ -148,6 +155,20 @@ class ImageGenerationService
             $characterReference = $this->getCharacterReferenceForScene($sceneMemory, $sceneIndex);
             $locationReference = $this->getLocationReferenceForScene($sceneMemory, $sceneIndex);
             $styleReference = $this->getStyleReference($sceneMemory);
+
+            // SHOT-TO-SHOT CONSISTENCY: Get previous shot as primary reference
+            // This is the key innovation - using the previous shot's image as the "ground truth"
+            // for all visual elements (characters, location, style, lighting, etc.)
+            if ($isMultiShotMode && $previousShotImageUrl) {
+                $previousShotReference = $this->getPreviousShotReference($previousShotImageUrl, $shotMetadata);
+                if ($previousShotReference) {
+                    Log::info('ImageGenerationService: Using previous shot for consistency', [
+                        'shotIndex' => $shotIndex,
+                        'hasReference' => true,
+                        'shotType' => $shotMetadata['shotType'] ?? 'unknown',
+                    ]);
+                }
+            }
         } elseif ($isCharacterPortrait) {
             // Character portrait: only use style reference for visual consistency
             $styleReference = $this->getStyleReference($sceneMemory);
@@ -158,7 +179,7 @@ class ImageGenerationService
         if ($modelConfig['provider'] === 'runpod') {
             return $this->generateWithHiDream($project, $scene, $prompt, $resolution, $options);
         } else {
-            return $this->generateWithGemini($project, $scene, $prompt, $resolution, $modelId, $modelConfig, $options, $characterReference, $locationReference, $styleReference);
+            return $this->generateWithGemini($project, $scene, $prompt, $resolution, $modelId, $modelConfig, $options, $characterReference, $locationReference, $styleReference, $previousShotReference, $shotMetadata);
         }
     }
 
@@ -452,6 +473,167 @@ class ImageGenerationService
         }
 
         return implode('. ', $parts);
+    }
+
+    /**
+     * Get previous shot image as reference for shot-to-shot consistency.
+     *
+     * SHOT-TO-SHOT CONSISTENCY SYSTEM:
+     * This method fetches the previous shot's generated image and converts it
+     * to a format suitable for use as a reference in image-to-image generation.
+     *
+     * The previous shot serves as the "ground truth" for:
+     * - Character appearances (faces, costumes, positions)
+     * - Location details (environment, props, architecture)
+     * - Visual style (lighting, color palette, mood)
+     * - Overall scene consistency
+     *
+     * @param string $previousShotImageUrl URL of the previous shot's image
+     * @param array|null $shotMetadata Metadata about the current shot being generated
+     * @return array|null Previous shot reference data {base64, mimeType, shotMetadata} or null
+     */
+    protected function getPreviousShotReference(string $previousShotImageUrl, ?array $shotMetadata = null): ?array
+    {
+        try {
+            // Fetch the image from URL
+            $imageContent = @file_get_contents($previousShotImageUrl);
+            if (!$imageContent || strlen($imageContent) < 1000) {
+                Log::warning('[getPreviousShotReference] Failed to fetch previous shot image', [
+                    'url' => substr($previousShotImageUrl, 0, 100),
+                ]);
+                return null;
+            }
+
+            // Detect MIME type
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+            $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
+
+            // Convert to base64
+            $base64 = base64_encode($imageContent);
+
+            Log::info('[getPreviousShotReference] Successfully loaded previous shot reference', [
+                'urlPrefix' => substr($previousShotImageUrl, 0, 50),
+                'mimeType' => $mimeType,
+                'base64Length' => strlen($base64),
+                'shotType' => $shotMetadata['shotType'] ?? 'unknown',
+                'cameraMovement' => $shotMetadata['cameraMovement'] ?? 'none',
+            ]);
+
+            return [
+                'base64' => $base64,
+                'mimeType' => $mimeType,
+                'sourceUrl' => $previousShotImageUrl,
+                'shotMetadata' => $shotMetadata,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('[getPreviousShotReference] Exception loading previous shot', [
+                'error' => $e->getMessage(),
+                'url' => substr($previousShotImageUrl, 0, 100),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Build shot-to-shot consistency prompt for multi-shot mode.
+     *
+     * This creates a specialized prompt that:
+     * 1. References the previous shot as the visual "ground truth"
+     * 2. Specifies exactly what should change (camera framing, angle)
+     * 3. Emphasizes preservation of all visual elements
+     *
+     * @param string $basePrompt The original shot prompt/description
+     * @param array $shotMetadata Metadata about the shot (type, camera movement, etc.)
+     * @return string Enhanced prompt for shot-to-shot consistency
+     */
+    protected function buildShotConsistencyPrompt(string $basePrompt, array $shotMetadata): string
+    {
+        $shotType = $shotMetadata['shotType'] ?? 'medium';
+        $cameraMovement = $shotMetadata['cameraMovement'] ?? '';
+        $shotIndex = $shotMetadata['shotIndex'] ?? 1;
+
+        // Map shot types to camera framing descriptions
+        $shotTypeDescriptions = [
+            'establishing' => 'very wide establishing shot showing the full environment',
+            'very-wide' => 'very wide shot capturing the entire scene and environment',
+            'wide' => 'wide shot showing subjects in full context',
+            'medium-wide' => 'medium-wide shot framing subjects from approximately knees up',
+            'medium' => 'medium shot framing subjects from waist up',
+            'medium-close' => 'medium close-up shot focusing on upper body and face',
+            'close-up' => 'close-up shot emphasizing facial expressions and details',
+            'extreme-close' => 'extreme close-up shot highlighting specific details',
+            'detail' => 'detail shot focusing on a specific element or object',
+            'reaction' => 'reaction shot capturing emotional response',
+        ];
+
+        $framingDescription = $shotTypeDescriptions[$shotType] ?? "a {$shotType} shot";
+
+        // Build the consistency prompt
+        $consistencyPrompt = <<<EOT
+SHOT-TO-SHOT CONSISTENCY MODE - REFERENCE IMAGE ATTACHED
+
+The attached reference image is the PREVIOUS SHOT in this scene sequence.
+Generate Shot #{$shotIndex} using this reference as the MASTER VISUAL GUIDE.
+
+═══════════════════════════════════════════════════════════════════════════════
+ABSOLUTE PRESERVATION REQUIREMENTS (DO NOT CHANGE):
+═══════════════════════════════════════════════════════════════════════════════
+
+1. CHARACTER CONSISTENCY - CRITICAL:
+   • EXACT same character appearances (faces, body types, heights)
+   • EXACT same costumes, clothing, and accessories
+   • EXACT same hair styles and colors
+   • Maintain character positions relative to each other (unless action requires movement)
+
+2. LOCATION CONSISTENCY - CRITICAL:
+   • IDENTICAL environment and setting
+   • Same architectural elements, props, and background details
+   • Same atmospheric effects (fog, lighting particles, etc.)
+   • Maintain spatial relationships and depth
+
+3. VISUAL STYLE CONSISTENCY - CRITICAL:
+   • IDENTICAL color palette and color grading
+   • Same lighting direction, quality, and mood
+   • Same contrast levels and exposure
+   • Maintain the exact cinematic aesthetic
+
+═══════════════════════════════════════════════════════════════════════════════
+CAMERA CHANGE TO APPLY:
+═══════════════════════════════════════════════════════════════════════════════
+
+Framing: {$framingDescription}
+EOT;
+
+        // Add camera movement if specified
+        if (!empty($cameraMovement)) {
+            $consistencyPrompt .= "\nCamera Action: {$cameraMovement}";
+        }
+
+        // Add the original shot description
+        $consistencyPrompt .= <<<EOT
+
+
+═══════════════════════════════════════════════════════════════════════════════
+SHOT DESCRIPTION:
+═══════════════════════════════════════════════════════════════════════════════
+
+{$basePrompt}
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT REQUIREMENTS:
+═══════════════════════════════════════════════════════════════════════════════
+
+• 8K photorealistic, cinematic film still quality
+• The viewer must recognize this as the SAME scene, same characters, same location
+• Only the camera framing/angle changes - everything else stays IDENTICAL
+• Natural skin textures, realistic lighting, professional cinematography
+
+CRITICAL: DO NOT introduce ANY changes to characters, costumes, location, or style.
+This is a CONTINUATION of the same scene, not a new interpretation.
+EOT;
+
+        return $consistencyPrompt;
     }
 
     /**
@@ -780,6 +962,8 @@ class ImageGenerationService
      * @param array|null $characterReference Character reference for face consistency {base64, mimeType, characterName}
      * @param array|null $locationReference Location reference for environment consistency {base64, mimeType, locationName}
      * @param array|null $styleReference Style reference for visual style consistency {base64, mimeType, styleDescription}
+     * @param array|null $previousShotReference Previous shot reference for shot-to-shot consistency {base64, mimeType, shotMetadata}
+     * @param array|null $shotMetadata Metadata about the current shot being generated
      */
     protected function generateWithGemini(
         WizardProject $project,
@@ -791,7 +975,9 @@ class ImageGenerationService
         array $options = [],
         ?array $characterReference = null,
         ?array $locationReference = null,
-        ?array $styleReference = null
+        ?array $styleReference = null,
+        ?array $previousShotReference = null,
+        ?array $shotMetadata = null
     ): array {
         // Map aspect ratio for Gemini
         $aspectRatioMap = [
@@ -806,6 +992,110 @@ class ImageGenerationService
 
         // Get model resolution string (1K, 2K, 4K) for API call
         $modelResolution = $modelConfig['resolution'] ?? '2K';
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // SHOT-TO-SHOT CONSISTENCY: Previous shot reference takes HIGHEST priority
+        // This ensures visual continuity across all shots in a scene
+        // ═══════════════════════════════════════════════════════════════════════════
+        if ($previousShotReference && !empty($previousShotReference['base64'])) {
+            Log::info('[generateWithGemini] SHOT-TO-SHOT CONSISTENCY: Using previous shot as primary reference', [
+                'shotIndex' => $shotMetadata['shotIndex'] ?? 'unknown',
+                'shotType' => $shotMetadata['shotType'] ?? 'unknown',
+                'cameraMovement' => $shotMetadata['cameraMovement'] ?? 'none',
+                'mimeType' => $previousShotReference['mimeType'] ?? 'image/png',
+                'hasCharacterReference' => !empty($characterReference),
+                'hasLocationReference' => !empty($locationReference),
+                'hasStyleReference' => !empty($styleReference),
+            ]);
+
+            // Build the shot-to-shot consistency prompt
+            $shotConsistencyPrompt = $this->buildShotConsistencyPrompt($prompt, $shotMetadata ?? []);
+
+            // Prepare additional reference images for multi-image consistency
+            // Gemini supports up to 14 reference images (6 objects + 5 humans)
+            $additionalImages = [];
+
+            // Add character reference if available (reinforces face consistency)
+            if ($characterReference && !empty($characterReference['base64'])) {
+                $additionalImages[] = [
+                    'base64' => $characterReference['base64'],
+                    'mimeType' => $characterReference['mimeType'] ?? 'image/png',
+                ];
+            }
+
+            // Add style reference if available (reinforces visual style)
+            if ($styleReference && !empty($styleReference['base64'])) {
+                $additionalImages[] = [
+                    'base64' => $styleReference['base64'],
+                    'mimeType' => $styleReference['mimeType'] ?? 'image/png',
+                ];
+            }
+
+            $result = $this->geminiService->generateImageFromImage(
+                $previousShotReference['base64'],
+                $shotConsistencyPrompt,
+                [
+                    'model' => $modelConfig['model'] ?? 'gemini-2.5-flash-image',
+                    'mimeType' => $previousShotReference['mimeType'] ?? 'image/png',
+                    'aspectRatio' => $aspectRatio,
+                    'resolution' => $modelResolution,
+                    'additionalImages' => $additionalImages,
+                ]
+            );
+
+            // Handle image-to-image response format
+            if (!empty($result['error']) || (!$result['success'] ?? false)) {
+                throw new \Exception($result['error'] ?? 'Shot-to-shot consistency generation failed');
+            }
+
+            if (!empty($result['imageData'])) {
+                // Store the base64 image
+                $storedPath = $this->storeBase64Image(
+                    $result['imageData'],
+                    $result['mimeType'] ?? 'image/png',
+                    $project,
+                    $scene['id']
+                );
+                $imageUrl = $this->getPublicUrl($storedPath);
+
+                // Create asset record
+                $asset = WizardAsset::create([
+                    'project_id' => $project->id,
+                    'user_id' => $project->user_id,
+                    'type' => WizardAsset::TYPE_IMAGE,
+                    'name' => $scene['id'],
+                    'path' => $storedPath,
+                    'url' => $imageUrl,
+                    'mime_type' => $result['mimeType'] ?? 'image/png',
+                    'scene_index' => $options['sceneIndex'] ?? null,
+                    'scene_id' => $scene['id'],
+                    'metadata' => [
+                        'prompt' => $prompt,
+                        'model' => $modelId,
+                        'shotToShotConsistency' => true,
+                        'shotIndex' => $shotMetadata['shotIndex'] ?? null,
+                        'shotType' => $shotMetadata['shotType'] ?? null,
+                        'previousShotUsed' => true,
+                        'additionalReferencesCount' => count($additionalImages),
+                    ],
+                ]);
+
+                return [
+                    'success' => true,
+                    'imageUrl' => $imageUrl,
+                    'prompt' => $prompt,
+                    'model' => $modelId,
+                    'assetId' => $asset->id,
+                    'shotToShotConsistency' => true,
+                ];
+            }
+
+            throw new \Exception('No image data in shot-to-shot consistency response');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // STANDARD FLOW: Character reference (face consistency) > Location > Style
+        // ═══════════════════════════════════════════════════════════════════════════
 
         // Priority: Character reference (face consistency) > Location reference (environment consistency)
         // If we have a character reference, use image-to-image generation for face consistency
