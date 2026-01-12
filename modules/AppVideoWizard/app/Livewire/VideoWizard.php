@@ -4129,14 +4129,50 @@ class VideoWizard extends Component
                 if ($status === 'completed') {
                     // Video generation completed
                     if (isset($result['videoUrl'])) {
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                        $temporaryUrl = $result['videoUrl'];
+                        $finalVideoUrl = $temporaryUrl; // Default to temporary URL
+
+                        // Download and store video permanently to prevent URL expiration
+                        if ($this->projectId && $animationService->isTemporaryUrl($temporaryUrl)) {
+                            try {
+                                $project = \Modules\AppVideoWizard\Models\WizardProject::find($this->projectId);
+                                if ($project) {
+                                    $storeResult = $animationService->downloadAndStoreVideo(
+                                        $temporaryUrl,
+                                        $project,
+                                        $sceneIndex,
+                                        $shotIndex,
+                                        $provider
+                                    );
+
+                                    if ($storeResult['success'] && !empty($storeResult['permanentUrl'])) {
+                                        $finalVideoUrl = $storeResult['permanentUrl'];
+                                        \Log::info('📡 ✅ Video stored permanently', [
+                                            'sceneIndex' => $sceneIndex,
+                                            'shotIndex' => $shotIndex,
+                                            'permanentUrl' => substr($finalVideoUrl, 0, 100) . '...',
+                                        ]);
+                                    } else {
+                                        \Log::warning('📡 Failed to store video permanently, using temporary URL', [
+                                            'error' => $storeResult['error'] ?? 'Unknown',
+                                        ]);
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                \Log::error('📡 Exception storing video, using temporary URL', [
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
+                        }
+
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $finalVideoUrl;
                         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
                         $hasUpdates = true;
 
                         \Log::info('📡 ✅ Video READY!', [
                             'sceneIndex' => $sceneIndex,
                             'shotIndex' => $shotIndex,
-                            'videoUrl' => substr($result['videoUrl'], 0, 100) . '...',
+                            'videoUrl' => substr($finalVideoUrl, 0, 100) . '...',
                         ]);
                     } else {
                         \Log::warning('📡 Completed but no videoUrl', ['result' => $result]);
@@ -5480,7 +5516,32 @@ class VideoWizard extends Component
         if ($status === 'completed') {
             // Video generation completed
             if (isset($result['videoUrl'])) {
-                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                $temporaryUrl = $result['videoUrl'];
+                $finalVideoUrl = $temporaryUrl;
+
+                // Download and store video permanently to prevent URL expiration
+                if ($this->projectId && $animationService->isTemporaryUrl($temporaryUrl)) {
+                    try {
+                        $project = \Modules\AppVideoWizard\Models\WizardProject::find($this->projectId);
+                        if ($project) {
+                            $storeResult = $animationService->downloadAndStoreVideo(
+                                $temporaryUrl,
+                                $project,
+                                $sceneIndex,
+                                $shotIndex,
+                                $provider
+                            );
+
+                            if ($storeResult['success'] && !empty($storeResult['permanentUrl'])) {
+                                $finalVideoUrl = $storeResult['permanentUrl'];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Exception storing video in pollVideoJob', ['error' => $e->getMessage()]);
+                    }
+                }
+
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $finalVideoUrl;
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
             }
             unset($this->pendingJobs[$jobKey]);
@@ -12202,9 +12263,31 @@ PROMPT;
 
                     if ($result['success']) {
                         if (isset($result['videoUrl'])) {
-                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $result['videoUrl'];
+                            $temporaryUrl = $result['videoUrl'];
+                            $finalVideoUrl = $temporaryUrl;
+
+                            // Download and store video permanently to prevent URL expiration
+                            if ($animationService->isTemporaryUrl($temporaryUrl)) {
+                                try {
+                                    $storeResult = $animationService->downloadAndStoreVideo(
+                                        $temporaryUrl,
+                                        $project,
+                                        $sceneIndex,
+                                        $shotIndex,
+                                        $selectedModel
+                                    );
+
+                                    if ($storeResult['success'] && !empty($storeResult['permanentUrl'])) {
+                                        $finalVideoUrl = $storeResult['permanentUrl'];
+                                    }
+                                } catch (\Exception $e) {
+                                    \Log::error('Exception storing video in generateShotVideo', ['error' => $e->getMessage()]);
+                                }
+                            }
+
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoUrl'] = $finalVideoUrl;
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'ready';
-                            \Log::info('🎬 Video immediately ready', ['videoUrl' => substr($result['videoUrl'], 0, 80)]);
+                            \Log::info('🎬 Video immediately ready', ['videoUrl' => substr($finalVideoUrl, 0, 80)]);
                         } elseif (isset($result['taskId'])) {
                             // Async job - store for polling
                             $jobKey = "shot_video_{$sceneIndex}_{$shotIndex}";
