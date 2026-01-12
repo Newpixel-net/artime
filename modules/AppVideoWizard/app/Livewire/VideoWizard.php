@@ -18,6 +18,7 @@ use Modules\AppVideoWizard\Services\CinematographyService;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
 use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Services\ShotIntelligenceService;
+use Modules\AppVideoWizard\Services\ShotProgressionService;
 use Modules\AppVideoWizard\Services\ProductionIntelligenceService;
 use Modules\AppVideoWizard\Services\CinematicIntelligenceService;
 use Modules\AppVideoWizard\Services as Services;
@@ -9793,17 +9794,33 @@ EOT;
     {
         $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
 
-        // Build context for AI analysis
+        // Calculate total scenes for narrative positioning
+        $totalScenes = count($this->scenes ?? []);
+
+        // Build context for AI analysis - CRITICAL: Pass all wizard configuration
         $context = [
+            // Basic scene/project settings
             'genre' => $this->content['genre'] ?? 'general',
             'pacing' => $this->content['pacing'] ?? 'balanced',
             'mood' => $scene['mood'] ?? 'neutral',
             'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
             'characters' => array_keys($this->sceneMemory['characterBible']['characters'] ?? []),
+
+            // PHASE 6: Narrative progression context (from wizard UI selections)
+            'tensionCurve' => $this->tensionCurve ?? 'balanced',
+            'emotionalJourney' => $this->emotionalJourney ?? 'hopeful-path',
+            'sceneIndex' => $sceneIndex,
+            'totalScenes' => $totalScenes,
+
+            // Additional narrative context
+            'narrativePreset' => $this->narrativePreset ?? null,
+            'storyArc' => $this->storyArc ?? null,
+            'scriptTone' => $this->scriptTone ?? null,
         ];
 
-        // Call AI Shot Intelligence Service
+        // Call AI Shot Intelligence Service with ShotProgressionService
         $service = new ShotIntelligenceService();
+        $service->setProgressionService(new ShotProgressionService());
         $analysis = $service->analyzeScene($scene, $context);
 
         Log::info('VideoWizard: AI Shot Intelligence analysis complete', [
