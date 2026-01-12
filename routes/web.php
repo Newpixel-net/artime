@@ -41,3 +41,19 @@ Route::get('/storage/{path}', function (string $path) {
         'Cache-Control' => 'public, max-age=2592000',
     ]);
 })->where('path', '.*')->name('storage.serve');
+
+// Serve wizard videos from public folder (for cPanel compatibility)
+Route::get('/wizard-videos/{path}', function (string $path) {
+    $fullPath = public_path('wizard-videos/' . $path);
+
+    if (!file_exists($fullPath)) {
+        abort(404, 'Video not found');
+    }
+
+    return response()->file($fullPath, [
+        'Content-Type' => 'video/mp4',
+        'Content-Disposition' => 'inline',
+        'Accept-Ranges' => 'bytes',
+        'Cache-Control' => 'public, max-age=2592000',
+    ]);
+})->where('path', '.*')->name('wizard-videos.serve');
