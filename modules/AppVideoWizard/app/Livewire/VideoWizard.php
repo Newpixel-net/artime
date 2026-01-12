@@ -6812,21 +6812,40 @@ class VideoWizard extends Component
         $hasExistingStyle = !empty($this->sceneMemory['styleBible']['style']);
 
         // 1. Auto-populate Style Bible based on production type (if not already set)
+        // Each detection runs in its own try-catch to ensure independence
         if (!$hasExistingStyle) {
-            $this->transitionMessage = __('Setting up visual style...');
-            $this->autoPopulateStyleBible();
+            try {
+                $this->transitionMessage = __('Setting up visual style...');
+                $this->autoPopulateStyleBible();
+            } catch (\Exception $e) {
+                Log::error('SceneMemoryPopulation: Style Bible failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // 2. Auto-detect characters from script (if none exist)
         if (!$hasExistingCharacters) {
-            $this->transitionMessage = __('Detecting characters from script...');
-            $this->autoDetectCharactersFromScript();
+            try {
+                $this->transitionMessage = __('Detecting characters from script...');
+                $this->autoDetectCharactersFromScript();
+            } catch (\Exception $e) {
+                Log::error('SceneMemoryPopulation: Character detection failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // 3. Auto-detect locations from script (if none exist)
         if (!$hasExistingLocations) {
-            $this->transitionMessage = __('Identifying locations...');
-            $this->autoDetectLocationsFromScript();
+            try {
+                $this->transitionMessage = __('Identifying locations...');
+                $this->autoDetectLocationsFromScript();
+            } catch (\Exception $e) {
+                Log::error('SceneMemoryPopulation: Location detection failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // Dispatch event to notify UI
@@ -8190,14 +8209,65 @@ class VideoWizard extends Component
                 }
             }
 
+            // Explicit handling for AI failure (success = false)
+            if (!$result['success']) {
+                Log::warning('LocationExtraction: AI returned failure, falling back to pattern matching', [
+                    'error' => $result['error'] ?? 'Unknown AI error',
+                ]);
+                // Fall through to pattern matching
+            }
+
         } catch (\Exception $e) {
-            Log::warning('LocationExtraction: AI extraction failed, falling back to pattern matching', [
+            Log::warning('LocationExtraction: AI extraction exception, falling back to pattern matching', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
 
-        // Fallback to pattern-based detection
-        $this->autoDetectLocationsWithPatterns();
+        // Fallback to pattern-based detection - wrapped in try-catch for robustness
+        try {
+            $this->autoDetectLocationsWithPatterns();
+        } catch (\Exception $e) {
+            Log::error('LocationExtraction: Pattern-based detection failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        // FINAL FALLBACK: Ensure at least one location exists
+        // This guarantees the Location Bible is never empty after detection runs
+        if (empty($this->sceneMemory['locationBible']['locations'])) {
+            $totalScenes = count($this->script['scenes'] ?? []);
+            Log::warning('LocationExtraction: All detection methods failed, creating default location', [
+                'totalScenes' => $totalScenes,
+            ]);
+
+            $this->sceneMemory['locationBible']['locations'][] = [
+                'id' => uniqid('loc_'),
+                'name' => 'General Location',
+                'type' => 'exterior',
+                'timeOfDay' => 'day',
+                'weather' => 'clear',
+                'atmosphere' => '',
+                'mood' => '',
+                'lightingStyle' => '',
+                'description' => 'Default location for the video. Edit this to add specific environment details.',
+                'scenes' => $totalScenes > 0 ? range(0, $totalScenes - 1) : [],
+                'stateChanges' => [],
+                'referenceImage' => null,
+                'autoDetected' => true,
+                'defaultFallback' => true, // Flag to indicate this was created as a fallback
+            ];
+
+            $this->sceneMemory['locationBible']['enabled'] = true;
+
+            $this->dispatch('vw-debug', [
+                'type' => 'location_extraction',
+                'method' => 'fallback',
+                'count' => 1,
+                'message' => 'Created default location as fallback',
+            ]);
+        }
     }
 
     /**
@@ -9257,12 +9327,40 @@ EOT;
 
     /**
      * Auto-detect locations from script.
+     * Called when user clicks "Auto-detect from Script" button in Location Bible modal.
      */
     public function autoDetectLocations(): void
     {
-        // Use AI-powered extraction (with pattern fallback)
-        $this->autoDetectLocationsFromScript();
-        $this->saveProject();
+        Log::info('LocationExtraction: Manual auto-detect triggered', [
+            'hasScript' => !empty($this->script),
+            'sceneCount' => count($this->script['scenes'] ?? []),
+            'existingLocations' => count($this->sceneMemory['locationBible']['locations'] ?? []),
+        ]);
+
+        try {
+            // Clear existing auto-detected locations to allow fresh detection
+            $manualLocations = array_filter(
+                $this->sceneMemory['locationBible']['locations'] ?? [],
+                fn($loc) => empty($loc['autoDetected']) && empty($loc['aiGenerated']) && empty($loc['patternMatched'])
+            );
+            $this->sceneMemory['locationBible']['locations'] = array_values($manualLocations);
+
+            // Use AI-powered extraction (with pattern fallback)
+            $this->autoDetectLocationsFromScript();
+            $this->saveProject();
+
+            Log::info('LocationExtraction: Manual auto-detect completed', [
+                'locationCount' => count($this->sceneMemory['locationBible']['locations'] ?? []),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('LocationExtraction: Manual auto-detect failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Ensure at least something is shown to the user
+            $this->error = __('Location detection encountered an issue. A default location has been added.');
+        }
     }
 
     /**
