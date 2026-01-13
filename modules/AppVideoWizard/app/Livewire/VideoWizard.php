@@ -3076,6 +3076,7 @@ class VideoWizard extends Component
 
     /**
      * Regenerate a single scene.
+     * Phase 3: Uses context-aware regeneration when Story Bible is present.
      */
     public function regenerateScene(int $sceneIndex): void
     {
@@ -3090,12 +3091,22 @@ class VideoWizard extends Component
             $project = WizardProject::findOrFail($this->projectId);
             $scriptService = app(ScriptGenerationService::class);
 
-            $regeneratedScene = $scriptService->regenerateScene($project, $sceneIndex, [
-                'teamId' => session('current_team_id', 0),
-                'tone' => $this->scriptTone,
-                'contentDepth' => $this->contentDepth,
-                'existingScene' => $this->script['scenes'][$sceneIndex],
-            ]);
+            // Phase 3: Use context-aware regeneration when Story Bible exists
+            if ($project->hasStoryBible()) {
+                $regeneratedScene = $scriptService->regenerateSceneWithContext($project, $sceneIndex, $this->script['scenes'], [
+                    'teamId' => session('current_team_id', 0),
+                    'tone' => $this->scriptTone,
+                    'aiModelTier' => $this->aiModelTier ?? 'economy',
+                ]);
+            } else {
+                // Fallback to standard regeneration
+                $regeneratedScene = $scriptService->regenerateScene($project, $sceneIndex, [
+                    'teamId' => session('current_team_id', 0),
+                    'tone' => $this->scriptTone,
+                    'contentDepth' => $this->contentDepth,
+                    'existingScene' => $this->script['scenes'][$sceneIndex],
+                ]);
+            }
 
             if ($regeneratedScene) {
                 // Preserve certain fields from the original scene
@@ -3115,6 +3126,28 @@ class VideoWizard extends Component
             $this->error = __('Failed to regenerate scene: ') . $e->getMessage();
         } finally {
             $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Get context utilization stats for display (Phase 3).
+     */
+    public function getContextStats(): array
+    {
+        if (!$this->projectId) {
+            return [];
+        }
+
+        try {
+            $project = WizardProject::find($this->projectId);
+            if (!$project) {
+                return [];
+            }
+
+            $scriptService = app(ScriptGenerationService::class);
+            return $scriptService->getContextUtilization($project, $this->aiModelTier ?? 'economy');
+        } catch (\Exception $e) {
+            return [];
         }
     }
 

@@ -1124,6 +1124,12 @@
             <span>Locations:</span>
             <span class="wr-stat-value">{{ count($storyBible['locations'] ?? []) }}</span>
         </div>
+        @if(!empty($storyBible['status']) && $storyBible['status'] === 'ready')
+        <div class="wr-stat" style="border-left: 1px solid rgba(255,255,255,0.1); padding-left: 1rem; margin-left: 0.5rem;">
+            <span style="color: #10b981;">Context-Aware</span>
+            <span class="wr-stat-value" style="color: #10b981;" title="Scene regeneration uses full Story Bible + surrounding scenes for better continuity">✓</span>
+        </div>
+        @endif
     </div>
 
     {{-- Reference Popover (Alpine.js managed) --}}
