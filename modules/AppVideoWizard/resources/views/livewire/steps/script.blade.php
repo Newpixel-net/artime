@@ -1365,11 +1365,20 @@
                                 <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 0.8rem; line-height: 1.5;">{{ Str::limit($storyBible['logline'], 150) }}</p>
                             @endif
                         </div>
-                        <button type="button"
-                                wire:click="openStoryBibleModal"
-                                style="padding: 0.35rem 0.75rem; background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); border-radius: 0.375rem; color: #6ee7b7; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
-                            ✏️ {{ __('Edit Bible') }}
-                        </button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button"
+                                    wire:click="openStoryBibleModal"
+                                    style="padding: 0.35rem 0.75rem; background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); border-radius: 0.375rem; color: #6ee7b7; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
+                                ✏️ {{ __('Edit Bible') }}
+                            </button>
+                            @if(!empty($script['scenes']))
+                            <button type="button"
+                                    wire:click="openWritersRoom"
+                                    style="padding: 0.35rem 0.75rem; background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,182,212,0.2)); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.375rem; color: #c4b5fd; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
+                                ✍️ {{ __("Writer's Room") }}
+                            </button>
+                            @endif
+                        </div>
                     </div>
 
                     <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">

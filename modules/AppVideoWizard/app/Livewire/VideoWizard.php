@@ -708,6 +708,10 @@ class VideoWizard extends Component
     public int $editingBibleLocationIndex = 0;
     public bool $isGeneratingStoryBible = false;
 
+    // Writer's Room state (Phase 2: Professional Writing Interface)
+    public bool $showWritersRoom = false;
+    public int $writersRoomActiveScene = 0;
+
     // Storyboard Pagination (Performance optimization for 45+ scenes)
     public int $storyboardPage = 1;
     public int $storyboardPerPage = 12;
@@ -9167,6 +9171,66 @@ class VideoWizard extends Component
             }
         }
 
+        $this->saveProject();
+    }
+
+    // =========================================================================
+    // WRITER'S ROOM METHODS (Phase 2: Professional Writing Interface)
+    // =========================================================================
+
+    /**
+     * Open the Writer's Room interface.
+     */
+    public function openWritersRoom(): void
+    {
+        $this->showWritersRoom = true;
+        $this->writersRoomActiveScene = 0;
+    }
+
+    /**
+     * Close the Writer's Room interface.
+     */
+    public function closeWritersRoom(): void
+    {
+        $this->showWritersRoom = false;
+    }
+
+    /**
+     * Move a scene up in the scene order.
+     */
+    public function moveSceneUp(int $index): void
+    {
+        if ($index <= 0 || $index >= count($this->script['scenes'] ?? [])) {
+            return;
+        }
+
+        $scenes = $this->script['scenes'];
+        $temp = $scenes[$index];
+        $scenes[$index] = $scenes[$index - 1];
+        $scenes[$index - 1] = $temp;
+
+        $this->script['scenes'] = $scenes;
+        $this->writersRoomActiveScene = $index - 1;
+        $this->saveProject();
+    }
+
+    /**
+     * Move a scene down in the scene order.
+     */
+    public function moveSceneDown(int $index): void
+    {
+        $sceneCount = count($this->script['scenes'] ?? []);
+        if ($index < 0 || $index >= $sceneCount - 1) {
+            return;
+        }
+
+        $scenes = $this->script['scenes'];
+        $temp = $scenes[$index];
+        $scenes[$index] = $scenes[$index + 1];
+        $scenes[$index + 1] = $temp;
+
+        $this->script['scenes'] = $scenes;
+        $this->writersRoomActiveScene = $index + 1;
         $this->saveProject();
     }
 
