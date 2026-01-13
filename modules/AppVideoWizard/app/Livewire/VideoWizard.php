@@ -9461,18 +9461,62 @@ class VideoWizard extends Component
             return;
         }
 
-        // Get existing Character Bible characters
+        // STEP 1: Build map of existing character data to preserve (by lowercase name)
         $existingCharacters = $this->sceneMemory['characterBible']['characters'] ?? [];
-        $existingNames = array_map(fn($c) => strtolower($c['name'] ?? ''), $existingCharacters);
+        $existingDataMap = [];
+        foreach ($existingCharacters as $char) {
+            $key = strtolower($char['name'] ?? '');
+            if (!empty($key)) {
+                $existingDataMap[$key] = $char;
+            }
+        }
 
-        $syncedCount = 0;
+        // STEP 2: Build scene content for character name matching
+        $scenes = $this->script['scenes'] ?? [];
+        $sceneTexts = [];
+        foreach ($scenes as $idx => $scene) {
+            $text = strtolower(
+                ($scene['narration'] ?? '') . ' ' .
+                ($scene['visualDescription'] ?? '') . ' ' .
+                ($scene['visualPrompt'] ?? '') . ' ' .
+                ($scene['title'] ?? '')
+            );
+            $sceneTexts[$idx] = $text;
+        }
 
+        // STEP 3: Add Story Bible characters with auto-detected scene assignments
+        $syncedCharacters = [];
         foreach ($storyBibleCharacters as $bibleChar) {
             $name = $bibleChar['name'] ?? '';
             if (empty($name)) continue;
 
-            // Check if character already exists in Character Bible
-            $existingIndex = array_search(strtolower($name), $existingNames);
+            $lowerName = strtolower($name);
+
+            // Auto-detect which scenes this character appears in
+            $detectedScenes = [];
+            $searchTerms = [$lowerName];
+
+            // Add partial name matches (e.g., "King Saul" should match "king" and "saul")
+            $nameParts = explode(' ', $lowerName);
+            foreach ($nameParts as $part) {
+                if (strlen($part) > 2) { // Only add meaningful parts
+                    $searchTerms[] = $part;
+                }
+            }
+
+            foreach ($sceneTexts as $sceneIdx => $text) {
+                foreach ($searchTerms as $term) {
+                    if (strpos($text, $term) !== false) {
+                        $detectedScenes[] = $sceneIdx;
+                        break; // Found in this scene, move to next scene
+                    }
+                }
+            }
+            $detectedScenes = array_values(array_unique($detectedScenes));
+            sort($detectedScenes);
+
+            // Check if we had existing data for this character (to preserve user settings)
+            $existing = $existingDataMap[$lowerName] ?? null;
 
             // Convert Story Bible character to Character Bible format
             $characterBibleFormat = [
@@ -9481,49 +9525,33 @@ class VideoWizard extends Component
                 'traits' => $bibleChar['traits'] ?? [],
                 'role' => $bibleChar['role'] ?? 'supporting',
                 'arc' => $bibleChar['arc'] ?? '',
-                'appliedScenes' => [],
-                'referenceImage' => $bibleChar['referenceImage'] ?? '',
-                'referenceImageSource' => !empty($bibleChar['referenceImage']) ? 'story-bible' : '',
-                // Hair, wardrobe, makeup, accessories can be filled in later
-                'hair' => ['color' => '', 'style' => '', 'length' => '', 'texture' => ''],
-                'wardrobe' => ['outfit' => '', 'colors' => '', 'style' => '', 'footwear' => ''],
-                'makeup' => ['style' => '', 'details' => ''],
-                'accessories' => [],
+                // Use existing scene assignments if user has set them, otherwise auto-detected
+                'appliedScenes' => (!empty($existing['appliedScenes'])) ? $existing['appliedScenes'] : $detectedScenes,
+                // Preserve user's reference image, or use Story Bible's
+                'referenceImage' => $existing['referenceImage'] ?? $bibleChar['referenceImage'] ?? '',
+                'referenceImageSource' => $existing['referenceImageSource'] ?? (!empty($bibleChar['referenceImage']) ? 'story-bible' : ''),
+                // Preserve DNA fields from existing, or initialize empty
+                'hair' => (!empty($existing['hair']['color'])) ? $existing['hair'] : ['color' => '', 'style' => '', 'length' => '', 'texture' => ''],
+                'wardrobe' => (!empty($existing['wardrobe']['outfit'])) ? $existing['wardrobe'] : ['outfit' => '', 'colors' => '', 'style' => '', 'footwear' => ''],
+                'makeup' => (!empty($existing['makeup']['style'])) ? $existing['makeup'] : ['style' => '', 'details' => ''],
+                'accessories' => $existing['accessories'] ?? [],
                 'syncedFromStoryBible' => true,
             ];
 
-            if ($existingIndex !== false) {
-                // Update existing character, preserving their reference image if they have one
-                $existing = $existingCharacters[$existingIndex];
-                if (!empty($existing['referenceImage'])) {
-                    $characterBibleFormat['referenceImage'] = $existing['referenceImage'];
-                    $characterBibleFormat['referenceImageSource'] = $existing['referenceImageSource'] ?? 'preserved';
-                }
-                // Preserve applied scenes
-                $characterBibleFormat['appliedScenes'] = $existing['appliedScenes'] ?? [];
-                // Preserve DNA fields if already set
-                if (!empty($existing['hair']['color'])) $characterBibleFormat['hair'] = $existing['hair'];
-                if (!empty($existing['wardrobe']['outfit'])) $characterBibleFormat['wardrobe'] = $existing['wardrobe'];
-                if (!empty($existing['makeup']['style'])) $characterBibleFormat['makeup'] = $existing['makeup'];
-                if (!empty($existing['accessories'])) $characterBibleFormat['accessories'] = $existing['accessories'];
-
-                $this->sceneMemory['characterBible']['characters'][$existingIndex] = $characterBibleFormat;
-            } else {
-                // Add new character
-                $this->sceneMemory['characterBible']['characters'][] = $characterBibleFormat;
-                $existingNames[] = strtolower($name);
-            }
-            $syncedCount++;
+            $syncedCharacters[] = $characterBibleFormat;
         }
 
+        // STEP 4: Replace character list with Story Bible characters (authoritative source)
+        $this->sceneMemory['characterBible']['characters'] = $syncedCharacters;
+
         // Enable Character Bible if we synced characters
-        if ($syncedCount > 0) {
+        if (count($syncedCharacters) > 0) {
             $this->sceneMemory['characterBible']['enabled'] = true;
         }
 
-        Log::info('CharacterBible: Synced from Story Bible', [
-            'syncedCount' => $syncedCount,
-            'totalCharacters' => count($this->sceneMemory['characterBible']['characters']),
+        Log::info('CharacterBible: Synced from Story Bible (replaced)', [
+            'syncedCount' => count($syncedCharacters),
+            'characterScenes' => array_map(fn($c) => ['name' => $c['name'], 'scenes' => count($c['appliedScenes'])], $syncedCharacters),
         ]);
 
         $this->saveProject();
@@ -9542,62 +9570,100 @@ class VideoWizard extends Component
             return;
         }
 
-        // Get existing Location Bible locations
+        // STEP 1: Build map of existing location data to preserve (by lowercase name)
         $existingLocations = $this->sceneMemory['locationBible']['locations'] ?? [];
-        $existingNames = array_map(fn($l) => strtolower($l['name'] ?? ''), $existingLocations);
+        $existingDataMap = [];
+        foreach ($existingLocations as $loc) {
+            $key = strtolower($loc['name'] ?? '');
+            if (!empty($key)) {
+                $existingDataMap[$key] = $loc;
+            }
+        }
 
-        $syncedCount = 0;
+        // STEP 2: Build scene content for location name matching
+        $scenes = $this->script['scenes'] ?? [];
+        $sceneTexts = [];
+        foreach ($scenes as $idx => $scene) {
+            $text = strtolower(
+                ($scene['narration'] ?? '') . ' ' .
+                ($scene['visualDescription'] ?? '') . ' ' .
+                ($scene['visualPrompt'] ?? '') . ' ' .
+                ($scene['title'] ?? '') . ' ' .
+                ($scene['location'] ?? '') . ' ' .
+                ($scene['setting'] ?? '')
+            );
+            $sceneTexts[$idx] = $text;
+        }
 
+        // STEP 3: Add Story Bible locations with auto-detected scene assignments
+        $syncedLocations = [];
         foreach ($storyBibleLocations as $bibleLoc) {
             $name = $bibleLoc['name'] ?? '';
             if (empty($name)) continue;
 
-            // Check if location already exists in Location Bible
-            $existingIndex = array_search(strtolower($name), $existingNames);
+            $lowerName = strtolower($name);
+
+            // Auto-detect which scenes this location appears in
+            $detectedScenes = [];
+            $searchTerms = [$lowerName];
+
+            // Add partial name matches (e.g., "Valley of Elah" should match "valley", "elah")
+            $nameParts = preg_split('/[\s\-_]+/', $lowerName);
+            foreach ($nameParts as $part) {
+                if (strlen($part) > 3) { // Only add meaningful parts (longer for locations)
+                    $searchTerms[] = $part;
+                }
+            }
+
+            foreach ($sceneTexts as $sceneIdx => $text) {
+                foreach ($searchTerms as $term) {
+                    if (strpos($text, $term) !== false) {
+                        $detectedScenes[] = $sceneIdx;
+                        break; // Found in this scene, move to next scene
+                    }
+                }
+            }
+            $detectedScenes = array_values(array_unique($detectedScenes));
+            sort($detectedScenes);
+
+            // Check if we had existing data for this location (to preserve user settings)
+            $existing = $existingDataMap[$lowerName] ?? null;
 
             // Convert Story Bible location to Location Bible format
+            // NOTE: Use 'scenes' field (consistent with toggleLocationScene) not 'appliedScenes'
             $locationBibleFormat = [
                 'name' => $name,
                 'description' => $bibleLoc['description'] ?? '',
                 'type' => $bibleLoc['type'] ?? 'exterior',
                 'timeOfDay' => $bibleLoc['timeOfDay'] ?? 'day',
+                'weather' => $bibleLoc['weather'] ?? 'clear',
                 'atmosphere' => $bibleLoc['atmosphere'] ?? '',
+                'mood' => $bibleLoc['mood'] ?? '',
+                'lightingStyle' => $bibleLoc['lightingStyle'] ?? '',
                 'keyElements' => $bibleLoc['keyElements'] ?? [],
-                'appliedScenes' => [],
-                'referenceImage' => $bibleLoc['referenceImage'] ?? '',
-                'referenceImageSource' => !empty($bibleLoc['referenceImage']) ? 'story-bible' : '',
-                'referenceImageStatus' => !empty($bibleLoc['referenceImage']) ? 'ready' : 'none',
+                // Use existing scene assignments if user has set them, otherwise auto-detected
+                'scenes' => (!empty($existing['scenes'])) ? $existing['scenes'] : $detectedScenes,
+                // Preserve user's reference image, or use Story Bible's
+                'referenceImage' => $existing['referenceImage'] ?? $bibleLoc['referenceImage'] ?? '',
+                'referenceImageSource' => $existing['referenceImageSource'] ?? (!empty($bibleLoc['referenceImage']) ? 'story-bible' : ''),
+                'referenceImageStatus' => $existing['referenceImageStatus'] ?? (!empty($bibleLoc['referenceImage']) ? 'ready' : 'none'),
                 'syncedFromStoryBible' => true,
             ];
 
-            if ($existingIndex !== false) {
-                // Update existing location, preserving their reference image if they have one
-                $existing = $existingLocations[$existingIndex];
-                if (!empty($existing['referenceImage'])) {
-                    $locationBibleFormat['referenceImage'] = $existing['referenceImage'];
-                    $locationBibleFormat['referenceImageSource'] = $existing['referenceImageSource'] ?? 'preserved';
-                    $locationBibleFormat['referenceImageStatus'] = $existing['referenceImageStatus'] ?? 'ready';
-                }
-                // Preserve applied scenes
-                $locationBibleFormat['appliedScenes'] = $existing['appliedScenes'] ?? [];
-
-                $this->sceneMemory['locationBible']['locations'][$existingIndex] = $locationBibleFormat;
-            } else {
-                // Add new location
-                $this->sceneMemory['locationBible']['locations'][] = $locationBibleFormat;
-                $existingNames[] = strtolower($name);
-            }
-            $syncedCount++;
+            $syncedLocations[] = $locationBibleFormat;
         }
 
+        // STEP 4: Replace location list with Story Bible locations (authoritative source)
+        $this->sceneMemory['locationBible']['locations'] = $syncedLocations;
+
         // Enable Location Bible if we synced locations
-        if ($syncedCount > 0) {
+        if (count($syncedLocations) > 0) {
             $this->sceneMemory['locationBible']['enabled'] = true;
         }
 
-        Log::info('LocationBible: Synced from Story Bible', [
-            'syncedCount' => $syncedCount,
-            'totalLocations' => count($this->sceneMemory['locationBible']['locations']),
+        Log::info('LocationBible: Synced from Story Bible (replaced)', [
+            'syncedCount' => count($syncedLocations),
+            'locationScenes' => array_map(fn($l) => ['name' => $l['name'], 'scenes' => count($l['scenes'])], $syncedLocations),
         ]);
 
         $this->saveProject();
