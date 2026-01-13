@@ -12,6 +12,42 @@ use Illuminate\Support\Facades\Log;
 class CharacterExtractionService
 {
     /**
+     * AI Model Tier configurations.
+     * Maps tier names to provider/model pairs.
+     */
+    const AI_MODEL_TIERS = [
+        'economy' => [
+            'provider' => 'grok',
+            'model' => 'grok-4-fast',
+        ],
+        'standard' => [
+            'provider' => 'openai',
+            'model' => 'gpt-4o-mini',
+        ],
+        'premium' => [
+            'provider' => 'openai',
+            'model' => 'gpt-4o',
+        ],
+    ];
+
+    /**
+     * Call AI with tier-based model selection.
+     */
+    protected function callAIWithTier(string $prompt, string $tier, int $teamId, array $options = []): array
+    {
+        $config = self::AI_MODEL_TIERS[$tier] ?? self::AI_MODEL_TIERS['economy'];
+
+        return AI::processWithOverride(
+            $prompt,
+            $config['provider'],
+            $config['model'],
+            'text',
+            $options,
+            $teamId
+        );
+    }
+
+    /**
      * Extract characters from a video script using AI analysis.
      *
      * @param array $script The script data with scenes
@@ -36,6 +72,7 @@ class CharacterExtractionService
         $productionMode = $options['productionMode'] ?? 'standard';
         $styleBible = $options['styleBible'] ?? null;
         $visualMode = $options['visualMode'] ?? null; // Master visual mode enforcement
+        $aiModelTier = $options['aiModelTier'] ?? 'economy';
 
         try {
             // Build scene content for analysis
@@ -53,8 +90,8 @@ class CharacterExtractionService
 
             $startTime = microtime(true);
 
-            // Call AI
-            $result = AI::process($prompt, 'text', ['maxResult' => 1], $teamId);
+            // Call AI with tier-based model selection
+            $result = $this->callAIWithTier($prompt, $aiModelTier, $teamId, ['maxResult' => 1]);
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
@@ -563,6 +600,7 @@ USER;
         $visualMode = $options['visualMode'] ?? null;
         $batchSize = $options['batchSize'] ?? 3;
         $minDescriptionLength = $options['minDescriptionLength'] ?? 30;
+        $aiModelTier = $options['aiModelTier'] ?? 'economy';
 
         // Identify characters needing enrichment
         $needsEnrichment = [];
@@ -599,7 +637,7 @@ USER;
 
         foreach ($batches as $batchIdx => $batch) {
             try {
-                $batchEnriched = $this->enrichBatch($batch, $sceneContext, $visualMode, $teamId);
+                $batchEnriched = $this->enrichBatch($batch, $sceneContext, $visualMode, $teamId, $aiModelTier);
                 foreach ($batchEnriched as $charIdx => $enrichedChar) {
                     $enriched[$charIdx] = $enrichedChar;
                 }
@@ -636,7 +674,7 @@ USER;
     /**
      * Enrich a batch of characters with AI-generated descriptions.
      */
-    protected function enrichBatch(array $characters, string $sceneContext, ?array $visualMode, int $teamId): array
+    protected function enrichBatch(array $characters, string $sceneContext, ?array $visualMode, int $teamId, string $aiModelTier = 'economy'): array
     {
         // Build character list for prompt
         $charList = [];
@@ -693,7 +731,7 @@ Return ONLY valid JSON in this exact format:
 CRITICAL: Use the EXACT character names provided. Generate unique, detailed descriptions for each.
 PROMPT;
 
-        $result = AI::process($prompt, 'text', ['maxResult' => 1], $teamId);
+        $result = $this->callAIWithTier($prompt, $aiModelTier, $teamId, ['maxResult' => 1]);
 
         if (!empty($result['error'])) {
             throw new \Exception('AI error: ' . $result['error']);

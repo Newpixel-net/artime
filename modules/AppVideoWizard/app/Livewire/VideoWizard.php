@@ -1834,6 +1834,7 @@ class VideoWizard extends Component
                 'productionType' => $this->productionType,
                 'productionSubType' => $this->productionSubtype,
                 'teamId' => session('current_team_id', 0),
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
             ]);
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
@@ -2014,6 +2015,7 @@ class VideoWizard extends Component
                     'productionType' => $this->productionType,
                     'productionSubType' => $this->productionSubtype,
                     'teamId' => session('current_team_id', 0),
+                    'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
                 ]);
 
                 $this->concept['refinedConcept'] = $result['improvedConcept'] ?? '';
@@ -2028,7 +2030,10 @@ class VideoWizard extends Component
             $variations = $conceptService->generateVariations(
                 $this->concept['refinedConcept'] ?: $this->concept['rawInput'],
                 3,
-                ['teamId' => session('current_team_id', 0)]
+                [
+                    'teamId' => session('current_team_id', 0),
+                    'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
+                ]
             );
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
@@ -2122,7 +2127,10 @@ class VideoWizard extends Component
             $variations = $conceptService->generateVariations(
                 $this->concept['rawInput'], // Use original input for fresh variations
                 3,
-                ['teamId' => session('current_team_id', 0)]
+                [
+                    'teamId' => session('current_team_id', 0),
+                    'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
+                ]
             );
 
             $this->conceptVariations = $variations;
@@ -2214,6 +2222,8 @@ class VideoWizard extends Component
                 'storyArc' => $this->storyArc,
                 'tensionCurve' => $this->tensionCurve,
                 'emotionalJourney' => $this->emotionalJourney,
+                // AI Model Tier selection
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
             ]);
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
@@ -7301,6 +7311,7 @@ class VideoWizard extends Component
                 'productionMode' => 'standard',
                 'styleBible' => $this->sceneMemory['styleBible'] ?? null,
                 'visualMode' => $this->getVisualMode(), // Master visual mode enforcement
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
             ]);
 
             if ($result['success'] && !empty($result['characters'])) {
@@ -7437,6 +7448,7 @@ class VideoWizard extends Component
                                 'visualMode' => $this->getVisualMode(),
                                 'batchSize' => $batchSize,
                                 'minDescriptionLength' => $minDescLength,
+                                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
                             ]
                         );
 
@@ -8163,6 +8175,7 @@ class VideoWizard extends Component
                 'productionMode' => 'standard',
                 'styleBible' => $this->sceneMemory['styleBible'] ?? null,
                 'visualMode' => $this->getVisualMode(), // Master visual mode enforcement
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
             ]);
 
             if ($result['success'] && !empty($result['locations'])) {

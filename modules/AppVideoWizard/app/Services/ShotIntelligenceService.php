@@ -467,25 +467,28 @@ class ShotIntelligenceService
         $provider = VwSetting::getValue('ai_shot_analysis_provider', 'openai');
         $model = VwSetting::getValue('ai_shot_analysis_model', 'gpt-4');
 
-        // Tier-based model overrides (user can still set base provider in admin)
+        // Tier-based model overrides - matches VideoWizard::AI_MODEL_TIERS
+        // Economy: Best value, great quality
+        // Standard: Balanced performance
+        // Premium: Maximum quality
         $tierModels = [
             'economy' => [
                 'openai' => 'gpt-4o-mini',
-                'grok' => 'grok-2-fast',
-                'gemini' => 'gemini-1.5-flash',
-                'anthropic' => 'claude-3-haiku',
+                'grok' => 'grok-4-fast', // Updated: xAI's latest fast model
+                'gemini' => 'gemini-2.5-flash',
+                'anthropic' => 'claude-3.5-haiku',
             ],
             'standard' => [
                 'openai' => 'gpt-4o-mini',
-                'grok' => 'grok-2',
-                'gemini' => 'gemini-1.5-pro',
-                'anthropic' => 'claude-3-5-sonnet',
+                'grok' => 'grok-4-fast',
+                'gemini' => 'gemini-2.5-pro',
+                'anthropic' => 'claude-sonnet-4',
             ],
             'premium' => [
                 'openai' => 'gpt-4o',
-                'grok' => 'grok-3',
-                'gemini' => 'gemini-2.0-flash-exp',
-                'anthropic' => 'claude-3-5-opus',
+                'grok' => 'grok-4', // Full Grok 4 for premium
+                'gemini' => 'gemini-2.5-pro',
+                'anthropic' => 'claude-opus-4',
             ],
         ];
 
