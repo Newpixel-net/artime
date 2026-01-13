@@ -9530,6 +9530,141 @@ class VideoWizard extends Component
     }
 
     /**
+     * Sync Story Bible locations to Location Bible.
+     * This ensures the Storyboard stage uses the same locations defined in Story Bible.
+     */
+    public function syncStoryBibleToLocationBible(): void
+    {
+        $storyBibleLocations = $this->storyBible['locations'] ?? [];
+
+        if (empty($storyBibleLocations)) {
+            Log::info('LocationBible: No Story Bible locations to sync');
+            return;
+        }
+
+        // Get existing Location Bible locations
+        $existingLocations = $this->sceneMemory['locationBible']['locations'] ?? [];
+        $existingNames = array_map(fn($l) => strtolower($l['name'] ?? ''), $existingLocations);
+
+        $syncedCount = 0;
+
+        foreach ($storyBibleLocations as $bibleLoc) {
+            $name = $bibleLoc['name'] ?? '';
+            if (empty($name)) continue;
+
+            // Check if location already exists in Location Bible
+            $existingIndex = array_search(strtolower($name), $existingNames);
+
+            // Convert Story Bible location to Location Bible format
+            $locationBibleFormat = [
+                'name' => $name,
+                'description' => $bibleLoc['description'] ?? '',
+                'type' => $bibleLoc['type'] ?? 'exterior',
+                'timeOfDay' => $bibleLoc['timeOfDay'] ?? 'day',
+                'atmosphere' => $bibleLoc['atmosphere'] ?? '',
+                'keyElements' => $bibleLoc['keyElements'] ?? [],
+                'appliedScenes' => [],
+                'referenceImage' => $bibleLoc['referenceImage'] ?? '',
+                'referenceImageSource' => !empty($bibleLoc['referenceImage']) ? 'story-bible' : '',
+                'referenceImageStatus' => !empty($bibleLoc['referenceImage']) ? 'ready' : 'none',
+                'syncedFromStoryBible' => true,
+            ];
+
+            if ($existingIndex !== false) {
+                // Update existing location, preserving their reference image if they have one
+                $existing = $existingLocations[$existingIndex];
+                if (!empty($existing['referenceImage'])) {
+                    $locationBibleFormat['referenceImage'] = $existing['referenceImage'];
+                    $locationBibleFormat['referenceImageSource'] = $existing['referenceImageSource'] ?? 'preserved';
+                    $locationBibleFormat['referenceImageStatus'] = $existing['referenceImageStatus'] ?? 'ready';
+                }
+                // Preserve applied scenes
+                $locationBibleFormat['appliedScenes'] = $existing['appliedScenes'] ?? [];
+
+                $this->sceneMemory['locationBible']['locations'][$existingIndex] = $locationBibleFormat;
+            } else {
+                // Add new location
+                $this->sceneMemory['locationBible']['locations'][] = $locationBibleFormat;
+                $existingNames[] = strtolower($name);
+            }
+            $syncedCount++;
+        }
+
+        // Enable Location Bible if we synced locations
+        if ($syncedCount > 0) {
+            $this->sceneMemory['locationBible']['enabled'] = true;
+        }
+
+        Log::info('LocationBible: Synced from Story Bible', [
+            'syncedCount' => $syncedCount,
+            'totalLocations' => count($this->sceneMemory['locationBible']['locations']),
+        ]);
+
+        $this->saveProject();
+    }
+
+    /**
+     * Sync Story Bible visual style to Style Bible.
+     * This ensures the Storyboard stage uses the same visual style defined in Story Bible.
+     */
+    public function syncStoryBibleToStyleBible(): void
+    {
+        $storyBibleStyle = $this->storyBible['visualStyle'] ?? [];
+
+        if (empty($storyBibleStyle) || empty($storyBibleStyle['mode'])) {
+            Log::info('StyleBible: No Story Bible visual style to sync');
+            return;
+        }
+
+        // Map Story Bible visual style fields to Style Bible fields
+        if (!empty($storyBibleStyle['colorPalette'])) {
+            $this->sceneMemory['styleBible']['colorPalette'] = $storyBibleStyle['colorPalette'];
+        }
+
+        if (!empty($storyBibleStyle['lighting'])) {
+            // Handle lighting - could be string or structured
+            if (is_string($storyBibleStyle['lighting'])) {
+                $this->sceneMemory['styleBible']['lighting']['setup'] = $storyBibleStyle['lighting'];
+            } else {
+                $this->sceneMemory['styleBible']['lighting'] = array_merge(
+                    $this->sceneMemory['styleBible']['lighting'],
+                    $storyBibleStyle['lighting']
+                );
+            }
+        }
+
+        if (!empty($storyBibleStyle['cameraLanguage'])) {
+            $this->sceneMemory['styleBible']['cameraLanguage'] = $storyBibleStyle['cameraLanguage'];
+        }
+
+        if (!empty($storyBibleStyle['references'])) {
+            // Store references as part of the style
+            $this->sceneMemory['styleBible']['styleReferences'] = $storyBibleStyle['references'];
+        }
+
+        // Map mode to style
+        $modeToStyle = [
+            'cinematic-realistic' => 'Photorealistic cinematic',
+            'documentary' => 'Documentary style',
+            'animated-3d' => '3D animated',
+            'animated-2d' => '2D animated',
+            'stock-footage' => 'Stock footage style',
+        ];
+        $this->sceneMemory['styleBible']['style'] = $modeToStyle[$storyBibleStyle['mode']] ?? $storyBibleStyle['mode'];
+
+        // Mark as synced
+        $this->sceneMemory['styleBible']['syncedFromStoryBible'] = true;
+
+        Log::info('StyleBible: Synced from Story Bible', [
+            'mode' => $storyBibleStyle['mode'],
+            'hasColorPalette' => !empty($storyBibleStyle['colorPalette']),
+            'hasLighting' => !empty($storyBibleStyle['lighting']),
+        ]);
+
+        $this->saveProject();
+    }
+
+    /**
      * Open Character Bible modal.
      * Auto-syncs from Story Bible if available.
      */
@@ -10454,11 +10589,15 @@ EOT;
 
     /**
      * Open Location Bible modal.
-     * Note: Does NOT auto-add placeholder location - let auto-detection populate
-     * or user can click "Add Location" button manually.
+     * Auto-syncs from Story Bible if available.
      */
     public function openLocationBibleModal(): void
     {
+        // Auto-sync from Story Bible if it has locations
+        if (!empty($this->storyBible['locations']) && $this->storyBible['status'] === 'ready') {
+            $this->syncStoryBibleToLocationBible();
+        }
+
         $this->showLocationBibleModal = true;
         // Set editing index to first location if exists, otherwise -1
         $this->editingLocationIndex = !empty($this->sceneMemory['locationBible']['locations']) ? 0 : -1;
