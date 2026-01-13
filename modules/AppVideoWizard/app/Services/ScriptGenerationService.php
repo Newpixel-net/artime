@@ -14,11 +14,17 @@ class ScriptGenerationService
     protected PromptService $promptService;
 
     /**
+     * ContextWindowService for maximized context generation (Phase 3).
+     */
+    protected ContextWindowService $contextService;
+
+    /**
      * Constructor.
      */
-    public function __construct(?PromptService $promptService = null)
+    public function __construct(?PromptService $promptService = null, ?ContextWindowService $contextService = null)
     {
         $this->promptService = $promptService ?? new PromptService();
+        $this->contextService = $contextService ?? new ContextWindowService();
     }
 
     /**
@@ -2655,6 +2661,139 @@ PROMPT;
         $scene['kenBurns'] = $this->generateKenBurnsEffect();
 
         return $scene;
+    }
+
+    /**
+     * Regenerate a scene with full context awareness (Phase 3: Context Window Maximization).
+     * Uses Story Bible + surrounding scenes for perfect narrative continuity.
+     */
+    public function regenerateSceneWithContext(WizardProject $project, int $sceneIndex, array $allScenes, array $options = []): ?array
+    {
+        $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+        $existingScene = $allScenes[$sceneIndex] ?? [];
+        $tone = $options['tone'] ?? 'engaging';
+        $aiModelTier = $options['aiModelTier'] ?? 'economy';
+
+        // Build full context using ContextWindowService
+        $contextData = $this->contextService->buildSceneRegenerationContext(
+            $project,
+            $allScenes,
+            $sceneIndex,
+            ['aiModelTier' => $aiModelTier]
+        );
+
+        \Log::info('VideoWizard: Context-aware scene regeneration', [
+            'sceneIndex' => $sceneIndex,
+            'aiModelTier' => $aiModelTier,
+            'contextLength' => strlen($contextData),
+            'hasStoryBible' => $project->hasStoryBible(),
+            'totalScenes' => count($allScenes),
+        ]);
+
+        $prompt = $contextData . <<<PROMPT
+
+TONE: {$tone}
+TARGET SCENE: {$sceneIndex} + 1
+SCENE TITLE: {$existingScene['title']}
+DURATION: {$existingScene['duration']} seconds
+
+Generate a completely new version of this scene that:
+1. Flows naturally from previous scenes (if any)
+2. Leads smoothly into following scenes (if any)
+3. Uses characters exactly as described in the Story Bible
+4. Uses locations exactly as described in the Story Bible
+5. Maintains the established visual style and tone
+6. Keeps the same approximate duration
+
+RESPOND WITH ONLY THIS JSON (no markdown, no explanation):
+{
+  "id": "{$existingScene['id']}",
+  "title": "New scene title",
+  "narration": "New narrator text matching the duration",
+  "visualDescription": "Detailed visual description for AI image generation, using Story Bible character/location descriptions",
+  "visualPrompt": "Concise image generation prompt (50-100 words)",
+  "voiceover": {
+    "enabled": true,
+    "text": "",
+    "voiceId": null,
+    "status": "pending"
+  },
+  "duration": {$existingScene['duration']},
+  "mood": "cinematic",
+  "status": "draft",
+  "characters": ["Names of characters appearing in this scene"],
+  "location": "Name of location used in this scene"
+}
+PROMPT;
+
+        $result = $this->callAIWithTier($prompt, $aiModelTier, $teamId, ['maxResult' => 1]);
+
+        if (!empty($result['error'])) {
+            \Log::error('VideoWizard: Context-aware regeneration failed', ['error' => $result['error']]);
+            throw new \Exception($result['error']);
+        }
+
+        $response = $result['data'][0] ?? '';
+        $json = $this->extractJson($response);
+        $scene = json_decode($json, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !isset($scene['narration'])) {
+            \Log::warning('VideoWizard: Failed to parse context-aware scene', [
+                'jsonError' => json_last_error_msg(),
+                'responsePreview' => substr($response, 0, 200),
+            ]);
+            return null;
+        }
+
+        // Ensure Ken Burns effect
+        $scene['kenBurns'] = $this->generateKenBurnsEffect();
+
+        // Validate against Story Bible
+        $validation = $this->contextService->validateAgainstBible($project, ['scenes' => [$scene]]);
+        if (!empty($validation['warnings'])) {
+            \Log::warning('VideoWizard: Scene has Bible consistency warnings', $validation['warnings']);
+        }
+
+        return $scene;
+    }
+
+    /**
+     * Generate script with maximized context (Phase 3).
+     * Uses full Story Bible context for better narrative coherence.
+     */
+    public function generateScriptWithMaxContext(WizardProject $project, array $options = []): array
+    {
+        $tier = $options['aiModelTier'] ?? 'economy';
+
+        // Get context stats and recommendation
+        $stats = $this->contextService->getContextStats($project, $tier);
+
+        // If complexity suggests a higher tier, log recommendation
+        if ($stats['recommendation'] !== $tier) {
+            \Log::info('VideoWizard: Context service recommends different tier', [
+                'current' => $tier,
+                'recommended' => $stats['recommendation'],
+                'utilization' => $stats['utilization'] . '%',
+            ]);
+        }
+
+        // Build full context prompt parts
+        $fullContext = $this->contextService->buildFullContextPrompt($project, [], ['aiModelTier' => $tier]);
+
+        // Inject the full context into options for prompt building
+        $options['fullContextData'] = $fullContext;
+        $options['contextStats'] = $stats;
+
+        // Use standard generation with enhanced context
+        return $this->generateScript($project, $options);
+    }
+
+    /**
+     * Get context utilization information for UI display.
+     */
+    public function getContextUtilization(WizardProject $project, string $tier = 'economy'): array
+    {
+        return $this->contextService->getContextStats($project, $tier);
     }
 
     /**
