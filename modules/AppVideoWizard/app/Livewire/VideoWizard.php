@@ -15,6 +15,7 @@ use Modules\AppVideoWizard\Services\StockMediaService;
 use Modules\AppVideoWizard\Services\CharacterExtractionService;
 use Modules\AppVideoWizard\Services\LocationExtractionService;
 use Modules\AppVideoWizard\Services\CinematographyService;
+use Modules\AppVideoWizard\Services\StoryBibleService;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
 use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Services\ShotIntelligenceService;
@@ -644,6 +645,69 @@ class VideoWizard extends Component
     public bool $showSceneOverwriteModal = false;
     public string $sceneOverwriteAction = 'replace'; // 'replace' or 'append'
 
+    // =========================================================================
+    // STORY BIBLE STATE (Phase 1: Bible-First Architecture)
+    // =========================================================================
+
+    /**
+     * Story Bible - The "DNA" that constrains all generation.
+     *
+     * Generated BEFORE script to establish:
+     * - Title, logline, theme, tone, genre
+     * - Three-act structure with turning points
+     * - Character profiles with detailed visual descriptions
+     * - Location index with atmosphere details
+     * - Visual style guide
+     * - Pacing and emotional journey
+     *
+     * Structure: See WizardProject::getStoryBibleConstraint() for full schema
+     */
+    public array $storyBible = [
+        'enabled' => false,
+        'status' => 'pending', // 'pending' | 'generating' | 'ready'
+        'generatedAt' => null,
+        'structureTemplate' => 'three-act', // 'three-act' | 'five-act' | 'heros-journey'
+
+        // Core Story Elements
+        'title' => '',
+        'logline' => '',
+        'theme' => '',
+        'tone' => '',
+        'genre' => '',
+
+        // Acts (populated by AI)
+        'acts' => [],
+
+        // Characters (3-5+ with detailed descriptions for AI image generation)
+        'characters' => [],
+
+        // Locations (2-5+ with detailed descriptions for AI image generation)
+        'locations' => [],
+
+        // Visual Style Definition
+        'visualStyle' => [
+            'mode' => 'cinematic-realistic', // Inherits from content.visualMode
+            'colorPalette' => '',
+            'lighting' => '',
+            'cameraLanguage' => '',
+            'references' => '',
+        ],
+
+        // Pacing
+        'pacing' => [
+            'overall' => 'balanced',
+            'tensionCurve' => [],
+            'emotionalBeats' => [],
+        ],
+    ];
+
+    // Story Bible Modal state
+    public bool $showStoryBibleModal = false;
+    public string $storyBibleTab = 'overview'; // 'overview' | 'characters' | 'locations' | 'style'
+    public int $editingBibleCharacterIndex = 0;
+    public int $editingBibleLocationIndex = 0;
+    public bool $isGeneratingStoryBible = false;
+
     // Storyboard Pagination (Performance optimization for 45+ scenes)
     public int $storyboardPage = 1;
     public int $storyboardPerPage = 12;
@@ -997,6 +1061,12 @@ class VideoWizard extends Component
         if ($project->concept) {
             $this->concept = array_merge($this->concept, $project->concept);
         }
+
+        // Restore Story Bible (Phase 1: Bible-First Architecture)
+        if ($project->story_bible) {
+            $this->storyBible = array_merge($this->storyBible, $project->story_bible);
+        }
+
         if ($project->script) {
             // DEBUG: Log scenes before and after merge
             $dbSceneCount = count($project->script['scenes'] ?? []);
@@ -1119,6 +1189,7 @@ class VideoWizard extends Component
             'production_type' => $this->productionType,
             'production_subtype' => $this->productionSubtype,
             'concept' => $this->concept,
+            'story_bible' => $this->storyBible, // Story Bible (Phase 1: Bible-First Architecture)
             'script' => $this->script,
             'storyboard' => $this->storyboard,
             'animation' => $this->animation,
@@ -1170,6 +1241,7 @@ class VideoWizard extends Component
                 'production_type' => $this->productionType,
                 'production_subtype' => $this->productionSubtype,
                 'concept' => $this->concept,
+                'story_bible' => $this->storyBible, // Story Bible (Phase 1: Bible-First Architecture)
                 'script' => $this->script,
                 'storyboard' => $this->storyboard,
                 'animation' => $this->animation,
@@ -8603,6 +8675,499 @@ class VideoWizard extends Component
         }
 
         return $description;
+    }
+
+    // =========================================================================
+    // STORY BIBLE METHODS (Phase 1: Bible-First Architecture)
+    // =========================================================================
+
+    /**
+     * Generate Story Bible from concept.
+     *
+     * This is the first AI call in the workflow. The Story Bible becomes
+     * the "DNA" that constrains all subsequent generation (script, images, etc.)
+     *
+     * Flow: Concept → Story Bible → Script → Storyboard → Animation → Export
+     */
+    public function generateStoryBible(): void
+    {
+        $startTime = microtime(true);
+        $promptSlug = 'story_bible_generation';
+
+        $this->dispatch('vw-debug', [
+            'action' => 'generate-story-bible-start',
+            'message' => 'Starting Story Bible generation',
+            'data' => [
+                'projectId' => $this->projectId,
+                'duration' => $this->targetDuration,
+                'visualMode' => $this->content['visualMode'] ?? 'cinematic-realistic',
+            ]
+        ]);
+
+        if (empty($this->concept['rawInput']) && empty($this->concept['refinedConcept'])) {
+            $this->error = __('Please enter a concept description first.');
+            $this->dispatch('vw-debug', [
+                'action' => 'generate-story-bible-error',
+                'message' => 'No concept input provided',
+                'level' => 'warn'
+            ]);
+            return;
+        }
+
+        $this->isGeneratingStoryBible = true;
+        $this->error = null;
+
+        // Update Story Bible status
+        $this->storyBible['status'] = 'generating';
+
+        try {
+            // Save project first to ensure database has latest settings
+            $this->forceSaveProject();
+            $project = WizardProject::findOrFail($this->projectId);
+
+            Log::info('StoryBible: Starting generation', [
+                'projectId' => $this->projectId,
+                'duration' => $this->targetDuration,
+                'visualMode' => $this->content['visualMode'] ?? 'cinematic-realistic',
+                'structureTemplate' => $this->storyBible['structureTemplate'] ?? 'three-act',
+            ]);
+
+            $storyBibleService = app(StoryBibleService::class);
+
+            $generatedBible = $storyBibleService->generateStoryBible($project, [
+                'teamId' => session('current_team_id', 0),
+                'visualMode' => $this->content['visualMode'] ?? 'cinematic-realistic',
+                'structureTemplate' => $this->storyBible['structureTemplate'] ?? 'three-act',
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
+                'additionalInstructions' => $this->additionalInstructions ?? '',
+            ]);
+
+            $durationMs = (int)((microtime(true) - $startTime) * 1000);
+
+            // Merge generated bible with existing structure
+            $this->storyBible = array_merge($this->storyBible, $generatedBible);
+            $this->storyBible['enabled'] = true;
+            $this->storyBible['status'] = 'ready';
+            $this->storyBible['generatedAt'] = now()->toIso8601String();
+
+            // Log success
+            try {
+                VwGenerationLog::logSuccess(
+                    $promptSlug,
+                    ['topic' => substr($this->concept['refinedConcept'] ?? $this->concept['rawInput'], 0, 200)],
+                    [
+                        'characterCount' => count($this->storyBible['characters'] ?? []),
+                        'locationCount' => count($this->storyBible['locations'] ?? []),
+                        'actCount' => count($this->storyBible['acts'] ?? []),
+                    ],
+                    null,
+                    $durationMs,
+                    $this->projectId,
+                    auth()->id(),
+                    session('current_team_id')
+                );
+            } catch (\Exception $logEx) {
+                Log::warning('VideoWizard: Failed to log generation success', ['error' => $logEx->getMessage()]);
+            }
+
+            $this->saveProject();
+
+            // Dispatch success event
+            $this->dispatch('vw-debug', [
+                'action' => 'generate-story-bible-success',
+                'message' => 'Story Bible generated successfully',
+                'data' => [
+                    'duration_ms' => $durationMs,
+                    'characterCount' => count($this->storyBible['characters'] ?? []),
+                    'locationCount' => count($this->storyBible['locations'] ?? []),
+                ]
+            ]);
+
+            $this->dispatch('story-bible-generated');
+
+            Log::info('StoryBible: Generation completed', [
+                'projectId' => $this->projectId,
+                'durationMs' => $durationMs,
+                'characterCount' => count($this->storyBible['characters'] ?? []),
+                'locationCount' => count($this->storyBible['locations'] ?? []),
+            ]);
+
+        } catch (\Exception $e) {
+            $durationMs = (int)((microtime(true) - $startTime) * 1000);
+            $errorMessage = $e->getMessage();
+
+            $this->storyBible['status'] = 'pending';
+
+            // Log failure
+            try {
+                VwGenerationLog::logFailure(
+                    $promptSlug,
+                    ['topic' => substr($this->concept['refinedConcept'] ?? $this->concept['rawInput'] ?? '', 0, 200)],
+                    $errorMessage,
+                    $durationMs,
+                    $this->projectId,
+                    auth()->id(),
+                    session('current_team_id')
+                );
+            } catch (\Exception $logEx) {
+                Log::warning('VideoWizard: Failed to log generation failure', ['error' => $logEx->getMessage()]);
+            }
+
+            $this->dispatch('vw-debug', [
+                'action' => 'generate-story-bible-error',
+                'message' => 'Story Bible generation failed: ' . $errorMessage,
+                'level' => 'error',
+                'data' => ['error' => $errorMessage, 'duration_ms' => $durationMs]
+            ]);
+
+            Log::error('StoryBible: Generation failed', [
+                'projectId' => $this->projectId,
+                'error' => $errorMessage,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $this->error = __('Failed to generate Story Bible: ') . $errorMessage;
+        } finally {
+            $this->isGeneratingStoryBible = false;
+        }
+    }
+
+    /**
+     * Open Story Bible modal.
+     */
+    public function openStoryBibleModal(): void
+    {
+        $this->showStoryBibleModal = true;
+        $this->storyBibleTab = 'overview';
+    }
+
+    /**
+     * Close Story Bible modal.
+     */
+    public function closeStoryBibleModal(): void
+    {
+        $this->showStoryBibleModal = false;
+        $this->saveProject();
+    }
+
+    /**
+     * Set Story Bible tab.
+     */
+    public function setStoryBibleTab(string $tab): void
+    {
+        $validTabs = ['overview', 'characters', 'locations', 'style'];
+        if (in_array($tab, $validTabs)) {
+            $this->storyBibleTab = $tab;
+        }
+    }
+
+    /**
+     * Set Story Bible structure template.
+     */
+    public function setStoryBibleStructure(string $template): void
+    {
+        $validTemplates = ['three-act', 'five-act', 'heros-journey'];
+        if (in_array($template, $validTemplates)) {
+            $this->storyBible['structureTemplate'] = $template;
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Add a character to the Story Bible.
+     */
+    public function addBibleCharacter(): void
+    {
+        $characters = $this->storyBible['characters'] ?? [];
+        $index = count($characters);
+
+        $characters[] = [
+            'id' => 'char_' . time() . '_' . $index,
+            'name' => '',
+            'role' => 'supporting',
+            'description' => '',
+            'arc' => '',
+            'traits' => [],
+            'appearsInActs' => [1],
+            'referenceImage' => null,
+        ];
+
+        $this->storyBible['characters'] = $characters;
+        $this->editingBibleCharacterIndex = $index;
+        $this->saveProject();
+    }
+
+    /**
+     * Edit a Story Bible character.
+     */
+    public function editBibleCharacter(int $index): void
+    {
+        $this->editingBibleCharacterIndex = $index;
+    }
+
+    /**
+     * Remove a Story Bible character.
+     */
+    public function removeBibleCharacter(int $index): void
+    {
+        $characters = $this->storyBible['characters'] ?? [];
+
+        if (isset($characters[$index])) {
+            array_splice($characters, $index, 1);
+            $this->storyBible['characters'] = array_values($characters);
+
+            // Adjust editing index
+            if ($this->editingBibleCharacterIndex >= count($characters)) {
+                $this->editingBibleCharacterIndex = max(0, count($characters) - 1);
+            }
+
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Add a trait to a Story Bible character.
+     */
+    public function addBibleCharacterTrait(int $charIndex, string $trait): void
+    {
+        if (empty(trim($trait))) {
+            return;
+        }
+
+        $traits = $this->storyBible['characters'][$charIndex]['traits'] ?? [];
+        if (!in_array($trait, $traits)) {
+            $traits[] = trim($trait);
+            $this->storyBible['characters'][$charIndex]['traits'] = $traits;
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Remove a trait from a Story Bible character.
+     */
+    public function removeBibleCharacterTrait(int $charIndex, int $traitIndex): void
+    {
+        $traits = $this->storyBible['characters'][$charIndex]['traits'] ?? [];
+
+        if (isset($traits[$traitIndex])) {
+            array_splice($traits, $traitIndex, 1);
+            $this->storyBible['characters'][$charIndex]['traits'] = array_values($traits);
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Add a location to the Story Bible.
+     */
+    public function addBibleLocation(): void
+    {
+        $locations = $this->storyBible['locations'] ?? [];
+        $index = count($locations);
+
+        $locations[] = [
+            'id' => 'loc_' . time() . '_' . $index,
+            'name' => '',
+            'type' => 'interior',
+            'description' => '',
+            'timeOfDay' => 'day',
+            'atmosphere' => '',
+            'appearsInActs' => [1],
+            'referenceImage' => null,
+        ];
+
+        $this->storyBible['locations'] = $locations;
+        $this->editingBibleLocationIndex = $index;
+        $this->saveProject();
+    }
+
+    /**
+     * Edit a Story Bible location.
+     */
+    public function editBibleLocation(int $index): void
+    {
+        $this->editingBibleLocationIndex = $index;
+    }
+
+    /**
+     * Remove a Story Bible location.
+     */
+    public function removeBibleLocation(int $index): void
+    {
+        $locations = $this->storyBible['locations'] ?? [];
+
+        if (isset($locations[$index])) {
+            array_splice($locations, $index, 1);
+            $this->storyBible['locations'] = array_values($locations);
+
+            // Adjust editing index
+            if ($this->editingBibleLocationIndex >= count($locations)) {
+                $this->editingBibleLocationIndex = max(0, count($locations) - 1);
+            }
+
+            $this->saveProject();
+        }
+    }
+
+    /**
+     * Check if Story Bible is ready for script generation.
+     */
+    public function hasStoryBible(): bool
+    {
+        return !empty($this->storyBible['enabled'])
+            && $this->storyBible['status'] === 'ready'
+            && !empty($this->storyBible['characters'])
+            && !empty($this->storyBible['title']);
+    }
+
+    /**
+     * Get Story Bible status for UI display.
+     */
+    public function getStoryBibleStatus(): array
+    {
+        $characterCount = count($this->storyBible['characters'] ?? []);
+        $locationCount = count($this->storyBible['locations'] ?? []);
+        $hasTitle = !empty($this->storyBible['title']);
+        $hasActs = !empty($this->storyBible['acts']);
+
+        $isComplete = $characterCount >= 2
+            && $locationCount >= 1
+            && $hasTitle
+            && $hasActs;
+
+        $status = $this->storyBible['status'] ?? 'pending';
+
+        return [
+            'status' => $status,
+            'isComplete' => $isComplete,
+            'characterCount' => $characterCount,
+            'locationCount' => $locationCount,
+            'hasTitle' => $hasTitle,
+            'hasActs' => $hasActs,
+            'generatedAt' => $this->storyBible['generatedAt'] ?? null,
+            'structureTemplate' => $this->storyBible['structureTemplate'] ?? 'three-act',
+        ];
+    }
+
+    /**
+     * Reset Story Bible to pending state.
+     */
+    public function resetStoryBible(): void
+    {
+        $this->storyBible = [
+            'enabled' => false,
+            'status' => 'pending',
+            'generatedAt' => null,
+            'structureTemplate' => $this->storyBible['structureTemplate'] ?? 'three-act',
+            'title' => '',
+            'logline' => '',
+            'theme' => '',
+            'tone' => '',
+            'genre' => '',
+            'acts' => [],
+            'characters' => [],
+            'locations' => [],
+            'visualStyle' => [
+                'mode' => $this->content['visualMode'] ?? 'cinematic-realistic',
+                'colorPalette' => '',
+                'lighting' => '',
+                'cameraLanguage' => '',
+                'references' => '',
+            ],
+            'pacing' => [
+                'overall' => $this->content['pacing'] ?? 'balanced',
+                'tensionCurve' => [],
+                'emotionalBeats' => [],
+            ],
+        ];
+
+        $this->saveProject();
+    }
+
+    /**
+     * Sync Story Bible with scene memory bibles (for backward compatibility).
+     * This copies Bible characters/locations to the scene memory structures.
+     */
+    public function syncStoryBibleToSceneMemory(): void
+    {
+        if (!$this->hasStoryBible()) {
+            return;
+        }
+
+        // Sync characters to Character Bible
+        $bibleCharacters = $this->storyBible['characters'] ?? [];
+        foreach ($bibleCharacters as $bibleChar) {
+            // Check if character already exists in scene memory
+            $exists = false;
+            foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $existingChar) {
+                if ($existingChar['name'] === $bibleChar['name']) {
+                    $exists = true;
+                    break;
+                }
+            }
+
+            if (!$exists) {
+                $this->sceneMemory['characterBible']['characters'][] = [
+                    'name' => $bibleChar['name'],
+                    'role' => $bibleChar['role'] ?? 'supporting',
+                    'description' => $bibleChar['description'] ?? '',
+                    'traits' => $bibleChar['traits'] ?? [],
+                    'appliedScenes' => [],
+                    'referenceImage' => $bibleChar['referenceImage'] ?? null,
+                    'fromStoryBible' => true,
+                ];
+            }
+        }
+
+        // Enable Character Bible if we have characters
+        if (!empty($bibleCharacters)) {
+            $this->sceneMemory['characterBible']['enabled'] = true;
+        }
+
+        // Sync locations to Location Bible
+        $bibleLocations = $this->storyBible['locations'] ?? [];
+        foreach ($bibleLocations as $bibleLoc) {
+            // Check if location already exists in scene memory
+            $exists = false;
+            foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $existingLoc) {
+                if ($existingLoc['name'] === $bibleLoc['name']) {
+                    $exists = true;
+                    break;
+                }
+            }
+
+            if (!$exists) {
+                $this->sceneMemory['locationBible']['locations'][] = [
+                    'name' => $bibleLoc['name'],
+                    'type' => $bibleLoc['type'] ?? 'interior',
+                    'description' => $bibleLoc['description'] ?? '',
+                    'timeOfDay' => $bibleLoc['timeOfDay'] ?? 'day',
+                    'atmosphere' => $bibleLoc['atmosphere'] ?? '',
+                    'appliedScenes' => [],
+                    'referenceImage' => $bibleLoc['referenceImage'] ?? null,
+                    'fromStoryBible' => true,
+                ];
+            }
+        }
+
+        // Enable Location Bible if we have locations
+        if (!empty($bibleLocations)) {
+            $this->sceneMemory['locationBible']['enabled'] = true;
+        }
+
+        // Sync visual style to Style Bible
+        $visualStyle = $this->storyBible['visualStyle'] ?? [];
+        if (!empty($visualStyle)) {
+            $this->sceneMemory['styleBible']['style'] = $visualStyle['references'] ?? '';
+            $this->sceneMemory['styleBible']['colorGrade'] = $visualStyle['colorPalette'] ?? '';
+            $this->sceneMemory['styleBible']['lighting']['type'] = $visualStyle['lighting'] ?? '';
+            $this->sceneMemory['styleBible']['camera'] = $visualStyle['cameraLanguage'] ?? '';
+
+            if (!empty($visualStyle['mode'])) {
+                $this->sceneMemory['styleBible']['enabled'] = true;
+            }
+        }
+
+        $this->saveProject();
     }
 
     // =========================================================================

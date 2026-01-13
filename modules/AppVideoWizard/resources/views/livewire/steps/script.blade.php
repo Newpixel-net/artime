@@ -1339,6 +1339,113 @@
             </div>
         </div>
 
+        {{-- Story Bible Section (Phase 1: Bible-First Architecture) --}}
+        <div class="vw-selector-section" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                <div class="vw-selector-label" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0;">
+                    📖 {{ __('Story Bible') }}
+                    @if($storyBible['status'] === 'ready')
+                        <span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 600;">{{ __('READY') }}</span>
+                    @elseif($storyBible['status'] === 'generating')
+                        <span style="background: rgba(251,191,36,0.2); color: #fbbf24; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 600;">{{ __('GENERATING...') }}</span>
+                    @endif
+                    <span class="vw-selector-sublabel">— {{ __('The DNA that constrains all generation') }}</span>
+                </div>
+            </div>
+
+            @if($storyBible['status'] === 'ready')
+                {{-- Story Bible Ready - Show Summary --}}
+                <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.05)); border: 1px solid rgba(16,185,129,0.3); border-radius: 0.75rem; padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                        <div>
+                            @if(!empty($storyBible['title']))
+                                <h4 style="margin: 0 0 0.25rem 0; color: white; font-size: 0.95rem; font-weight: 600;">{{ $storyBible['title'] }}</h4>
+                            @endif
+                            @if(!empty($storyBible['logline']))
+                                <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 0.8rem; line-height: 1.5;">{{ Str::limit($storyBible['logline'], 150) }}</p>
+                            @endif
+                        </div>
+                        <button type="button"
+                                wire:click="openStoryBibleModal"
+                                style="padding: 0.35rem 0.75rem; background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); border-radius: 0.375rem; color: #6ee7b7; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
+                            ✏️ {{ __('Edit Bible') }}
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="font-size: 0.8rem;">👥</span>
+                            <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">{{ count($storyBible['characters'] ?? []) }} {{ __('Characters') }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="font-size: 0.8rem;">🏛️</span>
+                            <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">{{ count($storyBible['locations'] ?? []) }} {{ __('Locations') }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="font-size: 0.8rem;">🎭</span>
+                            <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">{{ count($storyBible['acts'] ?? []) }} {{ __('Acts') }}</span>
+                        </div>
+                        @if(!empty($storyBible['tone']))
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span style="font-size: 0.8rem;">🎨</span>
+                                <span style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">{{ ucfirst($storyBible['tone']) }}</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Character Names --}}
+                    @if(!empty($storyBible['characters']))
+                        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em;">{{ __('Characters') }}:</span>
+                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.35rem;">
+                                @foreach($storyBible['characters'] as $char)
+                                    <span style="padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.375rem; color: #c4b5fd; font-size: 0.7rem;">
+                                        {{ $char['name'] ?? __('Unnamed') }}
+                                        <span style="color: rgba(255,255,255,0.4);">({{ ucfirst($char['role'] ?? 'supporting') }})</span>
+                                    </span>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @else
+                {{-- Story Bible Not Ready - Show Generate Button --}}
+                <div style="background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(245,158,11,0.05)); border: 1px solid rgba(251,191,36,0.25); border-radius: 0.75rem; padding: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 0.8rem; line-height: 1.5;">
+                                {{ __('Generate a Story Bible first to establish characters, locations, and visual style. This ensures consistency across all generated content.') }}
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button"
+                                    wire:click="generateStoryBible"
+                                    wire:loading.attr="disabled"
+                                    wire:target="generateStoryBible"
+                                    @if($isGeneratingStoryBible) disabled @endif
+                                    style="padding: 0.5rem 1rem; background: linear-gradient(135deg, #f59e0b, #ec4899); border: none; border-radius: 0.5rem; color: white; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                                <span wire:loading.remove wire:target="generateStoryBible">✨ {{ __('Generate Story Bible') }}</span>
+                                <span wire:loading wire:target="generateStoryBible" style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <div style="width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: vw-spin 0.8s linear infinite;"></div>
+                                    {{ __('Generating...') }}
+                                </span>
+                            </button>
+                            <button type="button"
+                                    wire:click="openStoryBibleModal"
+                                    style="padding: 0.5rem 0.75rem; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; color: rgba(255,255,255,0.6); font-size: 0.8rem; cursor: pointer;">
+                                {{ __('Manual') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Optional Skip Notice --}}
+                <p style="margin: 0.5rem 0 0 0; color: rgba(255,255,255,0.4); font-size: 0.7rem; text-align: center;">
+                    {{ __('You can skip this step, but script generation will use basic extraction instead.') }}
+                </p>
+            @endif
+        </div>
+
         {{-- Script Tone Selector --}}
         <div class="vw-selector-section">
             <div class="vw-selector-label">{{ __('Script Tone') }}</div>
