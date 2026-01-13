@@ -274,6 +274,210 @@ INSTRUCTION: {{instruction}}
 RESPOND WITH ONLY THE IMPROVED JSON (no markdown, no explanation):
 PROMPT
             ],
+
+            [
+                'slug' => 'story_bible_generation',
+                'name' => 'Story Bible Generation',
+                'description' => 'Generates a comprehensive Story Bible in a single pass. Contains characters, locations, visual style, narrative structure, and all constraints for consistent script generation.',
+                'model' => 'grok-4',
+                'temperature' => 0.7,
+                'max_tokens' => 16000,
+                'variables' => ['concept', 'duration', 'minutes', 'storyType', 'structureTemplate', 'structureDescription', 'additionalInstructions'],
+                'prompt_template' => <<<'PROMPT'
+You are a master storyteller and world-builder creating a comprehensive STORY BIBLE for a {{minutes}}-minute {{storyType}} video.
+
+A Story Bible is the "DNA" of the project - it defines EVERYTHING about the story world before any script is written. Every future generation (scripts, scenes, images, dialogue) MUST conform to this Bible.
+
+CONCEPT: {{concept}}
+DURATION: {{duration}} seconds ({{minutes}} minutes)
+STORY TYPE: {{storyType}}
+
+NARRATIVE STRUCTURE: {{structureTemplate}}
+{{structureDescription}}
+
+{{additionalInstructions}}
+
+Generate a COMPLETE Story Bible with:
+
+1. **TITLE & LOGLINE**
+   - SEO-optimized title (max 60 characters)
+   - Compelling one-sentence logline that captures the essence
+
+2. **THEME & TONE**
+   - Core theme (the deeper message or lesson)
+   - Tone (emotional quality: dramatic, comedic, inspirational, etc.)
+   - Genre (documentary, narrative, educational, promotional, etc.)
+
+3. **NARRATIVE STRUCTURE (ACTS)**
+   Based on the {{structureTemplate}} structure, define each act:
+   - Act title and purpose
+   - Key beats/events that must occur
+   - Emotional arc for this act
+   - Approximate duration
+
+4. **CHARACTERS** (if applicable for story type)
+   For each character define:
+   - Name and role (protagonist, mentor, antagonist, etc.)
+   - Visual description (detailed for AI image consistency)
+   - Core traits (3-5 defining characteristics)
+   - Character arc (how they change)
+   - Voice/speaking style
+
+5. **LOCATIONS**
+   For each setting define:
+   - Name and type (interior/exterior)
+   - Visual description (colors, lighting, atmosphere)
+   - Time of day and weather
+   - Mood and significance to story
+
+6. **VISUAL STYLE GUIDE**
+   - Visual mode (cinematic/documentary/animated/stock)
+   - Color palette (3-5 primary colors)
+   - Lighting style (natural, dramatic, soft, high-contrast)
+   - Camera language (wide establishing, intimate close-ups, etc.)
+   - Visual motifs or recurring imagery
+
+7. **PACING & RHYTHM**
+   - Overall pace (fast/medium/slow)
+   - Scene transition style
+   - Music/audio mood suggestions
+   - Engagement hooks (where to place retention moments)
+
+RESPOND WITH ONLY THIS JSON (no markdown code blocks, no explanation, just pure JSON):
+{
+  "title": "SEO-optimized title (max 60 chars)",
+  "logline": "One compelling sentence capturing the story essence",
+  "theme": "The deeper message or lesson",
+  "tone": "Emotional quality of the piece",
+  "genre": "Documentary/Narrative/Educational/Promotional",
+  "acts": [
+    {
+      "number": 1,
+      "title": "Act title",
+      "purpose": "What this act accomplishes",
+      "beats": ["Key event 1", "Key event 2", "Key event 3"],
+      "emotionalArc": "Emotional journey in this act",
+      "duration": 60
+    }
+  ],
+  "characters": [
+    {
+      "name": "Character name",
+      "role": "protagonist/antagonist/mentor/ally/etc",
+      "visualDescription": "Detailed visual for AI consistency: age, appearance, clothing, distinctive features",
+      "traits": ["trait1", "trait2", "trait3"],
+      "arc": "How this character changes",
+      "voiceStyle": "How they speak"
+    }
+  ],
+  "locations": [
+    {
+      "name": "Location name",
+      "type": "interior/exterior",
+      "visualDescription": "Detailed setting description",
+      "timeOfDay": "morning/afternoon/evening/night",
+      "atmosphere": "Mood and feel of this place",
+      "significance": "Why this location matters"
+    }
+  ],
+  "visualStyle": {
+    "mode": "cinematic/documentary/animated/stock",
+    "colorPalette": ["#color1", "#color2", "#color3"],
+    "colorDescription": "Description of the color mood",
+    "lighting": "Lighting style description",
+    "cameraLanguage": "Camera approach and movement style",
+    "motifs": ["Visual motif 1", "Visual motif 2"]
+  },
+  "pacing": {
+    "overallPace": "fast/medium/slow",
+    "transitionStyle": "Description of how scenes connect",
+    "musicMood": "Audio/music suggestions",
+    "engagementHooks": [
+      {"position": 30, "type": "question/reveal/cliffhanger", "description": "Hook description"}
+    ]
+  },
+  "generatedAt": "{{generatedAt}}"
+}
+
+CRITICAL REQUIREMENTS:
+- This Story Bible is AUTHORITATIVE - all future generations MUST conform to it
+- Character visual descriptions must be specific enough for AI image consistency
+- Location descriptions must include lighting, colors, and atmosphere
+- Acts must cover the full {{duration}} second duration
+- Generate appropriate number of characters/locations for a {{minutes}}-minute {{storyType}}
+- NO markdown formatting - output raw JSON only
+PROMPT
+            ],
+
+            [
+                'slug' => 'story_bible_character_add',
+                'name' => 'Story Bible Character Addition',
+                'description' => 'Adds a new character to an existing Story Bible, ensuring consistency with established visual style and narrative.',
+                'model' => 'gpt-4',
+                'temperature' => 0.7,
+                'max_tokens' => 1000,
+                'variables' => ['existingBible', 'characterDescription', 'role'],
+                'prompt_template' => <<<'PROMPT'
+You are expanding a Story Bible by adding a new character that fits the established world.
+
+EXISTING STORY BIBLE:
+{{existingBible}}
+
+NEW CHARACTER REQUEST:
+Role: {{role}}
+Description: {{characterDescription}}
+
+Create a new character that:
+1. Fits the established visual style and tone
+2. Complements existing characters
+3. Has consistent visual description for AI generation
+
+RESPOND WITH ONLY THIS JSON (no markdown):
+{
+  "name": "Character name",
+  "role": "{{role}}",
+  "visualDescription": "Detailed visual matching story bible style",
+  "traits": ["trait1", "trait2", "trait3"],
+  "arc": "Character development",
+  "voiceStyle": "Speaking pattern"
+}
+PROMPT
+            ],
+
+            [
+                'slug' => 'story_bible_location_add',
+                'name' => 'Story Bible Location Addition',
+                'description' => 'Adds a new location to an existing Story Bible, ensuring visual consistency with established style guide.',
+                'model' => 'gpt-4',
+                'temperature' => 0.7,
+                'max_tokens' => 1000,
+                'variables' => ['existingBible', 'locationDescription', 'locationType'],
+                'prompt_template' => <<<'PROMPT'
+You are expanding a Story Bible by adding a new location that fits the established world.
+
+EXISTING STORY BIBLE:
+{{existingBible}}
+
+NEW LOCATION REQUEST:
+Type: {{locationType}}
+Description: {{locationDescription}}
+
+Create a new location that:
+1. Matches the established visual style and color palette
+2. Fits the story's tone and atmosphere
+3. Has consistent visual description for AI generation
+
+RESPOND WITH ONLY THIS JSON (no markdown):
+{
+  "name": "Location name",
+  "type": "{{locationType}}",
+  "visualDescription": "Detailed setting matching story bible style",
+  "timeOfDay": "morning/afternoon/evening/night",
+  "atmosphere": "Mood and feel",
+  "significance": "Role in the story"
+}
+PROMPT
+            ],
         ];
 
         foreach ($prompts as $promptData) {

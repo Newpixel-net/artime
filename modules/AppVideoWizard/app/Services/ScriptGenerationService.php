@@ -128,6 +128,10 @@ class ScriptGenerationService
         $tensionCurve = $options['tensionCurve'] ?? null;
         $emotionalJourney = $options['emotionalJourney'] ?? null;
 
+        // Story Bible constraint (Phase 1: Bible-First Architecture)
+        // If the project has a Story Bible, use it to constrain script generation
+        $storyBibleConstraint = $project->hasStoryBible() ? $project->getStoryBibleConstraint() : '';
+
         // Calculate script parameters
         $params = $this->calculateScriptParameters($duration, $contentDepth);
 
@@ -163,6 +167,8 @@ class ScriptGenerationService
             'storyArc' => $storyArc,
             'tensionCurve' => $tensionCurve,
             'emotionalJourney' => $emotionalJourney,
+            // Story Bible constraint (Phase 1: Bible-First Architecture)
+            'storyBibleConstraint' => $storyBibleConstraint,
         ];
 
         $prompt = $this->buildScriptPrompt($promptParams);
@@ -833,6 +839,9 @@ PROMPT;
         $tensionCurve = $params['tensionCurve'] ?? null;
         $emotionalJourney = $params['emotionalJourney'] ?? null;
 
+        // Story Bible constraint (Phase 1: Bible-First Architecture)
+        $storyBibleConstraint = $params['storyBibleConstraint'] ?? '';
+
         $minutes = round($duration / 60, 1);
         $avgSceneDuration = (int) ceil($duration / $sceneCount);
 
@@ -857,6 +866,8 @@ PROMPT;
             'storyArc' => $storyArc,
             'tensionCurve' => $tensionCurve,
             'emotionalJourney' => $emotionalJourney,
+            // Story Bible constraint (Phase 1: Bible-First Architecture)
+            'storyBibleConstraint' => $storyBibleConstraint,
         ]);
 
         return $prompt;
@@ -886,6 +897,9 @@ PROMPT;
         $storyArc = $params['storyArc'];
         $tensionCurve = $params['tensionCurve'];
         $emotionalJourney = $params['emotionalJourney'];
+
+        // Story Bible constraint (Phase 1: Bible-First Architecture)
+        $storyBibleConstraint = $params['storyBibleConstraint'] ?? '';
 
         // Load configs
         $narrativePresets = config('appvideowizard.narrative_presets', []);
@@ -961,6 +975,13 @@ PROMPT;
                 }
                 $prompt .= "\n";
             }
+        }
+
+        // === STORY BIBLE CONSTRAINT (Phase 1: Bible-First Architecture) ===
+        // If a Story Bible exists, inject it as a primary constraint
+        // This ensures characters, locations, and style are consistent with the Bible
+        if (!empty($storyBibleConstraint)) {
+            $prompt .= $storyBibleConstraint . "\n";
         }
 
         // === LAYER 3: CONTENT CONTEXT ===

@@ -481,6 +481,9 @@
     {{-- Frame Capture Modal --}}
     @include('appvideowizard::livewire.modals.frame-capture')
 
+    {{-- Story Bible Modal (Phase 1: Bible-First Architecture) --}}
+    @include('appvideowizard::livewire.modals.story-bible')
+
     {{-- Debug Console Logger --}}
     @if(config('app.debug', false) || session('login_as') === 'admin')
     <script>
