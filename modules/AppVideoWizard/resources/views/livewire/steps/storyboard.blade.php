@@ -1577,30 +1577,41 @@
                                                 </div>
                                             @elseif($sceneCollage['status'] === 'ready' && !empty($currentCollageData['previewUrl']))
                                                 <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5); margin-bottom: 0.35rem;">
-                                                    {{ __('Click a region to use as scene image:') }}
+                                                    {{ __('Click a quadrant to use as scene image:') }}
                                                 </div>
-                                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px;">
-                                                    @for($regionIdx = 0; $regionIdx < 4; $regionIdx++)
-                                                        <div wire:click="setSceneImageFromCollageRegion({{ $index }}, {{ $collageCurrentPage }}, {{ $regionIdx }})"
-                                                             style="aspect-ratio: 16/9; background: rgba(0,0,0,0.3); border-radius: 0.25rem; position: relative; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s, transform 0.2s;"
-                                                             onmouseover="this.style.borderColor='rgba(236, 72, 153, 0.8)'; this.style.transform='scale(1.02)';"
-                                                             onmouseout="this.style.borderColor='transparent'; this.style.transform='scale(1)';">
-                                                            {{-- Simulated region from collage --}}
-                                                            <img src="{{ $currentCollageData['previewUrl'] }}"
-                                                                 style="position: absolute; width: 200%; height: 200%; object-fit: cover;
-                                                                        {{ $regionIdx % 2 === 0 ? 'left: 0' : 'left: -100%' }};
-                                                                        {{ $regionIdx < 2 ? 'top: 0' : 'top: -100%' }};">
-                                                            <div style="position: absolute; top: 0.15rem; left: 0.15rem; background: rgba(0,0,0,0.7); color: white; padding: 0.1rem 0.25rem; border-radius: 0.15rem; font-size: 0.5rem; font-weight: 600;">
-                                                                {{ ($currentCollageShots[$regionIdx] ?? $regionIdx) + 1 }}
+                                                {{-- Single collage image with clickable quadrant overlay --}}
+                                                <div style="position: relative; border-radius: 0.25rem; overflow: hidden;">
+                                                    {{-- The single collage image --}}
+                                                    <img src="{{ $currentCollageData['previewUrl'] }}"
+                                                         alt="Collage Preview"
+                                                         style="width: 100%; display: block; border-radius: 0.25rem;">
+
+                                                    {{-- Clickable quadrant overlay grid (2x2) --}}
+                                                    <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr);">
+                                                        @for($regionIdx = 0; $regionIdx < 4; $regionIdx++)
+                                                            <div wire:click="setSceneImageFromCollageRegion({{ $index }}, {{ $collageCurrentPage }}, {{ $regionIdx }})"
+                                                                 style="position: relative; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: all 0.2s;"
+                                                                 onmouseover="this.style.background='rgba(236, 72, 153, 0.3)'; this.style.borderColor='rgba(236, 72, 153, 0.8)';"
+                                                                 onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.2)';">
+
+                                                                {{-- Region number badge --}}
+                                                                <div style="position: absolute; top: 0.2rem; left: 0.2rem; background: rgba(0,0,0,0.8); color: white; padding: 0.1rem 0.25rem; border-radius: 0.15rem; font-size: 0.5rem; font-weight: 600; z-index: 2;">
+                                                                    {{ ($currentCollageShots[$regionIdx] ?? $regionIdx) + 1 }}
+                                                                </div>
+
+                                                                {{-- Use This hover text --}}
+                                                                <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; pointer-events: none;"
+                                                                     class="use-this-overlay">
+                                                                    <span style="font-size: 0.55rem; color: white; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.5); background: rgba(236, 72, 153, 0.8); padding: 0.15rem 0.4rem; border-radius: 0.2rem;">{{ __('Use This') }}</span>
+                                                                </div>
                                                             </div>
-                                                            <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(139, 92, 246, 0.3)); opacity: 0; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center;"
-                                                                 onmouseover="this.style.opacity='1';"
-                                                                 onmouseout="this.style.opacity='0';">
-                                                                <span style="font-size: 0.6rem; color: white; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">{{ __('Use This') }}</span>
-                                                            </div>
-                                                        </div>
-                                                    @endfor
+                                                        @endfor
+                                                    </div>
                                                 </div>
+                                                <style>
+                                                    .use-this-overlay { opacity: 0; }
+                                                    div:hover > .use-this-overlay { opacity: 1 !important; }
+                                                </style>
 
                                                 {{-- Pagination Controls --}}
                                                 @if($collageTotalPages > 1)

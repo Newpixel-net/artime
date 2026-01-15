@@ -466,39 +466,52 @@ window.multiShotVideoPolling = function() {
                                     </div>
                                 </div>
                             @else
-                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; position: relative;"
+                                {{-- Single collage image with clickable quadrant overlay --}}
+                                <div style="position: relative; border-radius: 0.375rem; overflow: hidden;"
                                      x-data="{ selectedRegion: null, selectedPage: {{ $currentPage }} }">
-                                    @for($regionIdx = 0; $regionIdx < 4; $regionIdx++)
-                                        @php
-                                            $region = $currentCollage['regions'][$regionIdx] ?? null;
-                                            $assignedShot = $region['assignedToShot'] ?? null;
-                                        @endphp
-                                        <div style="aspect-ratio: 16/9; background: rgba(0,0,0,0.3); border-radius: 0.25rem; position: relative; overflow: hidden; cursor: pointer; border: 2px solid {{ $assignedShot !== null ? 'rgba(16, 185, 129, 0.6)' : 'transparent' }};"
-                                             x-on:click="selectedRegion = {{ $regionIdx }}; selectedPage = {{ $currentPage }}; $dispatch('region-selected', { regionIndex: {{ $regionIdx }}, pageIndex: {{ $currentPage }} })">
-                                            {{-- Region of the collage image --}}
-                                            @if(!empty($currentCollage['previewUrl']))
-                                                <img src="{{ $currentCollage['previewUrl'] }}"
-                                                     style="position: absolute; width: 200%; height: 200%; object-fit: cover; {{ $regionIdx % 2 === 0 ? 'left: 0' : 'right: 0; left: auto; transform: translateX(50%)' }}; {{ $regionIdx < 2 ? 'top: 0' : 'bottom: 0; top: auto; transform: translateY(50%)' }}; {{ $regionIdx === 1 ? 'transform: translateX(-50%)' : '' }}{{ $regionIdx === 2 ? 'transform: translateY(-50%)' : '' }}{{ $regionIdx === 3 ? 'transform: translate(-50%, -50%)' : '' }}">
-                                            @endif
-
-                                            {{-- Region number overlay with shot number --}}
-                                            <div style="position: absolute; top: 0.25rem; left: 0.25rem; background: rgba(0,0,0,0.7); color: white; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.6rem; font-weight: 600;">
-                                                {{ ($currentShots[$regionIdx] ?? $regionIdx) + 1 }}
-                                            </div>
-
-                                            {{-- Assigned shot badge --}}
-                                            @if($assignedShot !== null)
-                                                <div style="position: absolute; bottom: 0.25rem; right: 0.25rem; background: rgba(16, 185, 129, 0.9); color: white; padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-size: 0.55rem; font-weight: 600;">
-                                                    → {{ __('Shot') }} {{ $assignedShot + 1 }}
-                                                </div>
-                                            @endif
-
-                                            {{-- Hover overlay --}}
-                                            <div style="position: absolute; inset: 0; background: rgba(236, 72, 153, 0.3); opacity: 0; transition: opacity 0.2s;"
-                                                 x-bind:style="selectedRegion === {{ $regionIdx }} && selectedPage === {{ $currentPage }} ? 'opacity: 1' : ''">
-                                            </div>
+                                    {{-- The single collage image --}}
+                                    @if(!empty($currentCollage['previewUrl']))
+                                        <img src="{{ $currentCollage['previewUrl'] }}"
+                                             alt="Collage Preview"
+                                             style="width: 100%; display: block; border-radius: 0.375rem;">
+                                    @else
+                                        <div style="aspect-ratio: 1/1; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+                                            <span style="color: rgba(255,255,255,0.4);">{{ __('No preview available') }}</span>
                                         </div>
-                                    @endfor
+                                    @endif
+
+                                    {{-- Clickable quadrant overlay grid (2x2) --}}
+                                    <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr);">
+                                        @for($regionIdx = 0; $regionIdx < 4; $regionIdx++)
+                                            @php
+                                                $region = $currentCollage['regions'][$regionIdx] ?? null;
+                                                $assignedShot = $region['assignedToShot'] ?? null;
+                                            @endphp
+                                            <div style="position: relative; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: all 0.2s;"
+                                                 x-on:click="selectedRegion = {{ $regionIdx }}; selectedPage = {{ $currentPage }}; $dispatch('region-selected', { regionIndex: {{ $regionIdx }}, pageIndex: {{ $currentPage }} })"
+                                                 x-bind:style="selectedRegion === {{ $regionIdx }} && selectedPage === {{ $currentPage }} ? 'background: rgba(236, 72, 153, 0.4); border-color: rgba(236, 72, 153, 0.8);' : ''"
+                                                 onmouseover="if (!this.classList.contains('selected')) this.style.background='rgba(255,255,255,0.15)'"
+                                                 onmouseout="if (!this.classList.contains('selected')) this.style.background='transparent'">
+
+                                                {{-- Region number badge --}}
+                                                <div style="position: absolute; top: 0.35rem; left: 0.35rem; background: rgba(0,0,0,0.8); color: white; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 600; z-index: 2;">
+                                                    {{ ($currentShots[$regionIdx] ?? $regionIdx) + 1 }}
+                                                </div>
+
+                                                {{-- Assigned shot badge --}}
+                                                @if($assignedShot !== null)
+                                                    <div style="position: absolute; bottom: 0.35rem; right: 0.35rem; background: rgba(16, 185, 129, 0.95); color: white; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600; z-index: 2;">
+                                                        → {{ __('Shot') }} {{ $assignedShot + 1 }}
+                                                    </div>
+                                                @endif
+
+                                                {{-- Selection indicator --}}
+                                                <div style="position: absolute; inset: 0; pointer-events: none; transition: opacity 0.2s;"
+                                                     x-bind:style="selectedRegion === {{ $regionIdx }} && selectedPage === {{ $currentPage }} ? 'box-shadow: inset 0 0 0 3px rgba(236, 72, 153, 0.8);' : ''">
+                                                </div>
+                                            </div>
+                                        @endfor
+                                    </div>
                                 </div>
 
                                 {{-- Pagination Controls --}}
