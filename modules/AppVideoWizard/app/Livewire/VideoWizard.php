@@ -13584,19 +13584,27 @@ EOT;
                             }
                         }
 
-                        // Build a combined prompt for the 2x2 collage
-                        $shotDescriptions = [];
+                        // Build a combined prompt for a single 2x2 grid collage image
+                        $sceneDescription = $scene['visualDescription'] ?? $scene['narration'] ?? 'a cinematic scene';
+                        $style = $decomposed['consistencyAnchors']['style'] ?? 'cinematic';
+
+                        // Get shot types for each quadrant
+                        $quadrantDescriptions = [];
+                        $positions = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
                         foreach ($pageShots as $idx => $shot) {
-                            $shotDescriptions[] = "Panel " . ($idx + 1) . ": " . ($shot['imagePrompt'] ?? $shot['prompt'] ?? 'Shot ' . ($idx + 1));
+                            $shotType = $shot['type'] ?? 'medium';
+                            $shotDesc = $shot['imagePrompt'] ?? $shot['prompt'] ?? $shot['description'] ?? '';
+                            $position = $positions[$idx] ?? "Panel " . ($idx + 1);
+                            $quadrantDescriptions[] = "{$position}: {$shotType} shot" . ($shotDesc ? " - {$shotDesc}" : '');
                         }
 
-                        $startShot = ($pageIdx * $shotsPerCollage) + 1;
-                        $endShot = min(($pageIdx + 1) * $shotsPerCollage, $totalShots);
-
-                        $collagePrompt = "A 2x2 grid collage showing shots {$startShot}-{$endShot} of a scene. " .
-                            implode('. ', $shotDescriptions) . ". " .
-                            "Each panel shows a different shot type while maintaining visual consistency. " .
-                            "Style: " . ($decomposed['consistencyAnchors']['style'] ?? 'cinematic');
+                        // Build a clear prompt for generating ONE image with 4 panels
+                        $collagePrompt = "Create a 2x2 grid collage image divided into exactly 4 equal quadrants, showing 4 different camera angles of the same scene: {$sceneDescription}. " .
+                            implode('. ', $quadrantDescriptions) . ". " .
+                            "Each quadrant should show the same scene from a different perspective and camera angle. " .
+                            "The image must be clearly divided into 4 equal panels in a 2x2 grid layout. " .
+                            "Professional {$style} quality, consistent lighting, color grading, and art style across all four panels. " .
+                            "Maintain visual continuity - same characters, setting, and atmosphere in each panel.";
 
                         $collageData['status'] = 'generating';
 
@@ -13787,14 +13795,6 @@ EOT;
             return;
         }
 
-        $shot = $decomposed['shots'][$shotIndex];
-        $region = $collagePage['regions'][$regionIndex] ?? null;
-
-        if (!$region) {
-            $this->error = __('Region not found');
-            return;
-        }
-
         // Mark shot as generating
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'generating';
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageStatus'] = 'generating';
@@ -13802,56 +13802,36 @@ EOT;
         $this->isLoading = true;
 
         try {
-            $imageService = app(ImageGenerationService::class);
+            // Crop the specific quadrant from the collage image
+            $cropResult = $this->cropCollageQuadrant($collagePage['previewUrl'], $regionIndex);
 
-            // Build prompt that references the specific region of the collage
-            $regionDescription = "Based on panel " . ($regionIndex + 1) . " (row " . ($region['row'] + 1) . ", column " . ($region['col'] + 1) . ") of the reference collage. ";
-            $enhancedPrompt = $regionDescription . ($shot['imagePrompt'] ?? $shot['prompt'] ?? '');
+            if ($cropResult['success'] && isset($cropResult['imageUrl'])) {
+                // Set the cropped image as the shot image
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageUrl'] = $cropResult['imageUrl'];
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageStatus'] = 'ready';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'ready';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['fromCollageRegion'] = [
+                    'pageIndex' => $pageIndex,
+                    'regionIndex' => $regionIndex,
+                ];
 
-            if ($this->projectId) {
-                $project = WizardProject::find($this->projectId);
-                if ($project) {
-                    $result = $imageService->generateSceneImage($project, [
-                        'id' => $shot['id'],
-                        'visualDescription' => $enhancedPrompt,
-                    ], [
-                        'model' => $this->storyboard['imageModel'] ?? 'hidream',
-                        'sceneIndex' => $sceneIndex,
-                        'referenceImage' => $collagePage['previewUrl'],
-                        'from_collage_region' => true,
-                        'region_index' => $regionIndex,
-                        'page_index' => $pageIndex,
-                        'shot_type' => $shot['type'] ?? 'medium',
-                    ]);
+                Log::info('VideoWizard: Shot image set from collage quadrant', [
+                    'sceneIndex' => $sceneIndex,
+                    'shotIndex' => $shotIndex,
+                    'pageIndex' => $pageIndex,
+                    'regionIndex' => $regionIndex,
+                    'imageUrl' => $cropResult['imageUrl'],
+                ]);
 
-                    if ($result['success'] && isset($result['imageUrl'])) {
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageUrl'] = $result['imageUrl'];
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageStatus'] = 'ready';
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'ready';
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['fromCollageRegion'] = [
-                            'pageIndex' => $pageIndex,
-                            'regionIndex' => $regionIndex,
-                        ];
-                    } elseif (isset($result['jobId'])) {
-                        $this->pendingJobs["shot_{$sceneIndex}_{$shotIndex}"] = [
-                            'jobId' => $result['jobId'],
-                            'type' => 'shot',
-                            'sceneIndex' => $sceneIndex,
-                            'shotIndex' => $shotIndex,
-                        ];
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageStatus'] = 'processing';
-                    } else {
-                        throw new \Exception($result['error'] ?? __('Generation failed'));
-                    }
-
-                    $this->saveProject();
-                }
+                $this->saveProject();
+            } else {
+                throw new \Exception($cropResult['error'] ?? __('Failed to crop quadrant'));
             }
         } catch (\Exception $e) {
             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['status'] = 'error';
             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageStatus'] = 'error';
-            $this->error = __('Failed to generate shot from collage: ') . $e->getMessage();
-            Log::error('VideoWizard: Shot from collage generation failed', [
+            $this->error = __('Failed to extract shot from collage: ') . $e->getMessage();
+            Log::error('VideoWizard: Shot from collage extraction failed', [
                 'sceneIndex' => $sceneIndex,
                 'shotIndex' => $shotIndex,
                 'pageIndex' => $pageIndex,
@@ -13883,8 +13863,79 @@ EOT;
     }
 
     /**
+     * Crop a specific quadrant from a collage image.
+     * Returns the cropped image as a data URL or uploads it and returns the URL.
+     *
+     * @param string $collageUrl The URL of the collage image
+     * @param int $regionIndex The quadrant index (0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right)
+     * @return array{success: bool, imageUrl?: string, error?: string}
+     */
+    protected function cropCollageQuadrant(string $collageUrl, int $regionIndex): array
+    {
+        try {
+            // Download the collage image
+            $imageContents = @file_get_contents($collageUrl);
+            if ($imageContents === false) {
+                return ['success' => false, 'error' => 'Failed to download collage image'];
+            }
+
+            // Use Intervention Image to crop
+            $manager = \Intervention\Image\ImageManager::gd();
+            $image = $manager->read($imageContents);
+
+            // Get image dimensions
+            $width = $image->width();
+            $height = $image->height();
+
+            // Calculate crop coordinates for the quadrant (2x2 grid)
+            $halfWidth = (int) ($width / 2);
+            $halfHeight = (int) ($height / 2);
+
+            // Region coordinates:
+            // 0 = top-left (x=0, y=0)
+            // 1 = top-right (x=50%, y=0)
+            // 2 = bottom-left (x=0, y=50%)
+            // 3 = bottom-right (x=50%, y=50%)
+            $cropX = ($regionIndex % 2) * $halfWidth;
+            $cropY = intdiv($regionIndex, 2) * $halfHeight;
+
+            // Crop the quadrant
+            $cropped = $image->crop($halfWidth, $halfHeight, $cropX, $cropY);
+
+            // Encode to PNG
+            $encoded = $cropped->toPng();
+
+            // Generate a unique filename
+            $filename = 'collage_crop_' . time() . '_r' . $regionIndex . '.png';
+            $relativePath = 'wizard/crops/' . $filename;
+
+            // Store the cropped image
+            \Storage::disk('public')->put($relativePath, (string) $encoded);
+
+            // Get the public URL
+            $imageUrl = \Storage::disk('public')->url($relativePath);
+
+            Log::info('VideoWizard: Cropped collage quadrant', [
+                'regionIndex' => $regionIndex,
+                'cropX' => $cropX,
+                'cropY' => $cropY,
+                'dimensions' => "{$halfWidth}x{$halfHeight}",
+                'imageUrl' => $imageUrl,
+            ]);
+
+            return ['success' => true, 'imageUrl' => $imageUrl];
+        } catch (\Exception $e) {
+            Log::error('VideoWizard: Failed to crop collage quadrant', [
+                'regionIndex' => $regionIndex,
+                'error' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Set the scene's main image from a selected collage region.
-     * Generates a high-res version of the selected region and sets it as the scene image.
+     * Crops the quadrant from the collage and sets it as the scene image.
      * Now supports multi-page collages with pageIndex parameter.
      */
     public function setSceneImageFromCollageRegion(int $sceneIndex, int $pageIndex, int $regionIndex): void
@@ -13908,75 +13959,40 @@ EOT;
             return;
         }
 
-        // Mark as generating
+        // Mark as processing
         $this->storyboard['scenes'][$sceneIndex]['status'] = 'generating';
         $this->isLoading = true;
 
         try {
-            $imageService = app(ImageGenerationService::class);
+            // Crop the specific quadrant from the collage image
+            $cropResult = $this->cropCollageQuadrant($collagePage['previewUrl'], $regionIndex);
 
-            // Build prompt that references the specific region
-            $regionDescriptions = [
-                0 => 'top-left quadrant',
-                1 => 'top-right quadrant',
-                2 => 'bottom-left quadrant',
-                3 => 'bottom-right quadrant',
-            ];
-            $regionDesc = $regionDescriptions[$regionIndex] ?? "region " . ($regionIndex + 1);
+            if ($cropResult['success'] && isset($cropResult['imageUrl'])) {
+                // Set the cropped image as the scene image
+                $this->storyboard['scenes'][$sceneIndex]['imageUrl'] = $cropResult['imageUrl'];
+                $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
+                $this->storyboard['scenes'][$sceneIndex]['fromCollageRegion'] = [
+                    'pageIndex' => $pageIndex,
+                    'regionIndex' => $regionIndex,
+                ];
 
-            $enhancedPrompt = "Based on the {$regionDesc} of the reference collage. " .
-                ($scene['visualDescription'] ?? $scene['visuals'] ?? '');
+                // Clear the collage preview since we've selected an image
+                unset($this->sceneCollages[$sceneIndex]);
 
-            if ($this->projectId) {
-                $project = WizardProject::find($this->projectId);
-                if ($project) {
-                    $result = $imageService->generateSceneImage($project, [
-                        'id' => $scene['id'],
-                        'visualDescription' => $enhancedPrompt,
-                    ], [
-                        'model' => $this->storyboard['imageModel'] ?? 'hidream',
-                        'sceneIndex' => $sceneIndex,
-                        'referenceImage' => $collagePage['previewUrl'],
-                        'from_collage_region' => true,
-                        'region_index' => $regionIndex,
-                        'page_index' => $pageIndex,
-                    ]);
+                Log::info('VideoWizard: Scene image set from collage quadrant', [
+                    'sceneIndex' => $sceneIndex,
+                    'pageIndex' => $pageIndex,
+                    'regionIndex' => $regionIndex,
+                    'imageUrl' => $cropResult['imageUrl'],
+                ]);
 
-                    if ($result['success'] && isset($result['imageUrl'])) {
-                        $this->storyboard['scenes'][$sceneIndex]['imageUrl'] = $result['imageUrl'];
-                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
-                        $this->storyboard['scenes'][$sceneIndex]['fromCollageRegion'] = [
-                            'pageIndex' => $pageIndex,
-                            'regionIndex' => $regionIndex,
-                        ];
-
-                        // Clear the collage preview since we've selected an image
-                        unset($this->sceneCollages[$sceneIndex]);
-
-                        Log::info('VideoWizard: Scene image set from collage region', [
-                            'sceneIndex' => $sceneIndex,
-                            'pageIndex' => $pageIndex,
-                            'regionIndex' => $regionIndex,
-                            'imageUrl' => $result['imageUrl'],
-                        ]);
-                    } elseif (isset($result['jobId'])) {
-                        // Async job
-                        $this->pendingJobs["scene_{$sceneIndex}"] = [
-                            'jobId' => $result['jobId'],
-                            'type' => 'scene',
-                            'sceneIndex' => $sceneIndex,
-                        ];
-                        $this->storyboard['scenes'][$sceneIndex]['status'] = 'processing';
-                    } else {
-                        throw new \Exception($result['error'] ?? __('Generation failed'));
-                    }
-
-                    $this->saveProject();
-                }
+                $this->saveProject();
+            } else {
+                throw new \Exception($cropResult['error'] ?? __('Failed to crop quadrant'));
             }
         } catch (\Exception $e) {
             $this->storyboard['scenes'][$sceneIndex]['status'] = 'error';
-            $this->error = __('Failed to generate scene image from collage: ') . $e->getMessage();
+            $this->error = __('Failed to extract scene image from collage: ') . $e->getMessage();
             Log::error('VideoWizard: Scene image from collage failed', [
                 'sceneIndex' => $sceneIndex,
                 'pageIndex' => $pageIndex,
