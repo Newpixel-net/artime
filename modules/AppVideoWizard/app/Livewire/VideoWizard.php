@@ -15265,11 +15265,51 @@ PROMPT;
     protected function cropCollageQuadrant(string $collageUrl, int $regionIndex): array
     {
         try {
-            // Download the collage image
-            $imageContents = @file_get_contents($collageUrl);
-            if ($imageContents === false) {
-                return ['success' => false, 'error' => 'Failed to download collage image'];
+            Log::info('VideoWizard: Starting crop of collage quadrant', [
+                'collageUrl' => $collageUrl,
+                'regionIndex' => $regionIndex,
+            ]);
+
+            // Try to get image contents - handle both URLs and local paths
+            $imageContents = false;
+
+            // Check if this is a local storage URL that we can access directly
+            if (str_contains($collageUrl, '/storage/')) {
+                // Extract the path from URL and try to read from disk
+                $urlPath = parse_url($collageUrl, PHP_URL_PATH);
+                $relativePath = str_replace('/storage/', '', $urlPath);
+                if (\Storage::disk('public')->exists($relativePath)) {
+                    $imageContents = \Storage::disk('public')->get($relativePath);
+                    Log::info('VideoWizard: Read image from local storage', ['path' => $relativePath]);
+                }
             }
+
+            // Fallback to HTTP request if local read failed
+            if ($imageContents === false) {
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 30,
+                        'user_agent' => 'Mozilla/5.0 (compatible; VideoWizard/1.0)',
+                    ],
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                    ],
+                ]);
+                $imageContents = @file_get_contents($collageUrl, false, $context);
+            }
+
+            if ($imageContents === false) {
+                Log::error('VideoWizard: Failed to download collage image', [
+                    'collageUrl' => $collageUrl,
+                    'error' => error_get_last()['message'] ?? 'Unknown error',
+                ]);
+                return ['success' => false, 'error' => 'Failed to download collage image: ' . ($collageUrl)];
+            }
+
+            Log::info('VideoWizard: Downloaded collage image', [
+                'size' => strlen($imageContents),
+            ]);
 
             // Use Intervention Image to crop
             $manager = \Intervention\Image\ImageManager::gd();
@@ -15332,11 +15372,9 @@ PROMPT;
     protected function extractCollageQuadrantsToShots(int $sceneIndex): void
     {
         $collage = $this->sceneCollages[$sceneIndex] ?? null;
-        if (!$collage || $collage['status'] !== 'ready') {
-            Log::warning('VideoWizard: extractCollageQuadrantsToShots - collage not ready', [
+        if (!$collage) {
+            Log::warning('VideoWizard: extractCollageQuadrantsToShots - no collage found', [
                 'sceneIndex' => $sceneIndex,
-                'hasCollage' => !empty($collage),
-                'status' => $collage['status'] ?? 'none',
             ]);
             return;
         }
