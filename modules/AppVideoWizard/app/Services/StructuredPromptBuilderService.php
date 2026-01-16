@@ -427,6 +427,21 @@ class StructuredPromptBuilderService
             }
         }
 
+        // Debug logging for character filtering
+        Log::debug('StructuredPromptBuilder: Character filtering for scene', [
+            'sceneIndex' => $sceneIndex,
+            'totalCharactersInBible' => count($characters),
+            'filteredCharacterCount' => count($sceneCharacters),
+            'filteredCharacters' => array_map(fn($c) => [
+                'name' => $c['name'] ?? 'Unknown',
+                'appliedScenes' => $c['appliedScenes'] ?? $c['appearsInScenes'] ?? [],
+            ], $sceneCharacters),
+            'excludedCharacters' => array_map(fn($c) => [
+                'name' => $c['name'] ?? 'Unknown',
+                'appliedScenes' => $c['appliedScenes'] ?? $c['appearsInScenes'] ?? [],
+            ], array_filter($characters, fn($c) => !in_array($c, $sceneCharacters))),
+        ]);
+
         if (empty($sceneCharacters)) {
             $subject['description'] = $this->extractSubjectFromDescription($sceneDescription);
             $subject['character_count'] = $this->detectCharacterCountFromDescription($sceneDescription);
@@ -799,6 +814,10 @@ class StructuredPromptBuilderService
             }
             if (!empty($subject['body_language'])) {
                 $subjectParts[] = $subject['body_language'];
+            }
+            // Include secondary characters (if multiple characters in scene)
+            if (!empty($subject['secondary_subjects'])) {
+                $subjectParts[] = 'also featuring ' . $subject['secondary_subjects'];
             }
             $parts[] = implode(', ', array_filter($subjectParts));
         }
