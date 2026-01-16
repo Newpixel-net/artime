@@ -14314,17 +14314,52 @@ PROMPT;
     /**
      * Generate 2x2 collage previews for a scene.
      * Creates multiple grid images showing all shots (4 shots per collage).
+     * If no shots are decomposed yet, generates from scene's visual prompt with default shot types.
      * Supports pagination for scenes with more than 4 shots.
      */
     public function generateCollagePreview(int $sceneIndex): void
     {
-        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
-        if (!$decomposed || count($decomposed['shots'] ?? []) < 2) {
-            $this->error = __('Scene must have at least 2 shots to generate collage preview');
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        if (!$scene) {
+            $this->error = __('Scene not found');
             return;
         }
 
-        $shots = $decomposed['shots'];
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        $shots = $decomposed['shots'] ?? [];
+
+        // If no decomposed shots, create default shot structure from scene's visual prompt
+        if (empty($shots)) {
+            // Generate 4 default shots based on scene's visual description
+            $sceneDescription = $scene['visualDescription'] ?? $scene['narration'] ?? '';
+            $shots = [
+                0 => [
+                    'type' => 'establishing',
+                    'description' => $sceneDescription,
+                    'imagePrompt' => $sceneDescription,
+                ],
+                1 => [
+                    'type' => 'medium',
+                    'description' => $sceneDescription,
+                    'imagePrompt' => $sceneDescription,
+                ],
+                2 => [
+                    'type' => 'close-up',
+                    'description' => $sceneDescription,
+                    'imagePrompt' => $sceneDescription,
+                ],
+                3 => [
+                    'type' => 'detail',
+                    'description' => $sceneDescription,
+                    'imagePrompt' => $sceneDescription,
+                ],
+            ];
+
+            Log::info('VideoWizard: Generating collage from scene prompt (no decomposed shots)', [
+                'sceneIndex' => $sceneIndex,
+            ]);
+        }
+
         $totalShots = count($shots);
         $shotsPerCollage = 4;
         $totalPages = (int) ceil($totalShots / $shotsPerCollage);
@@ -14383,7 +14418,7 @@ PROMPT;
 
                         // Build a combined prompt for a single 2x2 grid collage image
                         $sceneDescription = $scene['visualDescription'] ?? $scene['narration'] ?? 'a cinematic scene';
-                        $style = $decomposed['consistencyAnchors']['style'] ?? 'cinematic';
+                        $style = $decomposed['consistencyAnchors']['style'] ?? $this->sceneMemory['styleBible']['style'] ?? 'cinematic';
 
                         // Build detailed framing instructions for each quadrant based on shot type
                         $quadrantDescriptions = [];
