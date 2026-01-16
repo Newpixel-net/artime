@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\AppVideoWizard\App\Services;
+namespace Modules\AppVideoWizard\Services;
 
 use Illuminate\Support\Facades\Log;
-use Modules\AppVideoWizard\App\Models\VwSetting;
+use Modules\AppVideoWizard\Models\VwSetting;
 
 /**
  * DynamicShotEngine - Content-Driven Shot Decomposition
