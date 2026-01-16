@@ -13333,8 +13333,11 @@ EOT;
     protected function getCharactersForScene(int $sceneIndex): array
     {
         $characters = [];
-        foreach ($this->sceneMemory['characterBible']['characters'] as $character) {
-            if (in_array($sceneIndex, $character['appliedScenes'] ?? [])) {
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $character) {
+            $appliedScenes = $character['appliedScenes'] ?? [];
+            // Empty array means "applies to ALL scenes" (default behavior)
+            // Non-empty array means "applies only to these specific scenes"
+            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
                 $characters[] = $character;
             }
         }
@@ -13346,8 +13349,11 @@ EOT;
      */
     protected function getLocationForScene(int $sceneIndex): ?array
     {
-        foreach ($this->sceneMemory['locationBible']['locations'] as $location) {
-            if (in_array($sceneIndex, $location['appliedScenes'] ?? [])) {
+        foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $location) {
+            $appliedScenes = $location['appliedScenes'] ?? $location['scenes'] ?? [];
+            // Empty array means "applies to ALL scenes" (default behavior)
+            // Non-empty array means "applies only to these specific scenes"
+            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
                 return $location;
             }
         }

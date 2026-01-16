@@ -377,7 +377,8 @@ class CinematicIntelligenceService
                 $appliedScenes = $char['appliedScenes'] ?? [];
 
                 // Skip if character is already assigned to this scene
-                if (in_array($sceneIndex, $appliedScenes)) {
+                // Empty array means "applies to ALL scenes" (default behavior)
+                if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
                     continue;
                 }
 
@@ -386,7 +387,7 @@ class CinematicIntelligenceService
                     continue;
                 }
 
-                // Check if character was in adjacent scenes
+                // Check if character was in adjacent scenes (only if they have explicit scene assignments)
                 $inPrevScene = in_array($sceneIndex - 1, $appliedScenes);
                 $inNextScene = in_array($sceneIndex + 1, $appliedScenes);
 
