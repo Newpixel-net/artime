@@ -1167,6 +1167,18 @@ class StructuredPromptBuilderService
     {
         $parts = [];
 
+        // Get visual mode to enforce realism upfront
+        $visualMode = $structuredPrompt['meta_data']['visual_mode'] ?? 'cinematic-realistic';
+        $promptType = $structuredPrompt['meta_data']['prompt_type'] ?? '';
+
+        // CRITICAL: Add strong realism enforcement at the very start of prompt
+        // This ensures the AI model prioritizes photorealism above all else
+        if ($promptType === 'photorealistic_cinematic' || $visualMode === 'cinematic-realistic') {
+            $parts[] = 'PHOTOREALISTIC ONLY - Ultra-realistic photograph, indistinguishable from real camera footage, NOT CGI, NOT illustration, NOT 3D render, NOT digital art';
+        } elseif ($promptType === 'photorealistic_documentary' || $visualMode === 'documentary-realistic') {
+            $parts[] = 'DOCUMENTARY PHOTOGRAPH - Real candid photograph, authentic moment captured, NOT staged, NOT CGI, NOT illustration';
+        }
+
         // Opening with quality and style
         $techSpecs = $structuredPrompt['technical_specifications'] ?? [];
         $parts[] = $techSpecs['quality'] ?? '8K UHD, photorealistic';
@@ -1321,6 +1333,14 @@ class StructuredPromptBuilderService
         if (!empty($characterDNA)) {
             $dnaSection = "\n\n" . implode("\n\n", $characterDNA);
             $basePrompt .= $dnaSection;
+        }
+
+        // CRITICAL: Final realism enforcement for photorealistic modes
+        // This ensures the AI model doesn't drift into stylized/CGI territory
+        if ($promptType === 'photorealistic_cinematic' || $visualMode === 'cinematic-realistic') {
+            $basePrompt .= "\n\n[MANDATORY STYLE: This must look like a real photograph taken on a professional cinema camera. Real human skin with pores, real textures, real lighting. NO CGI, NO illustration, NO digital art, NO anime, NO cartoon styling whatsoever.]";
+        } elseif ($promptType === 'photorealistic_documentary' || $visualMode === 'documentary-realistic') {
+            $basePrompt .= "\n\n[MANDATORY STYLE: This must look like a real documentary photograph. Authentic, candid, natural. NO stylization, NO CGI effects.]";
         }
 
         return $basePrompt;
