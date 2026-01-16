@@ -6,111 +6,70 @@
     <div class="vw-modal"
          style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(6,182,212,0.3); border-radius: 0.75rem; width: 100%; max-width: 1000px; max-height: 96vh; display: flex; flex-direction: column; overflow: hidden;">
         {{-- Header --}}
+        @php
+            $sceneDNA = $sceneMemory['sceneDNA'] ?? [];
+            $summary = $this->getSceneDNASummary();
+            $continuityIssues = $sceneDNA['continuityIssues'] ?? [];
+            $affinities = $sceneDNA['characterAffinities'] ?? [];
+        @endphp
         <div style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: linear-gradient(90deg, rgba(6,182,212,0.1), rgba(139,92,246,0.1));">
             <div>
                 <h3 style="margin: 0; color: white; font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
                     <span style="background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
                         {{ __('Scene DNA') }}
                     </span>
+                    <span style="font-size: 0.6rem; color: #10b981;">&#x2713; {{ __('Auto-sync') }}</span>
                 </h3>
-                <p style="margin: 0.15rem 0 0 0; color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Unified Bible data - single source of truth for each scene') }}</p>
+                <p style="margin: 0.15rem 0 0 0; color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Unified Bible data - automatically synced from your settings') }}</p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                @php
-                    $sceneDNA = $sceneMemory['sceneDNA'] ?? [];
-                    $isEnabled = $sceneDNA['enabled'] ?? false;
-                @endphp
-                @if(!$isEnabled)
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.3rem 0.6rem; background: linear-gradient(135deg, #06b6d4, #8b5cf6); border: none; border-radius: 0.35rem; color: white; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Build Scene DNA') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Building...') }}</span>
-                    </button>
-                @else
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.3rem 0.6rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.35rem; color: #67e8f9; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Rebuild') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Rebuilding...') }}</span>
-                    </button>
-                @endif
+                <button type="button"
+                        wire:click="buildSceneDNA"
+                        wire:loading.attr="disabled"
+                        wire:target="buildSceneDNA"
+                        style="padding: 0.3rem 0.6rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.35rem; color: #67e8f9; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
+                    <span wire:loading.remove wire:target="buildSceneDNA">&#x1F504; {{ __('Refresh') }}</span>
+                    <span wire:loading wire:target="buildSceneDNA">{{ __('Syncing...') }}</span>
+                </button>
                 <button type="button" wire:click="$set('showSceneDNAModal', false)" style="background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
             </div>
         </div>
 
         {{-- Status Bar --}}
-        @if($isEnabled)
-            @php
-                $summary = $this->getSceneDNASummary();
-                $continuityIssues = $sceneDNA['continuityIssues'] ?? [];
-                $affinities = $sceneDNA['characterAffinities'] ?? [];
-            @endphp
-            <div style="padding: 0.5rem 1rem; background: rgba(6,182,212,0.08); border-bottom: 1px solid rgba(6,182,212,0.2); display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Scenes:') }}</span>
-                    <span style="color: #67e8f9; font-weight: 600; font-size: 0.7rem;">{{ $summary['totalScenes'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Characters:') }}</span>
-                    <span style="color: #a78bfa; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithCharacters'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Locations:') }}</span>
-                    <span style="color: #34d399; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithLocations'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Unique Characters:') }}</span>
-                    <span style="color: #f472b6; font-weight: 600; font-size: 0.7rem;">{{ $summary['uniqueCharacters'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Continuity Issues:') }}</span>
-                    <span style="color: {{ count($continuityIssues) > 0 ? '#f97316' : '#10b981' }}; font-weight: 600; font-size: 0.7rem;">
-                        {{ count($continuityIssues) }}
-                    </span>
-                </div>
-                @if(!empty($sceneDNA['lastSyncedAt']))
-                    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.35rem;">
-                        <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">{{ __('Last synced:') }}</span>
-                        <span style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ \Carbon\Carbon::parse($sceneDNA['lastSyncedAt'])->diffForHumans() }}</span>
-                    </div>
-                @endif
+        <div style="padding: 0.5rem 1rem; background: rgba(6,182,212,0.08); border-bottom: 1px solid rgba(6,182,212,0.2); display: flex; gap: 1.5rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Scenes:') }}</span>
+                <span style="color: #67e8f9; font-weight: 600; font-size: 0.7rem;">{{ $summary['totalScenes'] ?? 0 }}</span>
             </div>
-        @endif
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Characters:') }}</span>
+                <span style="color: #a78bfa; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithCharacters'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Locations:') }}</span>
+                <span style="color: #34d399; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithLocations'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Unique Characters:') }}</span>
+                <span style="color: #f472b6; font-weight: 600; font-size: 0.7rem;">{{ $summary['uniqueCharacters'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Continuity Issues:') }}</span>
+                <span style="color: {{ count($continuityIssues) > 0 ? '#f97316' : '#10b981' }}; font-weight: 600; font-size: 0.7rem;">
+                    {{ count($continuityIssues) }}
+                </span>
+            </div>
+            @if(!empty($sceneDNA['lastSyncedAt']))
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.35rem;">
+                    <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">{{ __('Last synced:') }}</span>
+                    <span style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ \Carbon\Carbon::parse($sceneDNA['lastSyncedAt'])->diffForHumans() }}</span>
+                </div>
+            @endif
+        </div>
 
         {{-- Content --}}
         <div style="flex: 1; overflow-y: auto; padding: 0.75rem;">
-            @if(!$isEnabled)
-                {{-- Not yet built state --}}
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; text-align: center;">
-                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-                        <span style="font-size: 2rem; opacity: 0.8;">&#x1F9EC;</span>
-                    </div>
-                    <h4 style="color: white; margin: 0 0 0.5rem 0; font-size: 1rem;">{{ __('Scene DNA Not Built') }}</h4>
-                    <p style="color: rgba(255,255,255,0.6); font-size: 0.75rem; max-width: 400px; margin-bottom: 1rem;">
-                        {{ __('Scene DNA combines your Character Bible, Location Bible, and Style Bible into a unified per-scene data structure. This enables:') }}
-                    </p>
-                    <ul style="color: rgba(255,255,255,0.7); font-size: 0.7rem; text-align: left; margin: 0 0 1.5rem 0; padding-left: 1.5rem; line-height: 1.8;">
-                        <li>{{ __('Single source of truth for each scene') }}</li>
-                        <li>{{ __('Automatic continuity validation') }}</li>
-                        <li>{{ __('Character-location affinity tracking') }}</li>
-                        <li>{{ __('More accurate image generation prompts') }}</li>
-                    </ul>
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.6rem 1.5rem; background: linear-gradient(135deg, #06b6d4, #8b5cf6); border: none; border-radius: 0.5rem; color: white; font-size: 0.8rem; cursor: pointer; font-weight: 600;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Build Scene DNA Now') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Building...') }}</span>
-                    </button>
-                </div>
-            @else
-                {{-- Built state with tabs --}}
+            {{-- Tabs and Content --}}
                 @php
                     $activeTab = $sceneDNAActiveTab ?? 'overview';
                 @endphp
@@ -427,11 +386,9 @@
                         @endif
                     @endif
                 </div>
-            @endif
         </div>
 
         {{-- Footer Actions --}}
-        @if($isEnabled)
             <div style="padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     {{-- Auto-sync toggle --}}
@@ -458,7 +415,6 @@
                     </button>
                 </div>
             </div>
-        @endif
     </div>
 </div>
 @endif
