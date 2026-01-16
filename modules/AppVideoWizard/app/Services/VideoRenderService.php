@@ -810,7 +810,7 @@ class VideoRenderService
             } else {
                 // Fallback to public disk
                 Storage::disk('public')->put($fileName, file_get_contents($filePath));
-                $publicUrl = preg_replace('#(?<!:)//+#', '/', Storage::disk('public')->url($fileName));
+                $publicUrl = url('/files/' . $fileName);
             }
 
             Log::info("[VideoRender:{$jobId}] Upload completed: {$publicUrl}");

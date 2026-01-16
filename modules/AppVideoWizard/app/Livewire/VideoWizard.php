@@ -10270,9 +10270,8 @@ class VideoWizard extends Component
             // Store in public disk under wizard-assets
             $path = $this->characterImageUpload->storeAs('wizard-assets/characters', $filename, 'public');
 
-            // Get the public URL and fix any double slashes
-            $url = \Storage::disk('public')->url($path);
-            $url = preg_replace('#(?<!:)//+#', '/', $url);
+            // Use /files/ route which bypasses nginx blocking of /storage/ symlink
+            $url = url('/files/' . $path);
 
             // Read file as base64 for API calls (character face consistency)
             $base64Data = base64_encode(file_get_contents($this->characterImageUpload->getRealPath()));
@@ -10532,9 +10531,8 @@ class VideoWizard extends Component
             // Store in public disk under wizard-assets
             $path = $this->styleImageUpload->storeAs('wizard-assets/styles', $filename, 'public');
 
-            // Get the public URL and fix any double slashes
-            $url = \Storage::disk('public')->url($path);
-            $url = preg_replace('#(?<!:)//+#', '/', $url);
+            // Use /files/ route which bypasses nginx blocking of /storage/ symlink
+            $url = url('/files/' . $path);
 
             // Read file as base64 for API calls (style consistency)
             $base64Data = base64_encode(file_get_contents($this->styleImageUpload->getRealPath()));
@@ -11208,9 +11206,8 @@ EOT;
             // Store in public disk under wizard-assets
             $path = $this->locationImageUpload->storeAs('wizard-assets/locations', $filename, 'public');
 
-            // Get the public URL and fix any double slashes
-            $url = \Storage::disk('public')->url($path);
-            $url = preg_replace('#(?<!:)//+#', '/', $url);
+            // Use /files/ route which bypasses nginx blocking of /storage/ symlink
+            $url = url('/files/' . $path);
 
             // Read file as base64 for API calls (location visual consistency)
             $base64Data = base64_encode(file_get_contents($this->locationImageUpload->getRealPath()));
@@ -15406,9 +15403,8 @@ PROMPT;
             // Store the cropped image
             \Storage::disk('public')->put($relativePath, $encodedData);
 
-            // Get the public URL and fix any double slashes (e.g., from APP_URL ending with /)
-            $imageUrl = \Storage::disk('public')->url($relativePath);
-            $imageUrl = preg_replace('#(?<!:)//+#', '/', $imageUrl);
+            // Use /files/ route which bypasses nginx blocking of /storage/ symlink
+            $imageUrl = url('/files/' . $relativePath);
 
             Log::info('VideoWizard: Cropped collage quadrant', [
                 'regionIndex' => $regionIndex,
