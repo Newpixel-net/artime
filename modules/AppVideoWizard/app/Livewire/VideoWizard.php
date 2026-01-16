@@ -703,6 +703,10 @@ class VideoWizard extends Component
     public bool $showSceneOverwriteModal = false;
     public string $sceneOverwriteAction = 'replace'; // 'replace' or 'append'
 
+    // Scene DNA Modal state
+    public bool $showSceneDNAModal = false;
+    public string $sceneDNAActiveTab = 'overview'; // 'overview', 'continuity', 'affinities'
+
     // =========================================================================
     // STORY BIBLE STATE (Phase 1: Bible-First Architecture)
     // =========================================================================
