@@ -61,7 +61,8 @@ class WizardAsset extends Model
         if ($this->url) {
             return $this->url;
         }
-        return Storage::disk('public')->url($this->path);
+        // Use /files/ route which bypasses nginx blocking of /storage/ symlink
+        return url('/files/' . $this->path);
     }
 
     /**
