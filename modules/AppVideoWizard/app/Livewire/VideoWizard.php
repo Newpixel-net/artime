@@ -5692,6 +5692,9 @@ class VideoWizard extends Component
                 if ($jobType === 'shot_video') {
                     // Handle video generation jobs
                     $this->pollVideoJob($jobKey, $job, $animationService);
+                } elseif ($jobType === 'collage') {
+                    // Handle collage generation jobs
+                    $this->pollCollageJob($jobKey, $job, $imageService);
                 } else {
                     // Handle image generation jobs (legacy)
                     $this->pollImageJob($jobKey, $job, $imageService);
@@ -5731,6 +5734,85 @@ class VideoWizard extends Component
             unset($this->pendingJobs[$jobKey]);
             $this->saveProject();
         }
+    }
+
+    /**
+     * Poll status of a collage generation job.
+     */
+    protected function pollCollageJob(string $jobKey, array $job, ImageGenerationService $imageService): void
+    {
+        $sceneIndex = $job['sceneIndex'] ?? null;
+        $pageIndex = $job['pageIndex'] ?? 0;
+        $processingJobId = $job['processingJobId'] ?? null;
+
+        if ($sceneIndex === null || !$processingJobId) {
+            Log::warning('VideoWizard: pollCollageJob - missing required data', [
+                'jobKey' => $jobKey,
+                'sceneIndex' => $sceneIndex,
+                'processingJobId' => $processingJobId,
+            ]);
+            return;
+        }
+
+        // Get the WizardProcessingJob model
+        $processingJob = WizardProcessingJob::find($processingJobId);
+        if (!$processingJob) {
+            Log::error('VideoWizard: pollCollageJob - processing job not found', [
+                'processingJobId' => $processingJobId,
+            ]);
+            unset($this->pendingJobs[$jobKey]);
+            return;
+        }
+
+        // Use the correct polling method
+        $result = $imageService->pollHiDreamJob($processingJob);
+
+        if ($result['status'] === 'ready' && !empty($result['imageUrl'])) {
+            // Update collage data with completed image
+            if (isset($this->sceneCollages[$sceneIndex]['collages'][$pageIndex])) {
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['previewUrl'] = $result['imageUrl'];
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['status'] = 'ready';
+
+                // Check if all pages are ready
+                $allReady = true;
+                foreach ($this->sceneCollages[$sceneIndex]['collages'] as $collageData) {
+                    if ($collageData['status'] !== 'ready') {
+                        $allReady = false;
+                        break;
+                    }
+                }
+
+                if ($allReady) {
+                    $this->sceneCollages[$sceneIndex]['status'] = 'ready';
+                    // Extract quadrants to shots when collage is fully ready
+                    $this->extractCollageQuadrantsToShots($sceneIndex);
+                }
+            }
+
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+            Log::info('VideoWizard: Collage job completed', [
+                'sceneIndex' => $sceneIndex,
+                'pageIndex' => $pageIndex,
+                'imageUrl' => $result['imageUrl'],
+            ]);
+
+        } elseif ($result['status'] === 'error') {
+            if (isset($this->sceneCollages[$sceneIndex]['collages'][$pageIndex])) {
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['status'] = 'error';
+            }
+            $this->sceneCollages[$sceneIndex]['status'] = 'error';
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+            Log::error('VideoWizard: Collage job failed', [
+                'sceneIndex' => $sceneIndex,
+                'pageIndex' => $pageIndex,
+                'error' => $result['error'] ?? 'Unknown error',
+            ]);
+        }
+        // If status is 'generating', job is still in progress - do nothing, will be polled again
     }
 
     /**
@@ -14514,20 +14596,33 @@ PROMPT;
                             'collage_page' => $pageIdx,
                         ]);
 
-                        if ($result['success'] && isset($result['imageUrl'])) {
+                        if ($result['success'] && !empty($result['imageUrl'])) {
                             $collageData['previewUrl'] = $result['imageUrl'];
                             $collageData['status'] = 'ready';
-                        } elseif (isset($result['jobId'])) {
-                            // Async job
+                        } elseif (isset($result['jobId']) || isset($result['processingJobId'])) {
+                            // Async job - store both jobId and processingJobId for polling
                             $this->pendingJobs["collage_{$sceneIndex}_page_{$pageIdx}"] = [
-                                'jobId' => $result['jobId'],
+                                'jobId' => $result['jobId'] ?? null,
+                                'processingJobId' => $result['processingJobId'] ?? null,
                                 'type' => 'collage',
                                 'sceneIndex' => $sceneIndex,
                                 'pageIndex' => $pageIdx,
                             ];
                             $collageData['status'] = 'processing';
+
+                            Log::info('VideoWizard: Collage generation started async', [
+                                'sceneIndex' => $sceneIndex,
+                                'pageIndex' => $pageIdx,
+                                'jobId' => $result['jobId'] ?? null,
+                                'processingJobId' => $result['processingJobId'] ?? null,
+                            ]);
                         } else {
                             $collageData['status'] = 'error';
+                            Log::error('VideoWizard: Collage generation failed - no imageUrl or jobId', [
+                                'sceneIndex' => $sceneIndex,
+                                'pageIndex' => $pageIdx,
+                                'result' => $result,
+                            ]);
                         }
                     }
                     unset($collageData);
@@ -14541,6 +14636,11 @@ PROMPT;
                         }
                     }
                     $this->sceneCollages[$sceneIndex]['status'] = $allReady ? 'ready' : 'processing';
+
+                    // If collage is ready synchronously, extract quadrants to shots immediately
+                    if ($allReady) {
+                        $this->extractCollageQuadrantsToShots($sceneIndex);
+                    }
                 }
             }
 
@@ -14837,6 +14937,115 @@ PROMPT;
             ]);
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Automatically extract all quadrants from a collage and assign to shots.
+     * Called after collage generation is complete to populate shot images.
+     */
+    protected function extractCollageQuadrantsToShots(int $sceneIndex): void
+    {
+        $collage = $this->sceneCollages[$sceneIndex] ?? null;
+        if (!$collage || $collage['status'] !== 'ready') {
+            Log::warning('VideoWizard: extractCollageQuadrantsToShots - collage not ready', [
+                'sceneIndex' => $sceneIndex,
+                'hasCollage' => !empty($collage),
+                'status' => $collage['status'] ?? 'none',
+            ]);
+            return;
+        }
+
+        // Get the first page collage (page 0 contains shots 0-3)
+        $firstPage = $collage['collages'][0] ?? null;
+        if (!$firstPage || $firstPage['status'] !== 'ready' || empty($firstPage['previewUrl'])) {
+            Log::warning('VideoWizard: extractCollageQuadrantsToShots - first page not ready', [
+                'sceneIndex' => $sceneIndex,
+                'hasFirstPage' => !empty($firstPage),
+                'pageStatus' => $firstPage['status'] ?? 'none',
+                'hasPreviewUrl' => !empty($firstPage['previewUrl'] ?? null),
+            ]);
+            return;
+        }
+
+        $collageUrl = $firstPage['previewUrl'];
+
+        // Ensure storyboard scene exists
+        if (!isset($this->storyboard['scenes'][$sceneIndex])) {
+            $this->storyboard['scenes'][$sceneIndex] = [];
+        }
+
+        // Set the collage as the scene's main image for the 2x2 grid display
+        $this->storyboard['scenes'][$sceneIndex]['imageUrl'] = $collageUrl;
+        $this->storyboard['scenes'][$sceneIndex]['status'] = 'ready';
+        $this->storyboard['scenes'][$sceneIndex]['fromCollage'] = true;
+
+        Log::info('VideoWizard: Set scene main image from collage', [
+            'sceneIndex' => $sceneIndex,
+            'collageUrl' => $collageUrl,
+        ]);
+
+        // Get decomposed shots
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        if (!$decomposed || empty($decomposed['shots'])) {
+            Log::info('VideoWizard: No decomposed shots to extract quadrants to', [
+                'sceneIndex' => $sceneIndex,
+            ]);
+            // Still clear collage and save - we set the scene image already
+            unset($this->sceneCollages[$sceneIndex]);
+            return;
+        }
+
+        Log::info('VideoWizard: Extracting collage quadrants to shots', [
+            'sceneIndex' => $sceneIndex,
+            'collageUrl' => $collageUrl,
+            'shotCount' => count($decomposed['shots']),
+        ]);
+
+        // Extract each quadrant and assign to corresponding shot (up to 4 shots for first page)
+        $shotsToProcess = min(4, count($decomposed['shots']));
+        $successCount = 0;
+
+        for ($regionIdx = 0; $regionIdx < $shotsToProcess; $regionIdx++) {
+            try {
+                $cropResult = $this->cropCollageQuadrant($collageUrl, $regionIdx);
+
+                if ($cropResult['success'] && isset($cropResult['imageUrl'])) {
+                    // Assign the cropped image to the shot
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$regionIdx]['imageUrl'] = $cropResult['imageUrl'];
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$regionIdx]['imageStatus'] = 'ready';
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$regionIdx]['status'] = 'ready';
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$regionIdx]['fromCollageQuadrant'] = $regionIdx;
+                    $successCount++;
+
+                    Log::info('VideoWizard: Shot image assigned from collage quadrant', [
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => $regionIdx,
+                        'imageUrl' => $cropResult['imageUrl'],
+                    ]);
+                } else {
+                    Log::warning('VideoWizard: Crop failed for quadrant', [
+                        'sceneIndex' => $sceneIndex,
+                        'regionIdx' => $regionIdx,
+                        'error' => $cropResult['error'] ?? 'Unknown error',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('VideoWizard: Failed to extract quadrant for shot', [
+                    'sceneIndex' => $sceneIndex,
+                    'regionIdx' => $regionIdx,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('VideoWizard: Collage extraction complete', [
+            'sceneIndex' => $sceneIndex,
+            'successCount' => $successCount,
+            'totalShots' => $shotsToProcess,
+        ]);
+
+        // Clear the collage data since we've extracted the shots
+        unset($this->sceneCollages[$sceneIndex]);
     }
 
     /**
