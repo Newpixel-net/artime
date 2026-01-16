@@ -541,7 +541,7 @@ class VideoWizard extends Component
         // Scene DNA: Unified per-scene data combining all Bibles
         // This is the single source of truth for what appears in each scene
         'sceneDNA' => [
-            'enabled' => false,
+            'enabled' => true,            // Always enabled - unified Bible data is the default
             'autoSync' => true,           // Auto-rebuild when Bibles change
             'scenes' => [],               // Per-scene DNA data
             'continuityIssues' => [],     // Detected inconsistencies
@@ -887,6 +887,39 @@ class VideoWizard extends Component
         if ($project instanceof WizardProject && $project->exists) {
             $this->loadProject($project);
             $this->recoverPendingJobs($project);
+        }
+    }
+
+    /**
+     * Livewire lifecycle hook - called when properties are updated.
+     * Auto-rebuilds Scene DNA when Bibles change (if autoSync is enabled).
+     */
+    public function updated($property, $value): void
+    {
+        // Auto-sync Scene DNA when Bibles change
+        if ($this->sceneMemory['sceneDNA']['autoSync'] ?? true) {
+            $triggerProperties = [
+                'sceneMemory.characterBible',
+                'sceneMemory.locationBible',
+                'sceneMemory.styleBible',
+                'script.scenes',
+            ];
+
+            foreach ($triggerProperties as $trigger) {
+                if (str_starts_with($property, $trigger)) {
+                    // Debounce by checking if we've synced recently (within 2 seconds)
+                    $lastSync = $this->sceneMemory['sceneDNA']['lastSyncedAt'] ?? null;
+                    if ($lastSync && now()->diffInSeconds($lastSync) < 2) {
+                        return;
+                    }
+
+                    // Only rebuild if we have scenes
+                    if (!empty($this->script['scenes'])) {
+                        $this->buildSceneDNA();
+                    }
+                    return;
+                }
+            }
         }
     }
 

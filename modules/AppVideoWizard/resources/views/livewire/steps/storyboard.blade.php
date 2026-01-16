@@ -998,16 +998,16 @@
                     {{ __('Visual consistency with Style, Character & Location Bibles') }}
                 </p>
                 <div class="vw-memory-grid">
-                    {{-- Style Bible --}}
-                    <div class="vw-memory-card">
+                    {{-- Style Bible - Managed via Scene DNA --}}
+                    <div class="vw-memory-card" style="opacity: 0.6;">
                         <div class="vw-memory-icon">🎨</div>
                         <div class="vw-memory-content">
                             <div class="vw-memory-title">{{ __('Style Bible') }}</div>
-                            <div class="vw-memory-desc">{{ __('Visual DNA') }}</div>
+                            <div class="vw-memory-desc">{{ __('Managed via Scene DNA') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$dispatch('open-style-bible-modal')">
-                                {{ __('Edit') }}
+                            <button type="button" class="vw-edit-btn" wire:click="$set('showSceneDNAModal', true); $set('sceneDNAActiveTab', 'style')" style="font-size: 0.6rem;">
+                                {{ __('Scene DNA') }} →
                             </button>
                             <input type="checkbox"
                                    class="vw-memory-checkbox"
@@ -1052,35 +1052,27 @@
                         </div>
                     </div>
 
-                    {{-- Scene DNA - Unified Bible View --}}
+                    {{-- Scene DNA - Unified Bible View (Always Enabled) --}}
                     @php
-                        $sceneDNA = $sceneMemory['sceneDNA'] ?? [];
-                        $sceneDNAEnabled = $sceneDNA['enabled'] ?? false;
-                        $continuityIssueCount = count($sceneDNA['continuityIssues'] ?? []);
+                        $continuityIssueCount = count($sceneMemory['sceneDNA']['continuityIssues'] ?? []);
                     @endphp
-                    <div class="vw-memory-card" style="background: {{ $sceneDNAEnabled ? 'linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.08))' : 'rgba(255,255,255,0.02)' }}; border-color: {{ $sceneDNAEnabled ? 'rgba(6,182,212,0.3)' : 'rgba(255,255,255,0.1)' }};">
+                    <div class="vw-memory-card" style="background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.08)); border-color: rgba(6,182,212,0.3);">
                         <div class="vw-memory-icon" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2));">&#x1F9EC;</div>
                         <div class="vw-memory-content">
                             <div class="vw-memory-title" style="display: flex; align-items: center; gap: 0.35rem;">
                                 {{ __('Scene DNA') }}
-                                @if($sceneDNAEnabled)
-                                    <span style="font-size: 0.55rem; color: #10b981;">&#x2713;</span>
-                                @endif
+                                <span style="font-size: 0.55rem; color: #10b981;">&#x2713;</span>
                             </div>
                             <div class="vw-memory-desc">
-                                @if($sceneDNAEnabled)
-                                    {{ __('Unified Bible data') }}
-                                    @if($continuityIssueCount > 0)
-                                        <span style="color: #f97316; margin-left: 0.25rem;">{{ $continuityIssueCount }} {{ __('issues') }}</span>
-                                    @endif
-                                @else
-                                    {{ __('Build unified scene data') }}
+                                {{ __('Unified Bible data') }}
+                                @if($continuityIssueCount > 0)
+                                    <span style="color: #f97316; margin-left: 0.25rem;">{{ $continuityIssueCount }} {{ __('issues') }}</span>
                                 @endif
                             </div>
                         </div>
                         <div class="vw-memory-actions">
                             <button type="button" class="vw-edit-btn" wire:click="$set('showSceneDNAModal', true)" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2)); border-color: rgba(6,182,212,0.4);">
-                                {{ $sceneDNAEnabled ? __('View') : __('Build') }}
+                                {{ __('View') }}
                             </button>
                         </div>
                     </div>

@@ -6,121 +6,88 @@
     <div class="vw-modal"
          style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(6,182,212,0.3); border-radius: 0.75rem; width: 100%; max-width: 1000px; max-height: 96vh; display: flex; flex-direction: column; overflow: hidden;">
         {{-- Header --}}
+        @php
+            $sceneDNA = $sceneMemory['sceneDNA'] ?? [];
+            $summary = $this->getSceneDNASummary();
+            $continuityIssues = $sceneDNA['continuityIssues'] ?? [];
+            $affinities = $sceneDNA['characterAffinities'] ?? [];
+        @endphp
         <div style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: linear-gradient(90deg, rgba(6,182,212,0.1), rgba(139,92,246,0.1));">
             <div>
                 <h3 style="margin: 0; color: white; font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
                     <span style="background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
                         {{ __('Scene DNA') }}
                     </span>
+                    <span style="font-size: 0.6rem; color: #10b981;">&#x2713; {{ __('Auto-sync') }}</span>
                 </h3>
-                <p style="margin: 0.15rem 0 0 0; color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Unified Bible data - single source of truth for each scene') }}</p>
+                <p style="margin: 0.15rem 0 0 0; color: rgba(255,255,255,0.6); font-size: 0.7rem;">{{ __('Unified Bible data - automatically synced from your settings') }}</p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                @php
-                    $sceneDNA = $sceneMemory['sceneDNA'] ?? [];
-                    $isEnabled = $sceneDNA['enabled'] ?? false;
-                @endphp
-                @if(!$isEnabled)
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.3rem 0.6rem; background: linear-gradient(135deg, #06b6d4, #8b5cf6); border: none; border-radius: 0.35rem; color: white; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Build Scene DNA') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Building...') }}</span>
-                    </button>
-                @else
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.3rem 0.6rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.35rem; color: #67e8f9; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Rebuild') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Rebuilding...') }}</span>
-                    </button>
-                @endif
+                <button type="button"
+                        wire:click="buildSceneDNA"
+                        wire:loading.attr="disabled"
+                        wire:target="buildSceneDNA"
+                        style="padding: 0.3rem 0.6rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.35rem; color: #67e8f9; font-size: 0.65rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.25rem;">
+                    <span wire:loading.remove wire:target="buildSceneDNA">&#x1F504; {{ __('Refresh') }}</span>
+                    <span wire:loading wire:target="buildSceneDNA">{{ __('Syncing...') }}</span>
+                </button>
                 <button type="button" wire:click="$set('showSceneDNAModal', false)" style="background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
             </div>
         </div>
 
         {{-- Status Bar --}}
-        @if($isEnabled)
-            @php
-                $summary = $this->getSceneDNASummary();
-                $continuityIssues = $sceneDNA['continuityIssues'] ?? [];
-                $affinities = $sceneDNA['characterAffinities'] ?? [];
-            @endphp
-            <div style="padding: 0.5rem 1rem; background: rgba(6,182,212,0.08); border-bottom: 1px solid rgba(6,182,212,0.2); display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Scenes:') }}</span>
-                    <span style="color: #67e8f9; font-weight: 600; font-size: 0.7rem;">{{ $summary['totalScenes'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Characters:') }}</span>
-                    <span style="color: #a78bfa; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithCharacters'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Locations:') }}</span>
-                    <span style="color: #34d399; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithLocations'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Unique Characters:') }}</span>
-                    <span style="color: #f472b6; font-weight: 600; font-size: 0.7rem;">{{ $summary['uniqueCharacters'] ?? 0 }}</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Continuity Issues:') }}</span>
-                    <span style="color: {{ count($continuityIssues) > 0 ? '#f97316' : '#10b981' }}; font-weight: 600; font-size: 0.7rem;">
-                        {{ count($continuityIssues) }}
-                    </span>
-                </div>
-                @if(!empty($sceneDNA['lastSyncedAt']))
-                    <div style="margin-left: auto; display: flex; align-items: center; gap: 0.35rem;">
-                        <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">{{ __('Last synced:') }}</span>
-                        <span style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ \Carbon\Carbon::parse($sceneDNA['lastSyncedAt'])->diffForHumans() }}</span>
-                    </div>
-                @endif
+        <div style="padding: 0.5rem 1rem; background: rgba(6,182,212,0.08); border-bottom: 1px solid rgba(6,182,212,0.2); display: flex; gap: 1.5rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Scenes:') }}</span>
+                <span style="color: #67e8f9; font-weight: 600; font-size: 0.7rem;">{{ $summary['totalScenes'] ?? 0 }}</span>
             </div>
-        @endif
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Characters:') }}</span>
+                <span style="color: #a78bfa; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithCharacters'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('With Locations:') }}</span>
+                <span style="color: #34d399; font-weight: 600; font-size: 0.7rem;">{{ $summary['scenesWithLocations'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Unique Characters:') }}</span>
+                <span style="color: #f472b6; font-weight: 600; font-size: 0.7rem;">{{ $summary['uniqueCharacters'] ?? 0 }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Continuity Issues:') }}</span>
+                <span style="color: {{ count($continuityIssues) > 0 ? '#f97316' : '#10b981' }}; font-weight: 600; font-size: 0.7rem;">
+                    {{ count($continuityIssues) }}
+                </span>
+            </div>
+            @if(!empty($sceneDNA['lastSyncedAt']))
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 0.35rem;">
+                    <span style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">{{ __('Last synced:') }}</span>
+                    <span style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ \Carbon\Carbon::parse($sceneDNA['lastSyncedAt'])->diffForHumans() }}</span>
+                </div>
+            @endif
+        </div>
 
         {{-- Content --}}
         <div style="flex: 1; overflow-y: auto; padding: 0.75rem;">
-            @if(!$isEnabled)
-                {{-- Not yet built state --}}
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; text-align: center;">
-                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-                        <span style="font-size: 2rem; opacity: 0.8;">&#x1F9EC;</span>
-                    </div>
-                    <h4 style="color: white; margin: 0 0 0.5rem 0; font-size: 1rem;">{{ __('Scene DNA Not Built') }}</h4>
-                    <p style="color: rgba(255,255,255,0.6); font-size: 0.75rem; max-width: 400px; margin-bottom: 1rem;">
-                        {{ __('Scene DNA combines your Character Bible, Location Bible, and Style Bible into a unified per-scene data structure. This enables:') }}
-                    </p>
-                    <ul style="color: rgba(255,255,255,0.7); font-size: 0.7rem; text-align: left; margin: 0 0 1.5rem 0; padding-left: 1.5rem; line-height: 1.8;">
-                        <li>{{ __('Single source of truth for each scene') }}</li>
-                        <li>{{ __('Automatic continuity validation') }}</li>
-                        <li>{{ __('Character-location affinity tracking') }}</li>
-                        <li>{{ __('More accurate image generation prompts') }}</li>
-                    </ul>
-                    <button type="button"
-                            wire:click="buildSceneDNA"
-                            wire:loading.attr="disabled"
-                            wire:target="buildSceneDNA"
-                            style="padding: 0.6rem 1.5rem; background: linear-gradient(135deg, #06b6d4, #8b5cf6); border: none; border-radius: 0.5rem; color: white; font-size: 0.8rem; cursor: pointer; font-weight: 600;">
-                        <span wire:loading.remove wire:target="buildSceneDNA">{{ __('Build Scene DNA Now') }}</span>
-                        <span wire:loading wire:target="buildSceneDNA">{{ __('Building...') }}</span>
-                    </button>
-                </div>
-            @else
-                {{-- Built state with tabs --}}
+            {{-- Tabs and Content --}}
                 @php
                     $activeTab = $sceneDNAActiveTab ?? 'overview';
                 @endphp
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     {{-- Tabs --}}
-                    <div style="display: flex; gap: 0.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+                    <div style="display: flex; gap: 0.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; flex-wrap: wrap;">
                         <button type="button"
                                 wire:click="$set('sceneDNAActiveTab', 'overview')"
                                 style="padding: 0.4rem 0.8rem; background: {{ $activeTab === 'overview' ? 'rgba(6,182,212,0.2)' : 'transparent' }}; border: 1px solid {{ $activeTab === 'overview' ? 'rgba(6,182,212,0.4)' : 'transparent' }}; border-radius: 0.35rem; color: {{ $activeTab === 'overview' ? '#67e8f9' : 'rgba(255,255,255,0.6)' }}; font-size: 0.7rem; cursor: pointer;">
                             {{ __('Scene Overview') }}
+                        </button>
+                        <button type="button"
+                                wire:click="$set('sceneDNAActiveTab', 'style')"
+                                style="padding: 0.4rem 0.8rem; background: {{ $activeTab === 'style' ? 'rgba(236,72,153,0.2)' : 'transparent' }}; border: 1px solid {{ $activeTab === 'style' ? 'rgba(236,72,153,0.4)' : 'transparent' }}; border-radius: 0.35rem; color: {{ $activeTab === 'style' ? '#f9a8d4' : 'rgba(255,255,255,0.6)' }}; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                            &#x1F3A8; {{ __('Global Style') }}
+                            @if($sceneMemory['styleBible']['enabled'] ?? false)
+                                <span style="color: #10b981; font-size: 0.55rem;">&#x2713;</span>
+                            @endif
                         </button>
                         <button type="button"
                                 wire:click="$set('sceneDNAActiveTab', 'continuity')"
@@ -133,12 +100,139 @@
                         <button type="button"
                                 wire:click="$set('sceneDNAActiveTab', 'affinities')"
                                 style="padding: 0.4rem 0.8rem; background: {{ $activeTab === 'affinities' ? 'rgba(6,182,212,0.2)' : 'transparent' }}; border: 1px solid {{ $activeTab === 'affinities' ? 'rgba(6,182,212,0.4)' : 'transparent' }}; border-radius: 0.35rem; color: {{ $activeTab === 'affinities' ? '#67e8f9' : 'rgba(255,255,255,0.6)' }}; font-size: 0.7rem; cursor: pointer;">
-                            {{ __('Character-Location Affinities') }}
+                            {{ __('Affinities') }}
                         </button>
                     </div>
 
                     {{-- Tab Content --}}
-                    @if($activeTab === 'overview')
+                    @if($activeTab === 'style')
+                        {{-- Global Style Tab --}}
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            {{-- Enable toggle --}}
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(236,72,153,0.08); border: 1px solid rgba(236,72,153,0.2); border-radius: 0.5rem;">
+                                <div>
+                                    <div style="color: white; font-size: 0.8rem; font-weight: 600;">{{ __('Enable Global Style') }}</div>
+                                    <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem;">{{ __('Apply consistent visual style to all scenes') }}</div>
+                                </div>
+                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                    <input type="checkbox" wire:model.live="sceneMemory.styleBible.enabled" style="width: 16px; height: 16px; accent-color: #ec4899;">
+                                </label>
+                            </div>
+
+                            {{-- Quick Templates --}}
+                            <div>
+                                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.35rem;">{{ __('Quick Templates') }}</label>
+                                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                                    <button type="button" wire:click="applyStyleTemplate('cinematic')" style="padding: 0.3rem 0.6rem; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.3rem; color: #c4b5fd; font-size: 0.65rem; cursor: pointer;">&#x1F3AC; {{ __('Cinematic') }}</button>
+                                    <button type="button" wire:click="applyStyleTemplate('documentary')" style="padding: 0.3rem 0.6rem; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 0.3rem; color: #6ee7b7; font-size: 0.65rem; cursor: pointer;">&#x1F3A5; {{ __('Documentary') }}</button>
+                                    <button type="button" wire:click="applyStyleTemplate('anime')" style="padding: 0.3rem 0.6rem; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); border-radius: 0.3rem; color: #f9a8d4; font-size: 0.65rem; cursor: pointer;">&#x1F38C; {{ __('Anime') }}</button>
+                                    <button type="button" wire:click="applyStyleTemplate('noir')" style="padding: 0.3rem 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.3rem; color: rgba(255,255,255,0.7); font-size: 0.65rem; cursor: pointer;">&#x1F5A4; {{ __('Film Noir') }}</button>
+                                    <button type="button" wire:click="applyStyleTemplate('photorealistic')" style="padding: 0.3rem 0.6rem; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); border-radius: 0.3rem; color: #67e8f9; font-size: 0.65rem; cursor: pointer;">&#x1F4F7; {{ __('Photorealistic') }}</button>
+                                </div>
+                            </div>
+
+                            {{-- Style Fields Grid --}}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                {{-- Visual Style --}}
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Visual Style') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.style"
+                                              placeholder="{{ __('e.g., Photorealistic with cinematic framing...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 60px; resize: vertical;"></textarea>
+                                </div>
+
+                                {{-- Color Grade --}}
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Color Grade') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.colorGrade"
+                                              placeholder="{{ __('e.g., Teal and orange, lifted blacks...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 60px; resize: vertical;"></textarea>
+                                </div>
+
+                                {{-- Atmosphere --}}
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Atmosphere & Mood') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.atmosphere"
+                                              placeholder="{{ __('e.g., Moody, mysterious, volumetric lighting...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 60px; resize: vertical;"></textarea>
+                                </div>
+
+                                {{-- Camera Language --}}
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Camera Language') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.camera"
+                                              placeholder="{{ __('e.g., Shot on ARRI Alexa, anamorphic lenses...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 60px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+
+                            {{-- Lighting Quick Settings --}}
+                            <div style="padding: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.4rem;">
+                                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.4rem;">&#x1F4A1; {{ __('Lighting') }}</label>
+                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem;">
+                                    <div>
+                                        <label style="display: block; color: rgba(255,255,255,0.4); font-size: 0.55rem; margin-bottom: 0.15rem;">{{ __('Setup') }}</label>
+                                        <input type="text" wire:model.live.debounce.300ms="sceneMemory.styleBible.lighting.setup"
+                                               placeholder="{{ __('e.g., three-point') }}"
+                                               style="width: 100%; padding: 0.3rem 0.4rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.25rem; color: white; font-size: 0.65rem;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; color: rgba(255,255,255,0.4); font-size: 0.55rem; margin-bottom: 0.15rem;">{{ __('Intensity') }}</label>
+                                        <select wire:model.live="sceneMemory.styleBible.lighting.intensity"
+                                                style="width: 100%; padding: 0.3rem 0.4rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.25rem; color: white; font-size: 0.65rem;">
+                                            <option value="">-</option>
+                                            <option value="high-key">{{ __('High-key') }}</option>
+                                            <option value="normal">{{ __('Normal') }}</option>
+                                            <option value="low-key">{{ __('Low-key') }}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; color: rgba(255,255,255,0.4); font-size: 0.55rem; margin-bottom: 0.15rem;">{{ __('Type') }}</label>
+                                        <select wire:model.live="sceneMemory.styleBible.lighting.type"
+                                                style="width: 100%; padding: 0.3rem 0.4rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.25rem; color: white; font-size: 0.65rem;">
+                                            <option value="">-</option>
+                                            <option value="natural">{{ __('Natural') }}</option>
+                                            <option value="studio">{{ __('Studio') }}</option>
+                                            <option value="practical">{{ __('Practical') }}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; color: rgba(255,255,255,0.4); font-size: 0.55rem; margin-bottom: 0.15rem;">{{ __('Mood') }}</label>
+                                        <select wire:model.live="sceneMemory.styleBible.lighting.mood"
+                                                style="width: 100%; padding: 0.3rem 0.4rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.25rem; color: white; font-size: 0.65rem;">
+                                            <option value="">-</option>
+                                            <option value="dramatic">{{ __('Dramatic') }}</option>
+                                            <option value="soft">{{ __('Soft') }}</option>
+                                            <option value="hard">{{ __('Hard') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Visual DNA & Negative Prompt --}}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Visual DNA (Quality Keywords)') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.visualDNA"
+                                              placeholder="{{ __('e.g., 8K, detailed, professional, sharp focus...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 50px; resize: vertical;"></textarea>
+                                </div>
+                                <div>
+                                    <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.2rem;">{{ __('Negative Prompt (Avoid)') }}</label>
+                                    <textarea wire:model.live.debounce.300ms="sceneMemory.styleBible.negativePrompt"
+                                              placeholder="{{ __('e.g., blurry, low quality, watermark...') }}"
+                                              style="width: 100%; padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(239,68,68,0.15); border-radius: 0.35rem; color: white; font-size: 0.7rem; min-height: 50px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+
+                            {{-- Rebuild DNA reminder --}}
+                            <div style="padding: 0.4rem 0.6rem; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); border-radius: 0.35rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.8rem;">&#x1F4A1;</span>
+                                <span style="color: #fcd34d; font-size: 0.65rem;">{{ __('After changing style settings, click "Rebuild" to update Scene DNA with new style data.') }}</span>
+                            </div>
+                        </div>
+
+                    @elseif($activeTab === 'overview')
                         {{-- Scene Overview Grid --}}
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.5rem;">
                             @foreach(($sceneDNA['scenes'] ?? []) as $sceneIndex => $sceneData)
@@ -292,11 +386,9 @@
                         @endif
                     @endif
                 </div>
-            @endif
         </div>
 
         {{-- Footer Actions --}}
-        @if($isEnabled)
             <div style="padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     {{-- Auto-sync toggle --}}
@@ -323,7 +415,6 @@
                     </button>
                 </div>
             </div>
-        @endif
     </div>
 </div>
 @endif
