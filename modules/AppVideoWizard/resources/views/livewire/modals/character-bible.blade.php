@@ -395,7 +395,21 @@
 
                     {{-- Appears in Scenes --}}
                     <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.6rem; margin-bottom: 0.3rem;">{{ __('Appears in Scenes') }}</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                            <label style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ __('Appears in Scenes') }}</label>
+                            @php
+                                $appliedCount = count($currentChar['appliedScenes'] ?? []);
+                                $totalScenes = count($script['scenes'] ?? []);
+                            @endphp
+                            <span style="font-size: 0.55rem; color: {{ $appliedCount > 0 ? '#10b981' : 'rgba(255,255,255,0.4)' }};">
+                                {{ $appliedCount }}/{{ $totalScenes }} {{ __('scenes') }}
+                            </span>
+                        </div>
+                        @if($appliedCount === 0 && $totalScenes > 0)
+                            <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.3rem; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.25rem;">
+                                <span style="color: #fcd34d; font-size: 0.55rem;">⚠️ {{ __('No scenes assigned - click scene numbers below to assign') }}</span>
+                            </div>
+                        @endif
                         <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
                             @foreach($script['scenes'] ?? [] as $sceneIndex => $scene)
                                 @php
@@ -403,14 +417,17 @@
                                 @endphp
                                 <button type="button"
                                         wire:click="toggleCharacterScene({{ $editIndex }}, {{ $sceneIndex }})"
-                                        style="width: 26px; height: 26px; border-radius: 0.25rem; border: 1px solid {{ $isApplied ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.15)' }}; background: {{ $isApplied ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)' }}; color: {{ $isApplied ? '#c4b5fd' : 'rgba(255,255,255,0.5)' }}; cursor: pointer; font-size: 0.65rem; font-weight: 600;">
+                                        style="width: 28px; height: 28px; border-radius: 0.3rem; border: 2px solid {{ $isApplied ? '#8b5cf6' : 'rgba(255,255,255,0.2)' }}; background: {{ $isApplied ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.05)' }}; color: {{ $isApplied ? 'white' : 'rgba(255,255,255,0.5)' }}; cursor: pointer; font-size: 0.7rem; font-weight: {{ $isApplied ? '700' : '500' }}; transition: all 0.15s ease; {{ $isApplied ? 'box-shadow: 0 2px 8px rgba(139,92,246,0.4);' : '' }}">
                                     {{ $sceneIndex + 1 }}
                                 </button>
                             @endforeach
                             @if(count($script['scenes'] ?? []) > 0)
+                                @php
+                                    $allScenesApplied = $appliedCount === $totalScenes;
+                                @endphp
                                 <button type="button"
                                         wire:click="applyCharacterToAllScenes({{ $editIndex }})"
-                                        style="padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: 1px solid rgba(16,185,129,0.4); background: rgba(16,185,129,0.15); color: #6ee7b7; cursor: pointer; font-size: 0.55rem; margin-left: 0.3rem;">
+                                        style="padding: 0.25rem 0.6rem; border-radius: 0.3rem; border: 2px solid {{ $allScenesApplied ? '#10b981' : 'rgba(16,185,129,0.4)' }}; background: {{ $allScenesApplied ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(16,185,129,0.15)' }}; color: {{ $allScenesApplied ? 'white' : '#6ee7b7' }}; cursor: pointer; font-size: 0.6rem; font-weight: 600; margin-left: 0.3rem; {{ $allScenesApplied ? 'box-shadow: 0 2px 8px rgba(16,185,129,0.3);' : '' }}">
                                     {{ __('All') }}
                                 </button>
                             @endif

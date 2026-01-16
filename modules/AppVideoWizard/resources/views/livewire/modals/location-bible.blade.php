@@ -260,32 +260,41 @@
 
                         {{-- Scene Assignment --}}
                         <div style="margin-bottom: 0.35rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
-                                <label style="color: rgba(255,255,255,0.5); font-size: 0.55rem;">{{ __('Used in Scenes') }}</label>
-                                <button type="button"
-                                        wire:click="applyLocationToAllScenes({{ $editIndex }})"
-                                        style="padding: 0.1rem 0.25rem; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 0.15rem; color: white; font-size: 0.45rem; cursor: pointer;">
-                                    {{ __('Apply to All') }}
-                                </button>
+                            @php
+                                $assignedScenes = $currentLocation['scenes'] ?? [];
+                                $assignedScenesCount = count($assignedScenes);
+                                $totalScenes = count($script['scenes'] ?? []);
+                                $allScenesAssigned = $assignedScenesCount === $totalScenes && $totalScenes > 0;
+                            @endphp
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                <label style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ __('Used in Scenes') }}</label>
+                                <span style="font-size: 0.55rem; color: {{ $assignedScenesCount > 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)' }};">
+                                    {{ $assignedScenesCount }}/{{ $totalScenes }} {{ __('scenes') }}
+                                </span>
                             </div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
+                            @if($assignedScenesCount === 0 && $totalScenes > 0)
+                                <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.25rem; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.25rem;">
+                                    <span style="color: #67e8f9; font-size: 0.55rem;">ℹ️ {{ __('No scenes assigned - this location applies to ALL scenes by default') }}</span>
+                                </div>
+                            @endif
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;">
                                 @foreach($script['scenes'] ?? [] as $sceneIdx => $scene)
                                     @php
-                                        $assignedScenes = $currentLocation['scenes'] ?? [];
                                         $isAssigned = in_array($sceneIdx, $assignedScenes);
                                     @endphp
                                     <button type="button"
                                             wire:click="toggleLocationScene({{ $editIndex }}, {{ $sceneIdx }})"
-                                            style="padding: 0.15rem 0.3rem; background: {{ $isAssigned ? 'rgba(245, 158, 11, 0.3)' : 'rgba(255,255,255,0.05)' }}; border: 1px solid {{ $isAssigned ? 'rgba(245, 158, 11, 0.5)' : 'rgba(255,255,255,0.15)' }}; border-radius: 0.2rem; color: white; font-size: 0.55rem; cursor: pointer;">
+                                            style="width: 28px; height: 28px; border-radius: 0.3rem; border: 2px solid {{ $isAssigned ? '#f59e0b' : 'rgba(255,255,255,0.2)' }}; background: {{ $isAssigned ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(255,255,255,0.05)' }}; color: {{ $isAssigned ? 'white' : 'rgba(255,255,255,0.5)' }}; cursor: pointer; font-size: 0.7rem; font-weight: {{ $isAssigned ? '700' : '500' }}; transition: all 0.15s ease; {{ $isAssigned ? 'box-shadow: 0 2px 8px rgba(245,158,11,0.4);' : '' }}">
                                         {{ $sceneIdx + 1 }}
                                     </button>
                                 @endforeach
-                            </div>
-                            @php
-                                $assignedScenesCount = count($currentLocation['scenes'] ?? []);
-                            @endphp
-                            <div style="font-size: 0.45rem; color: rgba(255,255,255,0.4); margin-top: 0.15rem;">
-                                {{ $assignedScenesCount === 0 ? __('Currently applies to ALL scenes') : __('Applies to :count scene(s)', ['count' => $assignedScenesCount]) }}
+                                @if($totalScenes > 0)
+                                    <button type="button"
+                                            wire:click="applyLocationToAllScenes({{ $editIndex }})"
+                                            style="padding: 0.25rem 0.6rem; border-radius: 0.3rem; border: 2px solid {{ $allScenesAssigned ? '#10b981' : 'rgba(16, 185, 129, 0.4)' }}; background: {{ $allScenesAssigned ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(16, 185, 129, 0.15)' }}; color: {{ $allScenesAssigned ? 'white' : '#6ee7b7' }}; cursor: pointer; font-size: 0.6rem; font-weight: 600; margin-left: 0.25rem; {{ $allScenesAssigned ? 'box-shadow: 0 2px 8px rgba(16,185,129,0.3);' : '' }}">
+                                        {{ __('All') }}
+                                    </button>
+                                @endif
                             </div>
                             @if(empty($script['scenes']))
                                 <div style="color: rgba(255,255,255,0.4); font-size: 0.55rem; padding: 0.35rem;">
