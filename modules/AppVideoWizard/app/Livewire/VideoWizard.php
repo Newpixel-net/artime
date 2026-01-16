@@ -8459,6 +8459,71 @@ class VideoWizard extends Component
     }
 
     /**
+     * Validate and fill missing character scene assignments.
+     * Ensures that main characters appear in a reasonable number of scenes.
+     */
+    protected function validateCharacterSceneAssignments(): void
+    {
+        $totalScenes = count($this->script['scenes'] ?? []);
+        if ($totalScenes === 0) {
+            return;
+        }
+
+        $characters = &$this->sceneMemory['characterBible']['characters'];
+        if (empty($characters)) {
+            return;
+        }
+
+        // Define target scene coverage based on role
+        // Main characters should appear in ~70% of scenes
+        // Supporting characters should appear in ~40% of scenes
+        // Background characters keep their AI-detected scenes
+        $mainCharPercent = 0.7;
+        $supportingCharPercent = 0.4;
+
+        foreach ($characters as &$character) {
+            $role = strtolower($character['role'] ?? 'supporting');
+            $currentScenes = $character['appliedScenes'] ?? [];
+
+            // Skip if character already has scene assignments
+            if (!empty($currentScenes)) {
+                continue;
+            }
+
+            // Character has no scene assignments - need to auto-assign based on role
+            Log::info('CharacterValidation: Character has no scenes, auto-assigning', [
+                'name' => $character['name'],
+                'role' => $role,
+            ]);
+
+            if ($role === 'main' || $role === 'protagonist' || $role === 'lead') {
+                // Main characters get ~70% of scenes
+                $targetCount = max(1, (int) ceil($totalScenes * $mainCharPercent));
+                $character['appliedScenes'] = range(0, min($targetCount - 1, $totalScenes - 1));
+            } elseif ($role === 'supporting' || $role === 'secondary' || $role === 'antagonist') {
+                // Supporting characters get ~40% of scenes
+                $targetCount = max(1, (int) ceil($totalScenes * $supportingCharPercent));
+                // Distribute across scenes more evenly
+                $step = max(1, (int) floor($totalScenes / $targetCount));
+                $scenes = [];
+                for ($i = 0; $i < $totalScenes && count($scenes) < $targetCount; $i += $step) {
+                    $scenes[] = $i;
+                }
+                $character['appliedScenes'] = $scenes;
+            } else {
+                // Background/narrator characters get 1-2 scenes
+                $character['appliedScenes'] = [0]; // At least appear in first scene
+            }
+
+            Log::info('CharacterValidation: Auto-assigned scenes', [
+                'name' => $character['name'],
+                'role' => $role,
+                'scenes' => count($character['appliedScenes']),
+            ]);
+        }
+    }
+
+    /**
      * Find if a location with a synonymous name already exists.
      * Handles cases like "Office", "Corporate Office", "The Office" referring to the same location.
      *
@@ -9834,6 +9899,9 @@ class VideoWizard extends Component
         // Enable Character Bible if we synced characters
         if (count($syncedCharacters) > 0) {
             $this->sceneMemory['characterBible']['enabled'] = true;
+
+            // IMPORTANT: Validate scene assignments to ensure characters without detected scenes get assigned
+            $this->validateCharacterSceneAssignments();
         }
 
         Log::info('CharacterBible: Synced from Story Bible (replaced)', [
@@ -9949,6 +10017,9 @@ class VideoWizard extends Component
         // Enable Location Bible if we synced locations
         if (count($syncedLocations) > 0) {
             $this->sceneMemory['locationBible']['enabled'] = true;
+
+            // IMPORTANT: Validate scene assignments to ensure all scenes have at least one location
+            $this->validateLocationSceneAssignments();
         }
 
         Log::info('LocationBible: Synced from Story Bible (replaced)', [
