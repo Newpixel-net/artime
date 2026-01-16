@@ -1006,7 +1006,7 @@
                             <div class="vw-memory-desc">{{ __('Managed via Scene DNA') }}</div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" x-on:click="$wire.set('showSceneDNAModal', true); $wire.set('sceneDNAActiveTab', 'style')" style="font-size: 0.6rem;">
+                            <button type="button" class="vw-edit-btn" wire:click="openSceneDNAModal('style')" style="font-size: 0.6rem;">
                                 {{ __('Scene DNA') }} →
                             </button>
                             <input type="checkbox"
@@ -1071,7 +1071,7 @@
                             </div>
                         </div>
                         <div class="vw-memory-actions">
-                            <button type="button" class="vw-edit-btn" wire:click="$set('showSceneDNAModal', true)" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2)); border-color: rgba(6,182,212,0.4);">
+                            <button type="button" class="vw-edit-btn" wire:click="openSceneDNAModal" style="background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(139,92,246,0.2)); border-color: rgba(6,182,212,0.4);">
                                 {{ __('View') }}
                             </button>
                         </div>

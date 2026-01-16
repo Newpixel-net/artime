@@ -11247,6 +11247,20 @@ EOT;
     // =========================================================================
 
     /**
+     * Open Scene DNA modal and ensure data is fresh.
+     */
+    public function openSceneDNAModal(string $tab = 'overview'): void
+    {
+        // Build Scene DNA first to ensure fresh data
+        if (!empty($this->script['scenes'])) {
+            $this->buildSceneDNA();
+        }
+
+        $this->sceneDNAActiveTab = $tab;
+        $this->showSceneDNAModal = true;
+    }
+
+    /**
      * Build Scene DNA for all scenes.
      * Combines Character Bible + Location Bible + Style Bible into unified per-scene data.
      * This is the single source of truth for what appears in each scene.
