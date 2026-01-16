@@ -67,7 +67,7 @@ class VoiceoverService
             'type' => WizardAsset::TYPE_VOICEOVER,
             'name' => ($scene['title'] ?? $scene['id']) . ' - Voiceover',
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => preg_replace('#(?<!:)//+#', '/', Storage::disk('public')->url($path)),
             'mime_type' => 'audio/mpeg',
             'scene_index' => $options['sceneIndex'] ?? null,
             'scene_id' => $scene['id'],

@@ -10270,8 +10270,9 @@ class VideoWizard extends Component
             // Store in public disk under wizard-assets
             $path = $this->characterImageUpload->storeAs('wizard-assets/characters', $filename, 'public');
 
-            // Get the public URL
+            // Get the public URL and fix any double slashes
             $url = \Storage::disk('public')->url($path);
+            $url = preg_replace('#(?<!:)//+#', '/', $url);
 
             // Read file as base64 for API calls (character face consistency)
             $base64Data = base64_encode(file_get_contents($this->characterImageUpload->getRealPath()));
@@ -10531,8 +10532,9 @@ class VideoWizard extends Component
             // Store in public disk under wizard-assets
             $path = $this->styleImageUpload->storeAs('wizard-assets/styles', $filename, 'public');
 
-            // Get the public URL
+            // Get the public URL and fix any double slashes
             $url = \Storage::disk('public')->url($path);
+            $url = preg_replace('#(?<!:)//+#', '/', $url);
 
             // Read file as base64 for API calls (style consistency)
             $base64Data = base64_encode(file_get_contents($this->styleImageUpload->getRealPath()));
@@ -11206,8 +11208,9 @@ EOT;
             // Store in public disk under wizard-assets
             $path = $this->locationImageUpload->storeAs('wizard-assets/locations', $filename, 'public');
 
-            // Get the public URL
+            // Get the public URL and fix any double slashes
             $url = \Storage::disk('public')->url($path);
+            $url = preg_replace('#(?<!:)//+#', '/', $url);
 
             // Read file as base64 for API calls (location visual consistency)
             $base64Data = base64_encode(file_get_contents($this->locationImageUpload->getRealPath()));
@@ -15381,16 +15384,31 @@ PROMPT;
 
             // Encode to PNG
             $encoded = $cropped->toPng();
+            $encodedData = (string) $encoded;
+
+            // Validate encoded data is not empty
+            if (empty($encodedData) || strlen($encodedData) < 100) {
+                Log::error('VideoWizard: Encoded PNG data is empty or too small', [
+                    'regionIndex' => $regionIndex,
+                    'encodedSize' => strlen($encodedData),
+                ]);
+                return ['success' => false, 'error' => 'Failed to encode cropped image'];
+            }
+
+            Log::info('VideoWizard: Encoded PNG data', [
+                'size' => strlen($encodedData),
+            ]);
 
             // Generate a unique filename
             $filename = 'collage_crop_' . time() . '_r' . $regionIndex . '.png';
             $relativePath = 'wizard/crops/' . $filename;
 
             // Store the cropped image
-            \Storage::disk('public')->put($relativePath, (string) $encoded);
+            \Storage::disk('public')->put($relativePath, $encodedData);
 
-            // Get the public URL
+            // Get the public URL and fix any double slashes (e.g., from APP_URL ending with /)
             $imageUrl = \Storage::disk('public')->url($relativePath);
+            $imageUrl = preg_replace('#(?<!:)//+#', '/', $imageUrl);
 
             Log::info('VideoWizard: Cropped collage quadrant', [
                 'regionIndex' => $regionIndex,

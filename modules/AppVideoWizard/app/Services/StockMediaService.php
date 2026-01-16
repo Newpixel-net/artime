@@ -216,7 +216,7 @@ class StockMediaService
                 'type' => $type === 'video' ? WizardAsset::TYPE_VIDEO : WizardAsset::TYPE_IMAGE,
                 'name' => $sceneId . ' - Stock Media',
                 'path' => $path,
-                'url' => Storage::disk('public')->url($path),
+                'url' => preg_replace('#(?<!:)//+#', '/', Storage::disk('public')->url($path)),
                 'mime_type' => $type === 'video' ? 'video/mp4' : 'image/jpeg',
                 'scene_id' => $sceneId,
                 'metadata' => array_merge($metadata, [

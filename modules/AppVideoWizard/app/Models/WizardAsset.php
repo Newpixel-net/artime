@@ -61,7 +61,8 @@ class WizardAsset extends Model
         if ($this->url) {
             return $this->url;
         }
-        return Storage::disk('public')->url($this->path);
+        $url = Storage::disk('public')->url($this->path);
+        return preg_replace('#(?<!:)//+#', '/', $url);
     }
 
     /**
