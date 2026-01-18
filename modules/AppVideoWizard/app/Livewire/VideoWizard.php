@@ -3744,15 +3744,17 @@ class VideoWizard extends Component
             unset($location);
         }
 
-        // Update Character Bible scene indices (uses 'appliedScenes')
+        // Update Character Bible scene indices (uses 'scenes', legacy 'appliedScenes')
         if (!empty($this->sceneMemory['characterBible']['characters'])) {
             foreach ($this->sceneMemory['characterBible']['characters'] as &$character) {
-                if (empty($character['appliedScenes'])) {
-                    continue; // Empty means "all scenes", no update needed
+                // Support both new 'scenes' and legacy 'appliedScenes' field names
+                $characterScenes = $character['scenes'] ?? $character['appliedScenes'] ?? [];
+                if (empty($characterScenes)) {
+                    continue; // No scene assignments to update
                 }
 
                 $updatedScenes = [];
-                foreach ($character['appliedScenes'] as $idx) {
+                foreach ($characterScenes as $idx) {
                     if ($action === 'delete') {
                         // Remove the deleted scene and shift higher indices down
                         if ($idx < $sceneIndex) {
@@ -3770,7 +3772,9 @@ class VideoWizard extends Component
                         }
                     }
                 }
-                $character['appliedScenes'] = array_values($updatedScenes);
+                $character['scenes'] = array_values($updatedScenes);
+                // Remove legacy field if present (migrating to new field name)
+                unset($character['appliedScenes']);
             }
             unset($character);
         }
@@ -5201,7 +5205,7 @@ class VideoWizard extends Component
             'name' => $name,
             'description' => $description,
             'role' => 'Supporting',
-            'appliedScenes' => [],
+            'scenes' => [],
             'traits' => [],
             'defaultExpression' => '',           // Default facial expression (e.g., "confident", "thoughtful")
             'attire' => '',                      // Legacy attire field for prompt compatibility
@@ -6237,41 +6241,26 @@ class VideoWizard extends Component
         $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
 
         // Build scene-to-character map: sceneIndex => [characterIndices...]
+        // Note: 'scenes' is the new standardized field name, 'appliedScenes' is legacy
         $this->cachedSceneCharacterMap = [];
         foreach ($characters as $charIdx => $character) {
-            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+            $characterScenes = $character['scenes'] ?? $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
 
-            if (empty($appliedScenes)) {
-                // Empty = applies to ALL scenes - mark with special key
-                for ($i = 0; $i < $totalScenes; $i++) {
-                    $this->cachedSceneCharacterMap[$i][] = $charIdx;
-                }
-            } else {
-                // Use array_flip for O(1) lookup during build
-                foreach ($appliedScenes as $sceneIdx) {
-                    $this->cachedSceneCharacterMap[$sceneIdx][] = $charIdx;
-                }
+            // Characters must be explicitly assigned to scenes (no more "empty = all" logic)
+            foreach ($characterScenes as $sceneIdx) {
+                $this->cachedSceneCharacterMap[$sceneIdx][] = $charIdx;
             }
         }
 
         // Build scene-to-location map: sceneIndex => locationIndex
         $this->cachedSceneLocationMap = [];
         foreach ($locations as $locIdx => $location) {
-            $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+            $locationScenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
 
-            if (empty($scenes)) {
-                // Empty = applies to ALL scenes - first location wins
-                for ($i = 0; $i < $totalScenes; $i++) {
-                    if (!isset($this->cachedSceneLocationMap[$i])) {
-                        $this->cachedSceneLocationMap[$i] = $locIdx;
-                    }
-                }
-            } else {
-                // Specific scenes assigned
-                foreach ($scenes as $sceneIdx) {
-                    if (!isset($this->cachedSceneLocationMap[$sceneIdx])) {
-                        $this->cachedSceneLocationMap[$sceneIdx] = $locIdx;
-                    }
+            // Locations must be explicitly assigned to scenes (no more "empty = all" logic)
+            foreach ($locationScenes as $sceneIdx) {
+                if (!isset($this->cachedSceneLocationMap[$sceneIdx])) {
+                    $this->cachedSceneLocationMap[$sceneIdx] = $locIdx;
                 }
             }
         }
@@ -6309,14 +6298,15 @@ class VideoWizard extends Component
         }
 
         // Fallback to original O(n) method with array_flip optimization
+        // Note: 'scenes' is the new standardized field name for characters
         return array_filter($characters, function ($character) use ($sceneIndex) {
-            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
-            // Empty array means "applies to ALL scenes" (default behavior)
-            if (empty($appliedScenes)) {
-                return true;
+            $characterScenes = $character['scenes'] ?? $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+            // Characters must be explicitly assigned to scenes (no more "empty = all" logic)
+            if (empty($characterScenes)) {
+                return false;
             }
             // Use array_flip for O(1) lookup instead of in_array
-            $flipped = array_flip($appliedScenes);
+            $flipped = array_flip($characterScenes);
             return isset($flipped[$sceneIndex]);
         });
     }
@@ -6335,13 +6325,13 @@ class VideoWizard extends Component
 
         // Fallback to original method with array_flip optimization
         foreach ($locations as $location) {
-            $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
-            // Empty array means "applies to ALL scenes" (default behavior)
-            if (empty($scenes)) {
-                return $location;
+            $locationScenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+            // Locations must be explicitly assigned to scenes (no more "empty = all" logic)
+            if (empty($locationScenes)) {
+                continue;
             }
             // Use array_flip for O(1) lookup instead of in_array
-            $flipped = array_flip($scenes);
+            $flipped = array_flip($locationScenes);
             if (isset($flipped[$sceneIndex])) {
                 return $location;
             }
@@ -8009,11 +7999,15 @@ class VideoWizard extends Component
                         try {
                             $existingChar = &$this->sceneMemory['characterBible']['characters'][$existingIndex];
                             $newScenes = $character['appearsInScenes'] ?? [];
-                            $existingChar['appliedScenes'] = array_unique(array_merge(
-                                $existingChar['appliedScenes'] ?? [],
+                            // Support both new 'scenes' and legacy 'appliedScenes' field names
+                            $existingScenes = $existingChar['scenes'] ?? $existingChar['appliedScenes'] ?? [];
+                            $existingChar['scenes'] = array_unique(array_merge(
+                                $existingScenes,
                                 $newScenes
                             ));
-                            sort($existingChar['appliedScenes']);
+                            sort($existingChar['scenes']);
+                            // Remove legacy field if present
+                            unset($existingChar['appliedScenes']);
                             Log::info('CharacterExtraction: Merged synonymous character', [
                                 'existing' => $existingChar['name'],
                                 'merged' => $character['name'],
@@ -8050,7 +8044,7 @@ class VideoWizard extends Component
                         'name' => $character['name'],
                         'description' => $character['description'] ?? '',
                         'role' => $role,
-                        'appliedScenes' => $expandedScenes,
+                        'scenes' => $expandedScenes,
                         'originalAiScenes' => $aiScenes, // Keep original for reference
                         'traits' => $character['traits'] ?? [],
                         'defaultExpression' => $character['defaultExpression'] ?? '',
@@ -8367,7 +8361,7 @@ class VideoWizard extends Component
                     'name' => $data['name'],
                     'description' => $data['description'],
                     'role' => $inferredRoles[$name] ?? 'Supporting',
-                    'appliedScenes' => $characterScenes[$name] ?? [],
+                    'scenes' => $characterScenes[$name] ?? [],
                     'referenceImage' => null,
                     'autoDetected' => true,
                     'patternMatched' => true,
@@ -8447,7 +8441,7 @@ class VideoWizard extends Component
                 'name' => 'Main Character',
                 'description' => $description,
                 'role' => 'Main',
-                'appliedScenes' => $scenesWithHumanContent,
+                'scenes' => $scenesWithHumanContent,
                 'referenceImage' => null,
                 'autoDetected' => true,
                 'patternMatched' => false,
@@ -8839,7 +8833,8 @@ class VideoWizard extends Component
 
         foreach ($characters as &$character) {
             $role = strtolower($character['role'] ?? 'supporting');
-            $currentScenes = $character['appliedScenes'] ?? [];
+            // Support both new 'scenes' and legacy 'appliedScenes' field names
+            $currentScenes = $character['scenes'] ?? $character['appliedScenes'] ?? [];
 
             // Skip if character already has scene assignments
             if (!empty($currentScenes)) {
@@ -8851,7 +8846,7 @@ class VideoWizard extends Component
             if ($role === 'main' || $role === 'protagonist' || $role === 'lead') {
                 // Main characters get ~70% of scenes
                 $targetCount = max(1, (int) ceil($totalScenes * $mainCharPercent));
-                $character['appliedScenes'] = range(0, min($targetCount - 1, $totalScenes - 1));
+                $character['scenes'] = range(0, min($targetCount - 1, $totalScenes - 1));
             } elseif ($role === 'supporting' || $role === 'secondary' || $role === 'antagonist') {
                 // Supporting characters get ~40% of scenes
                 $targetCount = max(1, (int) ceil($totalScenes * $supportingCharPercent));
@@ -8861,11 +8856,13 @@ class VideoWizard extends Component
                 for ($i = 0; $i < $totalScenes && count($scenes) < $targetCount; $i += $step) {
                     $scenes[] = $i;
                 }
-                $character['appliedScenes'] = $scenes;
+                $character['scenes'] = $scenes;
             } else {
                 // Background/narrator characters get 1-2 scenes
-                $character['appliedScenes'] = [0]; // At least appear in first scene
+                $character['scenes'] = [0]; // At least appear in first scene
             }
+            // Remove legacy field if present
+            unset($character['appliedScenes']);
         }
     }
 
@@ -9857,7 +9854,7 @@ class VideoWizard extends Component
                     'role' => $bibleChar['role'] ?? 'supporting',
                     'description' => $bibleChar['description'] ?? '',
                     'traits' => $bibleChar['traits'] ?? [],
-                    'appliedScenes' => [],
+                    'scenes' => [],
                     'referenceImage' => $bibleChar['referenceImage'] ?? null,
                     'fromStoryBible' => true,
                 ];
@@ -9888,7 +9885,7 @@ class VideoWizard extends Component
                     'description' => $bibleLoc['description'] ?? '',
                     'timeOfDay' => $bibleLoc['timeOfDay'] ?? 'day',
                     'atmosphere' => $bibleLoc['atmosphere'] ?? '',
-                    'appliedScenes' => [],
+                    'scenes' => [],
                     'referenceImage' => $bibleLoc['referenceImage'] ?? null,
                     'fromStoryBible' => true,
                 ];
@@ -10220,6 +10217,8 @@ class VideoWizard extends Component
                 // Convert Story Bible character to Character Bible format
                 // Preserve existing ID or generate new one for portrait generation
                 $characterId = $existing['id'] ?? $bibleChar['id'] ?? ('char_' . time() . '_' . $idx);
+                // Support both field names for backward compatibility
+                $existingScenes = $existing['scenes'] ?? $existing['appliedScenes'] ?? [];
                 $characterBibleFormat = [
                     'id' => $characterId,
                     'name' => $name,
@@ -10228,7 +10227,7 @@ class VideoWizard extends Component
                     'role' => $bibleChar['role'] ?? 'supporting',
                     'arc' => $bibleChar['arc'] ?? '',
                     // Use existing scene assignments if user has set them, otherwise auto-detected
-                    'appliedScenes' => (!empty($existing['appliedScenes'])) ? $existing['appliedScenes'] : $detectedScenes,
+                    'scenes' => (!empty($existingScenes)) ? $existingScenes : $detectedScenes,
                     // Preserve user's reference image, or use Story Bible's
                     'referenceImage' => $existing['referenceImage'] ?? $bibleChar['referenceImage'] ?? '',
                     'referenceImageSource' => $existing['referenceImageSource'] ?? (!empty($bibleChar['referenceImage']) ? 'story-bible' : ''),
@@ -10256,7 +10255,7 @@ class VideoWizard extends Component
 
             Log::debug('CharacterBible: Synced from Story Bible', [
                 'syncedCount' => count($syncedCharacters),
-                'characterScenes' => array_map(fn($c) => ['name' => $c['name'], 'scenes' => count($c['appliedScenes'])], $syncedCharacters),
+                'characterScenes' => array_map(fn($c) => ['name' => $c['name'], 'scenes' => count($c['scenes'] ?? [])], $syncedCharacters),
             ]);
 
             $this->saveProject();
@@ -10294,8 +10293,10 @@ class VideoWizard extends Component
             }
 
             // STEP 2: Build scene content for location name matching
+            // Also track explicit location fields separately for priority matching
             $scenes = $this->script['scenes'] ?? [];
             $sceneTexts = [];
+            $sceneExplicitLocations = []; // Explicit location fields from scenes
             foreach ($scenes as $idx => $scene) {
                 $text = strtolower(
                     ($scene['narration'] ?? '') . ' ' .
@@ -10306,29 +10307,32 @@ class VideoWizard extends Component
                     ($scene['setting'] ?? '')
                 );
                 $sceneTexts[$idx] = $text;
+                // Track explicit location field for priority matching
+                $sceneExplicitLocations[$idx] = strtolower(trim($scene['location'] ?? ''));
             }
 
             // STEP 3: Add Story Bible locations with auto-detected scene assignments
+            // IMPROVED ALGORITHM: Priority-based matching with lower character threshold
             $syncedLocations = [];
             foreach ($storyBibleLocations as $idx => $bibleLoc) {
                 $name = $bibleLoc['name'] ?? '';
                 if (empty($name)) continue;
 
                 $lowerName = strtolower($name);
-
-                // Auto-detect which scenes this location appears in
-                // Use STRICT matching to avoid over-matching (e.g., "alley" matching everywhere)
                 $detectedScenes = [];
 
-                // Primary search: full location name (most reliable)
+                // Build search terms with improved matching
+                // Primary: full location name
                 $searchTermsFull = [$lowerName];
 
-                // Secondary search: significant name parts (6+ chars to avoid common words)
+                // Secondary: significant name parts (4+ chars instead of 6+ for better matching)
                 $nameParts = preg_split('/[\s\-_]+/', $lowerName);
                 $searchTermsParts = [];
                 foreach ($nameParts as $part) {
-                    // Only use parts 6+ chars long to avoid generic matches like "alley", "room", "city"
-                    if (strlen($part) >= 6) {
+                    // Use 4+ chars to match common locations like "room", "beach", "park"
+                    // Exclude very common words that could over-match
+                    $commonExclusions = ['the', 'and', 'with', 'from', 'into', 'area', 'place'];
+                    if (strlen($part) >= 4 && !in_array($part, $commonExclusions)) {
                         $searchTermsParts[] = $part;
                     }
                 }
@@ -10336,16 +10340,38 @@ class VideoWizard extends Component
                 foreach ($sceneTexts as $sceneIdx => $text) {
                     $matched = false;
 
-                    // First try full name match (highest confidence)
-                    foreach ($searchTermsFull as $term) {
-                        if (strpos($text, $term) !== false) {
+                    // PRIORITY 1: Exact or partial match in scene's explicit location field
+                    $explicitLoc = $sceneExplicitLocations[$sceneIdx] ?? '';
+                    if (!empty($explicitLoc)) {
+                        // Check if location name appears in scene's location field
+                        if (strpos($explicitLoc, $lowerName) !== false || strpos($lowerName, $explicitLoc) !== false) {
                             $detectedScenes[] = $sceneIdx;
                             $matched = true;
-                            break;
+                        }
+                        // Also check significant name parts against explicit location
+                        if (!$matched) {
+                            foreach ($searchTermsParts as $term) {
+                                if (strpos($explicitLoc, $term) !== false) {
+                                    $detectedScenes[] = $sceneIdx;
+                                    $matched = true;
+                                    break;
+                                }
+                            }
                         }
                     }
 
-                    // If no full match, try significant parts (6+ chars)
+                    // PRIORITY 2: Full name match in scene text
+                    if (!$matched) {
+                        foreach ($searchTermsFull as $term) {
+                            if (strpos($text, $term) !== false) {
+                                $detectedScenes[] = $sceneIdx;
+                                $matched = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // PRIORITY 3: Significant parts match (4+ chars)
                     if (!$matched && !empty($searchTermsParts)) {
                         foreach ($searchTermsParts as $term) {
                             if (strpos($text, $term) !== false) {
@@ -10568,12 +10594,14 @@ class VideoWizard extends Component
             ]);
             // Auto-fix invalid scene indices by removing them
             foreach ($this->sceneMemory['characterBible']['characters'] as &$character) {
-                if (isset($character['appliedScenes'])) {
-                    $character['appliedScenes'] = array_values(array_filter(
-                        $character['appliedScenes'],
-                        fn($s) => $s >= 0 && $s < $totalScenes
-                    ));
-                }
+                // Support both new 'scenes' and legacy 'appliedScenes' field names
+                $currentScenes = $character['scenes'] ?? $character['appliedScenes'] ?? [];
+                $character['scenes'] = array_values(array_filter(
+                    $currentScenes,
+                    fn($s) => $s >= 0 && $s < $totalScenes
+                ));
+                // Remove legacy field if present
+                unset($character['appliedScenes']);
             }
             unset($character);
         }
@@ -10589,17 +10617,22 @@ class VideoWizard extends Component
      */
     public function toggleCharacterScene(int $charIndex, int $sceneIndex): void
     {
-        $appliedScenes = $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] ?? [];
+        // Support both new field name 'scenes' and legacy 'appliedScenes'
+        $characterScenes = $this->sceneMemory['characterBible']['characters'][$charIndex]['scenes']
+            ?? $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes']
+            ?? [];
 
         // PHASE 4: O(1) check with array_flip instead of in_array
-        $flipped = array_flip($appliedScenes);
+        $flipped = array_flip($characterScenes);
         if (isset($flipped[$sceneIndex])) {
-            $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = array_values(
-                array_diff($appliedScenes, [$sceneIndex])
+            $this->sceneMemory['characterBible']['characters'][$charIndex]['scenes'] = array_values(
+                array_diff($characterScenes, [$sceneIndex])
             );
         } else {
-            $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'][] = $sceneIndex;
+            $this->sceneMemory['characterBible']['characters'][$charIndex]['scenes'][] = $sceneIndex;
         }
+        // Remove legacy field if present (migrating to new field name)
+        unset($this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes']);
 
         // PHASE 4: Invalidate lookup cache since scene assignments changed
         $this->invalidateSceneLookupCaches();
@@ -10613,7 +10646,9 @@ class VideoWizard extends Component
     public function applyCharacterToAllScenes(int $charIndex): void
     {
         $sceneCount = count($this->script['scenes'] ?? []);
-        $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = range(0, $sceneCount - 1);
+        $this->sceneMemory['characterBible']['characters'][$charIndex]['scenes'] = range(0, $sceneCount - 1);
+        // Remove legacy field if present (migrating to new field name)
+        unset($this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes']);
 
         // PHASE 4: Invalidate lookup cache since scene assignments changed
         $this->invalidateSceneLookupCaches();
@@ -11716,15 +11751,16 @@ EOT;
         try {
             $imageService = app(ImageGenerationService::class);
 
-            // Extract location details
+            // Extract location details - ALL fields including lightingStyle
             $locationType = $location['type'] ?? 'interior';
             $timeOfDay = $location['timeOfDay'] ?? 'day';
             $weather = $location['weather'] ?? 'clear';
             $mood = $location['mood'] ?? 'neutral';
             $description = $location['description'] ?? '';
+            $customLightingStyle = $location['lightingStyle'] ?? '';
 
-            // Build time-of-day specific lighting
-            $lightingDesc = match($timeOfDay) {
+            // Build time-of-day specific lighting as a base
+            $baseLightingDesc = match($timeOfDay) {
                 'dawn' => 'soft golden dawn light streaming through, warm color temperature, gentle shadows',
                 'morning' => 'bright morning natural light, clean shadows, fresh atmosphere',
                 'noon' => 'high noon lighting with defined shadows, neutral color temperature',
@@ -11735,6 +11771,11 @@ EOT;
                 'blue_hour' => 'blue hour twilight, cool blue tones mixing with warm artificial lights',
                 default => 'natural daylight with soft shadows',
             };
+
+            // Use custom lighting style if provided, otherwise use time-based default
+            $lightingDesc = !empty($customLightingStyle)
+                ? "{$baseLightingDesc}. {$customLightingStyle}"
+                : $baseLightingDesc;
 
             // Build weather atmosphere
             $weatherDesc = match($weather) {
@@ -12043,11 +12084,11 @@ EOT;
         $sceneCharacters = [];
 
         foreach ($characters as $character) {
-            // Support both field names: appliedScenes (internal) and appearsInScenes (from AI extraction)
-            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+            // Support both field names: scenes (new standard), appliedScenes (legacy)
+            $characterScenes = $character['scenes'] ?? $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
 
-            // Empty = all scenes, or check if scene is in list
-            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
+            // Characters must be explicitly assigned to scenes (no more "empty = all" logic)
+            if (!empty($characterScenes) && in_array($sceneIndex, $characterScenes)) {
                 $sceneCharacters[] = $character;
             }
         }
@@ -12535,12 +12576,14 @@ PROMPT;
                     // Update scene assignments for existing character
                     foreach ($this->sceneMemory['characterBible']['characters'] as &$existingChar) {
                         if (strtolower($existingChar['name'] ?? '') === $charKey) {
-                            // Merge scene assignments
-                            $existing = $existingChar['appliedScenes'] ?? [];
-                            $existingChar['appliedScenes'] = $this->validateSceneIndices(
+                            // Merge scene assignments - support both 'scenes' and 'appliedScenes'
+                            $existing = $existingChar['scenes'] ?? $existingChar['appliedScenes'] ?? [];
+                            $existingChar['scenes'] = $this->validateSceneIndices(
                                 array_merge($existing, $sceneAssignments)
                             );
-                            sort($existingChar['appliedScenes']);
+                            sort($existingChar['scenes']);
+                            // Remove legacy field if present
+                            unset($existingChar['appliedScenes']);
                             break;
                         }
                     }
@@ -12553,7 +12596,7 @@ PROMPT;
                     'name' => $charName,
                     'role' => $char['role'] ?? 'supporting',
                     'description' => $char['description'] ?? '',
-                    'appliedScenes' => $sceneAssignments,
+                    'scenes' => $sceneAssignments,
                     'traits' => [],
                     'hair' => ['color' => '', 'style' => '', 'length' => '', 'texture' => ''],
                     'wardrobe' => ['outfit' => '', 'colors' => '', 'style' => '', 'footwear' => ''],
@@ -12638,7 +12681,7 @@ PROMPT;
         // Log detailed info about scene assignments
         $characterAssignments = [];
         foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $char) {
-            $characterAssignments[$char['name'] ?? 'Unknown'] = $char['appliedScenes'] ?? [];
+            $characterAssignments[$char['name'] ?? 'Unknown'] = $char['scenes'] ?? $char['appliedScenes'] ?? [];
         }
         $locationAssignments = [];
         foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $loc) {
@@ -15054,16 +15097,16 @@ PROMPT;
 
     /**
      * Get characters applied to a scene.
+     * Note: 'scenes' is the new standardized field name
      */
     protected function getCharactersForScene(int $sceneIndex): array
     {
         $characters = [];
         foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $character) {
-            // Support both field names: appliedScenes (internal) and appearsInScenes (from AI extraction)
-            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
-            // Empty array means "applies to ALL scenes" (default behavior)
-            // Non-empty array means "applies only to these specific scenes"
-            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
+            // Support both field names: scenes (new standard), appliedScenes (legacy)
+            $characterScenes = $character['scenes'] ?? $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+            // Characters must be explicitly assigned to scenes (no more "empty = all" logic)
+            if (!empty($characterScenes) && in_array($sceneIndex, $characterScenes)) {
                 $characters[] = $character;
             }
         }
@@ -15076,11 +15119,10 @@ PROMPT;
     protected function getLocationForScene(int $sceneIndex): ?array
     {
         foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $location) {
-            // Support multiple field names: scenes (internal), appliedScenes (legacy), appearsInScenes (from AI extraction)
-            $appliedScenes = $location['scenes'] ?? $location['appliedScenes'] ?? $location['appearsInScenes'] ?? [];
-            // Empty array means "applies to ALL scenes" (default behavior)
-            // Non-empty array means "applies only to these specific scenes"
-            if (empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
+            // Support multiple field names: scenes (internal), appearsInScenes (from AI extraction)
+            $locationScenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+            // Locations must be explicitly assigned to scenes (no more "empty = all" logic)
+            if (!empty($locationScenes) && in_array($sceneIndex, $locationScenes)) {
                 return $location;
             }
         }
