@@ -7,7 +7,8 @@
       "Bash(dir /s /b *.css)",
       "Bash(git log:*)",
       "Bash(findstr:*)",
-      "Bash(more:*)"
+      "Bash(more:*)",
+      "Bash(git push:*)"
     ]
   }
 }
