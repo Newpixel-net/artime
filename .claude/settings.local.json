@@ -5,7 +5,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(dir /s /b *.css)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(findstr:*)",
+      "Bash(more:*)"
     ]
   }
 }
