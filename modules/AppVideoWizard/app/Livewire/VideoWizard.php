@@ -12206,12 +12206,15 @@ PROMPT;
                 'sceneNarration' => $scene['narration'] ?? '',
             ];
 
-            // If scene already has an image, use it for first shot
+            // If scene already has an individually generated image (not a collage), use it for first shot
+            // Don't use collage images as they contain multiple shots in one image
             $storyboardScene = $this->storyboard['scenes'][$sceneIndex] ?? null;
-            if ($storyboardScene && !empty($storyboardScene['imageUrl'])) {
+            $isCollageImage = $storyboardScene['fromCollage'] ?? false;
+            if ($storyboardScene && !empty($storyboardScene['imageUrl']) && !$isCollageImage) {
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['imageUrl'] = $storyboardScene['imageUrl'];
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['imageStatus'] = 'ready';
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['status'] = 'ready';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][0]['fromSceneImage'] = true;
             }
 
             $this->saveProject();
@@ -15498,14 +15501,29 @@ PROMPT;
             for ($regionIdx = 0; $regionIdx < $regionsOnPage; $regionIdx++) {
                 $shotIdx = $startShotIdx + $regionIdx;
 
-                // Skip if shot already has an image
+                // Check if shot already has an image
                 $existingImage = $decomposed['shots'][$shotIdx]['imageUrl'] ?? null;
-                if (!empty($existingImage)) {
-                    Log::info('VideoWizard: Shot already has image, skipping', [
+                $fromSceneImage = $decomposed['shots'][$shotIdx]['fromSceneImage'] ?? false;
+                $fromCollageRegion = $decomposed['shots'][$shotIdx]['fromCollageRegion'] ?? null;
+
+                // Skip if shot already has an individually generated/cropped image
+                // BUT don't skip if the image came from the scene's main image (which is the full collage)
+                // We need to replace that with the actual cropped region
+                if (!empty($existingImage) && !$fromSceneImage && $fromCollageRegion !== null) {
+                    Log::info('VideoWizard: Shot already has cropped image, skipping', [
                         'sceneIndex' => $sceneIndex,
                         'shotIndex' => $shotIdx,
                     ]);
                     continue;
+                }
+
+                // Also check if existing image is the same as the collage URL (full collage, not cropped)
+                if (!empty($existingImage) && $existingImage === $collageUrl) {
+                    Log::info('VideoWizard: Shot has full collage image, will replace with cropped region', [
+                        'sceneIndex' => $sceneIndex,
+                        'shotIndex' => $shotIdx,
+                    ]);
+                    // Don't skip - we need to replace the full collage with the cropped region
                 }
 
                 try {

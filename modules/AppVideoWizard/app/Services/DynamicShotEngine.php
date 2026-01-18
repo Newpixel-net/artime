@@ -107,6 +107,11 @@ class DynamicShotEngine
         // Detect scene type using SceneTypeDetectorService
         $sceneTypeResult = $this->detectSceneType($scene, $context);
 
+        // Calculate scene duration from narration if not explicitly set
+        // Average speaking rate is ~150 words per minute (2.5 words per second)
+        // Add buffer for visual pacing
+        $sceneDuration = $this->calculateSceneDurationFromContent($scene, $context);
+
         // Extract characteristics
         $characteristics = [
             // Scene identification
@@ -114,8 +119,8 @@ class DynamicShotEngine
             'sceneTypeConfidence' => $sceneTypeResult['confidence'] ?? 50,
             'coveragePattern' => $sceneTypeResult['patternSlug'] ?? null,
 
-            // Duration
-            'sceneDuration' => (int) ($scene['duration'] ?? 30),
+            // Duration - calculated from content
+            'sceneDuration' => $sceneDuration,
 
             // Character analysis
             'characterCount' => $this->detectCharacterCount($fullText, $context),
@@ -142,6 +147,42 @@ class DynamicShotEngine
         ];
 
         return $characteristics;
+    }
+
+    /**
+     * Calculate scene duration from content (narration word count)
+     * Uses speaking rate and visual pacing to determine appropriate duration
+     */
+    protected function calculateSceneDurationFromContent(array $scene, array $context): int
+    {
+        // If scene has explicit duration set, use it
+        if (!empty($scene['duration']) && $scene['duration'] > 0) {
+            return (int) $scene['duration'];
+        }
+
+        $narration = $scene['narration'] ?? '';
+        $wordCount = str_word_count($narration);
+
+        // Speaking rate: ~2.5 words per second (150 WPM)
+        // Add 20% buffer for visual pacing and transitions
+        $speakingDuration = $wordCount / 2.5;
+        $withBuffer = $speakingDuration * 1.2;
+
+        // Minimum 20 seconds, maximum 120 seconds per scene
+        $calculatedDuration = max(20, min(120, (int) ceil($withBuffer)));
+
+        // If narration is very short, use a reasonable default based on context
+        if ($wordCount < 10) {
+            $calculatedDuration = $context['defaultSceneDuration'] ?? 35;
+        }
+
+        Log::debug('DynamicShotEngine: Calculated scene duration from content', [
+            'wordCount' => $wordCount,
+            'speakingDuration' => $speakingDuration,
+            'calculatedDuration' => $calculatedDuration,
+        ]);
+
+        return $calculatedDuration;
     }
 
     /**
@@ -459,8 +500,16 @@ class DynamicShotEngine
         // Determine shot type sequence based on scene type
         $shotSequence = $this->getShotSequenceForSceneType($sceneType, $shotCount, $position);
 
-        // Calculate duration per shot (may vary by shot type)
-        $baseDuration = max(3, (int) ceil($sceneDuration / $shotCount));
+        // Calculate base duration per shot for pacing reference
+        // Minimum 5 since that's the shortest available video duration
+        $baseDuration = max(5, (int) ceil($sceneDuration / $shotCount));
+
+        Log::debug('DynamicShotEngine: Generating shot distribution', [
+            'shotCount' => $shotCount,
+            'sceneDuration' => $sceneDuration,
+            'baseDuration' => $baseDuration,
+            'sceneType' => $sceneType,
+        ]);
 
         for ($i = 0; $i < $shotCount; $i++) {
             $shotType = $shotSequence[$i] ?? 'medium';
@@ -519,41 +568,66 @@ class DynamicShotEngine
 
     /**
      * Get duration for shot type with variation
+     * Uses cinematic conventions: establishing shots are longer, reactions are quicker
      */
     protected function getDurationForShotType(string $shotType, int $baseDuration, array $analysis): int
     {
-        // Duration multipliers by shot type
-        $multipliers = [
-            'establishing' => 1.5,    // Longer for scene setting
-            'extreme-wide' => 1.4,
-            'wide' => 1.2,
-            'medium' => 1.0,
-            'medium-close' => 0.9,
-            'close-up' => 0.8,
-            'extreme-close-up' => 0.7,
-            'detail' => 0.7,
-            'reaction' => 0.6,        // Quick reaction cuts
-            'insert' => 0.5,
-        ];
-
-        $multiplier = $multipliers[$shotType] ?? 1.0;
-        $duration = (int) round($baseDuration * $multiplier);
-
-        // Clamp to available durations (5, 6, 10 seconds)
+        // Available video generation durations
         $availableDurations = [5, 6, 10];
 
-        // Find closest available duration
-        $closest = 6;
-        $minDiff = PHP_INT_MAX;
-        foreach ($availableDurations as $avail) {
-            $diff = abs($duration - $avail);
-            if ($diff < $minDiff) {
-                $minDiff = $diff;
-                $closest = $avail;
+        // Direct mapping based on shot type for cinematic pacing
+        // This ensures variety regardless of baseDuration calculation
+        $shotTypeDurations = [
+            'establishing' => 10,     // Longer for scene setting
+            'extreme-wide' => 10,     // Epic establishing shots
+            'wide' => 6,              // Standard wide shots
+            'medium' => 6,            // Workhorse shot
+            'medium-close' => 6,      // Character focus
+            'close-up' => 5,          // Quick emotional impact
+            'extreme-close-up' => 5,  // Brief intense moment
+            'detail' => 5,            // Quick insert
+            'reaction' => 5,          // Quick reaction cuts
+            'insert' => 5,            // Brief cutaway
+        ];
+
+        // Get base duration from shot type
+        $typeDuration = $shotTypeDurations[$shotType] ?? 6;
+
+        // If baseDuration suggests longer shots (scene is slow-paced), allow upgrades
+        if ($baseDuration >= 8 && $typeDuration < 10) {
+            // Slow pacing - upgrade some shots
+            if (in_array($shotType, ['establishing', 'extreme-wide', 'wide', 'medium'])) {
+                $typeDuration = 10;
+            } elseif (in_array($shotType, ['medium-close', 'close-up'])) {
+                $typeDuration = 6;
             }
         }
 
-        return $closest;
+        // If baseDuration is very short (fast-paced action), keep most shots at 5
+        if ($baseDuration <= 4) {
+            if (!in_array($shotType, ['establishing', 'extreme-wide'])) {
+                $typeDuration = 5;
+            } else {
+                $typeDuration = 6; // Even establishing shots are shorter in fast pacing
+            }
+        }
+
+        // Ensure duration is in available options
+        if (!in_array($typeDuration, $availableDurations)) {
+            // Find closest
+            $closest = 6;
+            $minDiff = PHP_INT_MAX;
+            foreach ($availableDurations as $avail) {
+                $diff = abs($typeDuration - $avail);
+                if ($diff < $minDiff) {
+                    $minDiff = $diff;
+                    $closest = $avail;
+                }
+            }
+            $typeDuration = $closest;
+        }
+
+        return $typeDuration;
     }
 
     /**
