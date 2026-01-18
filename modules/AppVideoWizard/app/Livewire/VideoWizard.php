@@ -8547,13 +8547,17 @@ class VideoWizard extends Component
                     }
                 }
 
-                // If still not assigned, use the first location with scenes (or create assignment for first location)
+                // If still not assigned, distribute round-robin among ALL locations (not just first)
+                // This prevents the first location from accumulating all uncovered scenes
                 if (!$assignedLocation && !empty($locations)) {
+                    // Find the location with the FEWEST scenes assigned (for better balance)
+                    $minScenes = PHP_INT_MAX;
                     $targetIdx = 0;
                     foreach ($locations as $idx => $loc) {
-                        if (!empty($loc['scenes'])) {
+                        $sceneCount = count($loc['scenes'] ?? []);
+                        if ($sceneCount < $minScenes) {
+                            $minScenes = $sceneCount;
                             $targetIdx = $idx;
-                            break;
                         }
                     }
 
@@ -10087,22 +10091,41 @@ class VideoWizard extends Component
                 $lowerName = strtolower($name);
 
                 // Auto-detect which scenes this location appears in
+                // Use STRICT matching to avoid over-matching (e.g., "alley" matching everywhere)
                 $detectedScenes = [];
-                $searchTerms = [$lowerName];
 
-                // Add partial name matches (e.g., "Valley of Elah" should match "valley", "elah")
+                // Primary search: full location name (most reliable)
+                $searchTermsFull = [$lowerName];
+
+                // Secondary search: significant name parts (6+ chars to avoid common words)
                 $nameParts = preg_split('/[\s\-_]+/', $lowerName);
+                $searchTermsParts = [];
                 foreach ($nameParts as $part) {
-                    if (strlen($part) > 3) { // Only add meaningful parts (longer for locations)
-                        $searchTerms[] = $part;
+                    // Only use parts 6+ chars long to avoid generic matches like "alley", "room", "city"
+                    if (strlen($part) >= 6) {
+                        $searchTermsParts[] = $part;
                     }
                 }
 
                 foreach ($sceneTexts as $sceneIdx => $text) {
-                    foreach ($searchTerms as $term) {
+                    $matched = false;
+
+                    // First try full name match (highest confidence)
+                    foreach ($searchTermsFull as $term) {
                         if (strpos($text, $term) !== false) {
                             $detectedScenes[] = $sceneIdx;
-                            break; // Found in this scene, move to next scene
+                            $matched = true;
+                            break;
+                        }
+                    }
+
+                    // If no full match, try significant parts (6+ chars)
+                    if (!$matched && !empty($searchTermsParts)) {
+                        foreach ($searchTermsParts as $term) {
+                            if (strpos($text, $term) !== false) {
+                                $detectedScenes[] = $sceneIdx;
+                                break;
+                            }
                         }
                     }
                 }
