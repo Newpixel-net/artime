@@ -11572,11 +11572,21 @@ EOT;
 
         $locations = $locationBible['locations'] ?? [];
 
+        // Priority 1: Find location with EXPLICIT scene assignment (most specific)
         foreach ($locations as $location) {
             $scenes = $location['scenes'] ?? [];
 
-            // Empty = all scenes, or check if scene is in list
-            if (empty($scenes) || in_array($sceneIndex, $scenes)) {
+            // Explicit scene assignment takes priority over "all scenes"
+            if (!empty($scenes) && in_array($sceneIndex, $scenes)) {
+                return $location;
+            }
+        }
+
+        // Priority 2: Fall back to location with empty scenes array (applies to all)
+        foreach ($locations as $location) {
+            $scenes = $location['scenes'] ?? [];
+
+            if (empty($scenes)) {
                 return $location;
             }
         }
@@ -11669,6 +11679,7 @@ EOT;
     protected function validateSceneContinuity(): void
     {
         $sceneDNA = $this->sceneMemory['sceneDNA']['scenes'] ?? [];
+        $totalScenes = count($sceneDNA);
         $issues = [];
 
         foreach ($sceneDNA as $sceneIndex => $scene) {
@@ -11678,9 +11689,9 @@ EOT;
             $prevScene = $sceneDNA[$sceneIndex - 1] ?? null;
             if (!$prevScene) continue;
 
-            // Check 1: Character teleportation
+            // Check 1: Character disappearance
             // If a character was at Location A in scene N-1, and scene N is also Location A,
-            // but character is missing, flag it
+            // but character is missing, flag it (unless character appears later)
             $prevLocation = $prevScene['location']['name'] ?? null;
             $currLocation = $scene['location']['name'] ?? null;
             $prevCharNames = $prevScene['characterNames'] ?? [];
@@ -11690,13 +11701,32 @@ EOT;
                 // Same location - check for missing characters
                 $missingChars = array_diff($prevCharNames, $currCharNames);
                 foreach ($missingChars as $charName) {
-                    // Only flag if character doesn't appear later (they might have left)
+                    // Check if character appears in ANY later scene (they might have just left temporarily)
+                    $appearsLater = false;
+                    for ($futureIdx = $sceneIndex + 1; $futureIdx < $totalScenes; $futureIdx++) {
+                        $futureCharNames = $sceneDNA[$futureIdx]['characterNames'] ?? [];
+                        if (in_array($charName, $futureCharNames)) {
+                            $appearsLater = true;
+                            break;
+                        }
+                    }
+
+                    // Only flag as warning if character never appears again
+                    // If they appear later, it's just an info note
+                    $severity = $appearsLater ? 'info' : 'warning';
+                    $message = $appearsLater
+                        ? "{$charName} temporarily leaves {$currLocation} between scene " . $sceneIndex . " and scene " . ($sceneIndex + 1)
+                        : "{$charName} was at {$currLocation} in scene " . $sceneIndex . " but disappeared in scene " . ($sceneIndex + 1) . " (same location)";
+
                     $issues[] = [
                         'type' => 'character_disappeared',
-                        'severity' => 'warning',
+                        'severity' => $severity,
                         'sceneIndex' => $sceneIndex,
-                        'message' => "{$charName} was at {$currLocation} in scene " . $sceneIndex . " but disappeared in scene " . ($sceneIndex + 1) . " (same location)",
-                        'suggestion' => "Either add {$charName} to scene " . ($sceneIndex + 1) . " or add a scene showing them leaving",
+                        'prevSceneIndex' => $sceneIndex - 1,
+                        'message' => $message,
+                        'suggestion' => $appearsLater
+                            ? "Consider adding a transition showing {$charName} leaving"
+                            : "Either add {$charName} to scene " . ($sceneIndex + 1) . " or add a scene showing them leaving",
                     ];
                 }
             }
@@ -11908,10 +11938,71 @@ PROMPT;
     }
 
     /**
+     * Validate and filter scene indices to ensure they're within valid range.
+     */
+    protected function validateSceneIndices(array $indices): array
+    {
+        $totalScenes = count($this->script['scenes'] ?? []);
+        if ($totalScenes === 0) {
+            return [];
+        }
+
+        // Filter to valid integer indices within range
+        $validated = [];
+        foreach ($indices as $idx) {
+            if (is_numeric($idx)) {
+                $idx = (int) $idx;
+                if ($idx >= 0 && $idx < $totalScenes) {
+                    $validated[] = $idx;
+                }
+            }
+        }
+
+        return array_values(array_unique($validated));
+    }
+
+    /**
      * Apply AI Bible analysis to the actual Bibles.
      */
     protected function applyAIBibleAnalysis(array $analysis): void
     {
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        // First, process sceneAnalysis to build per-scene character/location mapping
+        // This is more reliable than the aggregated appearsInScenes arrays
+        $characterSceneMap = [];
+        $locationSceneMap = [];
+
+        if (!empty($analysis['sceneAnalysis'])) {
+            foreach ($analysis['sceneAnalysis'] as $sceneData) {
+                $sceneIdx = $sceneData['sceneIndex'] ?? null;
+                if ($sceneIdx === null || $sceneIdx < 0 || $sceneIdx >= $totalScenes) {
+                    continue;
+                }
+
+                // Map characters to this scene
+                foreach ($sceneData['characters'] ?? [] as $charName) {
+                    if (is_string($charName) && !empty($charName)) {
+                        $charKey = strtolower(trim($charName));
+                        if (!isset($characterSceneMap[$charKey])) {
+                            $characterSceneMap[$charKey] = [];
+                        }
+                        $characterSceneMap[$charKey][] = $sceneIdx;
+                    }
+                }
+
+                // Map location to this scene
+                $locName = $sceneData['location'] ?? null;
+                if (is_string($locName) && !empty($locName)) {
+                    $locKey = strtolower(trim($locName));
+                    if (!isset($locationSceneMap[$locKey])) {
+                        $locationSceneMap[$locKey] = [];
+                    }
+                    $locationSceneMap[$locKey][] = $sceneIdx;
+                }
+            }
+        }
+
         // Apply characters to Character Bible
         if (!empty($analysis['characters'])) {
             $existingNames = array_map(
@@ -11923,15 +12014,22 @@ PROMPT;
                 $charName = $char['name'] ?? '';
                 if (empty($charName)) continue;
 
+                $charKey = strtolower(trim($charName));
+
+                // Prefer scene assignments from sceneAnalysis, fallback to appearsInScenes
+                $sceneAssignments = $characterSceneMap[$charKey]
+                    ?? $this->validateSceneIndices($char['appearsInScenes'] ?? []);
+
                 // Skip if already exists
-                if (in_array(strtolower($charName), $existingNames)) {
+                if (in_array($charKey, $existingNames)) {
                     // Update scene assignments for existing character
                     foreach ($this->sceneMemory['characterBible']['characters'] as &$existingChar) {
-                        if (strtolower($existingChar['name'] ?? '') === strtolower($charName)) {
+                        if (strtolower($existingChar['name'] ?? '') === $charKey) {
                             // Merge scene assignments
                             $existing = $existingChar['appliedScenes'] ?? [];
-                            $new = $char['appearsInScenes'] ?? [];
-                            $existingChar['appliedScenes'] = array_values(array_unique(array_merge($existing, $new)));
+                            $existingChar['appliedScenes'] = $this->validateSceneIndices(
+                                array_merge($existing, $sceneAssignments)
+                            );
                             sort($existingChar['appliedScenes']);
                             break;
                         }
@@ -11945,7 +12043,7 @@ PROMPT;
                     'name' => $charName,
                     'role' => $char['role'] ?? 'supporting',
                     'description' => $char['description'] ?? '',
-                    'appliedScenes' => $char['appearsInScenes'] ?? [],
+                    'appliedScenes' => $sceneAssignments,
                     'traits' => [],
                     'hair' => ['color' => '', 'style' => '', 'length' => '', 'texture' => ''],
                     'wardrobe' => ['outfit' => '', 'colors' => '', 'style' => '', 'footwear' => ''],
@@ -11970,15 +12068,22 @@ PROMPT;
                 $locName = $loc['name'] ?? '';
                 if (empty($locName)) continue;
 
+                $locKey = strtolower(trim($locName));
+
+                // Prefer scene assignments from sceneAnalysis, fallback to appearsInScenes
+                $sceneAssignments = $locationSceneMap[$locKey]
+                    ?? $this->validateSceneIndices($loc['appearsInScenes'] ?? []);
+
                 // Skip if already exists
-                if (in_array(strtolower($locName), $existingNames)) {
+                if (in_array($locKey, $existingNames)) {
                     // Update scene assignments for existing location
                     foreach ($this->sceneMemory['locationBible']['locations'] as &$existingLoc) {
-                        if (strtolower($existingLoc['name'] ?? '') === strtolower($locName)) {
+                        if (strtolower($existingLoc['name'] ?? '') === $locKey) {
                             // Merge scene assignments
                             $existing = $existingLoc['scenes'] ?? [];
-                            $new = $loc['appearsInScenes'] ?? [];
-                            $existingLoc['scenes'] = array_values(array_unique(array_merge($existing, $new)));
+                            $existingLoc['scenes'] = $this->validateSceneIndices(
+                                array_merge($existing, $sceneAssignments)
+                            );
                             sort($existingLoc['scenes']);
 
                             // Add state changes
@@ -11994,7 +12099,7 @@ PROMPT;
                     continue;
                 }
 
-                // Add new location
+                // Add new location with validated scene assignments
                 $this->sceneMemory['locationBible']['locations'][] = [
                     'id' => 'loc_' . time() . '_' . count($this->sceneMemory['locationBible']['locations']),
                     'name' => $locName,
@@ -12005,7 +12110,7 @@ PROMPT;
                     'atmosphere' => '',
                     'mood' => '',
                     'lightingStyle' => '',
-                    'scenes' => $loc['appearsInScenes'] ?? [],
+                    'scenes' => $sceneAssignments, // Use validated scene assignments
                     'stateChanges' => $loc['stateChanges'] ?? [],
                     'referenceImage' => null,
                     'fromAIAnalysis' => true,
@@ -12020,9 +12125,23 @@ PROMPT;
             $this->sceneMemory['sceneDNA']['characterAffinities'] = $analysis['characterAffinities'];
         }
 
+        // Log detailed info about scene assignments
+        $characterAssignments = [];
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $char) {
+            $characterAssignments[$char['name'] ?? 'Unknown'] = $char['appliedScenes'] ?? [];
+        }
+        $locationAssignments = [];
+        foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $loc) {
+            $locationAssignments[$loc['name'] ?? 'Unknown'] = $loc['scenes'] ?? [];
+        }
+
         Log::info('SceneDNA: Applied AI analysis to Bibles', [
-            'charactersAdded' => count($analysis['characters'] ?? []),
-            'locationsAdded' => count($analysis['locations'] ?? []),
+            'totalScenes' => $totalScenes,
+            'charactersProcessed' => count($analysis['characters'] ?? []),
+            'locationsProcessed' => count($analysis['locations'] ?? []),
+            'sceneAnalysisUsed' => !empty($analysis['sceneAnalysis']),
+            'characterSceneAssignments' => $characterAssignments,
+            'locationSceneAssignments' => $locationAssignments,
         ]);
 
         $this->saveProject();
