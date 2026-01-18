@@ -273,8 +273,8 @@
                                 </span>
                             </div>
                             @if($assignedScenesCount === 0 && $totalScenes > 0)
-                                <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.25rem; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 0.25rem;">
-                                    <span style="color: #67e8f9; font-size: 0.55rem;">ℹ️ {{ __('No scenes assigned - this location applies to ALL scenes by default') }}</span>
+                                <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.25rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.25rem;">
+                                    <span style="color: #fca5a5; font-size: 0.55rem;">⚠️ {{ __('Please assign at least one scene to this location') }}</span>
                                 </div>
                             @endif
                             <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;">

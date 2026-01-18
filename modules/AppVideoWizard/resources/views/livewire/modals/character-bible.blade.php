@@ -76,7 +76,7 @@
                             <div style="flex: 1; min-width: 0;">
                                 <div style="font-weight: 600; color: white; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $character['name'] ?: __('Unnamed') }}</div>
                                 <div style="color: rgba(255,255,255,0.5); font-size: 0.55rem; margin-top: 0.1rem;">
-                                    {{ count($character['appliedScenes'] ?? []) }} {{ __('scenes') }}
+                                    {{ count($character['scenes'] ?? $character['appliedScenes'] ?? []) }} {{ __('scenes') }}
                                     @if(!empty($character['referenceImage']))
                                         <span style="color: #10b981;">• ✓</span>
                                     @endif
@@ -398,7 +398,8 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
                             <label style="color: rgba(255,255,255,0.6); font-size: 0.6rem;">{{ __('Appears in Scenes') }}</label>
                             @php
-                                $appliedCount = count($currentChar['appliedScenes'] ?? []);
+                                $characterScenes = $currentChar['scenes'] ?? $currentChar['appliedScenes'] ?? [];
+                                $appliedCount = count($characterScenes);
                                 $totalScenes = count($script['scenes'] ?? []);
                             @endphp
                             <span style="font-size: 0.55rem; color: {{ $appliedCount > 0 ? '#10b981' : 'rgba(255,255,255,0.4)' }};">
@@ -406,14 +407,14 @@
                             </span>
                         </div>
                         @if($appliedCount === 0 && $totalScenes > 0)
-                            <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.3rem; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.25rem;">
-                                <span style="color: #fcd34d; font-size: 0.55rem;">⚠️ {{ __('No scenes assigned - click scene numbers below to assign') }}</span>
+                            <div style="padding: 0.35rem 0.5rem; margin-bottom: 0.3rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.25rem;">
+                                <span style="color: #fca5a5; font-size: 0.55rem;">⚠️ {{ __('Please assign at least one scene to this character') }}</span>
                             </div>
                         @endif
                         <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
                             @foreach($script['scenes'] ?? [] as $sceneIndex => $scene)
                                 @php
-                                    $isApplied = in_array($sceneIndex, $currentChar['appliedScenes'] ?? []);
+                                    $isApplied = in_array($sceneIndex, $characterScenes);
                                 @endphp
                                 <button type="button"
                                         wire:click.debounce.300ms="toggleCharacterScene({{ $editIndex }}, {{ $sceneIndex }})"
