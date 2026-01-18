@@ -436,6 +436,24 @@ Return ONLY valid JSON (no markdown, no explanation):
 
 PROMPT;
 
+        // Scale location count based on duration for better visual variety
+        // Short videos need fewer locations, longer videos need more variety
+        $minLocations = match (true) {
+            $duration <= 60 => 2,   // Up to 1 min: 2-3 locations
+            $duration <= 120 => 3,  // 1-2 min: 3-4 locations
+            $duration <= 180 => 4,  // 2-3 min: 4-5 locations
+            $duration <= 300 => 5,  // 3-5 min: 5-6 locations
+            default => 6,           // 5+ min: 6+ locations
+        };
+        $maxLocations = $minLocations + 2;
+
+        $prompt .= <<<SCALED
+
+=== DURATION-BASED LOCATION REQUIREMENT ===
+For a {$minutes}-minute video ({$duration} seconds), you MUST create {$minLocations}-{$maxLocations} distinct locations.
+This ensures visual variety throughout the video. Each scene should feel like it takes place in a distinct environment.
+SCALED;
+
         return $prompt;
     }
 
