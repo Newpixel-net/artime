@@ -15528,6 +15528,11 @@ PROMPT;
             ]);
         }
 
+        // Re-fetch decomposed data after potential creation (important: the variable was null before creation)
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        // Also refresh the shots array in case it was updated
+        $shots = $decomposed['shots'] ?? $shots;
+
         $totalShots = count($shots);
         $shotsPerCollage = 4;
         $totalPages = (int) ceil($totalShots / $shotsPerCollage);
@@ -15591,7 +15596,7 @@ PROMPT;
                         if (is_array($sceneDescription)) {
                             $sceneDescription = implode(' ', array_filter($sceneDescription));
                         }
-                        $style = $decomposed['consistencyAnchors']['style'] ?? $this->sceneMemory['styleBible']['style'] ?? 'cinematic';
+                        $style = ($decomposed['consistencyAnchors']['style'] ?? null) ?? ($this->sceneMemory['styleBible']['style'] ?? null) ?? 'cinematic';
                         if (is_array($style)) {
                             $style = implode(', ', array_filter($style));
                         }
