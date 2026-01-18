@@ -26,6 +26,7 @@ use Modules\AppVideoWizard\Services\ProductionIntelligenceService;
 use Modules\AppVideoWizard\Services\CinematicIntelligenceService;
 use Modules\AppVideoWizard\Services\PromptExpanderService;
 use Modules\AppVideoWizard\Services\VideoPromptBuilderService;
+use Modules\AppVideoWizard\Services\SceneSyncService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -797,6 +798,28 @@ class VideoWizard extends Component
     // Save debouncing
     protected int $saveDebounceMs = 500;
     protected ?string $lastSaveHash = null;
+
+    // =========================================================================
+    // PHASE 4: Algorithm Optimization - Cached Lookup Maps
+    // Pre-computed maps for O(1) scene-to-character and scene-to-location lookups
+    // =========================================================================
+
+    /**
+     * Cached scene-to-character map: sceneIndex => array of character indices
+     * Built once, used for all getCharactersForSceneIndex() calls
+     */
+    protected array $cachedSceneCharacterMap = [];
+
+    /**
+     * Cached scene-to-location map: sceneIndex => location index (or null)
+     * Built once, used for all getLocationForSceneIndex() calls
+     */
+    protected array $cachedSceneLocationMap = [];
+
+    /**
+     * Flag indicating whether lookup caches are valid
+     */
+    protected bool $lookupCachesValid = false;
 
     /**
      * Get paginated scenes for storyboard display.
@@ -5972,6 +5995,9 @@ class VideoWizard extends Component
         try {
             $this->storyboard['promptChain']['status'] = 'processing';
 
+            // PHASE 4: Build lookup caches once before iterating (O(n) build, O(1) lookups)
+            $this->buildSceneLookupCaches();
+
             // Process each scene
             foreach ($this->script['scenes'] as $index => $scene) {
                 $this->storyboard['promptChain']['scenes'][$index] = [
@@ -6187,29 +6213,131 @@ class VideoWizard extends Component
         return implode('. ', array_filter($parts));
     }
 
+    // =========================================================================
+    // PHASE 4: Optimized Scene Lookup Methods with O(1) Cached Lookups
+    // =========================================================================
+
+    /**
+     * Build cached lookup maps for O(1) scene-to-character and scene-to-location lookups.
+     * Call this once before iterating over scenes to avoid repeated in_array() calls.
+     */
+    protected function buildSceneLookupCaches(): void
+    {
+        if ($this->lookupCachesValid) {
+            return; // Already built and valid
+        }
+
+        $totalScenes = count($this->script['scenes'] ?? []);
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+        $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+
+        // Build scene-to-character map: sceneIndex => [characterIndices...]
+        $this->cachedSceneCharacterMap = [];
+        foreach ($characters as $charIdx => $character) {
+            $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
+
+            if (empty($appliedScenes)) {
+                // Empty = applies to ALL scenes - mark with special key
+                for ($i = 0; $i < $totalScenes; $i++) {
+                    $this->cachedSceneCharacterMap[$i][] = $charIdx;
+                }
+            } else {
+                // Use array_flip for O(1) lookup during build
+                foreach ($appliedScenes as $sceneIdx) {
+                    $this->cachedSceneCharacterMap[$sceneIdx][] = $charIdx;
+                }
+            }
+        }
+
+        // Build scene-to-location map: sceneIndex => locationIndex
+        $this->cachedSceneLocationMap = [];
+        foreach ($locations as $locIdx => $location) {
+            $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
+
+            if (empty($scenes)) {
+                // Empty = applies to ALL scenes - first location wins
+                for ($i = 0; $i < $totalScenes; $i++) {
+                    if (!isset($this->cachedSceneLocationMap[$i])) {
+                        $this->cachedSceneLocationMap[$i] = $locIdx;
+                    }
+                }
+            } else {
+                // Specific scenes assigned
+                foreach ($scenes as $sceneIdx) {
+                    if (!isset($this->cachedSceneLocationMap[$sceneIdx])) {
+                        $this->cachedSceneLocationMap[$sceneIdx] = $locIdx;
+                    }
+                }
+            }
+        }
+
+        $this->lookupCachesValid = true;
+    }
+
+    /**
+     * Invalidate lookup caches when bibles change.
+     * Call this whenever characters, locations, or scenes are modified.
+     */
+    protected function invalidateSceneLookupCaches(): void
+    {
+        $this->lookupCachesValid = false;
+        $this->cachedSceneCharacterMap = [];
+        $this->cachedSceneLocationMap = [];
+    }
+
     /**
      * Get characters that appear in a specific scene (for prompt building).
+     * PHASE 4 OPTIMIZED: Uses pre-computed cache for O(1) lookup.
      */
     protected function getCharactersForSceneIndex(array $characters, int $sceneIndex): array
     {
+        // If cache is valid, use O(1) lookup
+        if ($this->lookupCachesValid && !empty($this->cachedSceneCharacterMap)) {
+            $charIndices = $this->cachedSceneCharacterMap[$sceneIndex] ?? [];
+            $result = [];
+            foreach ($charIndices as $idx) {
+                if (isset($characters[$idx])) {
+                    $result[] = $characters[$idx];
+                }
+            }
+            return $result;
+        }
+
+        // Fallback to original O(n) method with array_flip optimization
         return array_filter($characters, function ($character) use ($sceneIndex) {
             $appliedScenes = $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
             // Empty array means "applies to ALL scenes" (default behavior)
-            // Non-empty array means "applies only to these specific scenes"
-            return empty($appliedScenes) || in_array($sceneIndex, $appliedScenes);
+            if (empty($appliedScenes)) {
+                return true;
+            }
+            // Use array_flip for O(1) lookup instead of in_array
+            $flipped = array_flip($appliedScenes);
+            return isset($flipped[$sceneIndex]);
         });
     }
 
     /**
      * Get the primary location for a specific scene (for prompt building).
+     * PHASE 4 OPTIMIZED: Uses pre-computed cache for O(1) lookup.
      */
     protected function getLocationForSceneIndex(array $locations, int $sceneIndex): ?array
     {
+        // If cache is valid, use O(1) lookup
+        if ($this->lookupCachesValid && !empty($this->cachedSceneLocationMap)) {
+            $locIdx = $this->cachedSceneLocationMap[$sceneIndex] ?? null;
+            return $locIdx !== null && isset($locations[$locIdx]) ? $locations[$locIdx] : null;
+        }
+
+        // Fallback to original method with array_flip optimization
         foreach ($locations as $location) {
             $scenes = $location['scenes'] ?? $location['appearsInScenes'] ?? [];
             // Empty array means "applies to ALL scenes" (default behavior)
-            // Non-empty array means "applies only to these specific scenes"
-            if (empty($scenes) || in_array($sceneIndex, $scenes)) {
+            if (empty($scenes)) {
+                return $location;
+            }
+            // Use array_flip for O(1) lookup instead of in_array
+            $flipped = array_flip($scenes);
+            if (isset($flipped[$sceneIndex])) {
                 return $location;
             }
         }
@@ -8073,11 +8201,14 @@ class VideoWizard extends Component
 
     /**
      * Pattern-based character detection (fallback method).
+     * PHASE 4 OPTIMIZED: Uses associative arrays for O(1) scene membership checks.
      */
     protected function autoDetectCharactersWithPatterns(): void
     {
         $detectedCharacters = [];
-        $characterScenes = []; // Track which scenes each character appears in
+        // PHASE 4: Use associative array for O(1) scene existence checks
+        // Structure: characterName => [sceneIndex => true, ...]
+        $characterScenesMap = [];
 
         // Common character indicators - expanded for better detection
         $characterPatterns = [
@@ -8121,10 +8252,11 @@ class VideoWizard extends Component
                                 'description' => '',
                                 'source' => 'dialogue',
                             ];
-                            $characterScenes[$normalizedName] = [];
+                            $characterScenesMap[$normalizedName] = [];
                         }
-                        if (!in_array($sceneIndex, $characterScenes[$normalizedName])) {
-                            $characterScenes[$normalizedName][] = $sceneIndex;
+                        // PHASE 4: O(1) check with isset instead of in_array
+                        if (!isset($characterScenesMap[$normalizedName][$sceneIndex])) {
+                            $characterScenesMap[$normalizedName][$sceneIndex] = true;
                         }
                     }
                 }
@@ -8142,15 +8274,23 @@ class VideoWizard extends Component
                                     'description' => $this->inferCharacterDescription($sceneText, $characterName),
                                     'source' => 'pattern',
                                 ];
-                                $characterScenes[$characterName] = [];
+                                $characterScenesMap[$characterName] = [];
                             }
-                            if (!in_array($sceneIndex, $characterScenes[$characterName])) {
-                                $characterScenes[$characterName][] = $sceneIndex;
+                            // PHASE 4: O(1) check with isset instead of in_array
+                            if (!isset($characterScenesMap[$characterName][$sceneIndex])) {
+                                $characterScenesMap[$characterName][$sceneIndex] = true;
                             }
                         }
                     }
                 }
             }
+        }
+
+        // PHASE 4: Convert maps to arrays for downstream processing
+        $characterScenes = [];
+        foreach ($characterScenesMap as $name => $sceneMap) {
+            $characterScenes[$name] = array_keys($sceneMap);
+            sort($characterScenes[$name]);
         }
 
         // =====================================================================
@@ -8360,6 +8500,7 @@ class VideoWizard extends Component
      * Expand scene assignments for a character to reach target count.
      * Uses intelligent expansion: fills gaps between existing scenes first,
      * then extends to adjacent scenes.
+     * PHASE 4 OPTIMIZED: Uses array_flip for O(1) membership checks instead of in_array.
      */
     protected function expandSceneAssignments(array $currentScenes, int $totalScenes, int $targetCount): array
     {
@@ -8367,40 +8508,44 @@ class VideoWizard extends Component
             return $currentScenes;
         }
 
-        $expandedScenes = $currentScenes;
+        // PHASE 4: Use array keys for O(1) lookup instead of in_array O(n)
+        $expandedScenesMap = array_flip($currentScenes); // sceneIndex => position (for O(1) isset)
         $allSceneIndices = range(0, $totalScenes - 1);
 
         // Priority 1: Fill gaps between existing scenes (narrative continuity)
-        sort($expandedScenes);
-        if (count($expandedScenes) >= 2) {
-            for ($i = 0; $i < count($expandedScenes) - 1 && count($expandedScenes) < $targetCount; $i++) {
-                $start = $expandedScenes[$i];
-                $end = $expandedScenes[$i + 1] ?? $start;
+        $sortedScenes = array_keys($expandedScenesMap);
+        sort($sortedScenes);
+
+        if (count($sortedScenes) >= 2) {
+            for ($i = 0; $i < count($sortedScenes) - 1 && count($expandedScenesMap) < $targetCount; $i++) {
+                $start = $sortedScenes[$i];
+                $end = $sortedScenes[$i + 1] ?? $start;
                 // Fill the gap between consecutive assigned scenes
-                for ($gap = $start + 1; $gap < $end && count($expandedScenes) < $targetCount; $gap++) {
-                    if (!in_array($gap, $expandedScenes)) {
-                        $expandedScenes[] = $gap;
+                for ($gap = $start + 1; $gap < $end && count($expandedScenesMap) < $targetCount; $gap++) {
+                    if (!isset($expandedScenesMap[$gap])) {
+                        $expandedScenesMap[$gap] = true;
                     }
                 }
-                sort($expandedScenes);
             }
         }
 
         // Priority 2: Extend to adjacent scenes (before first and after last)
-        while (count($expandedScenes) < $targetCount) {
+        while (count($expandedScenesMap) < $targetCount) {
             $added = false;
-            $min = min($expandedScenes);
-            $max = max($expandedScenes);
+            $sortedScenes = array_keys($expandedScenesMap);
+            sort($sortedScenes);
+            $min = $sortedScenes[0] ?? 0;
+            $max = $sortedScenes[count($sortedScenes) - 1] ?? 0;
 
             // Try to add scene before the earliest
-            if ($min > 0 && !in_array($min - 1, $expandedScenes)) {
-                $expandedScenes[] = $min - 1;
+            if ($min > 0 && !isset($expandedScenesMap[$min - 1])) {
+                $expandedScenesMap[$min - 1] = true;
                 $added = true;
             }
 
             // Try to add scene after the latest
-            if (count($expandedScenes) < $targetCount && $max < $totalScenes - 1 && !in_array($max + 1, $expandedScenes)) {
-                $expandedScenes[] = $max + 1;
+            if (count($expandedScenesMap) < $targetCount && $max < $totalScenes - 1 && !isset($expandedScenesMap[$max + 1])) {
+                $expandedScenesMap[$max + 1] = true;
                 $added = true;
             }
 
@@ -8408,17 +8553,22 @@ class VideoWizard extends Component
             if (!$added) {
                 break;
             }
-
-            sort($expandedScenes);
         }
 
-        // Priority 3: Fill any remaining slots with random unassigned scenes
-        $unassigned = array_diff($allSceneIndices, $expandedScenes);
-        while (count($expandedScenes) < $targetCount && !empty($unassigned)) {
-            $nextScene = array_shift($unassigned);
-            $expandedScenes[] = $nextScene;
+        // Priority 3: Fill any remaining slots with unassigned scenes
+        if (count($expandedScenesMap) < $targetCount) {
+            foreach ($allSceneIndices as $sceneIdx) {
+                if (!isset($expandedScenesMap[$sceneIdx])) {
+                    $expandedScenesMap[$sceneIdx] = true;
+                    if (count($expandedScenesMap) >= $targetCount) {
+                        break;
+                    }
+                }
+            }
         }
 
+        // Convert map back to sorted array
+        $expandedScenes = array_keys($expandedScenesMap);
         sort($expandedScenes);
         return $expandedScenes;
     }
@@ -8426,6 +8576,7 @@ class VideoWizard extends Component
     /**
      * Find if a character with a synonymous name already exists.
      * Handles cases like "Hero" and "Protagonist" referring to the same character.
+     * PHASE 4 OPTIMIZED: Pre-built lookup map for O(1) synonym group detection.
      *
      * @param string $name The character name to check
      * @return int|null The index of the existing character, or null if not found
@@ -8435,24 +8586,31 @@ class VideoWizard extends Component
         $name = strtolower(trim($name));
         $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
 
-        // Synonymous name groups - names in the same group refer to the same character
-        $synonymGroups = [
-            ['hero', 'protagonist', 'main character', 'the hero', 'our hero', 'central character'],
-            ['narrator', 'the narrator', 'storyteller', 'voice'],
-            ['villain', 'antagonist', 'the villain', 'the antagonist', 'bad guy'],
-            ['mentor', 'guide', 'teacher', 'wise one', 'master'],
-            ['sidekick', 'helper', 'companion', 'partner', 'ally'],
-            ['love interest', 'romantic interest', 'the love interest'],
-        ];
+        // PHASE 4: Pre-built lookup map - name => groupIndex for O(1) group detection
+        static $synonymLookup = null;
+        static $synonymGroups = null;
 
-        // Find which group the input name belongs to
-        $nameGroup = null;
-        foreach ($synonymGroups as $group) {
-            if (in_array($name, $group)) {
-                $nameGroup = $group;
-                break;
+        if ($synonymLookup === null) {
+            $synonymGroups = [
+                ['hero', 'protagonist', 'main character', 'the hero', 'our hero', 'central character'],
+                ['narrator', 'the narrator', 'storyteller', 'voice'],
+                ['villain', 'antagonist', 'the villain', 'the antagonist', 'bad guy'],
+                ['mentor', 'guide', 'teacher', 'wise one', 'master'],
+                ['sidekick', 'helper', 'companion', 'partner', 'ally'],
+                ['love interest', 'romantic interest', 'the love interest'],
+            ];
+
+            // Build O(1) lookup map: name => groupIndex
+            $synonymLookup = [];
+            foreach ($synonymGroups as $groupIdx => $group) {
+                foreach ($group as $synonym) {
+                    $synonymLookup[$synonym] = $groupIdx;
+                }
             }
         }
+
+        // O(1) lookup to find which group the input name belongs to
+        $nameGroupIdx = $synonymLookup[$name] ?? null;
 
         foreach ($characters as $index => $character) {
             $existingName = strtolower(trim($character['name']));
@@ -8462,14 +8620,10 @@ class VideoWizard extends Component
                 return $index;
             }
 
-            // Check if names are in the same synonym group
-            if ($nameGroup !== null && in_array($existingName, $nameGroup)) {
-                return $index;
-            }
-
-            // Check if existing character is in a group that contains our name
-            foreach ($synonymGroups as $group) {
-                if (in_array($existingName, $group) && in_array($name, $group)) {
+            // O(1) check if names are in the same synonym group
+            if ($nameGroupIdx !== null) {
+                $existingGroupIdx = $synonymLookup[$existingName] ?? null;
+                if ($existingGroupIdx === $nameGroupIdx) {
                     return $index;
                 }
             }
@@ -10392,29 +10546,58 @@ class VideoWizard extends Component
 
     /**
      * Close Character Bible modal.
-     * Saves changes and rebuilds scene DNA once (instead of on every edit).
+     * PHASE 3: Validates data integrity, then rebuilds Scene DNA.
      */
     public function closeCharacterBibleModal(): void
     {
         $this->showCharacterBibleModal = false;
+
+        // PHASE 3: Use SceneSyncService to validate character assignments
+        $syncService = app(SceneSyncService::class);
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        $validation = $syncService->validateCharacterBible($this->sceneMemory['characterBible'] ?? [], $totalScenes);
+        if (!$validation['valid']) {
+            Log::warning('CharacterBibleModal: Validation issues on close', [
+                'issues' => $validation['issues'],
+            ]);
+            // Auto-fix invalid scene indices by removing them
+            foreach ($this->sceneMemory['characterBible']['characters'] as &$character) {
+                if (isset($character['appliedScenes'])) {
+                    $character['appliedScenes'] = array_values(array_filter(
+                        $character['appliedScenes'],
+                        fn($s) => $s >= 0 && $s < $totalScenes
+                    ));
+                }
+            }
+            unset($character);
+        }
+
+        // Rebuild Scene DNA with validated data
         $this->buildSceneDNA();
         $this->saveProject();
     }
 
     /**
      * Toggle character scene assignment.
+     * PHASE 4 OPTIMIZED: Uses array_flip for O(1) membership check.
      */
     public function toggleCharacterScene(int $charIndex, int $sceneIndex): void
     {
         $appliedScenes = $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] ?? [];
 
-        if (in_array($sceneIndex, $appliedScenes)) {
+        // PHASE 4: O(1) check with array_flip instead of in_array
+        $flipped = array_flip($appliedScenes);
+        if (isset($flipped[$sceneIndex])) {
             $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = array_values(
                 array_diff($appliedScenes, [$sceneIndex])
             );
         } else {
             $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'][] = $sceneIndex;
         }
+
+        // PHASE 4: Invalidate lookup cache since scene assignments changed
+        $this->invalidateSceneLookupCaches();
 
         // Don't save here - let modal close handle batched saves for better performance
     }
@@ -10426,6 +10609,10 @@ class VideoWizard extends Component
     {
         $sceneCount = count($this->script['scenes'] ?? []);
         $this->sceneMemory['characterBible']['characters'][$charIndex]['appliedScenes'] = range(0, $sceneCount - 1);
+
+        // PHASE 4: Invalidate lookup cache since scene assignments changed
+        $this->invalidateSceneLookupCaches();
+
         // Don't save here - let modal close handle batched saves for better performance
     }
 
@@ -11319,11 +11506,33 @@ EOT;
 
     /**
      * Close Location Bible modal.
-     * Saves changes and rebuilds scene DNA once (instead of on every edit).
+     * PHASE 3: Validates data integrity, fixes conflicts, then rebuilds Scene DNA.
      */
     public function closeLocationBibleModal(): void
     {
         $this->showLocationBibleModal = false;
+
+        // PHASE 3: Use SceneSyncService to validate and fix any conflicts
+        $syncService = app(SceneSyncService::class);
+
+        // Fix any duplicate scene assignments
+        $conflictsFixed = $syncService->fixLocationConflicts($this->sceneMemory['locationBible']);
+        if ($conflictsFixed > 0) {
+            Log::info('LocationBibleModal: Fixed scene conflicts on close', [
+                'conflictsFixed' => $conflictsFixed,
+            ]);
+        }
+
+        // Ensure all scenes have a location
+        $totalScenes = count($this->script['scenes'] ?? []);
+        $assigned = $syncService->ensureAllScenesHaveLocation($this->sceneMemory['locationBible'], $totalScenes);
+        if ($assigned > 0) {
+            Log::info('LocationBibleModal: Assigned unassigned scenes on close', [
+                'scenesAssigned' => $assigned,
+            ]);
+        }
+
+        // Rebuild Scene DNA with validated data
         $this->buildSceneDNA();
         $this->saveProject();
     }
@@ -11331,6 +11540,7 @@ EOT;
     /**
      * Toggle location assignment to a scene.
      * Enforces ONE location per scene - adding a scene to this location removes it from others.
+     * PHASE 4 OPTIMIZED: Uses array_flip for O(1) membership check.
      */
     public function toggleLocationScene(int $locIndex, int $sceneIndex): void
     {
@@ -11340,7 +11550,9 @@ EOT;
 
         $scenes = $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] ?? [];
 
-        if (in_array($sceneIndex, $scenes)) {
+        // PHASE 4: O(1) check with array_flip instead of in_array
+        $flipped = array_flip($scenes);
+        if (isset($flipped[$sceneIndex])) {
             // Removing scene from this location - just remove it
             $scenes = array_values(array_filter($scenes, fn($s) => $s !== $sceneIndex));
         } else {
@@ -11360,6 +11572,10 @@ EOT;
 
         sort($scenes);
         $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] = $scenes;
+
+        // PHASE 4: Invalidate lookup cache since scene assignments changed
+        $this->invalidateSceneLookupCaches();
+
         // Don't save here - let modal close handle batched saves for better performance
     }
 
@@ -11386,6 +11602,10 @@ EOT;
         unset($otherLoc);
 
         $this->sceneMemory['locationBible']['locations'][$locIndex]['scenes'] = range(0, $sceneCount - 1);
+
+        // PHASE 4: Invalidate lookup cache since scene assignments changed
+        $this->invalidateSceneLookupCaches();
+
         // Don't save here - let modal close handle batched saves for better performance
     }
 
@@ -11752,6 +11972,57 @@ EOT;
         ]);
 
         $this->saveProject();
+    }
+
+    /**
+     * Validate all Bible systems are in sync.
+     * PHASE 3: Uses SceneSyncService for comprehensive validation.
+     *
+     * @return array Validation result with 'valid' boolean and 'issues' array
+     */
+    public function validateAllBibles(): array
+    {
+        $syncService = app(SceneSyncService::class);
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        $result = $syncService->validateAllBibles($this->sceneMemory, $totalScenes);
+
+        // Store validation issues in Scene DNA for UI display
+        $this->sceneMemory['sceneDNA']['validationIssues'] = $result['issues'];
+        $this->sceneMemory['sceneDNA']['lastValidatedAt'] = now()->toIso8601String();
+
+        if (!$result['valid']) {
+            Log::warning('VideoWizard: Bible validation failed', [
+                'issueCount' => count($result['issues']),
+                'issues' => $result['issues'],
+            ]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fix all Bible sync issues automatically.
+     * PHASE 3: Uses SceneSyncService to resolve conflicts.
+     */
+    public function fixAllBibleIssues(): void
+    {
+        $syncService = app(SceneSyncService::class);
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        // Fix location conflicts
+        $conflictsFixed = $syncService->fixLocationConflicts($this->sceneMemory['locationBible']);
+
+        // Ensure all scenes have locations
+        $scenesAssigned = $syncService->ensureAllScenesHaveLocation($this->sceneMemory['locationBible'], $totalScenes);
+
+        Log::info('VideoWizard: Fixed Bible issues', [
+            'locationConflictsFixed' => $conflictsFixed,
+            'scenesAssigned' => $scenesAssigned,
+        ]);
+
+        // Rebuild Scene DNA with fixed data
+        $this->buildSceneDNA();
     }
 
     /**
