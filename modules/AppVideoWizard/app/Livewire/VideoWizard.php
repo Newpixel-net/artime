@@ -27,6 +27,8 @@ use Modules\AppVideoWizard\Services\CinematicIntelligenceService;
 use Modules\AppVideoWizard\Services\PromptExpanderService;
 use Modules\AppVideoWizard\Services\VideoPromptBuilderService;
 use Modules\AppVideoWizard\Services\SceneSyncService;
+use Modules\AppVideoWizard\Services\PerformanceMonitoringService;
+use Modules\AppVideoWizard\Services\QueuedJobsManager;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -467,6 +469,9 @@ class VideoWizard extends Component
     public bool $isTransitioning = false;  // Track step transitions for loading overlay
     public ?string $transitionMessage = null;  // Message to show during transition
     public ?string $error = null;
+
+    // Phase 5: Async Job Tracking
+    public array $activeAsyncJobs = [];    // Currently running async jobs for this project
 
     // Stock Media Browser state
     public bool $showStockBrowser = false;
@@ -19004,6 +19009,263 @@ PROMPT;
 
     // =========================================================================
     // END PHASE 5: EXPORT ENHANCEMENT METHODS
+    // =========================================================================
+
+    // =========================================================================
+    // PHASE 5: PERFORMANCE MONITORING & ASYNC JOB METHODS
+    // =========================================================================
+
+    /**
+     * Dispatch batch image generation as a background job.
+     * Use this for large batches (5+ images) to avoid UI blocking.
+     *
+     * @param array $sceneIndices Scene indices to generate images for
+     * @return string|null Job ID for tracking, or null if sync mode is preferred
+     */
+    public function dispatchAsyncImageGeneration(array $sceneIndices): ?string
+    {
+        // Only use async for large batches
+        if (count($sceneIndices) < 5) {
+            return null;
+        }
+
+        try {
+            $project = WizardProject::findOrFail($this->projectId);
+            $scenes = [];
+
+            foreach ($sceneIndices as $index) {
+                if (isset($this->script['scenes'][$index])) {
+                    $scenes[] = array_merge($this->script['scenes'][$index], ['index' => $index]);
+                }
+            }
+
+            if (empty($scenes)) {
+                return null;
+            }
+
+            $jobsManager = app(QueuedJobsManager::class);
+            $jobId = $jobsManager->dispatchImageGeneration($project, $scenes, [
+                'model' => $this->storyboard['imageModel'] ?? 'nanobanana',
+                'teamId' => session('current_team_id', 0),
+            ]);
+
+            // Track the job
+            $this->activeAsyncJobs[] = [
+                'id' => $jobId,
+                'type' => 'image_generation',
+                'started_at' => now()->toIso8601String(),
+            ];
+
+            $this->dispatch('async-job-started', [
+                'jobId' => $jobId,
+                'type' => 'image_generation',
+                'count' => count($scenes),
+            ]);
+
+            return $jobId;
+        } catch (\Exception $e) {
+            Log::error('VideoWizard: Failed to dispatch async image generation', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Dispatch script generation as a background job.
+     *
+     * @return string|null Job ID for tracking
+     */
+    public function dispatchAsyncScriptGeneration(): ?string
+    {
+        try {
+            $project = WizardProject::findOrFail($this->projectId);
+
+            $jobsManager = app(QueuedJobsManager::class);
+            $jobId = $jobsManager->dispatchScriptGeneration($project, [
+                'tone' => $this->scriptTone,
+                'contentDepth' => $this->contentDepth,
+                'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
+                'narrativePreset' => $this->narrativePreset,
+                'teamId' => session('current_team_id', 0),
+            ]);
+
+            // Track the job
+            $this->activeAsyncJobs[] = [
+                'id' => $jobId,
+                'type' => 'script_generation',
+                'started_at' => now()->toIso8601String(),
+            ];
+
+            $this->dispatch('async-job-started', [
+                'jobId' => $jobId,
+                'type' => 'script_generation',
+            ]);
+
+            return $jobId;
+        } catch (\Exception $e) {
+            Log::error('VideoWizard: Failed to dispatch async script generation', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Check the status of an async job.
+     *
+     * @param string $jobId Job ID to check
+     * @return array|null Job status
+     */
+    public function checkAsyncJobStatus(string $jobId): ?array
+    {
+        $jobsManager = app(QueuedJobsManager::class);
+        return $jobsManager->getJobStatus($jobId);
+    }
+
+    /**
+     * Cancel an async job.
+     *
+     * @param string $jobId Job ID to cancel
+     */
+    public function cancelAsyncJob(string $jobId): void
+    {
+        $jobsManager = app(QueuedJobsManager::class);
+        $jobsManager->requestCancellation($jobId);
+
+        // Remove from active jobs list
+        $this->activeAsyncJobs = array_filter(
+            $this->activeAsyncJobs,
+            fn($job) => $job['id'] !== $jobId
+        );
+
+        $this->dispatch('async-job-cancelled', ['jobId' => $jobId]);
+    }
+
+    /**
+     * Poll for async job completion.
+     * Called from JavaScript on an interval.
+     *
+     * @param string $jobId Job ID to poll
+     */
+    #[On('poll-async-job')]
+    public function pollAsyncJob(string $jobId): void
+    {
+        $status = $this->checkAsyncJobStatus($jobId);
+
+        if (!$status) {
+            return;
+        }
+
+        // Dispatch status update to frontend
+        $this->dispatch('async-job-status', [
+            'jobId' => $jobId,
+            'status' => $status['status'],
+            'progress' => $status['progress'] ?? 0,
+            'message' => $status['message'] ?? '',
+        ]);
+
+        // Handle completion
+        if ($status['status'] === 'completed') {
+            $this->handleAsyncJobCompletion($jobId, $status);
+        } elseif ($status['status'] === 'failed') {
+            $this->handleAsyncJobFailure($jobId, $status);
+        }
+    }
+
+    /**
+     * Handle async job completion.
+     *
+     * @param string $jobId Job ID
+     * @param array $status Job status data
+     */
+    protected function handleAsyncJobCompletion(string $jobId, array $status): void
+    {
+        // Remove from active jobs
+        $this->activeAsyncJobs = array_filter(
+            $this->activeAsyncJobs,
+            fn($job) => $job['id'] !== $jobId
+        );
+
+        $type = $status['type'] ?? 'unknown';
+
+        if ($type === 'image_generation' && isset($status['result']['generated_images'])) {
+            // Update storyboard with generated images
+            foreach ($status['result']['generated_images'] as $imageData) {
+                $sceneIndex = $imageData['scene_index'] ?? null;
+                if ($sceneIndex !== null && isset($imageData['url'])) {
+                    $this->storyboard['scenes'][$sceneIndex] = [
+                        'sceneId' => $this->script['scenes'][$sceneIndex]['id'] ?? "scene-{$sceneIndex}",
+                        'imageUrl' => $imageData['url'],
+                        'assetId' => $imageData['asset_id'] ?? null,
+                        'status' => 'ready',
+                        'source' => 'ai-async',
+                    ];
+                }
+            }
+            $this->saveProject();
+        } elseif ($type === 'script_generation') {
+            // Reload the project to get the updated script
+            $this->loadProject(WizardProject::find($this->projectId));
+        }
+
+        $this->dispatch('async-job-completed', [
+            'jobId' => $jobId,
+            'type' => $type,
+            'result' => $status['result'] ?? [],
+        ]);
+    }
+
+    /**
+     * Handle async job failure.
+     *
+     * @param string $jobId Job ID
+     * @param array $status Job status data
+     */
+    protected function handleAsyncJobFailure(string $jobId, array $status): void
+    {
+        // Remove from active jobs
+        $this->activeAsyncJobs = array_filter(
+            $this->activeAsyncJobs,
+            fn($job) => $job['id'] !== $jobId
+        );
+
+        $this->error = $status['error'] ?? __('Background job failed');
+
+        $this->dispatch('async-job-failed', [
+            'jobId' => $jobId,
+            'error' => $status['error'] ?? 'Unknown error',
+        ]);
+    }
+
+    /**
+     * Get all active async jobs for this project.
+     *
+     * @return array Active jobs
+     */
+    public function getActiveAsyncJobs(): array
+    {
+        if (!$this->projectId) {
+            return [];
+        }
+
+        $jobsManager = app(QueuedJobsManager::class);
+        return $jobsManager->getActiveJobsForProject($this->projectId);
+    }
+
+    /**
+     * Get performance metrics summary for the current project.
+     *
+     * @return array Performance summary
+     */
+    public function getPerformanceMetrics(): array
+    {
+        $performanceService = app(PerformanceMonitoringService::class);
+        return $performanceService->getRequestMetrics();
+    }
+
+    // =========================================================================
+    // END PHASE 5: PERFORMANCE MONITORING & ASYNC JOB METHODS
     // =========================================================================
 
     /**

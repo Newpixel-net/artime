@@ -117,6 +117,12 @@ class AppVideoWizardServiceProvider extends ServiceProvider
                         'position' => 60,
                         'icon' => 'fa-light fa-chart-mixed',
                     ],
+                    [
+                        'uri' => 'admin/video-wizard/performance',
+                        'name' => 'Performance',
+                        'position' => 50,
+                        'icon' => 'fa-light fa-gauge-high',
+                    ],
                 ],
             ];
 
@@ -208,6 +214,18 @@ class AppVideoWizardServiceProvider extends ServiceProvider
         $this->app->singleton(
             \Modules\AppVideoWizard\Services\EnhancedPromptService::class,
             fn () => new \Modules\AppVideoWizard\Services\EnhancedPromptService()
+        );
+
+        // Phase 5 Performance Optimization: Performance Monitoring Service
+        $this->app->singleton(
+            \Modules\AppVideoWizard\Services\PerformanceMonitoringService::class,
+            fn () => new \Modules\AppVideoWizard\Services\PerformanceMonitoringService()
+        );
+
+        // Phase 5 Performance Optimization: Queued Jobs Manager
+        $this->app->singleton(
+            \Modules\AppVideoWizard\Services\QueuedJobsManager::class,
+            fn () => new \Modules\AppVideoWizard\Services\QueuedJobsManager()
         );
     }
 
