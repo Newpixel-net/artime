@@ -407,15 +407,17 @@ EOT;
             ],
         ];
 
-        // Add imageConfig for Gemini 2.5+ models (native aspect ratio and resolution support)
-        // This is CRITICAL for aspect ratio enforcement - text guidance alone is ignored by Gemini
-        if (str_contains($model, '2.5') || str_contains($model, '3-pro') || str_contains($model, 'flash-image')) {
-            $resolution = $options['resolution'] ?? '2K'; // Default to 2K for better quality
-            $generationConfig['imageConfig'] = [
-                'aspectRatio' => $requestedAspectRatio,
-                'imageSize' => strtoupper($resolution), // Must be uppercase: 1K, 2K, 4K
-            ];
-        }
+        // NOTE: imageConfig with imageSize was causing "Request contains an invalid argument" error
+        // The Gemini API doesn't support these parameters in generationConfig
+        // Aspect ratio is controlled through text guidance in the prompt instead
+        // If native imageConfig support is added to Gemini API in the future, re-enable this:
+        // if (str_contains($model, '2.5') || str_contains($model, '3-pro') || str_contains($model, 'flash-image')) {
+        //     $resolution = $options['resolution'] ?? '2K';
+        //     $generationConfig['imageConfig'] = [
+        //         'aspectRatio' => $requestedAspectRatio,
+        //         'imageSize' => strtoupper($resolution),
+        //     ];
+        // }
 
         try {
             // Log the request for debugging
