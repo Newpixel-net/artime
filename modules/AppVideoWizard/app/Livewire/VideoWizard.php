@@ -1424,6 +1424,56 @@ class VideoWizard extends Component
     }
 
     /**
+     * Fetch content from a URL using cURL (works when allow_url_fopen is disabled).
+     *
+     * @param string $url The URL to fetch
+     * @return string|false The content or false on failure
+     */
+    protected function fetchUrlContent(string $url): string|false
+    {
+        // First try file_get_contents (faster if available)
+        if (ini_get('allow_url_fopen')) {
+            $content = @file_get_contents($url);
+            if ($content !== false) {
+                return $content;
+            }
+        }
+
+        // Fall back to cURL
+        if (!function_exists('curl_init')) {
+            Log::warning('[fetchUrlContent] Neither allow_url_fopen nor cURL available');
+            return false;
+        }
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; Artime/1.0)',
+        ]);
+
+        $content = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($content === false || $httpCode !== 200) {
+            Log::warning('[fetchUrlContent] cURL fetch failed', [
+                'url' => $url,
+                'httpCode' => $httpCode,
+                'error' => $error,
+            ]);
+            return false;
+        }
+
+        return $content;
+    }
+
+    /**
      * Save project with change detection to avoid redundant database writes.
      * Uses hash comparison to skip saves when nothing has changed.
      * PHASE 2 OPTIMIZATION: Resets isDirty flag after successful save.
@@ -5761,9 +5811,9 @@ class VideoWizard extends Component
         // Check if character has a reference portrait
         $portraitBase64 = $character['referenceImageBase64'] ?? null;
         if (!$portraitBase64 && !empty($character['referenceImage'])) {
-            // Try to fetch the image
+            // Try to fetch the image using cURL (works when allow_url_fopen=0)
             try {
-                $imageContent = @file_get_contents($character['referenceImage']);
+                $imageContent = $this->fetchUrlContent($character['referenceImage']);
                 if ($imageContent !== false) {
                     $portraitBase64 = base64_encode($imageContent);
                 }
@@ -12066,7 +12116,7 @@ PROMPT;
 
                 // Fetch image as base64 for face consistency in scene generation
                 try {
-                    $imageContent = file_get_contents($imageUrl);
+                    $imageContent = $this->fetchUrlContent($imageUrl);
                     if ($imageContent !== false) {
                         $base64Data = base64_encode($imageContent);
                         // Detect MIME type from image content
