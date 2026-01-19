@@ -2980,6 +2980,36 @@ class VideoWizard extends Component
                         'scenesInMemory' => count($this->script['scenes']),
                         'generatedSceneCount' => $this->scriptGeneration['generatedSceneCount'],
                     ]);
+
+                    // =====================================================================
+                    // AUTO-PROCESS PROMPT CHAIN after batch script generation completes
+                    // =====================================================================
+                    $autoProcessChain = VwSetting::getValue('auto_process_prompt_chain', true);
+                    $promptChainEnabled = $this->storyboard['promptChain']['enabled'] ?? true;
+
+                    Log::info('BatchGeneration: Auto-process prompt chain check', [
+                        'autoProcessChain_setting' => $autoProcessChain,
+                        'promptChainEnabled' => $promptChainEnabled,
+                        'scenes_count' => count($this->script['scenes'] ?? []),
+                    ]);
+
+                    if ($autoProcessChain && $promptChainEnabled) {
+                        try {
+                            $this->processPromptChainInternal();
+                            $this->forceSaveProject();
+
+                            Log::info('BatchGeneration: Auto-processed prompt chain successfully', [
+                                'status' => $this->storyboard['promptChain']['status'] ?? 'unknown',
+                                'scenes_processed' => count($this->storyboard['promptChain']['scenes'] ?? []),
+                            ]);
+
+                            $this->dispatch('prompt-chain-processed');
+                        } catch (\Exception $e) {
+                            Log::warning('BatchGeneration: Auto-process prompt chain failed', [
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
                 } else {
                     $this->scriptGeneration['status'] = 'paused';
 
