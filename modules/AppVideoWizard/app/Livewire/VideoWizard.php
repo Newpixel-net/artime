@@ -31,6 +31,7 @@ use Modules\AppVideoWizard\Services\PerformanceMonitoringService;
 use Modules\AppVideoWizard\Services\QueuedJobsManager;
 use Modules\AppVideoWizard\Services\SmartReferenceService;
 use Modules\AppVideoWizard\Services\CharacterLookService;
+use Modules\AppVideoWizard\Services\BibleOrderingService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -5776,6 +5777,223 @@ class VideoWizard extends Component
         }
 
         return $results;
+    }
+
+    // =========================================================================
+    // PHASE 5: INTELLIGENT ORDERING & VISUAL CONSISTENCY DASHBOARD
+    // =========================================================================
+
+    /**
+     * Get sorted characters with metadata for display (Phase 5.1)
+     *
+     * @param string $sortMethod Sorting method: 'smart', 'alphabetical', 'manual'
+     * @return array Sorted characters with metadata
+     */
+    public function getSortedCharacters(string $sortMethod = 'smart'): array
+    {
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        if (empty($characters)) {
+            return [];
+        }
+
+        $orderingService = app(BibleOrderingService::class);
+        return $orderingService->getSortedCharactersWithMetadata($characters, $sortMethod);
+    }
+
+    /**
+     * Get sorted locations with metadata for display (Phase 5.2)
+     *
+     * @param string $sortMethod Sorting method: 'first_appearance', 'frequency', 'alphabetical'
+     * @return array Sorted locations with metadata
+     */
+    public function getSortedLocations(string $sortMethod = 'first_appearance'): array
+    {
+        $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+        $scenes = $this->script['scenes'] ?? [];
+
+        if (empty($locations)) {
+            return [];
+        }
+
+        $orderingService = app(BibleOrderingService::class);
+        return $orderingService->getSortedLocationsWithMetadata($locations, $scenes, $sortMethod);
+    }
+
+    /**
+     * Get the Visual Consistency Dashboard data (Phase 5.3)
+     *
+     * @return array Dashboard with scores, issues, and recommendations
+     */
+    public function getConsistencyDashboard(): array
+    {
+        $orderingService = app(BibleOrderingService::class);
+        return $orderingService->getConsistencyDashboard(
+            $this->sceneMemory,
+            $this->storyboard
+        );
+    }
+
+    /**
+     * Get characters that need reference images (for one-click generation)
+     *
+     * @return array Characters missing reference images with indices
+     */
+    public function getCharactersNeedingReferences(): array
+    {
+        $characterBible = $this->sceneMemory['characterBible'] ?? [];
+
+        if (!($characterBible['enabled'] ?? false)) {
+            return [];
+        }
+
+        $orderingService = app(BibleOrderingService::class);
+        return $orderingService->getCharactersNeedingReferences($characterBible);
+    }
+
+    /**
+     * Get locations that need reference images (for one-click generation)
+     *
+     * @return array Locations missing reference images with indices
+     */
+    public function getLocationsNeedingReferences(): array
+    {
+        $locationBible = $this->sceneMemory['locationBible'] ?? [];
+
+        if (!($locationBible['enabled'] ?? false)) {
+            return [];
+        }
+
+        $orderingService = app(BibleOrderingService::class);
+        return $orderingService->getLocationsNeedingReferences($locationBible);
+    }
+
+    /**
+     * Generate reference images for all characters that need them (one-click)
+     * Dispatches generation jobs and updates progress
+     */
+    public function generateAllMissingCharacterReferences(): void
+    {
+        $charactersNeeding = $this->getCharactersNeedingReferences();
+
+        if (empty($charactersNeeding)) {
+            $this->dispatch('notification', [
+                'type' => 'info',
+                'message' => 'All characters already have reference images.',
+            ]);
+            return;
+        }
+
+        $this->dispatch('generation-status', [
+            'message' => 'Generating ' . count($charactersNeeding) . ' character reference(s)...',
+        ]);
+
+        foreach ($charactersNeeding as $charData) {
+            $charIndex = $charData['index'];
+
+            // Use existing portrait generation method
+            $this->generateCharacterPortrait($charIndex);
+
+            // Small delay between generations
+            usleep(500000); // 0.5 seconds
+        }
+
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => 'Character reference generation initiated for ' . count($charactersNeeding) . ' character(s).',
+        ]);
+
+        Log::info('[VideoWizard] One-click character reference generation', [
+            'totalCharacters' => count($charactersNeeding),
+            'characterNames' => array_column($charactersNeeding, 'name'),
+        ]);
+    }
+
+    /**
+     * Generate reference images for all locations that need them (one-click)
+     * Dispatches generation jobs and updates progress
+     */
+    public function generateAllMissingLocationReferences(): void
+    {
+        $locationsNeeding = $this->getLocationsNeedingReferences();
+
+        if (empty($locationsNeeding)) {
+            $this->dispatch('notification', [
+                'type' => 'info',
+                'message' => 'All locations already have reference images.',
+            ]);
+            return;
+        }
+
+        $this->dispatch('generation-status', [
+            'message' => 'Generating ' . count($locationsNeeding) . ' location reference(s)...',
+        ]);
+
+        foreach ($locationsNeeding as $locData) {
+            $locIndex = $locData['index'];
+
+            // Use existing location generation method
+            $this->generateLocationReferenceImage($locIndex);
+
+            // Small delay between generations
+            usleep(500000); // 0.5 seconds
+        }
+
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => 'Location reference generation initiated for ' . count($locationsNeeding) . ' location(s).',
+        ]);
+
+        Log::info('[VideoWizard] One-click location reference generation', [
+            'totalLocations' => count($locationsNeeding),
+            'locationNames' => array_column($locationsNeeding, 'name'),
+        ]);
+    }
+
+    /**
+     * Generate all missing references (characters + locations) in one click
+     */
+    public function generateAllMissingReferences(): void
+    {
+        $charactersNeeding = $this->getCharactersNeedingReferences();
+        $locationsNeeding = $this->getLocationsNeedingReferences();
+
+        $totalNeeded = count($charactersNeeding) + count($locationsNeeding);
+
+        if ($totalNeeded === 0) {
+            $this->dispatch('notification', [
+                'type' => 'info',
+                'message' => 'All characters and locations already have reference images.',
+            ]);
+            return;
+        }
+
+        $this->dispatch('generation-status', [
+            'message' => "Generating {$totalNeeded} reference image(s)...",
+        ]);
+
+        // Generate character references first (more important for consistency)
+        foreach ($charactersNeeding as $charData) {
+            $this->generateCharacterPortrait($charData['index']);
+            usleep(500000);
+        }
+
+        // Then location references
+        foreach ($locationsNeeding as $locData) {
+            $this->generateLocationReferenceImage($locData['index']);
+            usleep(500000);
+        }
+
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => "Reference generation initiated for {$totalNeeded} item(s).",
+        ]);
+
+        Log::info('[VideoWizard] One-click all reference generation', [
+            'characters' => count($charactersNeeding),
+            'locations' => count($locationsNeeding),
+            'total' => $totalNeeded,
+        ]);
     }
 
     /**
