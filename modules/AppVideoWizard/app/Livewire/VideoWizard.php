@@ -1,5 +1,5 @@
 <?php
-
+// Cache bust: 2026-01-20
 namespace Modules\AppVideoWizard\Livewire;
 
 use Livewire\Component;
@@ -21845,70 +21845,6 @@ PROMPT;
                 'type' => 'lipsync_skipped',
             ]);
         }
-    }
-
-    /**
-     * Generate voiceovers for all shots that need lip-sync.
-     * This prepares shots for Multitalk animation by creating audio.
-     *
-     * @param int $sceneIndex Scene index
-     */
-    public function generateAllShotVoiceovers(int $sceneIndex): void
-    {
-        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
-        if (!$decomposed) {
-            $this->error = __('Scene not decomposed');
-            return;
-        }
-
-        $generated = 0;
-        $skipped = 0;
-
-        foreach ($decomposed['shots'] as $shotIndex => $shot) {
-            $needsLipSync = $shot['needsLipSync'] ?? false;
-            $hasMonologue = !empty($shot['monologue']) || !empty($shot['dialogue']);
-            $audioReady = !empty($shot['audioUrl']) && ($shot['audioStatus'] ?? '') === 'ready';
-            $audioGenerating = ($shot['audioStatus'] ?? '') === 'generating';
-
-            // Only generate for shots that need lip-sync and don't have audio yet
-            if ($needsLipSync && !$audioReady && !$audioGenerating) {
-                try {
-                    // Get or generate monologue first if needed
-                    if (!$hasMonologue) {
-                        $monologueResult = $this->extractShotMonologue($sceneIndex, $shotIndex);
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['monologue'] = $monologueResult['text'];
-                    }
-
-                    // Generate voiceover
-                    $this->generateShotVoiceover($sceneIndex, $shotIndex, []);
-                    $generated++;
-
-                } catch (\Exception $e) {
-                    Log::warning('Failed to generate voiceover for shot', [
-                        'sceneIndex' => $sceneIndex,
-                        'shotIndex' => $shotIndex,
-                        'error' => $e->getMessage(),
-                    ]);
-                    $skipped++;
-                }
-            } elseif ($audioReady) {
-                $skipped++; // Already has audio
-            }
-        }
-
-        if ($generated > 0) {
-            $this->dispatch('generation-status', [
-                'message' => __('Generated voiceovers for :count shot(s) with dialogue.', ['count' => $generated]),
-            ]);
-        }
-
-        if ($skipped > 0 && $generated === 0) {
-            $this->dispatch('generation-status', [
-                'message' => __('All dialogue shots already have voiceovers.'),
-            ]);
-        }
-
-        $this->saveProject();
     }
 
     /**
