@@ -1096,8 +1096,8 @@
                         @php
                             $narrationStyles = config('appvideowizard.narration_styles', [
                                 'voiceover' => ['name' => 'Voiceover', 'icon' => '🎙️', 'description' => 'Off-screen narrator'],
-                                'dialogue' => ['name' => 'Dialogue', 'icon' => '💬', 'description' => 'Character conversations', 'disabled' => true],
-                                'narrator' => ['name' => 'Narrator', 'icon' => '📖', 'description' => 'On-screen narrator'],
+                                'dialogue' => ['name' => 'Dialogue', 'icon' => '💬', 'description' => 'Characters speak (Multitalk lip-sync)'],
+                                'narrator' => ['name' => 'Narrator', 'icon' => '📖', 'description' => 'On-screen narrator + character dialogue'],
                                 'none' => ['name' => 'No Voice', 'icon' => '🔇', 'description' => 'Music/ambient only'],
                             ]);
                         @endphp

@@ -437,10 +437,20 @@ class VideoWizard extends Component
     public array $animation = [
         'scenes' => [],
         'selectedSceneIndex' => 0,
+        // Narrator voice - for off-screen storytelling
+        'narrator' => [
+            'voice' => 'nova',          // TTS voice ID for narrator
+            'speed' => 1.0,             // Playback speed
+            'style' => 'storytelling',  // storytelling, documentary, dramatic
+            'enabled' => true,          // Whether narrator is used
+        ],
+        // Legacy voiceover field (for backwards compatibility)
         'voiceover' => [
             'voice' => 'nova',
             'speed' => 1.0,
         ],
+        // Character voices - uses Character Bible voice settings
+        // When characters speak (dialogue/Multitalk), their individual voice settings are used
     ];
 
     // Step 6: Assembly
@@ -4040,11 +4050,218 @@ class VideoWizard extends Component
                 'data' => $detection,
             ]);
 
+            // ═══════════════════════════════════════════════════════════════════
+            // AUTO-SYNC DETECTED SPEAKERS TO CHARACTER BIBLE
+            // When dialogue is detected, automatically add speakers with voices
+            // ═══════════════════════════════════════════════════════════════════
+            if (!empty($detection['detectedSpeakers'])) {
+                $syncResult = $this->syncDetectedSpeakersToCharacterBible(false);
+
+                if ($syncResult['added'] > 0) {
+                    Log::info('VideoWizard: Auto-synced detected speakers to Character Bible', [
+                        'added' => $syncResult['added'],
+                        'updated' => $syncResult['updated'],
+                    ]);
+
+                    $this->dispatch('vw-debug', [
+                        'action' => 'speakers-synced-to-bible',
+                        'message' => "Added {$syncResult['added']} speaker(s) to Character Bible",
+                        'data' => $syncResult,
+                    ]);
+                }
+            }
+
         } catch (\Exception $e) {
             Log::warning('VideoWizard: Character Intelligence auto-detection failed', [
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Sync detected speakers from script to Character Bible.
+     * Creates character entries for speakers that don't already exist,
+     * and auto-assigns voices based on detected gender/role.
+     *
+     * @param bool $overwrite If true, updates existing characters with detected info
+     * @return array Summary of what was synced
+     */
+    public function syncDetectedSpeakersToCharacterBible(bool $overwrite = false): array
+    {
+        $detectedSpeakers = $this->characterIntelligence['detectedSpeakers'] ?? [];
+        $existingCharacters = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        $added = 0;
+        $updated = 0;
+        $skipped = 0;
+
+        // Build map of existing character names (case-insensitive)
+        $existingNames = [];
+        foreach ($existingCharacters as $idx => $char) {
+            $existingNames[strtoupper(trim($char['name'] ?? ''))] = $idx;
+        }
+
+        foreach ($detectedSpeakers as $speaker) {
+            $speakerName = trim($speaker['name'] ?? $speaker);
+            $speakerUpper = strtoupper($speakerName);
+
+            // Skip narrator
+            if ($speakerUpper === 'NARRATOR') {
+                continue;
+            }
+
+            // Check if character already exists
+            if (isset($existingNames[$speakerUpper])) {
+                if ($overwrite) {
+                    // Update existing character with detected info
+                    $idx = $existingNames[$speakerUpper];
+                    $this->updateCharacterFromDetection($idx, $speaker);
+                    $updated++;
+                } else {
+                    $skipped++;
+                }
+                continue;
+            }
+
+            // Create new character entry
+            $this->addCharacterFromDetection($speaker);
+            $added++;
+        }
+
+        if ($added > 0 || $updated > 0) {
+            $this->saveProject();
+
+            Log::info('Synced detected speakers to Character Bible', [
+                'added' => $added,
+                'updated' => $updated,
+                'skipped' => $skipped,
+            ]);
+        }
+
+        return [
+            'added' => $added,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'total' => count($this->sceneMemory['characterBible']['characters'] ?? []),
+        ];
+    }
+
+    /**
+     * Add a new character from detected speaker info.
+     *
+     * @param array|string $speakerInfo Speaker info from detection
+     */
+    protected function addCharacterFromDetection($speakerInfo): void
+    {
+        $name = is_array($speakerInfo) ? ($speakerInfo['name'] ?? 'Unknown') : $speakerInfo;
+        $gender = is_array($speakerInfo) ? ($speakerInfo['gender'] ?? null) : null;
+        $role = is_array($speakerInfo) ? ($speakerInfo['role'] ?? null) : null;
+
+        // Determine voice based on gender/role
+        $voiceId = $this->determineVoiceForSpeaker($name, $gender, $role);
+
+        // Create character entry
+        $character = [
+            'id' => 'char_detected_' . time() . '_' . Str::random(4),
+            'name' => $name,
+            'description' => '',
+            'gender' => $gender,
+            'ethnicity' => '',
+            'age' => '',
+            'traits' => [],
+            'appliedScenes' => [],
+            'scenes' => [],
+            'referenceImage' => null,
+            'referenceImageBase64' => null,
+            'referenceImageStatus' => 'pending',
+            'referenceImageSource' => null,
+            // Voice configuration
+            'voice' => [
+                'id' => $voiceId,
+                'gender' => $gender,
+                'style' => $role === 'narrator' ? 'storytelling' : 'natural',
+                'speed' => 1.0,
+                'pitch' => 'medium',
+            ],
+            'isNarrator' => $role === 'narrator',
+            'speakingRole' => $role ?? 'dialogue',
+            // Detection metadata
+            'autoDetected' => true,
+            'detectedFrom' => 'script',
+            // DNA fields
+            'hair' => ['color' => '', 'style' => '', 'length' => '', 'texture' => ''],
+            'wardrobe' => ['outfit' => '', 'colors' => '', 'style' => '', 'footwear' => ''],
+            'makeup' => ['style' => '', 'details' => ''],
+            'accessories' => [],
+        ];
+
+        $this->sceneMemory['characterBible']['characters'][] = $character;
+    }
+
+    /**
+     * Update existing character with detected speaker info.
+     *
+     * @param int $characterIndex Character index
+     * @param array|string $speakerInfo Speaker info from detection
+     */
+    protected function updateCharacterFromDetection(int $characterIndex, $speakerInfo): void
+    {
+        $gender = is_array($speakerInfo) ? ($speakerInfo['gender'] ?? null) : null;
+        $role = is_array($speakerInfo) ? ($speakerInfo['role'] ?? null) : null;
+
+        // Only update if new info is available and field is empty
+        if ($gender && empty($this->sceneMemory['characterBible']['characters'][$characterIndex]['gender'])) {
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['gender'] = $gender;
+        }
+
+        // Update voice if not set
+        $voiceId = $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice']['id'] ?? null;
+        if (empty($voiceId)) {
+            $name = $this->sceneMemory['characterBible']['characters'][$characterIndex]['name'] ?? '';
+            $voiceId = $this->determineVoiceForSpeaker($name, $gender, $role);
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice']['id'] = $voiceId;
+
+            if ($gender) {
+                $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice']['gender'] = $gender;
+            }
+        }
+
+        // Update speaking role if relevant
+        if ($role && empty($this->sceneMemory['characterBible']['characters'][$characterIndex]['speakingRole'])) {
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['speakingRole'] = $role;
+        }
+    }
+
+    /**
+     * Determine voice ID for a speaker based on name, gender, and role.
+     *
+     * @param string $name Speaker name
+     * @param string|null $gender Detected gender
+     * @param string|null $role Detected role
+     * @return string Voice ID
+     */
+    protected function determineVoiceForSpeaker(string $name, ?string $gender, ?string $role): string
+    {
+        // Narrator gets storytelling voice
+        if ($role === 'narrator') {
+            return 'fable';
+        }
+
+        // Gender-based assignment
+        if ($gender) {
+            $genderLower = strtolower($gender);
+            if (str_contains($genderLower, 'female') || str_contains($genderLower, 'woman')) {
+                return 'nova';
+            }
+            if (str_contains($genderLower, 'male') || str_contains($genderLower, 'man')) {
+                return 'onyx';
+            }
+        }
+
+        // Use name hash for consistent assignment
+        $hash = crc32(strtoupper(trim($name)));
+        $voices = ['echo', 'onyx', 'nova', 'shimmer', 'alloy'];
+        return $voices[$hash % count($voices)];
     }
 
     /**
@@ -4220,6 +4437,10 @@ class VideoWizard extends Component
                 'sceneIndex' => $sceneIndex,
                 'teamId' => session('current_team_id', 0),
                 'model' => $this->storyboard['imageModel'] ?? 'nanobanana', // Use UI-selected model
+                // CRITICAL: Pass sceneMemory for Reference Cascade face consistency
+                'sceneMemory' => $this->sceneMemory,
+                'storyboard' => $this->storyboard,
+                'useCascade' => true,
             ]);
 
             if ($result['async'] ?? false) {
@@ -4346,6 +4567,10 @@ class VideoWizard extends Component
                         'sceneIndex' => $index,
                         'teamId' => session('current_team_id', 0),
                         'model' => $this->storyboard['imageModel'] ?? 'nanobanana',
+                        // CRITICAL: Pass sceneMemory for Reference Cascade face consistency
+                        'sceneMemory' => $this->sceneMemory,
+                        'storyboard' => $this->storyboard,
+                        'useCascade' => true,
                     ]);
 
                     if ($result['async'] ?? false) {
@@ -5488,6 +5713,19 @@ class VideoWizard extends Component
             'referenceImageStatus' => 'none',    // 'none' | 'generating' | 'ready' | 'error'
 
             // ═══════════════════════════════════════════════════════════════════
+            // CHARACTER VOICE SYSTEM - For Multitalk lip-sync and voiceover
+            // ═══════════════════════════════════════════════════════════════════
+            'voice' => [
+                'id' => null,               // TTS voice ID: alloy, echo, fable, onyx, nova, shimmer
+                'gender' => null,           // male, female, neutral (auto-detected from description if null)
+                'style' => 'natural',       // natural, warm, authoritative, energetic, calm
+                'speed' => 1.0,             // 0.5 to 2.0
+                'pitch' => 'medium',        // low, medium, high
+            ],
+            'isNarrator' => false,          // If true, this character serves as story narrator
+            'speakingRole' => 'dialogue',   // dialogue, monologue, narrator, silent
+
+            // ═══════════════════════════════════════════════════════════════════
             // CHARACTER LOOK SYSTEM - Structured fields for Hollywood consistency
             // ═══════════════════════════════════════════════════════════════════
 
@@ -5649,6 +5887,164 @@ class VideoWizard extends Component
         $this->sceneMemory['characterBible']['characters'][$characterIndex]['accessories'] = array_values(
             $this->sceneMemory['characterBible']['characters'][$characterIndex]['accessories']
         );
+        $this->saveProject();
+    }
+
+    /**
+     * Update character voice settings.
+     * Used for Multitalk lip-sync and character-specific voiceover.
+     *
+     * @param int $characterIndex Character index in Character Bible
+     * @param string $field Voice field to update: id, gender, style, speed, pitch
+     * @param mixed $value New value
+     */
+    public function updateCharacterVoice(int $characterIndex, string $field, $value): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        // Initialize voice array if not exists (for backwards compatibility)
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex]['voice'])) {
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice'] = [
+                'id' => null,
+                'gender' => null,
+                'style' => 'natural',
+                'speed' => 1.0,
+                'pitch' => 'medium',
+            ];
+        }
+
+        // Validate field
+        $validFields = ['id', 'gender', 'style', 'speed', 'pitch'];
+        if (!in_array($field, $validFields)) {
+            return;
+        }
+
+        // Validate voice ID
+        if ($field === 'id') {
+            $validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+            if ($value !== null && !in_array($value, $validVoices)) {
+                return;
+            }
+        }
+
+        // Validate speed range
+        if ($field === 'speed') {
+            $value = max(0.5, min(2.0, (float)$value));
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice'][$field] = $value;
+        $this->saveProject();
+    }
+
+    /**
+     * Set character as narrator (or not).
+     * A narrator character tells the story in off-screen voiceover.
+     *
+     * @param int $characterIndex Character index
+     * @param bool $isNarrator Whether this character is the narrator
+     */
+    public function setCharacterAsNarrator(int $characterIndex, bool $isNarrator): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        // If setting as narrator, unset any other narrator first
+        if ($isNarrator) {
+            foreach ($this->sceneMemory['characterBible']['characters'] as $idx => &$char) {
+                $char['isNarrator'] = ($idx === $characterIndex);
+            }
+        } else {
+            $this->sceneMemory['characterBible']['characters'][$characterIndex]['isNarrator'] = false;
+        }
+
+        $this->saveProject();
+    }
+
+    /**
+     * Update character speaking role.
+     *
+     * @param int $characterIndex Character index
+     * @param string $role Speaking role: dialogue, monologue, narrator, silent
+     */
+    public function updateCharacterSpeakingRole(int $characterIndex, string $role): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $validRoles = ['dialogue', 'monologue', 'narrator', 'silent'];
+        if (!in_array($role, $validRoles)) {
+            return;
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['speakingRole'] = $role;
+        $this->saveProject();
+    }
+
+    /**
+     * Get the narrator character (if any).
+     * Returns null if no character is designated as narrator.
+     *
+     * @return array|null Narrator character data or null
+     */
+    public function getNarratorCharacter(): ?array
+    {
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $char) {
+            if (!empty($char['isNarrator'])) {
+                return $char;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get narrator voice ID for voiceover generation.
+     * Returns the narrator character's voice if set, otherwise falls back to global setting.
+     *
+     * @return string Voice ID
+     */
+    public function getNarratorVoice(): string
+    {
+        // Check for designated narrator character
+        $narrator = $this->getNarratorCharacter();
+        if ($narrator && !empty($narrator['voice']['id'])) {
+            return $narrator['voice']['id'];
+        }
+
+        // Fall back to animation narrator setting
+        return $this->animation['narrator']['voice'] ?? $this->animation['voiceover']['voice'] ?? 'nova';
+    }
+
+    /**
+     * Apply a voice preset to a character based on archetype.
+     */
+    public function applyCharacterVoicePreset(int $characterIndex, string $preset): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $voicePresets = [
+            'hero-male' => ['id' => 'onyx', 'gender' => 'male', 'style' => 'confident', 'speed' => 1.0, 'pitch' => 'medium'],
+            'hero-female' => ['id' => 'nova', 'gender' => 'female', 'style' => 'confident', 'speed' => 1.0, 'pitch' => 'medium'],
+            'villain-male' => ['id' => 'echo', 'gender' => 'male', 'style' => 'intense', 'speed' => 0.9, 'pitch' => 'low'],
+            'villain-female' => ['id' => 'shimmer', 'gender' => 'female', 'style' => 'intense', 'speed' => 0.9, 'pitch' => 'medium'],
+            'mentor' => ['id' => 'fable', 'gender' => 'neutral', 'style' => 'warm', 'speed' => 0.95, 'pitch' => 'medium'],
+            'narrator' => ['id' => 'fable', 'gender' => 'neutral', 'style' => 'storytelling', 'speed' => 1.0, 'pitch' => 'medium'],
+            'young-male' => ['id' => 'alloy', 'gender' => 'male', 'style' => 'energetic', 'speed' => 1.1, 'pitch' => 'medium'],
+            'young-female' => ['id' => 'nova', 'gender' => 'female', 'style' => 'energetic', 'speed' => 1.1, 'pitch' => 'high'],
+            'professional' => ['id' => 'alloy', 'gender' => 'neutral', 'style' => 'authoritative', 'speed' => 1.0, 'pitch' => 'medium'],
+            'documentary' => ['id' => 'onyx', 'gender' => 'male', 'style' => 'authoritative', 'speed' => 0.95, 'pitch' => 'low'],
+        ];
+
+        if (!isset($voicePresets[$preset])) {
+            return;
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['voice'] = $voicePresets[$preset];
         $this->saveProject();
     }
 
@@ -12315,6 +12711,10 @@ PROMPT;
                 'sceneIndex' => 0,
                 'teamId' => session('current_team_id', 0),
                 'model' => $heroModel,
+                // Pass sceneMemory for Reference Cascade (if Character Bible exists)
+                'sceneMemory' => $this->sceneMemory,
+                'storyboard' => $this->storyboard,
+                'useCascade' => true,
             ]);
 
             if ($result['async'] ?? false) {
@@ -17256,6 +17656,212 @@ PROMPT;
         return $randomPhrase;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // DIALOGUE NARRATION STYLE - Speaker Detection & Voice Assignment
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Parse dialogue text from scene narration.
+     * Extracts speaker lines in format "SPEAKER: text" or "[NARRATOR] text".
+     *
+     * @param string $narration Scene narration text
+     * @return array Array of dialogue segments with speaker info
+     */
+    public function parseSceneDialogue(string $narration): array
+    {
+        $segments = [];
+        $lines = preg_split('/\n+/', trim($narration));
+        $currentSpeaker = 'NARRATOR';
+        $currentText = '';
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            // Check for narrator tag: [NARRATOR] text
+            if (preg_match('/^\[NARRATOR\]\s*(.*)$/i', $line, $matches)) {
+                if (!empty($currentText)) {
+                    $segments[] = ['speaker' => $currentSpeaker, 'text' => trim($currentText), 'isNarrator' => $currentSpeaker === 'NARRATOR'];
+                }
+                $currentSpeaker = 'NARRATOR';
+                $currentText = $matches[1];
+                continue;
+            }
+
+            // Check for character dialogue: SPEAKER: text
+            if (preg_match('/^([A-Z][A-Za-z\s\-\']+):\s*(.+)$/u', $line, $matches)) {
+                if (!empty($currentText)) {
+                    $segments[] = ['speaker' => $currentSpeaker, 'text' => trim($currentText), 'isNarrator' => $currentSpeaker === 'NARRATOR'];
+                }
+                $currentSpeaker = trim($matches[1]);
+                $currentText = $matches[2];
+                continue;
+            }
+
+            // Continuation of current speaker
+            $currentText .= ' ' . $line;
+        }
+
+        if (!empty($currentText)) {
+            $segments[] = ['speaker' => $currentSpeaker, 'text' => trim($currentText), 'isNarrator' => strtoupper($currentSpeaker) === 'NARRATOR'];
+        }
+
+        return $segments;
+    }
+
+    /**
+     * Detect unique speakers in scene narration.
+     *
+     * @param string $narration Scene narration text
+     * @return array ['speakers' => array of names, 'hasDialogue' => bool, 'dialogueCount' => int]
+     */
+    public function detectSceneSpeakers(string $narration): array
+    {
+        $segments = $this->parseSceneDialogue($narration);
+        $speakers = [];
+        $dialogueCount = 0;
+
+        foreach ($segments as $segment) {
+            if (!$segment['isNarrator']) {
+                $speakers[$segment['speaker']] = true;
+                $dialogueCount++;
+            }
+        }
+
+        return [
+            'speakers' => array_keys($speakers),
+            'hasDialogue' => $dialogueCount > 0,
+            'dialogueCount' => $dialogueCount,
+            'totalSegments' => count($segments),
+        ];
+    }
+
+    /**
+     * Assign dialogue segments to shots based on timing and characters.
+     * When narrationStyle is "dialogue", this distributes speaker lines across shots.
+     *
+     * @param int $sceneIndex Scene index
+     * @return void
+     */
+    public function assignDialogueToShots(int $sceneIndex): void
+    {
+        $scene = $this->script['scenes'][$sceneIndex] ?? [];
+        $narration = $scene['narration'] ?? '';
+        $shots = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'] ?? [];
+
+        if (empty($shots) || empty($narration)) {
+            return;
+        }
+
+        // Parse dialogue
+        $segments = $this->parseSceneDialogue($narration);
+        if (empty($segments)) {
+            return;
+        }
+
+        // Distribute segments across shots
+        $segmentCount = count($segments);
+        $shotCount = count($shots);
+
+        // Simple distribution: assign segments proportionally to shots
+        $segmentIndex = 0;
+        $segmentsPerShot = max(1, ceil($segmentCount / $shotCount));
+
+        foreach ($shots as $shotIndex => $shot) {
+            $shotSegments = [];
+            $shotDialogue = '';
+            $shotSpeakers = [];
+            $needsLipSync = false;
+
+            // Collect segments for this shot
+            for ($i = 0; $i < $segmentsPerShot && $segmentIndex < $segmentCount; $i++, $segmentIndex++) {
+                $seg = $segments[$segmentIndex];
+                $shotSegments[] = $seg;
+
+                if (!$seg['isNarrator']) {
+                    $shotDialogue .= ($shotDialogue ? ' ' : '') . $seg['text'];
+                    $shotSpeakers[$seg['speaker']] = true;
+                    $needsLipSync = true;
+                }
+            }
+
+            // Update shot with dialogue info
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['dialogueSegments'] = $shotSegments;
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['dialogue'] = $shotDialogue;
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['speakingCharacters'] = array_keys($shotSpeakers);
+
+            // If shot has character dialogue, mark for lip-sync
+            if ($needsLipSync) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['needsLipSync'] = true;
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['selectedVideoModel'] = 'multitalk';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['monologue'] = $shotDialogue;
+
+                // Assign voice based on first speaking character
+                $firstSpeaker = array_keys($shotSpeakers)[0] ?? null;
+                if ($firstSpeaker) {
+                    $voice = $this->getVoiceForCharacterName($firstSpeaker);
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['voiceId'] = $voice;
+                }
+            }
+        }
+
+        Log::info('Assigned dialogue to shots', [
+            'sceneIndex' => $sceneIndex,
+            'segmentCount' => $segmentCount,
+            'shotCount' => $shotCount,
+        ]);
+    }
+
+    /**
+     * Get voice ID for a character by name, using Character Bible.
+     *
+     * @param string $characterName Character name
+     * @return string Voice ID
+     */
+    public function getVoiceForCharacterName(string $characterName): string
+    {
+        $charBible = $this->sceneMemory['characterBible']['characters'] ?? [];
+        $nameUpper = strtoupper(trim($characterName));
+
+        // Special case: narrator uses narrator voice
+        if ($nameUpper === 'NARRATOR') {
+            return $this->animation['narrator']['voice'] ?? 'fable';
+        }
+
+        foreach ($charBible as $char) {
+            $charNameUpper = strtoupper(trim($char['name'] ?? ''));
+            if ($charNameUpper === $nameUpper) {
+                // New voice array structure
+                if (is_array($char['voice'] ?? null) && !empty($char['voice']['id'])) {
+                    return $char['voice']['id'];
+                }
+                // Legacy string
+                if (is_string($char['voice'] ?? null) && !empty($char['voice'])) {
+                    return $char['voice'];
+                }
+                // Gender-based fallback
+                $gender = strtolower($char['gender'] ?? $char['voice']['gender'] ?? '');
+                if (str_contains($gender, 'female')) return 'nova';
+                if (str_contains($gender, 'male')) return 'onyx';
+            }
+        }
+
+        // Consistent fallback based on name hash
+        $hash = crc32($nameUpper);
+        $voices = ['echo', 'onyx', 'nova', 'shimmer', 'alloy'];
+        return $voices[$hash % count($voices)];
+    }
+
+    /**
+     * Check if narration style requires dialogue processing.
+     *
+     * @return bool True if dialogue narration style is active
+     */
+    public function isDialogueNarrationStyle(): bool
+    {
+        return ($this->characterIntelligence['narrationStyle'] ?? 'voiceover') === 'dialogue';
+    }
+
     /**
      * Get character voice for a shot based on Character Bible.
      */
@@ -17270,14 +17876,27 @@ PROMPT;
             $charBible = $this->sceneMemory['characterBible']['characters'] ?? [];
 
             foreach ($charBible as $char) {
-                if (($char['name'] ?? '') === $charName && !empty($char['voice'])) {
-                    return $char['voice'];
-                }
-            }
-
-            // Try to determine voice based on character gender
-            foreach ($charBible as $char) {
                 if (($char['name'] ?? '') === $charName) {
+                    // Check for new voice array structure
+                    if (is_array($char['voice'] ?? null) && !empty($char['voice']['id'])) {
+                        return $char['voice']['id'];
+                    }
+                    // Legacy: voice was a string
+                    if (is_string($char['voice'] ?? null) && !empty($char['voice'])) {
+                        return $char['voice'];
+                    }
+
+                    // Determine voice based on character's voice gender setting first
+                    $voiceGender = $char['voice']['gender'] ?? null;
+                    if ($voiceGender) {
+                        if ($voiceGender === 'female') {
+                            return 'nova';
+                        } elseif ($voiceGender === 'male') {
+                            return 'onyx';
+                        }
+                    }
+
+                    // Fall back to character's general gender field
                     $gender = strtolower($char['gender'] ?? '');
                     if (str_contains($gender, 'female') || str_contains($gender, 'woman')) {
                         return 'nova'; // Female voice
@@ -17290,6 +17909,52 @@ PROMPT;
 
         // Default voice based on setting or fallback
         return $this->storyboard['defaultVoice'] ?? 'nova';
+    }
+
+    /**
+     * Get full voice configuration for a character (id, speed, pitch, style).
+     * Returns array with all voice settings for advanced TTS control.
+     */
+    public function getCharacterVoiceConfig(string $characterName): array
+    {
+        $defaultConfig = [
+            'id' => 'nova',
+            'gender' => null,
+            'style' => 'natural',
+            'speed' => 1.0,
+            'pitch' => 'medium',
+        ];
+
+        $charBible = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        foreach ($charBible as $char) {
+            if (($char['name'] ?? '') === $characterName) {
+                // Return full voice config if available
+                if (is_array($char['voice'] ?? null)) {
+                    return array_merge($defaultConfig, $char['voice']);
+                }
+
+                // Legacy string voice - wrap in config
+                if (is_string($char['voice'] ?? null) && !empty($char['voice'])) {
+                    $defaultConfig['id'] = $char['voice'];
+                    return $defaultConfig;
+                }
+
+                // Auto-assign based on gender
+                $gender = strtolower($char['gender'] ?? '');
+                if (str_contains($gender, 'female') || str_contains($gender, 'woman')) {
+                    $defaultConfig['id'] = 'nova';
+                    $defaultConfig['gender'] = 'female';
+                } elseif (str_contains($gender, 'male') || str_contains($gender, 'man')) {
+                    $defaultConfig['id'] = 'onyx';
+                    $defaultConfig['gender'] = 'male';
+                }
+
+                return $defaultConfig;
+            }
+        }
+
+        return $defaultConfig;
     }
 
     /**
@@ -17407,6 +18072,7 @@ PROMPT;
     /**
      * Enrich stored shots with monologue text after decomposition.
      * Pre-extracts monologue for shots marked as needing lip-sync.
+     * When narrationStyle is "dialogue", distributes dialogue segments to shots.
      * Must be called AFTER shots are stored in multiShotMode['decomposedScenes'].
      *
      * @param int $sceneIndex Scene index
@@ -17419,6 +18085,34 @@ PROMPT;
             return;
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // DIALOGUE NARRATION STYLE: Distribute dialogue segments to shots
+        // When user selected "Dialogue" style, parse speaker lines and assign
+        // ═══════════════════════════════════════════════════════════════════
+        if ($this->isDialogueNarrationStyle()) {
+            $scene = $this->script['scenes'][$sceneIndex] ?? [];
+            $narration = $scene['narration'] ?? '';
+
+            // Check if scene has dialogue
+            $speakerInfo = $this->detectSceneSpeakers($narration);
+
+            if ($speakerInfo['hasDialogue']) {
+                // Distribute dialogue to shots and mark for lip-sync
+                $this->assignDialogueToShots($sceneIndex);
+
+                Log::info('Enriched shots with dialogue (dialogue narration style)', [
+                    'sceneIndex' => $sceneIndex,
+                    'speakers' => $speakerInfo['speakers'],
+                    'dialogueCount' => $speakerInfo['dialogueCount'],
+                ]);
+
+                return; // Dialogue processing complete
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STANDARD ENRICHMENT: Extract monologue for lip-sync shots
+        // ═══════════════════════════════════════════════════════════════════
         $enriched = 0;
         foreach ($shots as $index => $shot) {
             // Only pre-generate monologue for shots that need lip-sync
@@ -17431,12 +18125,17 @@ PROMPT;
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$index]['monologueSource'] = $result['source'];
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$index]['speakingCharacters'] = [$result['characterName']];
 
+                    // Assign voice from Character Bible
+                    $voice = $this->getVoiceForCharacterName($result['characterName']);
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$index]['voiceId'] = $voice;
+
                     $enriched++;
                     Log::info('Pre-extracted monologue for lip-sync shot', [
                         'sceneIndex' => $sceneIndex,
                         'shotIndex' => $index,
                         'source' => $result['source'],
                         'textLength' => strlen($result['text']),
+                        'voice' => $voice,
                     ]);
                 } catch (\Exception $e) {
                     Log::warning('Failed to pre-extract monologue for shot', [
@@ -17505,6 +18204,262 @@ PROMPT;
             'generated' => $generated,
             'skipped' => $skipped,
         ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // UNIFIED AUDIO FLOW: Narrator + Character Voices
+    // Generates combined audio for scenes with both narrator and character dialogue
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Generate unified audio for a scene with both narrator and character voices.
+     * This is the main method for "narrator" narration style which combines:
+     * - Narrator voice for storytelling segments (off-screen)
+     * - Character voices for dialogue (lip-sync with Multitalk)
+     *
+     * @param int $sceneIndex Scene index
+     * @param array $options Optional: narratorVoice, speed, force
+     * @return array Result with narrator audio, character audio segments, and timeline
+     */
+    public function generateUnifiedSceneAudio(int $sceneIndex, array $options = []): array
+    {
+        $scene = $this->script['scenes'][$sceneIndex] ?? [];
+        $narration = $scene['narration'] ?? '';
+
+        if (empty($narration)) {
+            return ['success' => false, 'error' => 'No narration text'];
+        }
+
+        $narrationStyle = $this->characterIntelligence['narrationStyle'] ?? 'voiceover';
+        $narratorVoice = $options['narratorVoice'] ?? $this->animation['narrator']['voice'] ?? 'fable';
+        $force = $options['force'] ?? false;
+
+        $result = [
+            'success' => true,
+            'sceneIndex' => $sceneIndex,
+            'narrationStyle' => $narrationStyle,
+            'narrator' => null,
+            'characters' => [],
+            'timeline' => [],
+            'totalDuration' => 0,
+        ];
+
+        try {
+            // Parse narration into segments
+            $segments = $this->parseSceneDialogue($narration);
+
+            if (empty($segments)) {
+                return ['success' => false, 'error' => 'No segments found in narration'];
+            }
+
+            $project = \Modules\AppVideoWizard\Models\WizardProject::findOrFail($this->projectId);
+            $voiceoverService = app(\Modules\AppVideoWizard\Services\VoiceoverService::class);
+            $characterBible = $this->sceneMemory['characterBible'] ?? [];
+            $teamId = session('current_team_id', 0);
+
+            // Separate narrator and character segments
+            $narratorText = '';
+            $characterSegments = [];
+
+            foreach ($segments as $idx => $seg) {
+                if ($seg['isNarrator']) {
+                    $narratorText .= ($narratorText ? ' ' : '') . $seg['text'];
+                } else {
+                    $characterSegments[] = array_merge($seg, ['segmentIndex' => $idx]);
+                }
+            }
+
+            // Generate narrator audio (combined into single track)
+            if (!empty($narratorText)) {
+                $audioResult = \App\Facades\AI::process($narratorText, 'speech', [
+                    'voice' => $narratorVoice,
+                ], $teamId);
+
+                if (empty($audioResult['error']) && !empty($audioResult['data'][0])) {
+                    $filename = Str::slug($scene['id'] ?? "scene-{$sceneIndex}") . '-narrator-' . time() . '.mp3';
+                    $path = "wizard-projects/{$project->id}/audio/{$filename}";
+                    Storage::disk('public')->put($path, $audioResult['data'][0]);
+
+                    $wordCount = str_word_count($narratorText);
+                    $duration = ($wordCount / 150) * 60;
+
+                    $result['narrator'] = [
+                        'voice' => $narratorVoice,
+                        'audioUrl' => url('/files/' . $path),
+                        'duration' => $duration,
+                        'text' => $narratorText,
+                        'wordCount' => $wordCount,
+                    ];
+                    $result['totalDuration'] += $duration;
+                }
+            }
+
+            // Generate character audio segments (for lip-sync)
+            foreach ($characterSegments as $charSeg) {
+                $voice = $voiceoverService->getVoiceForSpeaker(
+                    $charSeg['speaker'],
+                    $characterBible,
+                    $narratorVoice
+                );
+
+                $audioResult = \App\Facades\AI::process($charSeg['text'], 'speech', [
+                    'voice' => $voice,
+                ], $teamId);
+
+                if (empty($audioResult['error']) && !empty($audioResult['data'][0])) {
+                    $filename = Str::slug($scene['id'] ?? "scene-{$sceneIndex}") . "-char-{$charSeg['segmentIndex']}-" . time() . '.mp3';
+                    $path = "wizard-projects/{$project->id}/audio/{$filename}";
+                    Storage::disk('public')->put($path, $audioResult['data'][0]);
+
+                    $wordCount = str_word_count($charSeg['text']);
+                    $duration = ($wordCount / 150) * 60;
+
+                    $result['characters'][] = [
+                        'speaker' => $charSeg['speaker'],
+                        'voice' => $voice,
+                        'audioUrl' => url('/files/' . $path),
+                        'duration' => $duration,
+                        'text' => $charSeg['text'],
+                        'segmentIndex' => $charSeg['segmentIndex'],
+                        'needsLipSync' => true,
+                    ];
+                    $result['totalDuration'] += $duration;
+                }
+            }
+
+            // Build timeline for assembly
+            $currentTime = 0;
+            foreach ($segments as $idx => $seg) {
+                $timelineEntry = [
+                    'index' => $idx,
+                    'speaker' => $seg['speaker'],
+                    'text' => $seg['text'],
+                    'isNarrator' => $seg['isNarrator'],
+                    'startTime' => $currentTime,
+                ];
+
+                if ($seg['isNarrator']) {
+                    $timelineEntry['audioSource'] = 'narrator';
+                } else {
+                    // Find matching character audio
+                    foreach ($result['characters'] as $charAudio) {
+                        if ($charAudio['segmentIndex'] === $idx) {
+                            $timelineEntry['audioSource'] = 'character';
+                            $timelineEntry['audioUrl'] = $charAudio['audioUrl'];
+                            $timelineEntry['duration'] = $charAudio['duration'];
+                            $timelineEntry['needsLipSync'] = true;
+                            $currentTime += $charAudio['duration'];
+                            break;
+                        }
+                    }
+                }
+
+                $result['timeline'][] = $timelineEntry;
+            }
+
+            // Store unified audio data in scene
+            $this->script['scenes'][$sceneIndex]['unifiedAudio'] = $result;
+            $this->saveProject();
+
+            Log::info('Generated unified scene audio', [
+                'sceneIndex' => $sceneIndex,
+                'hasNarrator' => !empty($result['narrator']),
+                'characterCount' => count($result['characters']),
+                'totalDuration' => $result['totalDuration'],
+            ]);
+
+            $this->dispatch('unified-audio-generated', [
+                'sceneIndex' => $sceneIndex,
+                'hasNarrator' => !empty($result['narrator']),
+                'characterCount' => count($result['characters']),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to generate unified scene audio', [
+                'sceneIndex' => $sceneIndex,
+                'error' => $e->getMessage(),
+            ]);
+            $result = ['success' => false, 'error' => $e->getMessage()];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Generate unified audio for all scenes.
+     * Processes scenes based on narration style setting.
+     *
+     * @param array $options Optional: force, narratorVoice
+     * @return array Summary of generation results
+     */
+    public function generateAllUnifiedAudio(array $options = []): array
+    {
+        $scenes = $this->script['scenes'] ?? [];
+        $results = [];
+        $success = 0;
+        $failed = 0;
+
+        foreach ($scenes as $sceneIndex => $scene) {
+            $result = $this->generateUnifiedSceneAudio($sceneIndex, $options);
+
+            $results[$sceneIndex] = $result;
+            if ($result['success']) {
+                $success++;
+            } else {
+                $failed++;
+            }
+        }
+
+        Log::info('Generated unified audio for all scenes', [
+            'success' => $success,
+            'failed' => $failed,
+        ]);
+
+        return [
+            'success' => $failed === 0,
+            'scenesProcessed' => count($scenes),
+            'succeeded' => $success,
+            'failed' => $failed,
+            'results' => $results,
+        ];
+    }
+
+    /**
+     * Get audio configuration for the current project.
+     * Returns comprehensive voice settings for narrator and characters.
+     *
+     * @return array Audio configuration
+     */
+    public function getAudioConfiguration(): array
+    {
+        $narrationStyle = $this->characterIntelligence['narrationStyle'] ?? 'voiceover';
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        $config = [
+            'narrationStyle' => $narrationStyle,
+            'narrator' => [
+                'enabled' => in_array($narrationStyle, ['voiceover', 'narrator']),
+                'voice' => $this->animation['narrator']['voice'] ?? 'fable',
+                'speed' => $this->animation['narrator']['speed'] ?? 1.0,
+                'style' => $this->animation['narrator']['style'] ?? 'storytelling',
+            ],
+            'characters' => [],
+            'multitalkEnabled' => in_array($narrationStyle, ['dialogue', 'narrator']),
+        ];
+
+        // Build character voice mapping
+        foreach ($characters as $idx => $char) {
+            $config['characters'][$char['name'] ?? "Character {$idx}"] = [
+                'index' => $idx,
+                'voiceId' => $char['voice']['id'] ?? $this->getVoiceForCharacterName($char['name'] ?? ''),
+                'voiceConfig' => $char['voice'] ?? null,
+                'isNarrator' => $char['isNarrator'] ?? false,
+                'speakingRole' => $char['speakingRole'] ?? 'dialogue',
+                'hasReference' => !empty($char['referenceImageBase64']),
+            ];
+        }
+
+        return $config;
     }
 
     /**
@@ -17732,6 +18687,10 @@ PROMPT;
                         'total_shots' => count($decomposed['shots'] ?? []),
                         'story_beat' => $shot['storyBeat'] ?? $shot['emotionalBeat'] ?? null,
                         'is_multi_shot' => true,
+                        // CRITICAL: Pass sceneMemory for Reference Cascade face consistency
+                        'sceneMemory' => $this->sceneMemory,
+                        'storyboard' => $this->storyboard,
+                        'useCascade' => true,
                     ]);
 
                     if ($result['success']) {

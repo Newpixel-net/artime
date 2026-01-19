@@ -430,6 +430,150 @@
                                 </div>
                             </div>
 
+                            {{-- ═══════════════════════════════════════════════════════════════════ --}}
+                            {{-- CHARACTER VOICE - For Multitalk lip-sync and voiceover --}}
+                            {{-- ═══════════════════════════════════════════════════════════════════ --}}
+                            @php
+                                $voiceSettings = $currentChar['voice'] ?? [];
+                                $hasVoice = !empty($voiceSettings['id']);
+                            @endphp
+
+                            <div x-data="{ voiceOpen: false }" style="margin-bottom: 0.4rem; padding: 0.35rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 0.35rem;">
+                                {{-- Voice Section Header --}}
+                                <button type="button"
+                                        @click="voiceOpen = !voiceOpen"
+                                        style="display: flex; align-items: center; gap: 0.25rem; width: 100%; background: none; border: none; padding: 0; cursor: pointer;">
+                                    <span style="color: #6ee7b7; font-size: 0.6rem; transition: transform 0.2s;" :style="voiceOpen ? '' : 'transform: rotate(-90deg)'">▼</span>
+                                    <span style="color: #6ee7b7; font-size: 0.65rem; font-weight: 600;">🎙️ {{ __('Character Voice') }}</span>
+                                    <span style="color: rgba(255,255,255,0.4); font-size: 0.5rem; margin-left: 0.2rem;">({{ __('TTS & Lip-sync') }})</span>
+                                    @if($hasVoice)
+                                        <span style="color: #10b981; font-size: 0.5rem; margin-left: auto;">✓ {{ $voiceSettings['id'] ?? '' }}</span>
+                                    @endif
+                                    @if($currentChar['isNarrator'] ?? false)
+                                        <span style="background: rgba(251,191,36,0.3); color: #fcd34d; padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.45rem; font-weight: 600;">{{ __('NARRATOR') }}</span>
+                                    @endif
+                                </button>
+
+                                <div x-show="voiceOpen" x-collapse style="margin-top: 0.35rem;">
+                                    {{-- Voice Presets --}}
+                                    <div style="margin-bottom: 0.35rem;">
+                                        <label style="display: block; color: rgba(255,255,255,0.5); font-size: 0.5rem; margin-bottom: 0.15rem;">{{ __('Voice Presets') }}</label>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'hero-male')" style="padding: 0.15rem 0.3rem; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); border-radius: 0.2rem; color: #67e8f9; font-size: 0.45rem; cursor: pointer;">🦸‍♂️ {{ __('Hero M') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'hero-female')" style="padding: 0.15rem 0.3rem; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); border-radius: 0.2rem; color: #f9a8d4; font-size: 0.45rem; cursor: pointer;">🦸‍♀️ {{ __('Hero F') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'villain-male')" style="padding: 0.15rem 0.3rem; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.2rem; color: #c4b5fd; font-size: 0.45rem; cursor: pointer;">🦹‍♂️ {{ __('Villain M') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'villain-female')" style="padding: 0.15rem 0.3rem; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.2rem; color: #c4b5fd; font-size: 0.45rem; cursor: pointer;">🦹‍♀️ {{ __('Villain F') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'mentor')" style="padding: 0.15rem 0.3rem; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.3); border-radius: 0.2rem; color: #fcd34d; font-size: 0.45rem; cursor: pointer;">🧙 {{ __('Mentor') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'narrator')" style="padding: 0.15rem 0.3rem; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 0.2rem; color: #6ee7b7; font-size: 0.45rem; cursor: pointer;">📖 {{ __('Narrator') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'child')" style="padding: 0.15rem 0.3rem; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 0.2rem; color: #fcd34d; font-size: 0.45rem; cursor: pointer;">👶 {{ __('Child') }}</button>
+                                            <button type="button" wire:click="applyCharacterVoicePreset({{ $editIndex }}, 'elder')" style="padding: 0.15rem 0.3rem; background: rgba(107,114,128,0.2); border: 1px solid rgba(107,114,128,0.4); border-radius: 0.2rem; color: #d1d5db; font-size: 0.45rem; cursor: pointer;">👴 {{ __('Elder') }}</button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Voice ID & Gender (side by side) --}}
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; margin-bottom: 0.3rem;">
+                                        {{-- Voice ID --}}
+                                        <div>
+                                            <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.1rem;">{{ __('Voice') }}</label>
+                                            <select wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.id"
+                                                    style="width: 100%; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.6rem;">
+                                                <option value="">{{ __('Auto (by gender)') }}</option>
+                                                <option value="alloy">Alloy ({{ __('Neutral/Balanced') }})</option>
+                                                <option value="echo">Echo ({{ __('Male/Deep') }})</option>
+                                                <option value="fable">Fable ({{ __('British/Expressive') }})</option>
+                                                <option value="onyx">Onyx ({{ __('Male/Strong') }})</option>
+                                                <option value="nova">Nova ({{ __('Female/Warm') }})</option>
+                                                <option value="shimmer">Shimmer ({{ __('Female/Soft') }})</option>
+                                            </select>
+                                        </div>
+
+                                        {{-- Gender --}}
+                                        <div>
+                                            <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.1rem;">{{ __('Gender') }}</label>
+                                            <select wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.gender"
+                                                    style="width: 100%; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.6rem;">
+                                                <option value="">{{ __('Auto-detect') }}</option>
+                                                <option value="male">{{ __('Male') }}</option>
+                                                <option value="female">{{ __('Female') }}</option>
+                                                <option value="neutral">{{ __('Neutral') }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {{-- Style & Pitch (side by side) --}}
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; margin-bottom: 0.3rem;">
+                                        {{-- Voice Style --}}
+                                        <div>
+                                            <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.1rem;">{{ __('Style') }}</label>
+                                            <select wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.style"
+                                                    style="width: 100%; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.6rem;">
+                                                <option value="natural">{{ __('Natural') }}</option>
+                                                <option value="warm">{{ __('Warm') }}</option>
+                                                <option value="authoritative">{{ __('Authoritative') }}</option>
+                                                <option value="energetic">{{ __('Energetic') }}</option>
+                                                <option value="calm">{{ __('Calm') }}</option>
+                                                <option value="confident">{{ __('Confident') }}</option>
+                                                <option value="storytelling">{{ __('Storytelling') }}</option>
+                                                <option value="intense">{{ __('Intense') }}</option>
+                                            </select>
+                                        </div>
+
+                                        {{-- Pitch --}}
+                                        <div>
+                                            <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.1rem;">{{ __('Pitch') }}</label>
+                                            <select wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.pitch"
+                                                    style="width: 100%; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.6rem;">
+                                                <option value="low">{{ __('Low') }}</option>
+                                                <option value="medium">{{ __('Medium') }}</option>
+                                                <option value="high">{{ __('High') }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {{-- Speed Slider --}}
+                                    <div style="margin-bottom: 0.35rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem;">
+                                            <label style="color: rgba(255,255,255,0.6); font-size: 0.5rem;">{{ __('Speed') }}</label>
+                                            <span style="color: rgba(255,255,255,0.5); font-size: 0.5rem;">{{ number_format($voiceSettings['speed'] ?? 1.0, 2) }}x</span>
+                                        </div>
+                                        <input type="range"
+                                               wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.speed"
+                                               min="0.5" max="2.0" step="0.05"
+                                               style="width: 100%; height: 4px; accent-color: #10b981;">
+                                    </div>
+
+                                    {{-- Speaking Role & Narrator (side by side) --}}
+                                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding-top: 0.3rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                                        {{-- Speaking Role --}}
+                                        <div>
+                                            <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.1rem;">{{ __('Speaking Role') }}</label>
+                                            <select wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.speakingRole"
+                                                    style="width: 100%; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.6rem;">
+                                                <option value="dialogue">{{ __('Dialogue') }} - {{ __('Speaks in scenes') }}</option>
+                                                <option value="monologue">{{ __('Monologue') }} - {{ __('Thinking/narrating') }}</option>
+                                                <option value="narrator">{{ __('Narrator') }} - {{ __('Tells the story') }}</option>
+                                                <option value="silent">{{ __('Silent') }} - {{ __('No speaking') }}</option>
+                                            </select>
+                                        </div>
+
+                                        {{-- Is Narrator Toggle --}}
+                                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+                                            <label style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer; padding: 0.25rem 0.4rem; background: {{ ($currentChar['isNarrator'] ?? false) ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.05)' }}; border: 1px solid {{ ($currentChar['isNarrator'] ?? false) ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.15)' }}; border-radius: 0.25rem;">
+                                                <input type="checkbox"
+                                                       wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.isNarrator"
+                                                       style="accent-color: #f59e0b; width: 12px; height: 12px;">
+                                                <span style="color: {{ ($currentChar['isNarrator'] ?? false) ? '#fcd34d' : 'rgba(255,255,255,0.6)' }}; font-size: 0.55rem; font-weight: 500;">📖 {{ __('Narrator') }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {{-- Help text --}}
+                                    <p style="color: rgba(255,255,255,0.4); font-size: 0.45rem; margin-top: 0.25rem; line-height: 1.3;">
+                                        {{ __('Voice settings are used for TTS voiceover generation and Multitalk lip-sync. Mark as Narrator if this character narrates the story.') }}
+                                    </p>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 

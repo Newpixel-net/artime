@@ -151,4 +151,436 @@ class VoiceoverService
         // Return base64 encoded audio for preview
         return 'data:audio/mpeg;base64,' . base64_encode($audioContent);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // NARRATOR VS CHARACTER VOICE SEPARATION
+    // Supports mixed audio: narrator (off-screen) + character dialogue (lip-sync)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Parse dialogue/narration text to extract speaker segments.
+     * Supports formats:
+     * - "SPEAKER: text" (standard dialogue format)
+     * - "[NARRATOR] text" (narrator segments)
+     * - Plain text (narrator by default)
+     *
+     * @param string $text The narration/dialogue text
+     * @param string $defaultSpeaker Default speaker for unmarked text
+     * @return array Array of ['speaker' => string, 'text' => string, 'isNarrator' => bool]
+     */
+    public function parseDialogue(string $text, string $defaultSpeaker = 'NARRATOR'): array
+    {
+        $segments = [];
+        $lines = preg_split('/\n+/', trim($text));
+        $currentSpeaker = $defaultSpeaker;
+        $currentText = '';
+        $isNarrator = true;
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            // Check for narrator tag: [NARRATOR] text or [Narrator] text
+            if (preg_match('/^\[NARRATOR\]\s*(.*)$/i', $line, $matches)) {
+                // Save previous segment
+                if (!empty($currentText)) {
+                    $segments[] = [
+                        'speaker' => $currentSpeaker,
+                        'text' => trim($currentText),
+                        'isNarrator' => $isNarrator,
+                    ];
+                }
+                $currentSpeaker = 'NARRATOR';
+                $currentText = $matches[1];
+                $isNarrator = true;
+                continue;
+            }
+
+            // Check for character dialogue: SPEAKER: text
+            if (preg_match('/^([A-Z][A-Za-z\s\-\']+):\s*(.+)$/u', $line, $matches)) {
+                // Save previous segment
+                if (!empty($currentText)) {
+                    $segments[] = [
+                        'speaker' => $currentSpeaker,
+                        'text' => trim($currentText),
+                        'isNarrator' => $isNarrator,
+                    ];
+                }
+                $currentSpeaker = trim($matches[1]);
+                $currentText = $matches[2];
+                $isNarrator = (strtoupper($currentSpeaker) === 'NARRATOR');
+                continue;
+            }
+
+            // Check for parenthetical direction (skip)
+            if (preg_match('/^\(.+\)$/', $line)) {
+                continue;
+            }
+
+            // Continuation of current speaker's text
+            $currentText .= ' ' . $line;
+        }
+
+        // Save final segment
+        if (!empty($currentText)) {
+            $segments[] = [
+                'speaker' => $currentSpeaker,
+                'text' => trim($currentText),
+                'isNarrator' => $isNarrator,
+            ];
+        }
+
+        return $segments;
+    }
+
+    /**
+     * Detect unique speakers from dialogue text.
+     *
+     * @param string $text The narration/dialogue text
+     * @return array List of unique speaker names
+     */
+    public function detectSpeakers(string $text): array
+    {
+        $segments = $this->parseDialogue($text);
+        $speakers = [];
+
+        foreach ($segments as $segment) {
+            if (!$segment['isNarrator'] && !empty($segment['speaker'])) {
+                $speakers[$segment['speaker']] = true;
+            }
+        }
+
+        return array_keys($speakers);
+    }
+
+    /**
+     * Determine voice ID for a character based on Character Bible or defaults.
+     *
+     * @param string $speakerName The character/speaker name
+     * @param array $characterBible The Character Bible data
+     * @param string $narratorVoice Default voice for narrator
+     * @return string Voice ID (alloy, echo, fable, onyx, nova, shimmer)
+     */
+    public function getVoiceForSpeaker(string $speakerName, array $characterBible = [], string $narratorVoice = 'fable'): string
+    {
+        $speakerUpper = strtoupper(trim($speakerName));
+
+        // Narrator uses designated narrator voice
+        if ($speakerUpper === 'NARRATOR') {
+            return $narratorVoice;
+        }
+
+        // Look up in Character Bible
+        $characters = $characterBible['characters'] ?? [];
+        foreach ($characters as $char) {
+            $charName = strtoupper(trim($char['name'] ?? ''));
+            if ($charName === $speakerUpper) {
+                // Check for configured voice
+                if (is_array($char['voice'] ?? null) && !empty($char['voice']['id'])) {
+                    return $char['voice']['id'];
+                }
+                // Legacy string voice
+                if (is_string($char['voice'] ?? null) && !empty($char['voice'])) {
+                    return $char['voice'];
+                }
+                // Determine by gender
+                $gender = strtolower($char['gender'] ?? $char['voice']['gender'] ?? '');
+                if (str_contains($gender, 'female') || str_contains($gender, 'woman')) {
+                    return 'nova';
+                } elseif (str_contains($gender, 'male') || str_contains($gender, 'man')) {
+                    return 'onyx';
+                }
+            }
+        }
+
+        // Fallback: use speaker name hash to assign consistent voice
+        $hash = crc32($speakerUpper);
+        $characterVoices = ['echo', 'onyx', 'nova', 'shimmer', 'alloy'];
+        return $characterVoices[$hash % count($characterVoices)];
+    }
+
+    /**
+     * Generate dialogue audio with multiple character voices.
+     * Each segment is generated with the appropriate voice.
+     *
+     * @param WizardProject $project The project
+     * @param array $scene Scene data with narration
+     * @param array $options Options including characterBible, narratorVoice, teamId
+     * @return array Result with individual segment audio and combined URL
+     */
+    public function generateDialogueAudio(WizardProject $project, array $scene, array $options = []): array
+    {
+        $narration = $scene['narration'] ?? '';
+        $characterBible = $options['characterBible'] ?? [];
+        $narratorVoice = $options['narratorVoice'] ?? 'fable';
+        $speed = $options['speed'] ?? 1.0;
+        $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+
+        if (empty($narration)) {
+            throw new \Exception('No narration text provided');
+        }
+
+        // Parse dialogue into segments
+        $segments = $this->parseDialogue($narration);
+
+        if (empty($segments)) {
+            throw new \Exception('No dialogue segments found');
+        }
+
+        $audioSegments = [];
+        $totalDuration = 0;
+
+        // Generate audio for each segment
+        foreach ($segments as $index => $segment) {
+            $voice = $this->getVoiceForSpeaker($segment['speaker'], $characterBible, $narratorVoice);
+
+            $result = AI::process($segment['text'], 'speech', [
+                'voice' => $voice,
+            ], $teamId);
+
+            if (!empty($result['error'])) {
+                throw new \Exception("Failed to generate audio for {$segment['speaker']}: {$result['error']}");
+            }
+
+            $audioContent = $result['data'][0] ?? null;
+            if (!$audioContent) {
+                continue;
+            }
+
+            // Estimate duration
+            $wordCount = str_word_count($segment['text']);
+            $duration = ($wordCount / 150) * 60 / $speed;
+            $totalDuration += $duration;
+
+            $audioSegments[] = [
+                'index' => $index,
+                'speaker' => $segment['speaker'],
+                'text' => $segment['text'],
+                'voice' => $voice,
+                'isNarrator' => $segment['isNarrator'],
+                'audioContent' => $audioContent,
+                'duration' => $duration,
+                'needsLipSync' => !$segment['isNarrator'], // Characters need lip-sync
+            ];
+        }
+
+        // Store individual segment files and combined audio
+        $basePath = "wizard-projects/{$project->id}/audio";
+        $sceneSlug = Str::slug($scene['id']);
+        $timestamp = time();
+
+        $segmentResults = [];
+        foreach ($audioSegments as $seg) {
+            $filename = "{$sceneSlug}-segment-{$seg['index']}-{$timestamp}.mp3";
+            $path = "{$basePath}/{$filename}";
+            Storage::disk('public')->put($path, $seg['audioContent']);
+
+            $segmentResults[] = [
+                'speaker' => $seg['speaker'],
+                'text' => $seg['text'],
+                'voice' => $seg['voice'],
+                'isNarrator' => $seg['isNarrator'],
+                'needsLipSync' => $seg['needsLipSync'],
+                'audioUrl' => url('/files/' . $path),
+                'duration' => $seg['duration'],
+            ];
+        }
+
+        // Create combined audio (simple concatenation - for playback preview)
+        $combinedContent = '';
+        foreach ($audioSegments as $seg) {
+            $combinedContent .= $seg['audioContent'];
+        }
+
+        $combinedFilename = "{$sceneSlug}-dialogue-combined-{$timestamp}.mp3";
+        $combinedPath = "{$basePath}/{$combinedFilename}";
+        Storage::disk('public')->put($combinedPath, $combinedContent);
+
+        // Create asset record for combined audio
+        $asset = WizardAsset::create([
+            'project_id' => $project->id,
+            'user_id' => $project->user_id,
+            'type' => WizardAsset::TYPE_VOICEOVER,
+            'name' => ($scene['title'] ?? $scene['id']) . ' - Dialogue',
+            'path' => $combinedPath,
+            'url' => url('/files/' . $combinedPath),
+            'mime_type' => 'audio/mpeg',
+            'scene_index' => $options['sceneIndex'] ?? null,
+            'scene_id' => $scene['id'],
+            'metadata' => [
+                'type' => 'dialogue',
+                'segments' => $segmentResults,
+                'narratorVoice' => $narratorVoice,
+                'totalDuration' => $totalDuration,
+                'speakerCount' => count(array_unique(array_column($segmentResults, 'speaker'))),
+            ],
+        ]);
+
+        return [
+            'success' => true,
+            'audioUrl' => $asset->url,
+            'assetId' => $asset->id,
+            'duration' => $totalDuration,
+            'segments' => $segmentResults,
+            'speakers' => array_unique(array_column($segmentResults, 'speaker')),
+        ];
+    }
+
+    /**
+     * Generate mixed narration: combines narrator segments with character dialogue.
+     * Narrator segments are standard voiceover, character segments can be lip-synced.
+     *
+     * @param WizardProject $project The project
+     * @param array $scene Scene data
+     * @param array $options Options including characterBible, narratorVoice
+     * @return array Result with narrator and character audio separated
+     */
+    public function generateMixedNarration(WizardProject $project, array $scene, array $options = []): array
+    {
+        $narration = $scene['narration'] ?? '';
+        $characterBible = $options['characterBible'] ?? [];
+        $narratorVoice = $options['narratorVoice'] ?? 'fable';
+        $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+
+        // Parse the narration
+        $segments = $this->parseDialogue($narration);
+
+        // Separate narrator and character segments
+        $narratorSegments = [];
+        $characterSegments = [];
+
+        foreach ($segments as $seg) {
+            if ($seg['isNarrator']) {
+                $narratorSegments[] = $seg;
+            } else {
+                $characterSegments[] = $seg;
+            }
+        }
+
+        $result = [
+            'success' => true,
+            'narrator' => null,
+            'characters' => [],
+            'combined' => null,
+            'timeline' => [],
+        ];
+
+        // Generate narrator audio (combined into single track)
+        if (!empty($narratorSegments)) {
+            $narratorText = implode(' ', array_column($narratorSegments, 'text'));
+
+            $audioResult = AI::process($narratorText, 'speech', [
+                'voice' => $narratorVoice,
+            ], $teamId);
+
+            if (empty($audioResult['error']) && !empty($audioResult['data'][0])) {
+                $path = "wizard-projects/{$project->id}/audio/" . Str::slug($scene['id']) . "-narrator-" . time() . ".mp3";
+                Storage::disk('public')->put($path, $audioResult['data'][0]);
+
+                $wordCount = str_word_count($narratorText);
+                $result['narrator'] = [
+                    'voice' => $narratorVoice,
+                    'audioUrl' => url('/files/' . $path),
+                    'duration' => ($wordCount / 150) * 60,
+                    'text' => $narratorText,
+                ];
+            }
+        }
+
+        // Generate character audio (separate files for lip-sync)
+        foreach ($characterSegments as $index => $seg) {
+            $voice = $this->getVoiceForSpeaker($seg['speaker'], $characterBible, $narratorVoice);
+
+            $audioResult = AI::process($seg['text'], 'speech', [
+                'voice' => $voice,
+            ], $teamId);
+
+            if (empty($audioResult['error']) && !empty($audioResult['data'][0])) {
+                $path = "wizard-projects/{$project->id}/audio/" . Str::slug($scene['id']) . "-char-{$index}-" . time() . ".mp3";
+                Storage::disk('public')->put($path, $audioResult['data'][0]);
+
+                $wordCount = str_word_count($seg['text']);
+                $result['characters'][] = [
+                    'speaker' => $seg['speaker'],
+                    'voice' => $voice,
+                    'audioUrl' => url('/files/' . $path),
+                    'duration' => ($wordCount / 150) * 60,
+                    'text' => $seg['text'],
+                    'needsLipSync' => true,
+                ];
+            }
+        }
+
+        // Build timeline for sequenced playback
+        foreach ($segments as $index => $seg) {
+            $timeline = [
+                'index' => $index,
+                'speaker' => $seg['speaker'],
+                'isNarrator' => $seg['isNarrator'],
+                'text' => $seg['text'],
+            ];
+
+            if ($seg['isNarrator']) {
+                $timeline['audioSource'] = 'narrator';
+            } else {
+                // Find matching character audio
+                foreach ($result['characters'] as $charAudio) {
+                    if ($charAudio['speaker'] === $seg['speaker'] && $charAudio['text'] === $seg['text']) {
+                        $timeline['audioSource'] = 'character';
+                        $timeline['audioUrl'] = $charAudio['audioUrl'];
+                        $timeline['needsLipSync'] = true;
+                        break;
+                    }
+                }
+            }
+
+            $result['timeline'][] = $timeline;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get character voice mapping for a scene.
+     * Maps character names to their configured voices.
+     *
+     * @param array $characterBible The Character Bible data
+     * @param array $speakers List of speaker names in the scene
+     * @return array Map of speaker name => voice config
+     */
+    public function getCharacterVoiceMapping(array $characterBible, array $speakers): array
+    {
+        $mapping = [];
+
+        foreach ($speakers as $speaker) {
+            $speakerUpper = strtoupper(trim($speaker));
+
+            // Look up in Character Bible
+            $found = false;
+            foreach ($characterBible['characters'] ?? [] as $char) {
+                $charName = strtoupper(trim($char['name'] ?? ''));
+                if ($charName === $speakerUpper) {
+                    $mapping[$speaker] = [
+                        'voiceId' => $this->getVoiceForSpeaker($speaker, $characterBible),
+                        'voiceConfig' => $char['voice'] ?? null,
+                        'characterIndex' => array_search($char, $characterBible['characters']),
+                        'hasReference' => !empty($char['referenceImageBase64']),
+                    ];
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                $mapping[$speaker] = [
+                    'voiceId' => $this->getVoiceForSpeaker($speaker, $characterBible),
+                    'voiceConfig' => null,
+                    'characterIndex' => null,
+                    'hasReference' => false,
+                ];
+            }
+        }
+
+        return $mapping;
+    }
 }
