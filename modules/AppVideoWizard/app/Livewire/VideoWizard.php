@@ -30,6 +30,7 @@ use Modules\AppVideoWizard\Services\SceneSyncService;
 use Modules\AppVideoWizard\Services\PerformanceMonitoringService;
 use Modules\AppVideoWizard\Services\QueuedJobsManager;
 use Modules\AppVideoWizard\Services\SmartReferenceService;
+use Modules\AppVideoWizard\Services\CharacterLookService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -5576,6 +5577,205 @@ class VideoWizard extends Component
         }
 
         return "CHARACTER DNA - {$name} (MUST MATCH EXACTLY):\n" . implode("\n", $parts);
+    }
+
+    // =========================================================================
+    // PHASE 4: CHARACTER LOOK SYSTEM ENHANCEMENT
+    // =========================================================================
+
+    /**
+     * Get available Character DNA templates (Phase 4.2)
+     *
+     * @return array List of templates with key, name, description
+     */
+    public function getCharacterDNATemplates(): array
+    {
+        $lookService = app(CharacterLookService::class);
+        return $lookService->getTemplates();
+    }
+
+    /**
+     * Apply a Character DNA template to a character (Phase 4.2)
+     *
+     * @param int $characterIndex The character index in Character Bible
+     * @param string $templateKey The template key to apply
+     * @param bool $overwrite Whether to overwrite existing DNA fields
+     */
+    public function applyCharacterDNATemplate(int $characterIndex, string $templateKey, bool $overwrite = false): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
+
+        $updatedCharacter = $lookService->applyTemplate($character, $templateKey, $overwrite);
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex] = $updatedCharacter;
+        $this->saveProject();
+
+        Log::info('[VideoWizard] DNA template applied', [
+            'characterIndex' => $characterIndex,
+            'characterName' => $character['name'] ?? 'Unknown',
+            'template' => $templateKey,
+            'overwrite' => $overwrite,
+        ]);
+    }
+
+    /**
+     * Auto-populate DNA fields from character description using AI (Phase 4.1)
+     *
+     * @param int $characterIndex The character index in Character Bible
+     * @param bool $overwrite Whether to overwrite existing DNA fields
+     */
+    public function autoPopulateCharacterDNA(int $characterIndex, bool $overwrite = false): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
+
+        // Extract and merge DNA from description
+        $updatedCharacter = $lookService->autoPopulateDNA($character, $overwrite);
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex] = $updatedCharacter;
+        $this->saveProject();
+
+        Log::info('[VideoWizard] Character DNA auto-populated', [
+            'characterIndex' => $characterIndex,
+            'characterName' => $character['name'] ?? 'Unknown',
+            'overwrite' => $overwrite,
+        ]);
+
+        $this->dispatch('character-dna-populated', [
+            'characterIndex' => $characterIndex,
+            'characterName' => $character['name'] ?? 'Unknown',
+        ]);
+    }
+
+    /**
+     * Batch auto-populate DNA for all characters in Character Bible (Phase 4.1)
+     *
+     * @param bool $overwrite Whether to overwrite existing DNA fields
+     */
+    public function batchAutoPopulateAllCharactersDNA(bool $overwrite = false): void
+    {
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        if (empty($characters)) {
+            return;
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $updatedCharacters = $lookService->batchAutoPopulateDNA($characters, $overwrite);
+
+        $this->sceneMemory['characterBible']['characters'] = $updatedCharacters;
+        $this->saveProject();
+
+        Log::info('[VideoWizard] Batch DNA auto-population completed', [
+            'totalCharacters' => count($characters),
+            'overwrite' => $overwrite,
+        ]);
+
+        $this->dispatch('batch-dna-populated', [
+            'totalCharacters' => count($characters),
+        ]);
+    }
+
+    /**
+     * Set intentional wardrobe change for a character at a specific scene (Phase 4.3)
+     *
+     * @param int $characterIndex The character index
+     * @param int $sceneIndex The scene index where wardrobe changes
+     * @param array $newWardrobe The new wardrobe for this scene
+     * @param string|null $reason Optional reason for the change (e.g., "character changes after battle")
+     */
+    public function setCharacterWardrobeChange(
+        int $characterIndex,
+        int $sceneIndex,
+        array $newWardrobe,
+        ?string $reason = null
+    ): void {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return;
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
+
+        $updatedCharacter = $lookService->setIntentionalWardrobeChange(
+            $character,
+            $sceneIndex,
+            $newWardrobe,
+            $reason
+        );
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex] = $updatedCharacter;
+        $this->saveProject();
+
+        Log::info('[VideoWizard] Wardrobe change set', [
+            'characterIndex' => $characterIndex,
+            'characterName' => $character['name'] ?? 'Unknown',
+            'sceneIndex' => $sceneIndex,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
+     * Get wardrobe for a character at a specific scene (Phase 4.3)
+     *
+     * @param int $characterIndex The character index
+     * @param int $sceneIndex The scene index
+     * @return array|null Wardrobe data or null
+     */
+    public function getCharacterWardrobeForScene(int $characterIndex, int $sceneIndex): ?array
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            return null;
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
+
+        return $lookService->getWardrobeForScene($character, $sceneIndex);
+    }
+
+    /**
+     * Validate wardrobe continuity for all characters (Phase 4.3)
+     *
+     * @return array Validation results with warnings and changes
+     */
+    public function validateAllWardrobeContinuity(): array
+    {
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+        $scenes = $this->script['scenes'] ?? [];
+
+        if (empty($characters) || empty($scenes)) {
+            return ['valid' => true, 'characters' => []];
+        }
+
+        $lookService = app(CharacterLookService::class);
+        $results = ['valid' => true, 'characters' => []];
+
+        foreach ($characters as $idx => $character) {
+            $validation = $lookService->validateWardrobeContinuity($character, $scenes);
+
+            $results['characters'][$idx] = [
+                'name' => $character['name'] ?? 'Unknown',
+                'valid' => $validation['valid'],
+                'warnings' => $validation['warnings'],
+                'changes' => $validation['changes'],
+            ];
+
+            if (!$validation['valid']) {
+                $results['valid'] = false;
+            }
+        }
+
+        return $results;
     }
 
     /**
