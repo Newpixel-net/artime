@@ -19266,8 +19266,24 @@ PROMPT;
 
         try {
             // Fetch original image as base64
-            $imageContent = @file_get_contents($data['originalImageUrl']);
-            if ($imageContent === false) {
+            $imageUrl = $data['originalImageUrl'];
+            $imageContent = null;
+
+            // Try to extract relative path from /files/ URL and read from storage
+            if (preg_match('#/files/(.+)$#', $imageUrl, $matches)) {
+                $relativePath = $matches[1];
+                if (\Storage::disk('public')->exists($relativePath)) {
+                    $imageContent = \Storage::disk('public')->get($relativePath);
+                    Log::info('[ShotFaceCorrection] Loaded image from storage', ['path' => $relativePath]);
+                }
+            }
+
+            // Fallback: try file_get_contents for external URLs
+            if ($imageContent === null) {
+                $imageContent = @file_get_contents($imageUrl);
+            }
+
+            if ($imageContent === false || $imageContent === null) {
                 throw new \Exception(__('Failed to fetch original image'));
             }
             $originalBase64 = base64_encode($imageContent);
@@ -19282,8 +19298,23 @@ PROMPT;
                     if (!$refBase64 && !empty($char['referenceImage'])) {
                         // Download and convert to base64
                         try {
-                            $imgContent = @file_get_contents($char['referenceImage']);
-                            if ($imgContent !== false) {
+                            $refUrl = $char['referenceImage'];
+                            $imgContent = null;
+
+                            // Try to extract relative path from /files/ URL and read from storage
+                            if (preg_match('#/files/(.+)$#', $refUrl, $refMatches)) {
+                                $refRelativePath = $refMatches[1];
+                                if (\Storage::disk('public')->exists($refRelativePath)) {
+                                    $imgContent = \Storage::disk('public')->get($refRelativePath);
+                                }
+                            }
+
+                            // Fallback: try file_get_contents for external URLs
+                            if ($imgContent === null) {
+                                $imgContent = @file_get_contents($refUrl);
+                            }
+
+                            if ($imgContent !== false && $imgContent !== null) {
                                 $refBase64 = base64_encode($imgContent);
                             }
                         } catch (\Exception $e) {
