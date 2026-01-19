@@ -20,7 +20,10 @@
       "Bash(C:xamppphpphp.exe artisan view:clear)",
       "Bash(C:xamppphpphp.exe artisan cache:clear)",
       "Bash(Get-Content \"C:\\\\Users\\\\VoltaPsy\\\\Documents\\\\GitHub\\\\artime\\\\storage\\\\logs\\\\laravel.log\" -Tail 100)",
-      "Bash(Select-String -Pattern \"story|bible|character|location|error\" -SimpleMatch)"
+      "Bash(Select-String -Pattern \"story|bible|character|location|error\" -SimpleMatch)",
+      "Bash(C:xamppphpphp.exe artisan db:seed --class=\"Modules\\\\AppVideoWizard\\\\Database\\\\Seeders\\\\VwSettingSeeder\")",
+      "Bash(dir \"C:\\\\laragon\\\\bin\\\\php\" /b)",
+      "Bash(echo:*)"
     ]
   }
 }

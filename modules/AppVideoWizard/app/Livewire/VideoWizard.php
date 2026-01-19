@@ -2542,15 +2542,39 @@ class VideoWizard extends Component
             // AUTO-PROCESS PROMPT CHAIN after script generation
             // =====================================================================
             $autoProcessChain = VwSetting::getValue('auto_process_prompt_chain', true);
-            if ($autoProcessChain && ($this->storyboard['promptChain']['enabled'] ?? true)) {
+            $promptChainEnabled = $this->storyboard['promptChain']['enabled'] ?? true;
+
+            Log::info('Script: Auto-process prompt chain check', [
+                'autoProcessChain_setting' => $autoProcessChain,
+                'promptChainEnabled' => $promptChainEnabled,
+                'scenes_count' => count($this->script['scenes'] ?? []),
+            ]);
+
+            if ($autoProcessChain && $promptChainEnabled) {
                 try {
-                    $this->processPromptChain();
-                    Log::info('Script: Auto-processed prompt chain');
+                    // Process the prompt chain
+                    $this->processPromptChainInternal();
+
+                    // Ensure state is persisted
+                    $this->saveProject();
+
+                    Log::info('Script: Auto-processed prompt chain successfully', [
+                        'status' => $this->storyboard['promptChain']['status'] ?? 'unknown',
+                        'scenes_processed' => count($this->storyboard['promptChain']['scenes'] ?? []),
+                    ]);
+
+                    // Dispatch event to notify UI
+                    $this->dispatch('prompt-chain-processed');
                 } catch (\Exception $e) {
                     Log::warning('Script: Auto-process prompt chain failed', [
                         'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                 }
+            } else {
+                Log::info('Script: Auto-process prompt chain skipped', [
+                    'reason' => !$autoProcessChain ? 'setting_disabled' : 'prompt_chain_disabled',
+                ]);
             }
 
             // Dispatch success debug event
@@ -6713,6 +6737,32 @@ class VideoWizard extends Component
     // =========================================================================
 
     /**
+     * Process prompt chain for all scenes (internal version without loading state management).
+     * Used by auto-process to avoid interfering with outer method's loading state.
+     *
+     * @throws \Exception If processing fails
+     */
+    protected function processPromptChainInternal(): void
+    {
+        $this->storyboard['promptChain']['status'] = 'processing';
+
+        // Build lookup caches once before iterating (O(n) build, O(1) lookups)
+        $this->buildSceneLookupCaches();
+
+        // Process each scene
+        foreach ($this->script['scenes'] as $index => $scene) {
+            $this->storyboard['promptChain']['scenes'][$index] = [
+                'sceneId' => $scene['id'],
+                'imagePrompt' => $this->buildScenePrompt($scene, $index),
+                'processed' => true,
+            ];
+        }
+
+        $this->storyboard['promptChain']['status'] = 'ready';
+        $this->storyboard['promptChain']['processedAt'] = now()->toIso8601String();
+    }
+
+    /**
      * Process prompt chain for all scenes.
      */
     public function processPromptChain(): void
@@ -6721,23 +6771,7 @@ class VideoWizard extends Component
         $this->error = null;
 
         try {
-            $this->storyboard['promptChain']['status'] = 'processing';
-
-            // PHASE 4: Build lookup caches once before iterating (O(n) build, O(1) lookups)
-            $this->buildSceneLookupCaches();
-
-            // Process each scene
-            foreach ($this->script['scenes'] as $index => $scene) {
-                $this->storyboard['promptChain']['scenes'][$index] = [
-                    'sceneId' => $scene['id'],
-                    'imagePrompt' => $this->buildScenePrompt($scene, $index),
-                    'processed' => true,
-                ];
-            }
-
-            $this->storyboard['promptChain']['status'] = 'ready';
-            $this->storyboard['promptChain']['processedAt'] = now()->toIso8601String();
-
+            $this->processPromptChainInternal();
             $this->saveProject();
 
         } catch (\Exception $e) {
