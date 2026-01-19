@@ -573,13 +573,16 @@ class DynamicShotEngine
         $startsWithEstablishing = in_array($position, ['opening', 'setup']);
 
         // Define sequences by scene type
+        // ANIMATABILITY-AWARE: Removed 'detail' from end positions
+        // All sequences ensure animatable shots (with visible faces) at critical positions
+        // Detail shots moved to middle positions where they won't end scenes
         $sequences = [
-            'action' => ['wide', 'medium', 'close-up', 'wide', 'medium', 'close-up', 'detail', 'reaction'],
+            'action' => ['wide', 'medium', 'close-up', 'wide', 'medium', 'close-up', 'reaction', 'medium'],
             'dialogue' => ['wide', 'medium', 'close-up', 'close-up', 'medium', 'reaction', 'close-up', 'medium'],
             'emotional' => ['medium', 'close-up', 'close-up', 'extreme-close-up', 'medium', 'close-up', 'wide', 'close-up'],
-            'establishing' => ['extreme-wide', 'wide', 'medium', 'wide', 'medium', 'detail'],
-            'montage' => ['wide', 'detail', 'medium', 'detail', 'close-up', 'detail', 'wide', 'detail'],
-            'default' => ['establishing', 'wide', 'medium', 'close-up', 'medium', 'close-up', 'detail', 'wide'],
+            'establishing' => ['extreme-wide', 'wide', 'medium', 'wide', 'medium', 'close-up'],
+            'montage' => ['wide', 'medium', 'medium-close', 'close-up', 'medium', 'wide', 'medium', 'close-up'],
+            'default' => ['establishing', 'wide', 'medium', 'close-up', 'medium', 'close-up', 'reaction', 'wide'],
         ];
 
         $baseSequence = $sequences[$sceneType] ?? $sequences['default'];
@@ -595,10 +598,27 @@ class DynamicShotEngine
             }
         }
 
-        // Last shot often works well as detail or reaction
+        // ANIMATABILITY FIX: Final shot must be character-centric for video animation
+        // NEVER use 'detail' or 'pov' as final shot - they don't animate well
+        // Prefer shots that show character face for emotional closure
         if ($shotCount > 2) {
-            $lastShotOptions = ['detail', 'reaction', 'close-up'];
+            // Animatable final shot options - all require character face
+            $lastShotOptions = ['close-up', 'medium-close', 'reaction'];
             $result[$shotCount - 1] = $lastShotOptions[array_rand($lastShotOptions)];
+        }
+
+        // Also ensure no detail/pov shots at scene boundaries (first and last)
+        // These positions are critical for video flow and scene transitions
+        $nonAnimatableForBoundaries = ['detail', 'pov', 'insert'];
+
+        // Fix first shot if needed (unless establishing)
+        if ($shotCount > 1 && in_array($result[0], $nonAnimatableForBoundaries)) {
+            $result[0] = 'wide';
+        }
+
+        // Fix last shot if it somehow got a non-animatable type
+        if (in_array($result[$shotCount - 1], $nonAnimatableForBoundaries)) {
+            $result[$shotCount - 1] = 'close-up';
         }
 
         return $result;

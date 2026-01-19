@@ -15258,66 +15258,137 @@ PROMPT;
     protected function getShotTypeForIndex(int $index, int $total, ?array $scene = null): array
     {
         // Professional shot type definitions with cinematic descriptions
+        // UPGRADED: Added animatability requirements for video generation
         $shotTypes = [
             'establishing' => [
                 'type' => 'establishing',
                 'description' => 'Wide establishing shot showing full environment',
                 'purpose' => 'context',
                 'lens' => 'wide-angle 24mm',
+                'animatability' => [
+                    'face_required' => false,
+                    'body_required' => false,
+                    'motion_type' => 'camera_pan_or_environmental',
+                    'can_end_scene' => true,
+                ],
             ],
             'wide' => [
                 'type' => 'wide',
-                'description' => 'Wide shot revealing full scene context',
+                'description' => 'Wide shot revealing full scene context with complete character',
                 'purpose' => 'scope',
                 'lens' => 'ultra-wide 16mm',
+                'animatability' => [
+                    'face_required' => false,
+                    'body_required' => true,
+                    'min_body_visibility' => 0.8,
+                    'motion_type' => 'full_body_movement',
+                    'can_end_scene' => true,
+                ],
             ],
             'medium' => [
                 'type' => 'medium',
-                'description' => 'Medium shot focusing on main subject',
+                'description' => 'Medium shot focusing on main subject with visible face',
                 'purpose' => 'narrative',
                 'lens' => 'standard 50mm',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => true,
+                    'min_body_visibility' => 0.5,
+                    'motion_type' => 'upper_body_gesture',
+                    'can_end_scene' => true,
+                ],
             ],
             'medium-close' => [
                 'type' => 'medium-close',
-                'description' => 'Medium close-up for dialogue and connection',
+                'description' => 'Medium close-up for dialogue with clear face',
                 'purpose' => 'intimacy',
                 'lens' => '85mm portrait',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => false,
+                    'min_body_visibility' => 0.3,
+                    'motion_type' => 'facial_and_gesture',
+                    'can_end_scene' => true,
+                ],
             ],
             'close-up' => [
                 'type' => 'close-up',
-                'description' => 'Close-up emphasizing emotion and detail',
+                'description' => 'Close-up emphasizing character emotion',
                 'purpose' => 'emotion',
                 'lens' => 'telephoto 85mm, shallow depth of field',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => false,
+                    'min_body_visibility' => 0.2,
+                    'motion_type' => 'facial_expression',
+                    'can_end_scene' => true,
+                ],
             ],
             'extreme-close-up' => [
                 'type' => 'extreme-close-up',
-                'description' => 'Extreme close-up on critical detail',
+                'description' => 'Extreme close-up on character face/eyes',
                 'purpose' => 'emphasis',
                 'lens' => 'macro lens, extreme detail',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => false,
+                    'min_body_visibility' => 0.1,
+                    'motion_type' => 'subtle_facial',
+                    'can_end_scene' => true,
+                ],
             ],
             'reaction' => [
                 'type' => 'reaction',
-                'description' => 'Reaction shot capturing emotional response',
+                'description' => 'Reaction shot capturing emotional response on face',
                 'purpose' => 'response',
                 'lens' => '50mm standard',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => false,
+                    'min_body_visibility' => 0.3,
+                    'motion_type' => 'facial_reaction',
+                    'can_end_scene' => true,
+                ],
             ],
             'detail' => [
                 'type' => 'detail',
-                'description' => 'Detail shot highlighting specific elements',
+                'description' => 'Detail shot with character interacting with element',
                 'purpose' => 'focus',
                 'lens' => 'macro or telephoto',
+                'animatability' => [
+                    'face_required' => true, // CHANGED: was false, now requires face
+                    'body_required' => false,
+                    'min_body_visibility' => 0.15,
+                    'motion_type' => 'subtle_movement',
+                    'can_end_scene' => false, // CRITICAL: detail shots cannot end scenes
+                    'fallback_type' => 'close-up', // If validation fails, use this instead
+                ],
             ],
             'over-shoulder' => [
                 'type' => 'over-shoulder',
-                'description' => 'Over-the-shoulder shot for dialogue',
+                'description' => 'Over-the-shoulder shot with facing character face visible',
                 'purpose' => 'conversation',
                 'lens' => '35mm cinematic',
+                'animatability' => [
+                    'face_required' => true,
+                    'body_required' => true,
+                    'min_body_visibility' => 0.4,
+                    'motion_type' => 'dialogue_coverage',
+                    'can_end_scene' => true,
+                ],
             ],
             'pov' => [
                 'type' => 'pov',
                 'description' => 'Point-of-view shot from character perspective',
                 'purpose' => 'immersion',
                 'lens' => 'wide 28mm',
+                'animatability' => [
+                    'face_required' => false, // POV doesn't show protagonist face
+                    'body_required' => false,
+                    'motion_type' => 'camera_movement',
+                    'can_end_scene' => false, // POV shouldn't end scenes
+                    'fallback_type' => 'medium',
+                ],
             ],
         ];
 
@@ -15372,11 +15443,12 @@ PROMPT;
         }
 
         // Default professional sequence for 4+ shots
-        // Pattern: establishing → medium → close-up → reaction/detail → medium → wide
+        // ANIMATABILITY-AWARE: All positions use character-centric shots
+        // Pattern: establishing → medium → close-up → reaction/medium-close → medium → wide
         $defaultSequence = match(true) {
             $position < 0.25 => $shotTypes['medium'],           // Early: medium shots
             $position < 0.5 => $shotTypes['close-up'],          // Building: close-ups
-            $position < 0.75 => $hasDialogue ? $shotTypes['reaction'] : $shotTypes['detail'],
+            $position < 0.75 => $hasDialogue ? $shotTypes['reaction'] : $shotTypes['medium-close'],
             default => $shotTypes['medium'],                     // Late: return to medium
         };
 
@@ -15419,11 +15491,12 @@ PROMPT;
                 default => $shotTypes['reaction'],
             },
 
-            // Reveal/discovery scenes: build to detail
+            // Reveal/discovery scenes: build to character reaction
+            // ANIMATABILITY FIX: End with close-up (face visible) not detail
             'reveal', 'discovery', 'mystery' => match(true) {
                 $position < 0.5 => $shotTypes['medium'],
                 $position < 0.75 => $shotTypes['close-up'],
-                default => $shotTypes['detail'],
+                default => $shotTypes['extreme-close-up'], // Character reaction to reveal
             },
 
             // Climax scenes: escalating intensity
@@ -15442,6 +15515,74 @@ PROMPT;
             // Default fallback
             default => $shotTypes['medium'],
         };
+    }
+
+    /**
+     * Check if a shot type is suitable for video animation.
+     *
+     * ANIMATABILITY REQUIREMENTS:
+     * - Shots with face_required=true need visible character face for lip-sync/expression
+     * - Shots with body_required=true need visible character body for movement
+     * - Shots with can_end_scene=false should not be used at scene boundaries
+     *
+     * @param string $shotType The shot type to validate
+     * @param bool $isSceneEnd Whether this is the final shot in a scene
+     * @return array ['valid' => bool, 'issues' => array, 'fallback' => ?string]
+     */
+    protected function validateShotAnimatability(string $shotType, bool $isSceneEnd = false): array
+    {
+        // Shot types that cannot end scenes (not animatable for video closure)
+        $cannotEndScene = ['detail', 'insert', 'pov'];
+
+        // Shot types that always require character face for animation
+        $requiresFace = ['close-up', 'extreme-close-up', 'medium-close', 'reaction', 'medium', 'over-shoulder', 'detail'];
+
+        // Fallback shot types for problematic cases
+        $fallbacks = [
+            'detail' => 'close-up',
+            'insert' => 'close-up',
+            'pov' => 'medium',
+        ];
+
+        $issues = [];
+        $valid = true;
+
+        // Check scene ending constraint
+        if ($isSceneEnd && in_array($shotType, $cannotEndScene)) {
+            $issues[] = "Shot type '{$shotType}' cannot end a scene - not suitable for video animation closure";
+            $valid = false;
+        }
+
+        return [
+            'valid' => $valid,
+            'issues' => $issues,
+            'fallback' => $valid ? null : ($fallbacks[$shotType] ?? 'close-up'),
+            'requires_face' => in_array($shotType, $requiresFace),
+        ];
+    }
+
+    /**
+     * Get an animatable shot type, converting non-animatable types to their fallbacks.
+     *
+     * @param string $shotType The requested shot type
+     * @param bool $isSceneEnd Whether this is the final shot in a scene
+     * @return string The validated (possibly converted) shot type
+     */
+    protected function getAnimatableShotType(string $shotType, bool $isSceneEnd = false): string
+    {
+        $validation = $this->validateShotAnimatability($shotType, $isSceneEnd);
+
+        if (!$validation['valid'] && $validation['fallback']) {
+            \Log::info('[Animatability] Converted shot type', [
+                'original' => $shotType,
+                'fallback' => $validation['fallback'],
+                'reason' => $validation['issues'][0] ?? 'unknown',
+                'isSceneEnd' => $isSceneEnd,
+            ]);
+            return $validation['fallback'];
+        }
+
+        return $shotType;
     }
 
     /**
@@ -17272,7 +17413,8 @@ PROMPT;
             $useVariableDurations = $this->isPerShotDurationEnabled();
 
             // Shot types progression for cinematic variety
-            $shotTypes = ['establishing', 'wide', 'medium', 'medium-close', 'close-up', 'detail', 'reaction', 'insert'];
+            // ANIMATABILITY-AWARE: Removed detail/insert from cycling as they require special handling
+            $shotTypes = ['establishing', 'wide', 'medium', 'medium-close', 'close-up', 'reaction'];
 
             $shots = [];
             for ($i = 0; $i < $shotCount; $i++) {
@@ -17282,8 +17424,9 @@ PROMPT;
 
                 // For first shot, always use establishing
                 if ($i === 0) $shotType = 'establishing';
-                // For last shot, prefer detail or close-up
-                if ($i === $shotCount - 1 && $shotCount > 2) $shotType = 'detail';
+                // ANIMATABILITY FIX: For last shot, use close-up (character face visible)
+                // NEVER use 'detail' for final shot - it's not animatable
+                if ($i === $shotCount - 1 && $shotCount > 2) $shotType = 'close-up';
 
                 // Use variable duration based on shot type when enabled
                 $shotDuration = $useVariableDurations
@@ -17472,18 +17615,21 @@ PROMPT;
                         }
 
                         // Professional framing instructions for each shot type
+                        // ANIMATABILITY-AWARE FRAMING INSTRUCTIONS
+                        // All shot types must produce content suitable for video animation
+                        // CRITICAL: Detail/insert shots must include CHARACTER with FACE visible
                         $framingInstructions = [
-                            'establishing' => 'ULTRA-WIDE establishing shot showing the entire environment and atmosphere. Characters appear small in the distance. Emphasize the location, scale, and mood of the scene. Deep focus, everything sharp.',
-                            'wide' => 'WIDE SHOT showing the full scene environment with characters visible but environment dominant. Establish spatial relationships. Deep focus with clear background detail.',
-                            'medium' => 'MEDIUM SHOT framing the main subject from approximately waist up. Balanced composition showing the character in context with some background visible. Natural conversational framing.',
-                            'medium-close' => 'MEDIUM CLOSE-UP framing the subject from chest up. More intimate framing that captures emotion while maintaining some environmental context. Soft background blur.',
-                            'close-up' => 'CLOSE-UP with the face filling most of the frame. Shallow depth of field with beautifully blurred background. Focus on eyes and emotional expression. Intimate and powerful.',
-                            'extreme-close-up' => 'EXTREME CLOSE-UP focusing on a specific detail - eyes, hands, or crucial object. Macro-style framing. Abstract or heavily blurred background. Maximum emotional impact.',
-                            'reaction' => 'REACTION SHOT capturing emotional response. Tight framing on the face showing clear expression. The viewer should feel what the character feels.',
-                            'detail' => 'DETAIL/INSERT SHOT of a specific object, hand gesture, or important element. Macro-style close focus on one element only. Background completely blurred or minimal.',
-                            'over-shoulder' => 'OVER-THE-SHOULDER shot showing one character from behind with another character or scene element in focus. Creates depth and connection.',
-                            'pov' => 'POV (Point of View) shot showing exactly what the character sees. First-person perspective. Immersive framing.',
-                            'insert' => 'INSERT SHOT of a specific detail, object, or action. Close focus on one element that advances the story. Clean, focused composition.',
+                            'establishing' => 'ULTRA-WIDE establishing shot showing the entire environment and atmosphere. Characters may appear small in the distance. Emphasize the location, scale, and mood of the scene. Deep focus, everything sharp.',
+                            'wide' => 'WIDE SHOT showing the full scene environment with characters FULLY VISIBLE (head to toe). Establish spatial relationships. Deep focus with clear background detail. CHARACTER MUST BE COMPLETE - no cropping of body.',
+                            'medium' => 'MEDIUM SHOT framing the main subject from approximately waist up. CHARACTER FACE MUST BE CLEARLY VISIBLE. Balanced composition showing the character in context with some background visible. Natural conversational framing.',
+                            'medium-close' => 'MEDIUM CLOSE-UP framing the subject from chest up. CHARACTER FACE MUST BE CLEARLY VISIBLE. More intimate framing that captures emotion while maintaining some environmental context. Soft background blur.',
+                            'close-up' => 'CLOSE-UP with the CHARACTER FACE filling most of the frame. Shallow depth of field with beautifully blurred background. Focus on eyes and emotional expression. Intimate and powerful. FACE MUST BE THE PRIMARY FOCUS.',
+                            'extreme-close-up' => 'EXTREME CLOSE-UP focusing on the CHARACTER FACE - specifically eyes and expression. NOT hands or objects alone. Macro-style framing of facial features. Abstract or heavily blurred background. Maximum emotional impact through FACIAL expression.',
+                            'reaction' => 'REACTION SHOT capturing emotional response. Tight framing on the CHARACTER FACE showing clear expression. The viewer should feel what the character feels. FACE MUST BE VISIBLE.',
+                            'detail' => 'DETAIL SHOT showing a CHARACTER interacting with an important element. CHARACTER FACE OR UPPER BODY MUST BE VISIBLE alongside the detail. NOT hands-only or objects-only. Show the character\'s expression or body while highlighting the important element. Soft background blur.',
+                            'over-shoulder' => 'OVER-THE-SHOULDER shot showing one character from behind with another CHARACTER FACE in focus. Creates depth and connection. The facing character\'s FACE MUST BE CLEARLY VISIBLE.',
+                            'pov' => 'POV (Point of View) shot showing exactly what the character sees. First-person perspective. Immersive framing. If characters are visible in the POV, their FACES should be shown.',
+                            'insert' => 'INSERT SHOT showing a CHARACTER with an important detail or object. CHARACTER FACE OR UPPER BODY MUST BE VISIBLE. NOT objects-only or hands-only. The character should be interacting with or reacting to the insert element.',
                         ];
 
                         $collageData['status'] = 'generating';
