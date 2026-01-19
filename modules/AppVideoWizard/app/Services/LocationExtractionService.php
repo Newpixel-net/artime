@@ -206,20 +206,22 @@ You are an expert at analyzing video scripts and identifying locations for visua
 Your task is to extract all unique locations that appear in the script and create detailed visual descriptions for AI image generation.
 {$visualModeEnforcement}
 CRITICAL RULES:
-1. **CONSOLIDATE RELATED LOCATIONS** - Different rooms/areas of the same building = ONE location
-   - "Living Room", "Kitchen", "Bedroom" in same house = "The House" or "Home"
-   - "Office Lobby", "Office Meeting Room", "Office Rooftop" = "Corporate Office"
-2. **MERGE OUTDOOR AREAS** - Related outdoor spaces = ONE location
-   - "Forest Path", "Forest Clearing", "Dense Woods" = "Forest"
-   - "Beach Shore", "Beach Dunes" = "Beach"
+1. **EXTRACT EVERY DISTINCT VISUAL ENVIRONMENT** - Each visually different area should be a separate location
+   - Different rooms with different visual character = SEPARATE locations
+   - "Museum Great Court" vs "Egyptian Gallery" = TWO locations (different visual environments)
+   - ONLY merge truly IDENTICAL spaces (same room at different times)
+2. **PRESERVE VISUAL DIVERSITY** - More distinct locations = better visual variety
+   - Different galleries in a museum = SEPARATE locations
+   - Different areas of a forest (clearing vs deep woods) = SEPARATE locations
+   - Interior vs exterior of same building = SEPARATE locations
 3. **TIME IS NOT A LOCATION** - Same place at different times = ONE entry
-   - "Dock at Dawn" and "Dock at Night" = "Dock" (note time variations)
+   - "Dock at Dawn" and "Dock at Night" = "Dock" (note time variations in stateChanges)
 4. Create SPECIFIC, CONSISTENT descriptions for each location
 5. Include: setting type (interior/exterior), time of day, weather, atmosphere, architectural details
 6. Track which scenes each location appears in
 7. **STYLE CONSISTENCY IS PARAMOUNT** - ALL locations must match the Master Visual Style above
 8. If the visual mode is "cinematic-realistic", ALL locations must be real-world, photorealistic settings - NO fantasy, cartoon, or stylized imagery
-9. A 5-minute film typically has 3-6 distinct locations, not 10+
+9. **MINIMUM LOCATION COUNT** - A 5-minute film needs AT LEAST 4-8 distinct locations for visual variety. Extract MORE rather than fewer.
 
 LOCATION ANALYSIS:
 - Look for explicit location mentions in narration
@@ -293,28 +295,30 @@ Extract ALL distinct locations that appear in the script. PRIORITIZE finding eve
 }
 
 === CRITICAL RULES ===
-1. **CONSOLIDATE** - Rooms in the same building = ONE location (e.g., "John's Home" not "John's Kitchen" + "John's Bedroom")
-2. **MERGE** - Related outdoor areas = ONE location (e.g., "Forest" not "Forest Path" + "Forest Clearing")
+1. **PRESERVE DISTINCT ENVIRONMENTS** - Different visual environments = SEPARATE locations
+   - "Museum Great Court" vs "Egyptian Gallery" = TWO locations (different visual character)
+   - Only merge truly IDENTICAL rooms/spaces
+2. **VISUAL VARIETY IS KEY** - Extract EVERY visually distinct area
 3. If the same location appears multiple times, list it once with all scene numbers
 4. DNA fields (mood, lightingStyle, stateChanges) are OPTIONAL - include if inferable
-5. Focus on DISTINCT VISUAL ENVIRONMENTS - a typical 5-min film has 3-6 locations, not 10+
+5. **MINIMUM LOCATIONS** - A 5-minute film needs AT LEAST 4-8 distinct locations for visual variety
 
-=== CONSOLIDATION EXAMPLES ===
-WRONG (fragmented):
-- "John's House Exterior"
-- "John's House Living Room"
-- "John's House Kitchen"
+=== EXTRACTION EXAMPLES ===
+CORRECT (preserved visual variety):
+- "Museum Great Court" (grand glass-roofed atrium)
+- "Egyptian Gallery" (ancient artifacts, dim lighting)
+- "Museum Exterior" (stone facade, entrance steps)
 
-CORRECT (consolidated):
-- "John's House" (includes all rooms/areas)
+WRONG (over-consolidated):
+- "Museum" (loses visual diversity)
 
-WRONG (fragmented):
-- "Forest Path"
-- "Forest Clearing"
-- "Dark Forest"
+CORRECT (preserved visual variety):
+- "Forest Entrance" (bright, sparse trees)
+- "Dense Forest" (dark, thick canopy)
+- "Forest Clearing" (open sky, fallen logs)
 
-CORRECT (consolidated):
-- "Forest" (various areas within)
+WRONG (over-consolidated):
+- "Forest" (loses visual diversity)
 
 === QUICK REFERENCE ===
 - name: Distinctive location name (e.g., "Corporate Boardroom", "Forest Clearing", "Space Station Bridge")
@@ -622,34 +626,37 @@ USER;
 
     /**
      * Check if two locations should be merged.
+     * IMPORTANT: Only merge truly DUPLICATE locations, not related ones.
+     * Different rooms/areas with different visual character should remain separate.
      *
      * @param string $a First location name
      * @param string $b Second location name
-     * @return bool True if locations should be merged
+     * @return bool True if locations should be merged (only for true duplicates)
      */
     protected function shouldMergeLocations(string $a, string $b): bool
     {
         $a = strtolower(trim($a));
         $b = strtolower(trim($b));
 
-        // A contains B as prefix: "Elias's Home Living Room" contains "Elias's Home"
-        if (strpos($a, $b) === 0 && strlen($a) > strlen($b)) {
+        // Only merge if names are nearly identical (same location, minor variation)
+        // Use strict matching to preserve visual diversity
+
+        // Exact match
+        if ($a === $b) {
             return true;
         }
 
-        // B contains A as prefix: "Elias's Home" is prefix of "Elias's Home Living Room"
-        if (strpos($b, $a) === 0 && strlen($b) > strlen($a)) {
+        // Time-of-day variations of the same location (e.g., "Beach at Dawn" vs "Beach at Night")
+        $aWithoutTime = preg_replace('/\s+at\s+(dawn|dusk|night|day|noon|morning|evening|sunset|sunrise)$/i', '', $a);
+        $bWithoutTime = preg_replace('/\s+at\s+(dawn|dusk|night|day|noon|morning|evening|sunset|sunrise)$/i', '', $b);
+
+        if ($aWithoutTime === $bWithoutTime && $aWithoutTime !== $a && $bWithoutTime !== $b) {
             return true;
         }
 
-        // Check for possessive variations with same base
-        $aBase = $this->extractLocationBaseName($a);
-        $bBase = $this->extractLocationBaseName($b);
-
-        // Same base name but different full names = should merge
-        if ($aBase === $bBase && ($aBase !== $a || $bBase !== $b)) {
-            return true;
-        }
+        // DO NOT merge different rooms/areas - they have different visual character
+        // "Museum Great Court" and "Egyptian Gallery" should NOT merge
+        // "Living Room" and "Kitchen" should NOT merge
 
         return false;
     }

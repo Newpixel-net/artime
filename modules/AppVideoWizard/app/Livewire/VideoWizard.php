@@ -17253,6 +17253,9 @@ PROMPT;
                     : $baseShotDuration;
 
                 $shots[$i] = [
+                    'id' => "shot-scene{$sceneIndex}-{$i}",
+                    'index' => $i,
+                    'sceneIndex' => $sceneIndex,
                     'type' => $shotType,
                     'description' => $sceneDescription,
                     'imagePrompt' => $sceneDescription,
