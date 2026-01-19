@@ -11143,70 +11143,195 @@ class VideoWizard extends Component
     }
 
     /**
-     * Extract character references from the hero frame.
-     * Analyzes the scene for characters and extracts isolated portraits.
+     * Extract character and location references from the hero frame.
+     * Analyzes the scene for characters and extracts isolated portraits,
+     * then captures location reference for Scene 0's location.
      */
     protected function extractReferencesFromHeroFrame(string $imageBase64): void
     {
         $smartRef = app(SmartReferenceService::class);
         $characterBible = $this->sceneMemory['characterBible'] ?? [];
 
-        // Analyze the scene for characters
-        $this->dispatch('generation-status', ['message' => 'Analyzing characters in scene...']);
+        // ═══════════════════════════════════════════════════════════════════
+        // STEP 1: Extract Character Portraits
+        // ═══════════════════════════════════════════════════════════════════
 
+        $this->dispatch('generation-status', ['message' => 'Analyzing characters in scene...']);
         Log::info('SmartReference: Starting character analysis');
 
         $analysis = $smartRef->analyzeSceneForCharacters($imageBase64, $characterBible);
 
-        if (!$analysis['success'] || empty($analysis['detectedCharacters'])) {
+        if ($analysis['success'] && !empty($analysis['detectedCharacters'])) {
+            Log::info('SmartReference: Characters detected', [
+                'count' => count($analysis['detectedCharacters']),
+            ]);
+
+            // Extract portrait for each detected character
+            foreach ($analysis['detectedCharacters'] as $detected) {
+                $bibleIndex = $detected['bibleIndex'];
+                $charData = $detected['bibleCharacter'];
+
+                // Skip if character already has a ready reference
+                if (!empty($charData['referenceImageBase64']) &&
+                    ($charData['referenceImageStatus'] ?? '') === 'ready') {
+                    Log::debug('SmartReference: Skipping character with existing reference', [
+                        'characterName' => $charData['name'] ?? 'Unknown',
+                    ]);
+                    continue;
+                }
+
+                $this->dispatch('generation-status', [
+                    'message' => "Extracting portrait for {$charData['name']}..."
+                ]);
+
+                Log::info('SmartReference: Extracting portrait', [
+                    'characterName' => $charData['name'] ?? 'Unknown',
+                    'bibleIndex' => $bibleIndex,
+                ]);
+
+                $portrait = $smartRef->extractCharacterPortrait($imageBase64, $detected, $charData);
+
+                if ($portrait['success']) {
+                    $this->updateCharacterWithReference($bibleIndex, $portrait);
+                } else {
+                    Log::warning('SmartReference: Portrait extraction failed', [
+                        'character' => $charData['name'] ?? 'Unknown',
+                        'error' => $portrait['error'] ?? 'Unknown error',
+                    ]);
+                }
+
+                // Small delay to avoid rate limits (500ms)
+                usleep(500000);
+            }
+        } else {
             Log::info('SmartReference: No characters detected in hero frame', [
                 'error' => $analysis['error'] ?? null,
             ]);
-            $this->dispatch('generation-status', ['message' => 'No characters detected, continuing...']);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STEP 2: Extract Location Reference
+        // ═══════════════════════════════════════════════════════════════════
+
+        $this->extractLocationReferenceFromHeroFrame($imageBase64, $smartRef);
+    }
+
+    /**
+     * Extract location reference from the hero frame.
+     * Finds the location for Scene 0 and captures a clean establishing shot.
+     */
+    protected function extractLocationReferenceFromHeroFrame(string $imageBase64, SmartReferenceService $smartRef): void
+    {
+        $locationBible = $this->sceneMemory['locationBible'] ?? [];
+        $locations = $locationBible['locations'] ?? [];
+
+        if (empty($locations)) {
+            Log::info('SmartReference: No locations in Bible, skipping location extraction');
             return;
         }
 
-        Log::info('SmartReference: Characters detected', [
-            'count' => count($analysis['detectedCharacters']),
+        // Find location for Scene 0 (hero frame)
+        $locationIndex = $this->findLocationForScene(0);
+
+        if ($locationIndex === null) {
+            Log::info('SmartReference: No location assigned to Scene 0, skipping location extraction');
+            return;
+        }
+
+        $location = $locations[$locationIndex] ?? null;
+        if (!$location) {
+            Log::warning('SmartReference: Location index not found in Bible', [
+                'locationIndex' => $locationIndex,
+            ]);
+            return;
+        }
+
+        // Skip if location already has a ready reference
+        if (!empty($location['referenceImageBase64']) &&
+            ($location['referenceImageStatus'] ?? '') === 'ready') {
+            Log::debug('SmartReference: Skipping location with existing reference', [
+                'locationName' => $location['name'] ?? 'Unknown',
+            ]);
+            return;
+        }
+
+        $locationName = $location['name'] ?? 'Location';
+
+        $this->dispatch('generation-status', [
+            'message' => "Capturing location reference for {$locationName}..."
         ]);
 
-        // Extract portrait for each detected character
-        foreach ($analysis['detectedCharacters'] as $detected) {
-            $bibleIndex = $detected['bibleIndex'];
-            $charData = $detected['bibleCharacter'];
+        Log::info('SmartReference: Extracting location reference', [
+            'locationName' => $locationName,
+            'locationIndex' => $locationIndex,
+        ]);
 
-            // Skip if character already has a ready reference
-            if (!empty($charData['referenceImageBase64']) &&
-                ($charData['referenceImageStatus'] ?? '') === 'ready') {
-                Log::debug('SmartReference: Skipping character with existing reference', [
-                    'characterName' => $charData['name'] ?? 'Unknown',
-                ]);
-                continue;
-            }
+        $locationRef = $smartRef->captureLocationReference($imageBase64, $location);
 
-            $this->dispatch('generation-status', [
-                'message' => "Extracting portrait for {$charData['name']}..."
+        if ($locationRef['success']) {
+            $this->updateLocationWithReference($locationIndex, $locationRef);
+        } else {
+            Log::warning('SmartReference: Location extraction failed', [
+                'location' => $locationName,
+                'error' => $locationRef['error'] ?? 'Unknown error',
             ]);
-
-            Log::info('SmartReference: Extracting portrait', [
-                'characterName' => $charData['name'] ?? 'Unknown',
-                'bibleIndex' => $bibleIndex,
-            ]);
-
-            $portrait = $smartRef->extractCharacterPortrait($imageBase64, $detected, $charData);
-
-            if ($portrait['success']) {
-                $this->updateCharacterWithReference($bibleIndex, $portrait);
-            } else {
-                Log::warning('SmartReference: Portrait extraction failed', [
-                    'character' => $charData['name'] ?? 'Unknown',
-                    'error' => $portrait['error'] ?? 'Unknown error',
-                ]);
-            }
-
-            // Small delay to avoid rate limits (500ms)
-            usleep(500000);
         }
+    }
+
+    /**
+     * Find the location index for a given scene.
+     * Searches Location Bible for a location that includes this scene.
+     */
+    protected function findLocationForScene(int $sceneIndex): ?int
+    {
+        $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+
+        foreach ($locations as $index => $location) {
+            $scenes = $location['scenes'] ?? [];
+            if (in_array($sceneIndex, $scenes)) {
+                return $index;
+            }
+        }
+
+        // Fallback: check if scene has a locationRef field
+        $scene = $this->script['scenes'][$sceneIndex] ?? null;
+        if ($scene && !empty($scene['locationRef'])) {
+            foreach ($locations as $index => $location) {
+                if (($location['id'] ?? '') === $scene['locationRef']) {
+                    return $index;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Update a location with extracted reference image.
+     */
+    protected function updateLocationWithReference(int $locationIndex, array $referenceData): void
+    {
+        if (!isset($this->sceneMemory['locationBible']['locations'][$locationIndex])) {
+            Log::warning('SmartReference: Location index not found', [
+                'locationIndex' => $locationIndex,
+            ]);
+            return;
+        }
+
+        $locationName = $this->sceneMemory['locationBible']['locations'][$locationIndex]['name'] ?? 'Unknown';
+
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageBase64'] = $referenceData['base64'];
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageMimeType'] = $referenceData['mimeType'] ?? 'image/png';
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageStatus'] = 'ready';
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageSource'] = 'hero-extraction';
+
+        $this->saveProject();
+
+        Log::info('SmartReference: Location reference updated from hero frame', [
+            'locationIndex' => $locationIndex,
+            'locationName' => $locationName,
+            'base64Length' => strlen($referenceData['base64']),
+        ]);
     }
 
     /**
