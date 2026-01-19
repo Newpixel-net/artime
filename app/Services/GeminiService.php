@@ -819,6 +819,71 @@ EOT;
     // --- Vision Generation ---
 
     /**
+     * Analyze an image with a text prompt and return text response.
+     * Used for extracting information from images (e.g., character DNA from portraits).
+     *
+     * @param string $base64Image Base64 encoded image data
+     * @param string $prompt The prompt/question about the image
+     * @param array $options Optional settings (model, mimeType)
+     * @return array ['success' => bool, 'text' => string, 'error' => string|null]
+     */
+    public function analyzeImageWithPrompt(string $base64Image, string $prompt, array $options = []): array
+    {
+        $model = $options['model'] ?? 'gemini-2.5-flash';
+        $mimeType = $options['mimeType'] ?? 'image/png';
+
+        // Build the multimodal request
+        $parts = [
+            [
+                "inlineData" => [
+                    "mimeType" => $mimeType,
+                    "data" => $base64Image
+                ]
+            ],
+            [
+                "text" => $prompt
+            ]
+        ];
+
+        $payload = [
+            "contents" => [
+                [
+                    "parts" => $parts
+                ]
+            ],
+            "generationConfig" => [
+                "temperature" => 0.2,
+                "maxOutputTokens" => 4096,
+            ]
+        ];
+
+        try {
+            $body = $this->sendGenerateContentRequest($model, $payload);
+
+            // Extract text from response
+            $text = $body['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+            return [
+                'success' => true,
+                'text' => $text,
+                'model' => $model,
+            ];
+
+        } catch (\Throwable $e) {
+            \Log::error('[GeminiService] analyzeImageWithPrompt failed', [
+                'error' => $e->getMessage(),
+                'model' => $model,
+            ]);
+
+            return [
+                'success' => false,
+                'text' => '',
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Generates content based on text and an image (Vision).
      */
     public function generateVision(string|array $prompt, array $options = [], string $category = 'vision'): array

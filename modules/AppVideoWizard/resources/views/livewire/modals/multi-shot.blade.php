@@ -558,7 +558,10 @@ window.multiShotVideoPolling = function() {
                                             @endif
                                         </div>
                                     @elseif($hasImage && !$isGenVid)
-                                        <button wire:click.stop="openVideoModelSelector({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-animate-btn">🎬 {{ __('Animate') }}</button>
+                                        <div class="msm-action-row">
+                                            <button wire:click.stop="openVideoModelSelector({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-animate-btn">🎬 {{ __('Animate') }}</button>
+                                            <button wire:click.stop="openShotFaceCorrectionModal({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-face-btn" title="{{ __('Face Correction') }}">👤 {{ __('Fix Face') }}</button>
+                                        </div>
                                     @elseif($isGenVid)
                                         <div class="msm-render-status">
                                             <span>⏳ {{ __('Rendering...') }}</span>
@@ -915,8 +918,10 @@ window.multiShotVideoPolling = function() {
 .msm-play-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.25); }
 .msm-capture-btn { padding: 0.45rem 0.6rem; background: rgba(16,185,129,0.25); border: 1px solid rgba(16,185,129,0.4); border-radius: 8px; color: #fff; font-size: 0.7rem; cursor: pointer; transition: all 0.2s ease; }
 .msm-capture-btn:hover { background: rgba(16,185,129,0.35); }
-.msm-animate-btn { width: 100%; padding: 0.5rem; background: linear-gradient(135deg, rgba(6,182,212,0.35), rgba(59,130,246,0.3)); border: 1px solid rgba(6,182,212,0.5); border-radius: 8px; color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.msm-animate-btn { flex: 1; padding: 0.5rem; background: linear-gradient(135deg, rgba(6,182,212,0.35), rgba(59,130,246,0.3)); border: 1px solid rgba(6,182,212,0.5); border-radius: 8px; color: #fff; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .msm-animate-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6,182,212,0.3); }
+.msm-face-btn { flex: 1; padding: 0.5rem; background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.25)); border: 1px solid rgba(245,158,11,0.5); border-radius: 8px; color: #fbbf24; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.msm-face-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(245,158,11,0.3); background: linear-gradient(135deg, rgba(245,158,11,0.4), rgba(251,191,36,0.35)); }
 
 .msm-render-status { text-align: center; padding: 0.4rem; background: rgba(6,182,212,0.1); border-radius: 6px; }
 .msm-render-status span { font-size: 0.75rem; color: #67e8f9; font-weight: 500; }

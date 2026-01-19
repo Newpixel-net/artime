@@ -291,6 +291,29 @@
                                 </button>
 
                                 <div x-show="dnaOpen" x-collapse style="margin-top: 0.35rem;">
+                                    {{-- Extract DNA from Portrait Button --}}
+                                    @php
+                                        $hasPortrait = !empty($currentChar['referenceImageBase64']) || !empty($currentChar['referenceImage']);
+                                        $portraitReady = ($currentChar['referenceImageStatus'] ?? '') === 'ready';
+                                    @endphp
+                                    <div style="margin-bottom: 0.4rem;">
+                                        <button type="button"
+                                                wire:click="extractDNAFromPortrait({{ $editIndex }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="extractDNAFromPortrait({{ $editIndex }})"
+                                                {{ !$hasPortrait || !$portraitReady ? 'disabled' : '' }}
+                                                style="width: 100%; padding: 0.4rem 0.5rem; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(6,182,212,0.2)); border: 1px solid rgba(16,185,129,0.5); border-radius: 0.3rem; color: #6ee7b7; font-size: 0.6rem; font-weight: 600; cursor: {{ $hasPortrait && $portraitReady ? 'pointer' : 'not-allowed' }}; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.3rem; {{ !$hasPortrait || !$portraitReady ? 'opacity: 0.5;' : '' }}"
+                                                title="{{ $hasPortrait && $portraitReady ? __('Analyze portrait image and auto-fill all DNA fields') : __('Generate a portrait first') }}">
+                                            <span wire:loading.remove wire:target="extractDNAFromPortrait({{ $editIndex }})">🔍 {{ __('Extract DNA from Portrait') }}</span>
+                                            <span wire:loading wire:target="extractDNAFromPortrait({{ $editIndex }})">⏳ {{ __('Analyzing...') }}</span>
+                                        </button>
+                                        @if(!$hasPortrait || !$portraitReady)
+                                            <p style="color: rgba(255,255,255,0.4); font-size: 0.45rem; text-align: center; margin-top: 0.2rem;">{{ __('Generate a portrait first to extract DNA') }}</p>
+                                        @else
+                                            <p style="color: rgba(16,185,129,0.7); font-size: 0.45rem; text-align: center; margin-top: 0.2rem;">{{ __('Analyzes portrait to fill hair, wardrobe, accessories, etc.') }}</p>
+                                        @endif
+                                    </div>
+
                                     {{-- Quick Look Presets (Collapsible) --}}
                                     <div style="margin-bottom: 0.35rem;">
                                         <button type="button"

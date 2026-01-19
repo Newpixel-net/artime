@@ -682,6 +682,22 @@ class VideoWizard extends Component
     public ?string $correctedFrameUrl = null;
     public string $faceCorrectionStatus = 'idle'; // 'idle', 'processing', 'done', 'error'
 
+    // Shot Face Correction Modal state (for decomposed shots)
+    public bool $showShotFaceCorrectionModal = false;
+    public array $shotFaceCorrectionData = [
+        'sceneIndex' => null,
+        'shotIndex' => null,
+        'pageIndex' => null,
+        'regionIndex' => null,
+        'originalImageUrl' => null,
+        'selectedCharacters' => [],
+        'availableCharacters' => [],
+        'correctedImageUrl' => null,
+        'correctedBase64' => null,
+        'status' => 'idle', // idle, processing, ready, error
+        'error' => null,
+    ];
+
     // Video Model Selector Popup state
     public bool $showVideoModelSelector = false;
     public int $videoModelSelectorSceneIndex = 0;
@@ -5724,6 +5740,223 @@ class VideoWizard extends Component
             'characterIndex' => $characterIndex,
             'characterName' => $character['name'] ?? 'Unknown',
         ]);
+    }
+
+    /**
+     * Extract DNA from character's reference portrait image using AI vision.
+     * This analyzes the ACTUAL IMAGE to extract accurate visual details including
+     * hair, wardrobe, accessories (hats, glasses, jewelry), makeup, and physical traits.
+     *
+     * @param int $characterIndex The character index in Character Bible
+     */
+    public function extractDNAFromPortrait(int $characterIndex): void
+    {
+        if (!isset($this->sceneMemory['characterBible']['characters'][$characterIndex])) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => __('Character not found')]);
+            return;
+        }
+
+        $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
+
+        // Check if character has a reference portrait
+        $portraitBase64 = $character['referenceImageBase64'] ?? null;
+        if (!$portraitBase64 && !empty($character['referenceImage'])) {
+            // Try to fetch the image
+            try {
+                $imageContent = @file_get_contents($character['referenceImage']);
+                if ($imageContent !== false) {
+                    $portraitBase64 = base64_encode($imageContent);
+                }
+            } catch (\Exception $e) {
+                Log::warning('[ExtractDNA] Failed to fetch reference image', ['error' => $e->getMessage()]);
+            }
+        }
+
+        if (empty($portraitBase64)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => __('Generate a portrait first, then extract DNA from it')]);
+            return;
+        }
+
+        $this->dispatch('notify', ['type' => 'info', 'message' => __('Analyzing portrait to extract DNA...')]);
+
+        try {
+            $geminiService = app(\App\Services\GeminiService::class);
+
+            // Build the extraction prompt for image analysis
+            $prompt = <<<PROMPT
+CRITICAL TASK: Analyze this character portrait image and extract EVERY visual detail for AI image generation consistency.
+
+You must identify and document ALL of the following from WHAT YOU SEE in the image:
+
+1. HAIR - Be extremely specific:
+   - Exact color (e.g., "jet black", "dark brown with gray streaks", "platinum blonde")
+   - Style (e.g., "slicked back", "wavy shoulder-length", "tight curls", "bald", "buzz cut")
+   - Length (e.g., "short", "medium", "long", "chin-length")
+   - Texture (e.g., "straight", "wavy", "curly", "frizzy", "sleek")
+
+2. WARDROBE - Document EVERYTHING visible:
+   - Main outfit (e.g., "black wool overcoat over white dress shirt")
+   - Colors (list all visible clothing colors)
+   - Style category (e.g., "formal", "casual", "vintage", "modern")
+   - Visible footwear if any
+
+3. ACCESSORIES - THIS IS CRITICAL FOR CONSISTENCY:
+   - Hats/headwear (e.g., "black fedora hat", "baseball cap", "none")
+   - Glasses/eyewear (e.g., "round wire-frame glasses", "aviator sunglasses", "none")
+   - Jewelry (e.g., "gold wedding ring", "silver chain necklace", "earrings")
+   - Watches
+   - Scarves, ties, bowties
+   - ANY other accessories visible
+
+4. MAKEUP/GROOMING:
+   - Makeup style if any
+   - Facial hair (e.g., "clean-shaven", "full beard", "stubble", "mustache")
+   - Any notable grooming details
+
+5. PHYSICAL TRAITS:
+   - Approximate age range
+   - Build/body type if visible
+   - Distinctive features (e.g., "strong jawline", "high cheekbones", "prominent nose")
+   - Skin tone
+   - Eye color if visible
+
+Return ONLY valid JSON (no markdown, no explanation):
+{
+  "hair": {
+    "style": "exact style from image",
+    "color": "exact color from image",
+    "length": "length description",
+    "texture": "texture description"
+  },
+  "wardrobe": {
+    "outfit": "detailed outfit description from image",
+    "colors": "all visible clothing colors",
+    "style": "style category",
+    "footwear": "footwear if visible, otherwise empty"
+  },
+  "makeup": {
+    "style": "makeup style or 'none' or 'natural'",
+    "details": "facial hair, grooming details"
+  },
+  "accessories": ["list", "every", "accessory", "visible", "including", "hats"],
+  "physical": {
+    "age_range": "estimated age range",
+    "build": "body type if visible",
+    "distinctive_features": "notable physical features",
+    "skin_tone": "skin tone description",
+    "eye_color": "eye color if visible"
+  }
+}
+
+IMPORTANT: If the character is wearing a HAT, GLASSES, or any accessory, you MUST include it. These details are CRITICAL for maintaining consistency across shots.
+PROMPT;
+
+            // Use Gemini to analyze the image
+            $result = $geminiService->analyzeImageWithPrompt($portraitBase64, $prompt, [
+                'model' => 'gemini-2.5-flash',
+                'mimeType' => 'image/png',
+            ]);
+
+            if (!$result['success']) {
+                throw new \Exception($result['error'] ?? __('Failed to analyze portrait'));
+            }
+
+            // Parse the JSON response
+            $responseText = $result['text'] ?? '';
+
+            // Extract JSON from response (handle potential markdown wrapping)
+            $jsonMatch = preg_match('/\{[\s\S]*\}/m', $responseText, $matches);
+            if (!$jsonMatch) {
+                throw new \Exception(__('Could not parse DNA extraction response'));
+            }
+
+            $extractedDNA = json_decode($matches[0], true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception(__('Invalid JSON in DNA extraction response'));
+            }
+
+            // Merge extracted DNA into character data (overwrite mode)
+            $character = $this->mergeDNAIntoCharacter($character, $extractedDNA);
+
+            // Save updated character
+            $this->sceneMemory['characterBible']['characters'][$characterIndex] = $character;
+            $this->saveProject();
+
+            Log::info('[ExtractDNA] Successfully extracted DNA from portrait', [
+                'characterIndex' => $characterIndex,
+                'characterName' => $character['name'] ?? 'Unknown',
+                'accessories' => $extractedDNA['accessories'] ?? [],
+            ]);
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => __('DNA extracted from portrait! All fields have been populated.'),
+            ]);
+
+            $this->dispatch('character-dna-extracted', [
+                'characterIndex' => $characterIndex,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ExtractDNA] Failed', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => __('DNA extraction failed: ') . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Merge extracted DNA into character data.
+     */
+    protected function mergeDNAIntoCharacter(array $character, array $extractedDNA): array
+    {
+        // Hair
+        if (!isset($character['hair']) || !is_array($character['hair'])) {
+            $character['hair'] = [];
+        }
+        foreach (['style', 'color', 'length', 'texture'] as $key) {
+            if (!empty($extractedDNA['hair'][$key] ?? '')) {
+                $character['hair'][$key] = $extractedDNA['hair'][$key];
+            }
+        }
+
+        // Wardrobe
+        if (!isset($character['wardrobe']) || !is_array($character['wardrobe'])) {
+            $character['wardrobe'] = [];
+        }
+        foreach (['outfit', 'colors', 'style', 'footwear'] as $key) {
+            if (!empty($extractedDNA['wardrobe'][$key] ?? '')) {
+                $character['wardrobe'][$key] = $extractedDNA['wardrobe'][$key];
+            }
+        }
+
+        // Makeup
+        if (!isset($character['makeup']) || !is_array($character['makeup'])) {
+            $character['makeup'] = [];
+        }
+        foreach (['style', 'details'] as $key) {
+            if (!empty($extractedDNA['makeup'][$key] ?? '')) {
+                $character['makeup'][$key] = $extractedDNA['makeup'][$key];
+            }
+        }
+
+        // Accessories - CRITICAL: Always overwrite to capture hats, glasses, etc.
+        if (!empty($extractedDNA['accessories']) && is_array($extractedDNA['accessories'])) {
+            $character['accessories'] = $extractedDNA['accessories'];
+        }
+
+        // Physical
+        if (!isset($character['physical']) || !is_array($character['physical'])) {
+            $character['physical'] = [];
+        }
+        foreach (['age_range', 'build', 'distinctive_features', 'skin_tone', 'eye_color'] as $key) {
+            if (!empty($extractedDNA['physical'][$key] ?? '')) {
+                $character['physical'][$key] = $extractedDNA['physical'][$key];
+            }
+        }
+
+        return $character;
     }
 
     /**
@@ -17060,6 +17293,10 @@ PROMPT;
                                 'shot_index' => $shotIndex,
                                 'is_multi_shot' => true,
                                 'is_collage_shot' => true, // New flag to indicate individual collage shot
+                                // CRITICAL: Pass sceneMemory for Reference Cascade face consistency
+                                'sceneMemory' => $this->sceneMemory,
+                                'storyboard' => $this->storyboard,
+                                'useCascade' => true,
                             ]);
 
                             if ($result['success'] && !empty($result['imageUrl'])) {
@@ -18654,6 +18891,336 @@ PROMPT;
             'type' => 'success',
             'message' => __('Corrected frame saved. You can now transfer it to the next shot.')
         ]);
+    }
+
+    // =========================================================================
+    // SHOT FACE CORRECTION (for decomposed shots in Multi-Shot Modal)
+    // =========================================================================
+
+    /**
+     * Open face correction modal for a decomposed shot.
+     */
+    public function openShotFaceCorrectionModal(int $sceneIndex, int $shotIndex, ?int $pageIndex = null, ?int $regionIndex = null): void
+    {
+        // Get shot data from decomposition
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        $shot = $decomposed['shots'][$shotIndex] ?? null;
+
+        if (!$shot || empty($shot['imageUrl'])) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => __('Shot image not found')]);
+            return;
+        }
+
+        // Get characters that appear in this shot's scene
+        $scene = $this->script['scenes'][$sceneIndex] ?? [];
+        $sceneCharacterIds = $scene['characters'] ?? [];
+
+        // Build list of available characters with references
+        $availableCharacters = [];
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $idx => $char) {
+            $hasRef = !empty($char['referenceImageBase64']) || !empty($char['referenceImage']);
+            $refStatus = $char['referenceImageStatus'] ?? '';
+
+            if ($hasRef && $refStatus === 'ready') {
+                $inScene = empty($sceneCharacterIds) || in_array($char['id'] ?? $idx, $sceneCharacterIds);
+                $availableCharacters[] = [
+                    'index' => $idx,
+                    'id' => $char['id'] ?? "char_{$idx}",
+                    'name' => $char['name'] ?? 'Unknown',
+                    'hasReference' => true,
+                    'inScene' => $inScene,
+                ];
+            }
+        }
+
+        $this->shotFaceCorrectionData = [
+            'sceneIndex' => $sceneIndex,
+            'shotIndex' => $shotIndex,
+            'pageIndex' => $pageIndex,
+            'regionIndex' => $regionIndex,
+            'originalImageUrl' => $shot['imageUrl'],
+            'selectedCharacters' => [],
+            'availableCharacters' => $availableCharacters,
+            'correctedImageUrl' => null,
+            'correctedBase64' => null,
+            'status' => 'idle',
+            'error' => null,
+        ];
+
+        $this->showShotFaceCorrectionModal = true;
+    }
+
+    /**
+     * Close shot face correction modal.
+     */
+    public function closeShotFaceCorrectionModal(): void
+    {
+        $this->showShotFaceCorrectionModal = false;
+        $this->shotFaceCorrectionData = [
+            'sceneIndex' => null,
+            'shotIndex' => null,
+            'pageIndex' => null,
+            'regionIndex' => null,
+            'originalImageUrl' => null,
+            'selectedCharacters' => [],
+            'availableCharacters' => [],
+            'correctedImageUrl' => null,
+            'correctedBase64' => null,
+            'status' => 'idle',
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Toggle character selection for shot face correction.
+     */
+    public function toggleShotFaceCorrectionCharacter(int $characterIndex): void
+    {
+        $selected = $this->shotFaceCorrectionData['selectedCharacters'] ?? [];
+
+        if (in_array($characterIndex, $selected)) {
+            $this->shotFaceCorrectionData['selectedCharacters'] = array_values(
+                array_filter($selected, fn($idx) => $idx !== $characterIndex)
+            );
+        } else {
+            $this->shotFaceCorrectionData['selectedCharacters'][] = $characterIndex;
+        }
+    }
+
+    /**
+     * Apply face correction to the shot using selected character references.
+     */
+    public function applyFaceCorrectionToShot(): void
+    {
+        $data = $this->shotFaceCorrectionData;
+
+        if (empty($data['selectedCharacters'])) {
+            $this->shotFaceCorrectionData['error'] = __('Please select at least one character');
+            return;
+        }
+
+        if (empty($data['originalImageUrl'])) {
+            $this->shotFaceCorrectionData['error'] = __('Original image not found');
+            return;
+        }
+
+        $this->shotFaceCorrectionData['status'] = 'processing';
+        $this->shotFaceCorrectionData['error'] = null;
+
+        try {
+            // Fetch original image as base64
+            $imageContent = @file_get_contents($data['originalImageUrl']);
+            if ($imageContent === false) {
+                throw new \Exception(__('Failed to fetch original image'));
+            }
+            $originalBase64 = base64_encode($imageContent);
+
+            // Build character reference data
+            $characterRefs = [];
+            foreach ($data['selectedCharacters'] as $charIdx) {
+                $char = $this->sceneMemory['characterBible']['characters'][$charIdx] ?? null;
+                if ($char) {
+                    // Get base64 for reference image
+                    $refBase64 = $char['referenceImageBase64'] ?? null;
+                    if (!$refBase64 && !empty($char['referenceImage'])) {
+                        // Download and convert to base64
+                        try {
+                            $imgContent = @file_get_contents($char['referenceImage']);
+                            if ($imgContent !== false) {
+                                $refBase64 = base64_encode($imgContent);
+                            }
+                        } catch (\Exception $e) {
+                            Log::warning('[ShotFaceCorrection] Failed to load reference image', [
+                                'character' => $char['name'] ?? 'Unknown',
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+
+                    if ($refBase64) {
+                        $characterRefs[] = [
+                            'name' => $char['name'] ?? 'Character',
+                            'description' => $char['description'] ?? '',
+                            'base64' => $refBase64,
+                            'mimeType' => $char['referenceImageMimeType'] ?? 'image/png',
+                        ];
+                    }
+                }
+            }
+
+            if (empty($characterRefs)) {
+                throw new \Exception(__('No valid character references found'));
+            }
+
+            // Build the face correction prompt
+            $characterDescriptions = collect($characterRefs)->map(function($char, $idx) {
+                $charNum = $idx + 2; // +2 because image 1 is the scene
+                $desc = $char['description'] ? " ({$char['description']})" : '';
+                return "- Image {$charNum}: {$char['name']}{$desc}";
+            })->join("\n");
+
+            $numImages = count($characterRefs) + 1;
+            $aspectRatio = $this->aspectRatio ?? '16:9';
+
+            $prompt = <<<PROMPT
+FACE CORRECTION TASK - LIGHTING CRITICAL:
+
+You have been given {$numImages} images:
+- Image 1: The SCENE to preserve (composition, lighting, poses, background, clothing, everything EXCEPT faces)
+{$characterDescriptions}
+
+=== CRITICAL LIGHTING PRESERVATION ===
+BEFORE making ANY changes, ANALYZE Image 1's lighting:
+1. Color temperature (warm/cool/neutral)
+2. Light direction (front/side/back/above)
+3. Light intensity (bright/dim/dramatic shadows)
+4. Color grading (teal/orange, cool blues, warm ambers, etc.)
+5. Atmospheric effects (fog, haze, smoke, neon glow, volumetric light)
+6. Shadow depth and placement
+
+The corrected faces MUST match ALL these lighting characteristics EXACTLY.
+The face should look like it was FILMED IN THAT SCENE, not pasted in.
+
+YOUR TASK:
+1. PRESERVE the EXACT scene from Image 1:
+   - Same composition, poses, camera angle, background, clothing, body positions
+   - Same color grading and color temperature
+   - Same lighting direction and shadow patterns
+
+2. REPLACE only the facial features with those from the character references:
+   - Eyes, nose, mouth, face shape, skin tone FROM the reference
+   - BUT the lighting ON the face must match Image 1's lighting EXACTLY
+
+CRITICAL DO NOT:
+- Do NOT flatten the lighting
+- Do NOT remove atmospheric effects
+- Do NOT change the color grading
+- Do NOT create a "pasted on" look
+
+Output a single corrected image maintaining {$aspectRatio} aspect ratio.
+PROMPT;
+
+            // Prepare additional images (character references)
+            $additionalImages = collect($characterRefs)->map(function($char) {
+                return [
+                    'base64' => $char['base64'],
+                    'mimeType' => $char['mimeType'],
+                ];
+            })->all();
+
+            // Call Gemini Service for face correction
+            $geminiService = app(\App\Services\GeminiService::class);
+
+            $result = $geminiService->generateImageFromImage(
+                $originalBase64,
+                $prompt,
+                [
+                    'model' => 'gemini-2.5-flash',
+                    'mimeType' => 'image/png',
+                    'aspectRatio' => $aspectRatio,
+                    'resolution' => '2K',
+                    'additionalImages' => $additionalImages,
+                ]
+            );
+
+            if (!$result['success']) {
+                throw new \Exception($result['error'] ?? __('Face correction generation failed'));
+            }
+
+            // Save corrected image temporarily
+            $correctedBase64 = $result['imageData'];
+            $correctedMimeType = $result['mimeType'] ?? 'image/png';
+
+            // Save to temporary storage for preview
+            if ($this->projectId) {
+                $project = WizardProject::find($this->projectId);
+                if ($project) {
+                    $filename = "shot_correction_{$data['sceneIndex']}_{$data['shotIndex']}_" . time() . '.png';
+                    $storagePath = "wizard-projects/{$project->id}/temp/{$filename}";
+                    Storage::disk('public')->put($storagePath, base64_decode($correctedBase64));
+
+                    $this->shotFaceCorrectionData['correctedImageUrl'] = url('/public/storage/' . $storagePath);
+                } else {
+                    $this->shotFaceCorrectionData['correctedImageUrl'] = "data:{$correctedMimeType};base64,{$correctedBase64}";
+                }
+            } else {
+                $this->shotFaceCorrectionData['correctedImageUrl'] = "data:{$correctedMimeType};base64,{$correctedBase64}";
+            }
+
+            $this->shotFaceCorrectionData['correctedBase64'] = $correctedBase64;
+            $this->shotFaceCorrectionData['status'] = 'ready';
+
+            Log::info('[ShotFaceCorrection] Face correction completed', [
+                'sceneIndex' => $data['sceneIndex'],
+                'shotIndex' => $data['shotIndex'],
+                'characters' => collect($characterRefs)->pluck('name')->all(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ShotFaceCorrection] Failed', ['error' => $e->getMessage()]);
+            $this->shotFaceCorrectionData['status'] = 'error';
+            $this->shotFaceCorrectionData['error'] = $e->getMessage();
+        }
+    }
+
+    /**
+     * Save the corrected shot, replacing the original.
+     */
+    public function saveCorrectedShot(): void
+    {
+        $data = $this->shotFaceCorrectionData;
+
+        if ($data['status'] !== 'ready' || empty($data['correctedBase64'])) {
+            return;
+        }
+
+        $sceneIndex = $data['sceneIndex'];
+        $shotIndex = $data['shotIndex'];
+
+        try {
+            // Get project for file storage
+            $project = WizardProject::findOrFail($this->projectId);
+
+            // Save corrected image to permanent storage
+            $filename = "scene_{$sceneIndex}_shot_{$shotIndex}_corrected_" . time() . '.png';
+            $storagePath = "wizard-projects/{$project->id}/shots/{$filename}";
+
+            Storage::disk('public')->put($storagePath, base64_decode($data['correctedBase64']));
+            $newUrl = url('/public/storage/' . $storagePath);
+
+            // Update shot in decomposition
+            if (isset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex])) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['imageUrl'] = $newUrl;
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['faceCorrected'] = true;
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['faceCorrectedAt'] = now()->toIso8601String();
+            }
+
+            // Also update in storyboard if linked
+            if (isset($this->storyboard['scenes'][$sceneIndex]['decomposition']['shots'][$shotIndex])) {
+                $this->storyboard['scenes'][$sceneIndex]['decomposition']['shots'][$shotIndex]['imageUrl'] = $newUrl;
+                $this->storyboard['scenes'][$sceneIndex]['decomposition']['shots'][$shotIndex]['faceCorrected'] = true;
+                $this->storyboard['scenes'][$sceneIndex]['decomposition']['shots'][$shotIndex]['faceCorrectedAt'] = now()->toIso8601String();
+            }
+
+            $this->saveProject();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => __('Face correction saved successfully'),
+            ]);
+
+            // Close modal
+            $this->closeShotFaceCorrectionModal();
+
+            Log::info('[ShotFaceCorrection] Saved corrected shot', [
+                'sceneIndex' => $sceneIndex,
+                'shotIndex' => $shotIndex,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[ShotFaceCorrection] Failed to save', ['error' => $e->getMessage()]);
+            $this->shotFaceCorrectionData['error'] = __('Failed to save: ') . $e->getMessage();
+        }
     }
 
     // =========================================================================

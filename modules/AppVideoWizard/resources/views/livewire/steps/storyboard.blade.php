@@ -2060,6 +2060,9 @@
 
     {{-- AI Edit Modal --}}
     @include('appvideowizard::livewire.modals.ai-edit')
+
+    {{-- Shot Face Correction Modal --}}
+    @include('appvideowizard::livewire.modals.shot-face-correction')
 </div>
 
 <script>
