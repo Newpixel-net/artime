@@ -207,9 +207,9 @@ You are an expert at analyzing video scripts and identifying characters for visu
 Your task is to extract ALL characters that appear in the script and create detailed visual descriptions for AI image generation.
 {$visualModeEnforcement}
 CORE TASK:
-1. Read the script carefully and identify MAIN and RECURRING characters who appear visually
+1. Read the script carefully and identify MAIN and RECURRING characters who appear visually OR are introduced/referenced
 2. Create a DETAILED visual description for each character (age, gender, ethnicity, build, hair, eyes, clothing)
-3. Track which scenes each character appears in
+3. Track which scenes each character appears in - include scenes where they are shown, mentioned, or the scene is about them
 4. EXCLUDE extras, background characters, and generic numbered roles
 
 CRITICAL REQUIREMENTS:
@@ -219,6 +219,12 @@ CRITICAL REQUIREMENTS:
 - Descriptions must be specific: "brown shoulder-length wavy hair" not just "brown hair"
 - MERGE AGE VARIANTS: "Young Sarah" and "Sarah" = ONE entry with age note in description
 - EXCLUDE: "Guard 1", "Officer 2", "Waiter", "Pedestrian", crowd members, unnamed extras
+
+SCENE 1 RULE (IMPORTANT):
+- Scene 1 often introduces main characters through narration, voiceover, or establishing context
+- If a MAIN character appears in Scene 2 or later, check if they are introduced/mentioned in Scene 1
+- Include Scene 1 in appearsInScenes for MAIN characters who are referenced there, even indirectly
+- Opening scenes establish the protagonist - include Scene 1 for main characters whenever relevant
 
 STYLE MATCHING:
 For CINEMATIC-REALISTIC mode: Describe as real people, like casting for a film
@@ -255,7 +261,7 @@ Production Mode: {$productionMode}
 {$sceneContent}
 {$styleBibleContext}
 === OUTPUT FORMAT ===
-Extract ALL characters that appear visually in the script. PRIORITIZE finding every character.
+Extract ALL characters that appear visually OR are introduced/referenced in the script. PRIORITIZE finding every character.
 
 {
   "characters": [
@@ -279,9 +285,10 @@ Extract ALL characters that appear visually in the script. PRIORITIZE finding ev
 4. Each character MUST have a DETAILED description field - this is REQUIRED, never leave it empty
 5. Description must include: age, gender, ethnicity/skin tone, build, hair, eyes, clothing
 6. For groups or crowds, only extract NAMED individuals with plot significance
+7. **SCENE 1 RULE**: Main characters should ALWAYS include Scene 1 in their appearsInScenes if they are the protagonist or are introduced/mentioned in the opening. Scene 1 establishes the story - include it for main characters.
 
 === WHO TO INCLUDE ===
-- Protagonists and main characters (always include)
+- Protagonists and main characters (always include, and ALWAYS include Scene 1 for protagonists)
 - Supporting characters with names who appear in multiple scenes
 - Antagonists with names (even if 1-2 scenes, if plot-critical)
 

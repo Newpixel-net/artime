@@ -9001,6 +9001,12 @@ class VideoWizard extends Component
                     $this->sceneMemory['characterBible']['enabled'] = true;
 
                     // =====================================================================
+                    // VALIDATE SCENE ASSIGNMENTS: Ensure main characters appear in Scene 1
+                    // This fixes the bug where AI might skip Scene 1 for characters
+                    // =====================================================================
+                    $this->validateCharacterSceneAssignments();
+
+                    // =====================================================================
                     // CINEMATIC INTELLIGENCE: Run full analysis after character detection
                     // This analyzes emotional arcs, story beats, relationships, and scoring
                     // =====================================================================
@@ -9244,6 +9250,11 @@ class VideoWizard extends Component
         // Enable Character Bible if we detected any characters
         if (!empty($detectedCharacters)) {
             $this->sceneMemory['characterBible']['enabled'] = true;
+
+            // =====================================================================
+            // VALIDATE SCENE ASSIGNMENTS: Ensure main characters appear in Scene 1
+            // =====================================================================
+            $this->validateCharacterSceneAssignments();
 
             // =====================================================================
             // CINEMATIC INTELLIGENCE: Run full analysis after character detection
@@ -9708,8 +9719,30 @@ class VideoWizard extends Component
             // Support both new 'scenes' and legacy 'appliedScenes' field names
             $currentScenes = $character['scenes'] ?? $character['appliedScenes'] ?? [];
 
-            // Skip if character already has scene assignments
+            // =====================================================================
+            // SCENE 1 FIX: Ensure main characters appear in Scene 1 (index 0)
+            // This fixes the bug where AI extracts characters starting from Scene 2
+            // because Scene 1 might be an establishing shot with narration only.
+            // =====================================================================
             if (!empty($currentScenes)) {
+                $isMainCharacter = in_array($role, ['main', 'protagonist', 'lead']);
+                $hasScene0 = in_array(0, $currentScenes);
+                $minScene = min($currentScenes);
+
+                // If main character appears in early scenes (1-3) but NOT Scene 1, add Scene 1
+                // This ensures narrative continuity - protagonists should be in opening scene
+                if ($isMainCharacter && !$hasScene0 && $minScene <= 3) {
+                    array_unshift($currentScenes, 0);
+                    $character['scenes'] = array_unique($currentScenes);
+                    sort($character['scenes']);
+                    Log::info('CharacterValidation: Added Scene 1 for main character', [
+                        'name' => $character['name'] ?? 'Unknown',
+                        'originalMinScene' => $minScene + 1, // Display as 1-based
+                        'newScenes' => count($character['scenes']),
+                    ]);
+                }
+                // Remove legacy field if present
+                unset($character['appliedScenes']);
                 continue;
             }
 
