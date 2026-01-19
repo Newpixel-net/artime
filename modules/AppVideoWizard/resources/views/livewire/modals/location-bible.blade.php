@@ -454,6 +454,60 @@
         </div>
     </div>
 </div>
+
+{{-- JavaScript for batch location reference generation polling --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Location Bible batch generation polling
+    let locGenPollingActive = false;
+    let locGenRetryCount = 0;
+    const locGenMaxRetries = 50;
+
+    Livewire.on('continue-location-reference-generation', function(data) {
+        console.log('[LocationBible] Received continue-location-reference-generation event', data);
+        if (!locGenPollingActive) {
+            locGenPollingActive = true;
+            locGenRetryCount = 0;
+            pollNextLocationReference();
+        }
+    });
+
+    function pollNextLocationReference() {
+        if (locGenRetryCount >= locGenMaxRetries) {
+            console.log('[LocationBible] Max retries reached, stopping polling');
+            locGenPollingActive = false;
+            return;
+        }
+
+        locGenRetryCount++;
+        console.log('[LocationBible] Polling for next reference, attempt', locGenRetryCount);
+
+        // Use setTimeout to give Livewire time to update state
+        setTimeout(function() {
+            const component = Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+            if (component) {
+                component.call('generateNextPendingLocationReference').then(function(result) {
+                    console.log('[LocationBible] generateNextPendingLocationReference result:', result);
+                    if (result && result.remaining > 0) {
+                        // More references to generate, continue polling
+                        console.log('[LocationBible] ' + result.remaining + ' references remaining');
+                        setTimeout(pollNextLocationReference, 1500);
+                    } else {
+                        console.log('[LocationBible] All references generated, stopping polling');
+                        locGenPollingActive = false;
+                    }
+                }).catch(function(error) {
+                    console.error('[LocationBible] Error generating reference:', error);
+                    locGenPollingActive = false;
+                });
+            } else {
+                console.warn('[LocationBible] Livewire component not found');
+                locGenPollingActive = false;
+            }
+        }, 500);
+    }
+});
+</script>
 @endif
 
 <style>

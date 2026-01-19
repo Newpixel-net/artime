@@ -6041,11 +6041,11 @@ class VideoWizard extends Component
 
         // Dispatch event to start polling - generation will happen via polling to avoid HTTP timeout
         // This is fully async: no generation during the initial request
-        Log::info('CharacterAutoGen: Dispatching continue-reference-generation event', [
+        Log::info('CharacterAutoGen: Dispatching continue-character-reference-generation event', [
             'type' => 'character',
             'remaining' => count($toGenerate),
         ]);
-        $this->dispatch('continue-reference-generation', [
+        $this->dispatch('continue-character-reference-generation', [
             'type' => 'character',
             'remaining' => count($toGenerate),
         ]);
@@ -6157,11 +6157,11 @@ class VideoWizard extends Component
 
         // Dispatch event to start polling - generation will happen via polling to avoid HTTP timeout
         // This is fully async: no generation during the initial request
-        Log::info('LocationAutoGen: Dispatching continue-reference-generation event', [
+        Log::info('LocationAutoGen: Dispatching continue-location-reference-generation event', [
             'type' => 'location',
             'remaining' => count($toGenerate),
         ]);
-        $this->dispatch('continue-reference-generation', [
+        $this->dispatch('continue-location-reference-generation', [
             'type' => 'location',
             'remaining' => count($toGenerate),
         ]);

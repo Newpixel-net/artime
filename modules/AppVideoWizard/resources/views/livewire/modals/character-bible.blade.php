@@ -488,4 +488,58 @@
         </div>
     </div>
 </div>
+
+{{-- JavaScript for batch portrait generation polling --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Character Bible batch generation polling
+    let charGenPollingActive = false;
+    let charGenRetryCount = 0;
+    const charGenMaxRetries = 50;
+
+    Livewire.on('continue-character-reference-generation', function(data) {
+        console.log('[CharacterBible] Received continue-character-reference-generation event', data);
+        if (!charGenPollingActive) {
+            charGenPollingActive = true;
+            charGenRetryCount = 0;
+            pollNextCharacterPortrait();
+        }
+    });
+
+    function pollNextCharacterPortrait() {
+        if (charGenRetryCount >= charGenMaxRetries) {
+            console.log('[CharacterBible] Max retries reached, stopping polling');
+            charGenPollingActive = false;
+            return;
+        }
+
+        charGenRetryCount++;
+        console.log('[CharacterBible] Polling for next portrait, attempt', charGenRetryCount);
+
+        // Use setTimeout to give Livewire time to update state
+        setTimeout(function() {
+            const component = Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+            if (component) {
+                component.call('generateNextPendingCharacterPortrait').then(function(result) {
+                    console.log('[CharacterBible] generateNextPendingCharacterPortrait result:', result);
+                    if (result && result.remaining > 0) {
+                        // More portraits to generate, continue polling
+                        console.log('[CharacterBible] ' + result.remaining + ' portraits remaining');
+                        setTimeout(pollNextCharacterPortrait, 1500);
+                    } else {
+                        console.log('[CharacterBible] All portraits generated, stopping polling');
+                        charGenPollingActive = false;
+                    }
+                }).catch(function(error) {
+                    console.error('[CharacterBible] Error generating portrait:', error);
+                    charGenPollingActive = false;
+                });
+            } else {
+                console.warn('[CharacterBible] Livewire component not found');
+                charGenPollingActive = false;
+            }
+        }, 500);
+    }
+});
+</script>
 @endif
