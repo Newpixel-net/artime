@@ -5899,34 +5899,27 @@ class VideoWizard extends Component
             return;
         }
 
-        $this->dispatch('generation-status', [
-            'message' => 'Generating ' . count($charactersNeeding) . ' character reference(s)...',
-        ]);
-
-        foreach ($charactersNeeding as $charData) {
-            $charIndex = $charData['index'];
-
-            // Use existing portrait generation method
-            $this->generateCharacterPortrait($charIndex);
-
-            // Small delay between generations
-            usleep(500000); // 0.5 seconds
-        }
-
-        $this->dispatch('notification', [
-            'type' => 'success',
-            'message' => 'Character reference generation initiated for ' . count($charactersNeeding) . ' character(s).',
-        ]);
-
         Log::info('[VideoWizard] One-click character reference generation', [
             'totalCharacters' => count($charactersNeeding),
             'characterNames' => array_column($charactersNeeding, 'name'),
+        ]);
+
+        $this->dispatch('generation-status', [
+            'message' => 'Queuing ' . count($charactersNeeding) . ' character portrait(s) for generation...',
+        ]);
+
+        // Use the async polling approach to avoid HTTP timeout
+        $this->queueAutoCharacterPortraits();
+
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => 'Character portrait generation started for ' . count($charactersNeeding) . ' character(s). They will be generated automatically.',
         ]);
     }
 
     /**
      * Generate reference images for all locations that need them (one-click)
-     * Dispatches generation jobs and updates progress
+     * Uses async polling approach to avoid HTTP timeout
      */
     public function generateAllMissingLocationReferences(): void
     {
@@ -5940,28 +5933,21 @@ class VideoWizard extends Component
             return;
         }
 
-        $this->dispatch('generation-status', [
-            'message' => 'Generating ' . count($locationsNeeding) . ' location reference(s)...',
-        ]);
-
-        foreach ($locationsNeeding as $locData) {
-            $locIndex = $locData['index'];
-
-            // Use existing location generation method
-            $this->generateLocationReferenceImage($locIndex);
-
-            // Small delay between generations
-            usleep(500000); // 0.5 seconds
-        }
-
-        $this->dispatch('notification', [
-            'type' => 'success',
-            'message' => 'Location reference generation initiated for ' . count($locationsNeeding) . ' location(s).',
-        ]);
-
         Log::info('[VideoWizard] One-click location reference generation', [
             'totalLocations' => count($locationsNeeding),
             'locationNames' => array_column($locationsNeeding, 'name'),
+        ]);
+
+        $this->dispatch('generation-status', [
+            'message' => 'Queuing ' . count($locationsNeeding) . ' location reference(s) for generation...',
+        ]);
+
+        // Use the async polling approach to avoid HTTP timeout
+        $this->queueAutoLocationReferences();
+
+        $this->dispatch('notification', [
+            'type' => 'success',
+            'message' => 'Location reference generation started for ' . count($locationsNeeding) . ' location(s). They will be generated automatically.',
         ]);
     }
 
@@ -6013,16 +5999,18 @@ class VideoWizard extends Component
 
     /**
      * Queue auto-generation of character portraits.
-     * Uses dispatch to run in background without blocking UI.
+     * Directly generates portraits for all characters that need them.
      */
     public function queueAutoCharacterPortraits(): void
     {
         $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
 
         if (empty($characters)) {
+            Log::info('CharacterAutoGen: No characters to generate portraits for');
             return;
         }
 
+        $toGenerate = [];
         foreach ($characters as $index => $char) {
             // Skip if already has portrait
             if (!empty($char['referenceImageBase64']) &&
@@ -6030,30 +6018,115 @@ class VideoWizard extends Component
                 continue;
             }
 
+            // Skip if already generating or pending (prevent duplicate queuing)
+            if (in_array($char['referenceImageStatus'] ?? '', ['generating', 'pending'])) {
+                continue;
+            }
+
             // Mark as pending
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'pending';
+            $toGenerate[] = ['index' => $index, 'name' => $char['name'] ?? 'Unknown'];
+        }
+
+        if (empty($toGenerate)) {
+            Log::info('CharacterAutoGen: All characters already have portraits');
+            return;
         }
 
         $this->saveProject();
 
-        // Dispatch async job for portrait generation (runs after response)
-        dispatch(function () {
-            $this->generateAllMissingCharacterReferences();
-        })->afterResponse();
+        Log::info('CharacterAutoGen: Marked ' . count($toGenerate) . ' characters as pending', [
+            'characters' => array_column($toGenerate, 'name'),
+        ]);
+
+        // Dispatch event to start polling - generation will happen via polling to avoid HTTP timeout
+        // This is fully async: no generation during the initial request
+        Log::info('CharacterAutoGen: Dispatching continue-reference-generation event', [
+            'type' => 'character',
+            'remaining' => count($toGenerate),
+        ]);
+        $this->dispatch('continue-reference-generation', [
+            'type' => 'character',
+            'remaining' => count($toGenerate),
+        ]);
+
+        // Also dispatch a browser-visible debug event
+        $this->dispatch('vw-debug', [
+            'source' => 'queueAutoCharacterPortraits',
+            'toGenerate' => count($toGenerate),
+            'message' => 'Character portrait generation queued for polling',
+        ]);
+    }
+
+    /**
+     * Generate the next pending character portrait.
+     * Called by polling to continue auto-generation without timeout.
+     */
+    public function generateNextPendingCharacterPortrait(): ?array
+    {
+        $characters = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        foreach ($characters as $index => $char) {
+            if (($char['referenceImageStatus'] ?? '') === 'pending') {
+                try {
+                    Log::info('CharacterAutoGen: Generating next pending portrait', [
+                        'index' => $index,
+                        'name' => $char['name'] ?? 'Unknown',
+                    ]);
+                    $this->generateCharacterPortrait($index);
+                    return [
+                        'success' => true,
+                        'name' => $char['name'] ?? 'Unknown',
+                        'remaining' => $this->countPendingCharacterPortraits(),
+                    ];
+                } catch (\Exception $e) {
+                    Log::warning('CharacterAutoGen: Failed to generate pending portrait', [
+                        'index' => $index,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Mark as failed so we don't loop forever
+                    $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'failed';
+                    $this->saveProject();
+                    return [
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'remaining' => $this->countPendingCharacterPortraits(),
+                    ];
+                }
+            }
+        }
+
+        return ['success' => true, 'remaining' => 0, 'message' => 'No pending characters'];
+    }
+
+    /**
+     * Count how many character portraits are still pending.
+     */
+    public function countPendingCharacterPortraits(): int
+    {
+        $count = 0;
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $char) {
+            if (($char['referenceImageStatus'] ?? '') === 'pending') {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     /**
      * Queue auto-generation of location references.
-     * Uses dispatch to run in background without blocking UI.
+     * Directly generates references for all locations that need them.
      */
     public function queueAutoLocationReferences(): void
     {
         $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
 
         if (empty($locations)) {
+            Log::info('LocationAutoGen: No locations to generate references for');
             return;
         }
 
+        $toGenerate = [];
         foreach ($locations as $index => $loc) {
             // Skip if already has reference
             if (!empty($loc['referenceImageBase64']) &&
@@ -6061,16 +6134,99 @@ class VideoWizard extends Component
                 continue;
             }
 
+            // Skip if already generating or pending (prevent duplicate queuing)
+            if (in_array($loc['referenceImageStatus'] ?? '', ['generating', 'pending'])) {
+                continue;
+            }
+
             // Mark as pending
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'pending';
+            $toGenerate[] = ['index' => $index, 'name' => $loc['name'] ?? 'Unknown'];
+        }
+
+        if (empty($toGenerate)) {
+            Log::info('LocationAutoGen: All locations already have references');
+            return;
         }
 
         $this->saveProject();
 
-        // Dispatch async job for reference generation (runs after response)
-        dispatch(function () {
-            $this->generateAllMissingLocationReferences();
-        })->afterResponse();
+        Log::info('LocationAutoGen: Marked ' . count($toGenerate) . ' locations as pending', [
+            'locations' => array_column($toGenerate, 'name'),
+        ]);
+
+        // Dispatch event to start polling - generation will happen via polling to avoid HTTP timeout
+        // This is fully async: no generation during the initial request
+        Log::info('LocationAutoGen: Dispatching continue-reference-generation event', [
+            'type' => 'location',
+            'remaining' => count($toGenerate),
+        ]);
+        $this->dispatch('continue-reference-generation', [
+            'type' => 'location',
+            'remaining' => count($toGenerate),
+        ]);
+
+        // Also dispatch a browser-visible debug event
+        $this->dispatch('vw-debug', [
+            'source' => 'queueAutoLocationReferences',
+            'toGenerate' => count($toGenerate),
+            'message' => 'Location auto-generation queued for polling',
+        ]);
+    }
+
+    /**
+     * Generate the next pending location reference.
+     * Called by polling to continue auto-generation without timeout.
+     */
+    public function generateNextPendingLocationReference(): ?array
+    {
+        $locations = $this->sceneMemory['locationBible']['locations'] ?? [];
+
+        foreach ($locations as $index => $loc) {
+            if (($loc['referenceImageStatus'] ?? '') === 'pending') {
+                try {
+                    Log::info('LocationAutoGen: Generating next pending reference', [
+                        'index' => $index,
+                        'name' => $loc['name'] ?? 'Unknown',
+                    ]);
+                    $this->generateLocationReference($index);
+                    return [
+                        'success' => true,
+                        'name' => $loc['name'] ?? 'Unknown',
+                        'remaining' => $this->countPendingLocationReferences(),
+                    ];
+                } catch (\Exception $e) {
+                    Log::warning('LocationAutoGen: Failed to generate pending reference', [
+                        'index' => $index,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Mark as failed so we don't loop forever
+                    $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'failed';
+                    $this->saveProject();
+                    return [
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'remaining' => $this->countPendingLocationReferences(),
+                    ];
+                }
+            }
+        }
+
+        return ['success' => true, 'remaining' => 0, 'message' => 'No pending locations'];
+    }
+
+    /**
+     * Count how many location references are still pending.
+     */
+    public function countPendingLocationReferences(): int
+    {
+        $count = 0;
+        foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $loc) {
+            if (($loc['referenceImageStatus'] ?? '') === 'pending') {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     /**
@@ -10760,6 +10916,29 @@ class VideoWizard extends Component
 
         // Use AI-powered extraction (with pattern fallback)
         $this->autoDetectCharactersFromScript();
+
+        // =====================================================================
+        // AUTO-GENERATE CHARACTER PORTRAITS (Full Auto Mode)
+        // Triggered after manual "Auto-detect from Script" button click
+        // =====================================================================
+        $autoGenCharRefs = VwSetting::getValue('auto_generate_character_references', true);
+        if ($autoGenCharRefs && !empty($this->sceneMemory['characterBible']['characters'])) {
+            try {
+                $this->dispatch('generation-status', [
+                    'message' => 'Auto-generating character portraits...',
+                ]);
+
+                // Generate portraits for all characters that need them
+                $this->queueAutoCharacterPortraits();
+
+                Log::info('CharacterExtraction: Auto-portrait generation triggered from manual detect');
+            } catch (\Exception $e) {
+                Log::warning('CharacterExtraction: Auto-portrait generation failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $this->saveProject();
 
         Log::info('CharacterExtraction: Manual auto-detect completed', [
@@ -12435,6 +12614,29 @@ EOT;
 
             // Use AI-powered extraction (with pattern fallback)
             $this->autoDetectLocationsFromScript();
+
+            // =====================================================================
+            // AUTO-GENERATE LOCATION REFERENCES (Full Auto Mode)
+            // Triggered after manual "Auto-detect from Script" button click
+            // =====================================================================
+            $autoGenLocRefs = VwSetting::getValue('auto_generate_location_references', true);
+            if ($autoGenLocRefs && !empty($this->sceneMemory['locationBible']['locations'])) {
+                try {
+                    $this->dispatch('generation-status', [
+                        'message' => 'Auto-generating location references...',
+                    ]);
+
+                    // Generate references for all locations that need them
+                    $this->queueAutoLocationReferences();
+
+                    Log::info('LocationExtraction: Auto-reference generation triggered from manual detect');
+                } catch (\Exception $e) {
+                    Log::warning('LocationExtraction: Auto-reference generation failed', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             $this->saveProject();
 
             Log::info('LocationExtraction: Manual auto-detect completed', [

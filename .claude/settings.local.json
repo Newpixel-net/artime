@@ -13,7 +13,12 @@
       "Bash(php:*)",
       "Bash(php -l:*)",
       "Bash(.phpphp.exe -l modules/AppVideoWizard/app/Services/SmartReferenceService.php)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(Get-Content C:UsersVoltaPsyDocumentsGitHubartimestoragelogslaravel.log -Tail 200)",
+      "Bash(Select-String -Pattern \"LocationAutoGen|LocationExtraction|auto.*generat|queueAutoLocation\")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(C:xamppphpphp.exe artisan view:clear)",
+      "Bash(C:xamppphpphp.exe artisan cache:clear)"
     ]
   }
 }

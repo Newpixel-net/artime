@@ -60,6 +60,23 @@
                     </button>
                 @endif
 
+                {{-- Generate All Missing Portraits Button --}}
+                @php
+                    $charactersNeedingPortraits = collect($sceneMemory['characterBible']['characters'] ?? [])->filter(function($char) {
+                        return empty($char['referenceImageBase64']) || ($char['referenceImageStatus'] ?? '') !== 'ready';
+                    })->count();
+                @endphp
+                @if($charactersNeedingPortraits > 0)
+                <button type="button"
+                        wire:click="generateAllMissingCharacterReferences"
+                        wire:loading.attr="disabled"
+                        wire:target="generateAllMissingCharacterReferences"
+                        style="width: 100%; padding: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.375rem; color: #10b981; font-size: 0.6rem; cursor: pointer; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                    <span wire:loading.remove wire:target="generateAllMissingCharacterReferences">✨ {{ __('Generate All Portraits') }} ({{ $charactersNeedingPortraits }})</span>
+                    <span wire:loading wire:target="generateAllMissingCharacterReferences">{{ __('Generating...') }}</span>
+                </button>
+                @endif
+
                 {{-- Character Items --}}
                 <div style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 380px; overflow-y: auto;">
                     @forelse($sceneMemory['characterBible']['characters'] ?? [] as $index => $character)

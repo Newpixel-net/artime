@@ -63,6 +63,23 @@
                 </button>
                 @endif
 
+                {{-- Generate All Missing References Button --}}
+                @php
+                    $locationsNeedingRefs = collect($sceneMemory['locationBible']['locations'] ?? [])->filter(function($loc) {
+                        return empty($loc['referenceImageBase64']) || ($loc['referenceImageStatus'] ?? '') !== 'ready';
+                    })->count();
+                @endphp
+                @if($locationsNeedingRefs > 0)
+                <button type="button"
+                        wire:click="generateAllMissingLocationReferences"
+                        wire:loading.attr="disabled"
+                        wire:target="generateAllMissingLocationReferences"
+                        style="width: 100%; padding: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.375rem; color: #10b981; font-size: 0.6rem; cursor: pointer; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                    <span wire:loading.remove wire:target="generateAllMissingLocationReferences">✨ {{ __('Generate All References') }} ({{ $locationsNeedingRefs }})</span>
+                    <span wire:loading wire:target="generateAllMissingLocationReferences">{{ __('Generating...') }}</span>
+                </button>
+                @endif
+
                 {{-- Location Items List --}}
                 @if(count($sceneMemory['locationBible']['locations'] ?? []) === 0)
                     <div style="text-align: center; color: rgba(255,255,255,0.4); font-size: 0.75rem; padding: 1rem;">

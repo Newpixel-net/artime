@@ -2187,6 +2187,108 @@
             console.error('Image generation error:', data.error);
         });
 
+        // Listen for continue-reference-generation event (auto-generation of portraits/references)
+        let refGenInterval = null;
+        let pendingRefType = null;
+        let pendingRefCount = 0;
+
+        let isGenerating = false; // Semaphore to prevent overlapping generations
+
+        Livewire.on('continue-reference-generation', (params) => {
+            // Livewire 3 passes params as array or object depending on dispatch format
+            // Handle both cases: [{ type, remaining }] or { type, remaining }
+            const data = Array.isArray(params) ? params[0] : params;
+            console.log('Continue reference generation event received:', data);
+            if (data && data.type) {
+                pendingRefType = data.type;
+                pendingRefCount = data.remaining || 0;
+                // Start generating immediately (don't wait for first interval)
+                generateNextReference();
+                startRefGenPolling();
+            } else {
+                console.warn('Invalid reference generation data:', params);
+            }
+        });
+
+        function generateNextReference() {
+            if (isGenerating) {
+                console.log('Already generating, skipping this tick');
+                return;
+            }
+            if (pendingRefCount <= 0) {
+                console.log('No pending references, stopping');
+                stopRefGenPolling();
+                return;
+            }
+
+            isGenerating = true;
+            console.log('Generating next ' + pendingRefType + ' reference, ' + pendingRefCount + ' remaining');
+
+            if (pendingRefType === 'character') {
+                @this.generateNextPendingCharacterPortrait().then((result) => {
+                    console.log('Character portrait result:', result);
+                    pendingRefCount = result?.remaining || 0;
+                    isGenerating = false;
+                    if (pendingRefCount === 0) {
+                        stopRefGenPolling();
+                    }
+                }).catch((err) => {
+                    console.error('Error generating character portrait:', err);
+                    isGenerating = false;
+                    // Don't stop on error - try the next one
+                    pendingRefCount = Math.max(0, pendingRefCount - 1);
+                    if (pendingRefCount === 0) {
+                        stopRefGenPolling();
+                    }
+                });
+            } else if (pendingRefType === 'location') {
+                @this.generateNextPendingLocationReference().then((result) => {
+                    console.log('Location reference result:', result);
+                    pendingRefCount = result?.remaining || 0;
+                    isGenerating = false;
+                    if (pendingRefCount === 0) {
+                        stopRefGenPolling();
+                    }
+                }).catch((err) => {
+                    console.error('Error generating location reference:', err);
+                    isGenerating = false;
+                    // Don't stop on error - try the next one
+                    pendingRefCount = Math.max(0, pendingRefCount - 1);
+                    if (pendingRefCount === 0) {
+                        stopRefGenPolling();
+                    }
+                });
+            } else {
+                isGenerating = false;
+                console.warn('Unknown reference type:', pendingRefType);
+            }
+        }
+
+        function startRefGenPolling() {
+            if (refGenInterval) return;
+
+            // Check every 2 seconds if we should generate the next one
+            // (but only if not already generating)
+            refGenInterval = setInterval(() => {
+                if (!isGenerating && pendingRefCount > 0) {
+                    generateNextReference();
+                }
+            }, 2000);
+
+            console.log('Reference generation polling started');
+        }
+
+        function stopRefGenPolling() {
+            if (refGenInterval) {
+                clearInterval(refGenInterval);
+                refGenInterval = null;
+            }
+            pendingRefType = null;
+            pendingRefCount = 0;
+            isGenerating = false;
+            console.log('Reference generation polling stopped');
+        }
+
         function startPolling() {
             if (pollInterval || !isPageVisible) return;
 
