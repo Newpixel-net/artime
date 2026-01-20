@@ -345,6 +345,259 @@ class VideoWizard extends Component
         ],
     ];
 
+    /**
+     * CINEMATIC SHOT PATTERNS - 33 professional filmmaking patterns.
+     *
+     * These patterns are used by the AI decomposition system to create
+     * proper cinematic storytelling with Action-Reaction beats,
+     * dialogue coverage, and emotional progression.
+     *
+     * Each pattern defines:
+     * - trigger: When to use this pattern (keywords/scene types)
+     * - shotSequence: The shot types in order
+     * - cameraMovements: Recommended camera movements
+     * - purpose: Emotional/narrative purpose
+     */
+    public const CINEMATIC_PATTERNS = [
+        // === DIALOGUE & CONVERSATION PATTERNS ===
+        'shot_reverse_shot' => [
+            'name' => 'Shot/Reverse Shot',
+            'trigger' => ['dialogue', 'conversation', 'talking', 'speaking', 'interview'],
+            'shotSequence' => ['wide', 'medium', 'close-up', 'close-up', 'medium', 'reaction'],
+            'cameraMovements' => ['static', 'static', 'static', 'static', 'static', 'static'],
+            'purpose' => 'Standard dialogue coverage with 180-degree rule',
+            'rules' => ['maintain_eyeline', '180_degree_rule', 'match_shot_sizes'],
+        ],
+        'conversation_escalation' => [
+            'name' => 'Conversation Escalation',
+            'trigger' => ['argument', 'confrontation', 'tension', 'conflict', 'heated'],
+            'shotSequence' => ['wide', 'medium', 'medium', 'close-up', 'extreme-close-up', 'wide'],
+            'cameraMovements' => ['static', 'static', 'push_in', 'push_in', 'static', 'pull_out'],
+            'purpose' => 'Visual tightening mirrors emotional escalation',
+            'rules' => ['progressive_tightening', 'increase_tension'],
+        ],
+        'walk_and_talk' => [
+            'name' => 'Walk and Talk',
+            'trigger' => ['walking', 'moving', 'corridor', 'exposition', 'busy'],
+            'shotSequence' => ['tracking', 'medium', 'medium', 'over-shoulder'],
+            'cameraMovements' => ['tracking', 'tracking', 'tracking', 'tracking'],
+            'purpose' => 'Dynamic exposition delivery while characters move',
+            'rules' => ['continuous_movement', 'steadicam_preferred'],
+        ],
+
+        // === ACTION-REACTION PATTERNS ===
+        'action_reaction' => [
+            'name' => 'Action-Reaction',
+            'trigger' => ['action', 'does', 'reacts', 'responds', 'surprised'],
+            'shotSequence' => ['medium', 'insert', 'close-up', 'medium'],
+            'cameraMovements' => ['static', 'push_in', 'static', 'static'],
+            'purpose' => 'Show action, object detail, then emotional reaction',
+            'rules' => ['insert_for_objects', 'reaction_follows_action'],
+        ],
+        'pov_discovery' => [
+            'name' => 'POV Discovery (Hitchcock)',
+            'trigger' => ['sees', 'discovers', 'notices', 'finds', 'looks at'],
+            'shotSequence' => ['medium', 'pov', 'close-up', 'pov'],
+            'cameraMovements' => ['static', 'push_in', 'static', 'static'],
+            'purpose' => 'Character sees something, audience experiences discovery',
+            'rules' => ['pov_shows_what_character_sees', 'reaction_completes_sequence'],
+        ],
+        'object_reveal' => [
+            'name' => 'Object Reveal',
+            'trigger' => ['pulls out', 'shows', 'reveals', 'presents', 'holds up', 'takes out'],
+            'shotSequence' => ['medium', 'insert', 'insert', 'close-up'],
+            'cameraMovements' => ['static', 'push_in', 'static', 'static'],
+            'purpose' => 'Dramatic reveal of significant object (the Amulet pattern)',
+            'rules' => ['insert_on_object', 'reaction_shows_impact'],
+        ],
+
+        // === SUSPENSE & TENSION PATTERNS ===
+        'bomb_under_table' => [
+            'name' => 'Bomb Under Table (Hitchcock)',
+            'trigger' => ['suspense', 'danger', 'unaware', 'threat', 'ticking', 'countdown'],
+            'shotSequence' => ['insert', 'wide', 'medium', 'insert', 'close-up', 'wide'],
+            'cameraMovements' => ['static', 'static', 'static', 'push_in', 'static', 'static'],
+            'purpose' => 'Audience knows danger characters dont - dramatic irony',
+            'rules' => ['show_threat_first', 'alternate_threat_and_oblivious'],
+        ],
+        'ticking_clock' => [
+            'name' => 'Ticking Clock/Countdown',
+            'trigger' => ['deadline', 'timer', 'running out', 'hurry', 'race against'],
+            'shotSequence' => ['insert', 'medium', 'insert', 'close-up', 'insert', 'medium'],
+            'cameraMovements' => ['static', 'tracking', 'static', 'static', 'static', 'tracking'],
+            'purpose' => 'Build urgency through time pressure',
+            'rules' => ['insert_clock_periodically', 'accelerate_cutting_pace'],
+        ],
+        'empty_frame_suspense' => [
+            'name' => 'Empty Frame Suspense',
+            'trigger' => ['alone', 'waiting', 'quiet', 'eerie', 'something coming'],
+            'shotSequence' => ['wide', 'wide', 'medium', 'close-up'],
+            'cameraMovements' => ['static', 'slow_push_in', 'static', 'static'],
+            'purpose' => 'Negative space creates anticipation of threat',
+            'rules' => ['hold_longer_than_comfortable', 'empty_space_dominant'],
+        ],
+
+        // === REVEAL PATTERNS ===
+        'camera_reveal' => [
+            'name' => 'Camera Movement Reveal',
+            'trigger' => ['reveals', 'shows', 'pan to', 'crane up', 'discover'],
+            'shotSequence' => ['medium', 'wide', 'wide'],
+            'cameraMovements' => ['static', 'pan_right', 'static'],
+            'purpose' => 'Control information delivery through camera movement',
+            'rules' => ['start_partial_view', 'reveal_new_information'],
+        ],
+        'scale_reveal' => [
+            'name' => 'Scale/Scope Reveal',
+            'trigger' => ['massive', 'enormous', 'huge', 'army', 'crowd', 'monster'],
+            'shotSequence' => ['close-up', 'medium', 'extreme-wide', 'close-up'],
+            'cameraMovements' => ['static', 'pull_out', 'crane_up', 'static'],
+            'purpose' => 'Reveal true scale for awe or terror',
+            'rules' => ['start_tight', 'reveal_full_scope'],
+        ],
+        'character_introduction' => [
+            'name' => 'Character Introduction',
+            'trigger' => ['enters', 'appears', 'introduces', 'first time', 'arrives'],
+            'shotSequence' => ['detail', 'medium', 'close-up', 'wide'],
+            'cameraMovements' => ['static', 'push_in', 'static', 'static'],
+            'purpose' => 'Build anticipation before full reveal of important character',
+            'rules' => ['partial_reveal_first', 'hold_full_reveal'],
+        ],
+
+        // === EMOTIONAL PATTERNS ===
+        'emotional_intimacy' => [
+            'name' => 'Emotional Intimacy',
+            'trigger' => ['romantic', 'tender', 'emotional', 'vulnerable', 'confession'],
+            'shotSequence' => ['medium', 'close-up', 'close-up', 'two-shot', 'close-up'],
+            'cameraMovements' => ['static', 'slow_push_in', 'slow_push_in', 'static', 'static'],
+            'purpose' => 'Visual progression mirrors emotional connection',
+            'rules' => ['shallow_depth_of_field', 'soft_lighting'],
+        ],
+        'isolation_loneliness' => [
+            'name' => 'Visual Isolation',
+            'trigger' => ['alone', 'lonely', 'isolated', 'abandoned', 'grief'],
+            'shotSequence' => ['extreme-wide', 'wide', 'medium', 'close-up'],
+            'cameraMovements' => ['static', 'static', 'static', 'static'],
+            'purpose' => 'Character small in frame = emotional smallness',
+            'rules' => ['negative_space_dominates', 'character_small_in_frame'],
+        ],
+        'power_dynamics' => [
+            'name' => 'Power Dynamics',
+            'trigger' => ['boss', 'authority', 'dominates', 'submits', 'intimidates'],
+            'shotSequence' => ['low-angle', 'high-angle', 'low-angle', 'medium'],
+            'cameraMovements' => ['static', 'static', 'push_in', 'static'],
+            'purpose' => 'Camera angle conveys power relationships',
+            'rules' => ['low_angle_for_dominant', 'high_angle_for_submissive'],
+        ],
+
+        // === CHASE & ACTION PATTERNS ===
+        'chase_sequence' => [
+            'name' => 'Chase Sequence',
+            'trigger' => ['chase', 'pursuit', 'running', 'escaping', 'following'],
+            'shotSequence' => ['wide', 'tracking', 'pov', 'medium', 'tracking', 'wide'],
+            'cameraMovements' => ['static', 'tracking', 'tracking', 'tracking', 'tracking', 'static'],
+            'purpose' => 'Maintain spatial clarity while building excitement',
+            'rules' => ['maintain_screen_direction', 'accelerate_cutting'],
+        ],
+        'fight_coverage' => [
+            'name' => 'Fight/Combat Coverage',
+            'trigger' => ['fight', 'combat', 'punch', 'battle', 'attack'],
+            'shotSequence' => ['wide', 'medium', 'close-up', 'insert', 'wide', 'close-up'],
+            'cameraMovements' => ['static', 'tracking', 'static', 'static', 'static', 'static'],
+            'purpose' => 'Show choreography clearly while selling impacts',
+            'rules' => ['wide_for_choreography', 'inserts_sell_hits'],
+        ],
+
+        // === TRANSITION PATTERNS ===
+        'match_cut' => [
+            'name' => 'Match Cut Transition',
+            'trigger' => ['transition', 'time passes', 'cut to', 'meanwhile'],
+            'shotSequence' => ['close-up', 'close-up'],
+            'cameraMovements' => ['static', 'static'],
+            'purpose' => 'Elegant time/space bridge through visual similarity',
+            'rules' => ['match_shape_or_movement', 'different_context'],
+        ],
+        'flashback' => [
+            'name' => 'Flashback Transition',
+            'trigger' => ['remembers', 'flashback', 'memory', 'past', 'recalls'],
+            'shotSequence' => ['close-up', 'medium', 'wide', 'medium'],
+            'cameraMovements' => ['static', 'static', 'static', 'static'],
+            'purpose' => 'Visual differentiation for time periods',
+            'rules' => ['different_color_grade', 'transition_effect'],
+        ],
+
+        // === MONTAGE PATTERNS ===
+        'time_compression_montage' => [
+            'name' => 'Time Compression Montage',
+            'trigger' => ['training', 'preparing', 'building', 'growing', 'time passes'],
+            'shotSequence' => ['wide', 'medium', 'close-up', 'medium', 'wide', 'close-up'],
+            'cameraMovements' => ['static', 'static', 'static', 'tracking', 'static', 'static'],
+            'purpose' => 'Compress hours/days/weeks into minutes',
+            'rules' => ['cut_on_beat', 'show_progression'],
+        ],
+        'parallel_editing' => [
+            'name' => 'Parallel Editing (Cross-Cut)',
+            'trigger' => ['meanwhile', 'at the same time', 'simultaneously', 'converging'],
+            'shotSequence' => ['medium', 'medium', 'close-up', 'close-up', 'wide'],
+            'cameraMovements' => ['static', 'static', 'static', 'static', 'static'],
+            'purpose' => 'Build tension through simultaneous action in multiple locations',
+            'rules' => ['accelerate_cutting_toward_convergence', 'maintain_clarity'],
+        ],
+
+        // === HORROR PATTERNS ===
+        'jump_scare' => [
+            'name' => 'Jump Scare Buildup',
+            'trigger' => ['horror', 'scary', 'creepy', 'dark', 'something there'],
+            'shotSequence' => ['wide', 'medium', 'close-up', 'close-up', 'medium'],
+            'cameraMovements' => ['slow_push_in', 'static', 'static', 'static', 'static'],
+            'purpose' => 'Buildup tension for sudden scare release',
+            'rules' => ['extend_anticipation', 'silence_before_scare'],
+        ],
+        'stalker_pov' => [
+            'name' => 'Stalker POV',
+            'trigger' => ['watching', 'following', 'stalking', 'observing', 'hidden'],
+            'shotSequence' => ['pov', 'medium', 'pov', 'close-up'],
+            'cameraMovements' => ['tracking', 'static', 'tracking', 'static'],
+            'purpose' => 'Audience complicit in observation, creates dread',
+            'rules' => ['obscured_framing', 'victim_unaware'],
+        ],
+
+        // === ESTABLISHING PATTERNS ===
+        'establishing_sequence' => [
+            'name' => 'Establishing Shot Sequence',
+            'trigger' => ['new location', 'arrives at', 'opening', 'scene opens'],
+            'shotSequence' => ['extreme-wide', 'wide', 'medium', 'close-up'],
+            'cameraMovements' => ['crane_down', 'static', 'static', 'static'],
+            'purpose' => 'Orient audience spatially before intimate action',
+            'rules' => ['wide_tells_where', 'medium_tells_who', 'close_tells_what'],
+        ],
+
+        // === SPECIAL TECHNIQUES ===
+        'dolly_zoom' => [
+            'name' => 'Dolly Zoom (Vertigo Effect)',
+            'trigger' => ['realization', 'shock', 'world changing', 'vertigo', 'dizzy'],
+            'shotSequence' => ['medium', 'medium'],
+            'cameraMovements' => ['dolly_zoom', 'static'],
+            'purpose' => 'Signal psychological shift or disorientation',
+            'rules' => ['subject_size_constant', 'background_distorts'],
+        ],
+        'dutch_angle' => [
+            'name' => 'Dutch Angle Sequence',
+            'trigger' => ['unstable', 'drunk', 'crazy', 'disoriented', 'wrong'],
+            'shotSequence' => ['medium', 'close-up', 'medium'],
+            'cameraMovements' => ['static', 'static', 'static'],
+            'purpose' => 'Visual representation of psychological instability',
+            'rules' => ['tilt_matches_intensity', 'return_to_level_for_stability'],
+        ],
+        'oner_long_take' => [
+            'name' => 'Single Take (Oner)',
+            'trigger' => ['continuous', 'real time', 'unbroken', 'follows'],
+            'shotSequence' => ['wide'],
+            'cameraMovements' => ['tracking'],
+            'purpose' => 'Immersive real-time experience without cuts',
+            'rules' => ['choreographed_blocking', 'camera_recomposes'],
+        ],
+    ];
+
     // Step 2: Concept
     public array $concept = [
         'rawInput' => '',
@@ -800,6 +1053,37 @@ class VideoWizard extends Component
             'overall' => 'balanced',
             'tensionCurve' => [],
             'emotionalBeats' => [],
+        ],
+
+        // Cinematography Configuration (connects to CINEMATIC_PATTERNS constant)
+        'cinematography' => [
+            'enabled' => true,
+            'autoDetect' => true,            // AI auto-detects patterns from scene content
+            'genreDefaults' => [],           // Pattern preferences based on genre
+            'activePatterns' => [],          // Manually selected patterns for this project
+            'scenePatterns' => [],           // Per-scene pattern assignments: sceneIndex => ['patterns' => [...]]
+            'globalRules' => [
+                'maxSimilarityThreshold' => 0.7,      // Adjacent shot similarity limit
+                'enforceEyeline' => true,              // Maintain eyeline across shots
+                'enforce180Rule' => true,              // 180-degree rule for dialogue
+                'enforceMatchCuts' => true,            // Match action across cuts
+                'minShotVariety' => 3,                 // Minimum different shot types per scene
+            ],
+            'dialogueSettings' => [
+                'defaultPattern' => 'shot_reverse_shot',  // Default dialogue coverage
+                'insertReactions' => true,                 // Auto-insert reaction shots
+                'matchEyelines' => true,                   // Match character eyelines
+            ],
+            'actionSettings' => [
+                'defaultPattern' => 'action_reaction',     // Default action coverage
+                'useInsertShots' => true,                  // Use insert shots for objects
+                'matchAction' => true,                     // Match action across cuts
+            ],
+            'suspenseSettings' => [
+                'defaultPattern' => 'bomb_under_table',    // Default suspense coverage
+                'buildTension' => true,                    // Gradually build tension
+                'useTimeCuts' => true,                     // Use ticking clock patterns
+            ],
         ],
     ];
 
@@ -11294,7 +11578,7 @@ PROMPT;
      */
     public function setStoryBibleTab(string $tab): void
     {
-        $validTabs = ['overview', 'characters', 'locations', 'style'];
+        $validTabs = ['overview', 'characters', 'locations', 'style', 'cinematography'];
         if (in_array($tab, $validTabs)) {
             $this->storyBibleTab = $tab;
         }
@@ -15355,7 +15639,187 @@ PROMPT;
     }
 
     // =========================================================================
-    // PHASE 6: AI-DRIVEN STORY BEAT DECOMPOSITION
+    // PHASE 6: CINEMATIC PATTERN DETECTION & STORY BIBLE INTEGRATION
+    // =========================================================================
+
+    /**
+     * Detect applicable cinematic patterns for a scene based on content analysis.
+     * Uses CINEMATIC_PATTERNS constant and Story Bible cinematography settings.
+     *
+     * @param array $scene Scene data (narration, visual, mood, characters)
+     * @param int $sceneIndex Scene index for per-scene overrides
+     * @return array Applicable patterns with their configurations
+     */
+    protected function detectApplicablePatterns(array $scene, int $sceneIndex): array
+    {
+        $applicablePatterns = [];
+        $sceneText = strtolower(
+            ($scene['narration'] ?? '') . ' ' .
+            ($scene['visualDescription'] ?? $scene['visual'] ?? '') . ' ' .
+            ($scene['dialogue'] ?? '')
+        );
+
+        // Get cinematography settings from Story Bible
+        $cinematography = $this->storyBible['cinematography'] ?? [];
+        $autoDetect = $cinematography['autoDetect'] ?? true;
+        $globalRules = $cinematography['globalRules'] ?? [];
+
+        // Check for per-scene pattern overrides
+        $scenePatterns = $cinematography['scenePatterns'][$sceneIndex]['patterns'] ?? null;
+        if ($scenePatterns) {
+            // Use manually assigned patterns for this scene
+            foreach ($scenePatterns as $patternKey) {
+                if (isset(self::CINEMATIC_PATTERNS[$patternKey])) {
+                    $applicablePatterns[$patternKey] = self::CINEMATIC_PATTERNS[$patternKey];
+                }
+            }
+            return $applicablePatterns;
+        }
+
+        // Auto-detect patterns from scene content
+        if ($autoDetect) {
+            foreach (self::CINEMATIC_PATTERNS as $patternKey => $pattern) {
+                $triggers = $pattern['trigger'] ?? [];
+                foreach ($triggers as $trigger) {
+                    if (str_contains($sceneText, strtolower($trigger))) {
+                        $applicablePatterns[$patternKey] = $pattern;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Add genre-specific defaults if no patterns detected
+        if (empty($applicablePatterns)) {
+            $genre = strtolower($this->storyBible['genre'] ?? $this->content['genre'] ?? 'drama');
+            $genreDefaults = $this->getGenreDefaultPatterns($genre);
+            foreach ($genreDefaults as $patternKey) {
+                if (isset(self::CINEMATIC_PATTERNS[$patternKey])) {
+                    $applicablePatterns[$patternKey] = self::CINEMATIC_PATTERNS[$patternKey];
+                }
+            }
+        }
+
+        // Always include dialogue pattern if scene has dialogue
+        $dialogueSettings = $cinematography['dialogueSettings'] ?? [];
+        if (str_contains($sceneText, 'says') || str_contains($sceneText, 'speaks') ||
+            str_contains($sceneText, 'asks') || str_contains($sceneText, 'replies') ||
+            str_contains($sceneText, '"') || str_contains($sceneText, "'")) {
+            $defaultDialogue = $dialogueSettings['defaultPattern'] ?? 'shot_reverse_shot';
+            if (!isset($applicablePatterns[$defaultDialogue]) && isset(self::CINEMATIC_PATTERNS[$defaultDialogue])) {
+                $applicablePatterns[$defaultDialogue] = self::CINEMATIC_PATTERNS[$defaultDialogue];
+            }
+        }
+
+        Log::info('Detected cinematic patterns for scene', [
+            'sceneIndex' => $sceneIndex,
+            'patternsFound' => array_keys($applicablePatterns),
+            'autoDetect' => $autoDetect,
+        ]);
+
+        return $applicablePatterns;
+    }
+
+    /**
+     * Get default cinematic patterns for a genre.
+     *
+     * @param string $genre Genre name
+     * @return array Array of pattern keys
+     */
+    protected function getGenreDefaultPatterns(string $genre): array
+    {
+        $genrePatterns = [
+            'action' => ['action_reaction', 'chase_sequence', 'fight_coverage', 'match_cut'],
+            'thriller' => ['bomb_under_table', 'ticking_clock', 'stalker_pov', 'creeping_reveal'],
+            'drama' => ['shot_reverse_shot', 'emotional_intimacy', 'reflective_moment', 'lingering_shot'],
+            'horror' => ['jump_scare', 'stalker_pov', 'creeping_reveal', 'isolated_character'],
+            'comedy' => ['shot_reverse_shot', 'comedic_cutaway', 'reaction_emphasis'],
+            'romance' => ['emotional_intimacy', 'shot_reverse_shot', 'lingering_shot', 'silhouette_romance'],
+            'sci-fi' => ['scale_reveal', 'establishing_sequence', 'match_cut', 'parallel_editing'],
+            'fantasy' => ['object_reveal', 'scale_reveal', 'establishing_sequence', 'magic_reveal'],
+            'documentary' => ['interview_coverage', 'montage', 'establishing_sequence'],
+            'mystery' => ['pov_discovery', 'camera_reveal', 'detective_scan', 'flashback'],
+        ];
+
+        return $genrePatterns[$genre] ?? ['shot_reverse_shot', 'action_reaction', 'establishing_sequence'];
+    }
+
+    /**
+     * Build pattern instructions for the AI prompt.
+     * Converts detected patterns into specific instructions for the cinematographer AI.
+     *
+     * @param array $patterns Applicable patterns
+     * @return string Formatted pattern instructions
+     */
+    protected function buildPatternInstructions(array $patterns): string
+    {
+        if (empty($patterns)) {
+            return '';
+        }
+
+        $instructions = "DETECTED CINEMATIC PATTERNS TO APPLY:\n\n";
+
+        foreach ($patterns as $key => $pattern) {
+            $name = $pattern['name'] ?? $key;
+            $purpose = $pattern['purpose'] ?? '';
+            $sequence = implode(' → ', $pattern['shotSequence'] ?? []);
+            $movements = implode(', ', $pattern['cameraMovements'] ?? []);
+            $rules = implode(', ', $pattern['rules'] ?? []);
+
+            $instructions .= "**{$name}**\n";
+            $instructions .= "- Purpose: {$purpose}\n";
+            $instructions .= "- Shot Sequence: {$sequence}\n";
+            $instructions .= "- Camera Movements: {$movements}\n";
+            if ($rules) {
+                $instructions .= "- Rules: {$rules}\n";
+            }
+            $instructions .= "\n";
+        }
+
+        $instructions .= "IMPORTANT: Follow these patterns when decomposing the scene. ";
+        $instructions .= "Match the shot sequences and camera movements specified above.\n\n";
+
+        return $instructions;
+    }
+
+    /**
+     * Get Story Bible cinematography rules for the prompt.
+     *
+     * @return string Formatted rules
+     */
+    protected function getCinematographyRules(): string
+    {
+        $cinematography = $this->storyBible['cinematography'] ?? [];
+        $globalRules = $cinematography['globalRules'] ?? [];
+
+        $rules = [];
+
+        if ($globalRules['enforce180Rule'] ?? true) {
+            $rules[] = "STRICTLY maintain 180-degree rule for all dialogue scenes";
+        }
+        if ($globalRules['enforceEyeline'] ?? true) {
+            $rules[] = "Ensure eyeline matches across all cuts";
+        }
+        if ($globalRules['enforceMatchCuts'] ?? true) {
+            $rules[] = "Match action across cuts (motion, position, gesture continuity)";
+        }
+
+        $minVariety = $globalRules['minShotVariety'] ?? 3;
+        $rules[] = "Use at least {$minVariety} different shot types per scene";
+
+        $maxSimilarity = $globalRules['maxSimilarityThreshold'] ?? 0.7;
+        $similarityPercent = (int)(($maxSimilarity) * 100);
+        $rules[] = "No two adjacent shots should exceed {$similarityPercent}% visual similarity";
+
+        if (empty($rules)) {
+            return '';
+        }
+
+        return "CINEMATOGRAPHY RULES (Story Bible):\n- " . implode("\n- ", $rules) . "\n\n";
+    }
+
+    // =========================================================================
+    // AI-DRIVEN STORY BEAT DECOMPOSITION
     // =========================================================================
 
     /**
@@ -15389,8 +15853,20 @@ PROMPT;
             $visual = $scene['visualDescription'] ?? $scene['visual'] ?? '';
             $mood = $scene['mood'] ?? 'neutral';
 
-            // Build the enhanced decomposition prompt
-            $prompt = $this->buildStoryBeatDecompositionPrompt($narration, $visual, $mood, $characterList);
+            // PHASE 6: Detect applicable cinematic patterns from Story Bible
+            $applicablePatterns = $this->detectApplicablePatterns($scene, $sceneIndex);
+            $patternInstructions = $this->buildPatternInstructions($applicablePatterns);
+            $cinematographyRules = $this->getCinematographyRules();
+
+            // Build the enhanced decomposition prompt with patterns
+            $prompt = $this->buildStoryBeatDecompositionPrompt(
+                $narration,
+                $visual,
+                $mood,
+                $characterList,
+                $patternInstructions,
+                $cinematographyRules
+            );
 
             // Call AI for story beat decomposition
             $result = $geminiService->generateText(
@@ -15441,10 +15917,23 @@ PROMPT;
 
     /**
      * Build the enhanced story beat decomposition prompt.
-     * Implements the cinematic patterns from our research.
+     * Implements the cinematic patterns from Story Bible and auto-detection.
+     *
+     * @param string $narration Scene narration
+     * @param string $visual Visual description
+     * @param string $mood Scene mood
+     * @param string $characterList Characters in scene
+     * @param string $patternInstructions Detected pattern instructions from Story Bible
+     * @param string $cinematographyRules Global cinematography rules from Story Bible
      */
-    protected function buildStoryBeatDecompositionPrompt(string $narration, string $visual, string $mood, string $characterList): string
-    {
+    protected function buildStoryBeatDecompositionPrompt(
+        string $narration,
+        string $visual,
+        string $mood,
+        string $characterList,
+        string $patternInstructions = '',
+        string $cinematographyRules = ''
+    ): string {
         return <<<PROMPT
 You are a professional cinematographer decomposing a scene into shots using cinematic storytelling patterns.
 
@@ -15458,6 +15947,8 @@ MOOD: {$mood}
 
 {$characterList}
 
+{$patternInstructions}
+{$cinematographyRules}
 DECOMPOSITION RULES:
 
 1. **BEAT STRUCTURE**: Identify 3-5 story beats. Each beat is a unit of story progression:

@@ -47,8 +47,8 @@
         @endif
 
         {{-- Tabs --}}
-        <div style="display: flex; gap: 0.25rem; padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; background: rgba(0,0,0,0.2);">
-            @foreach(['overview' => ['icon' => '📋', 'label' => 'Overview'], 'characters' => ['icon' => '👥', 'label' => 'Characters'], 'locations' => ['icon' => '🏛️', 'label' => 'Locations'], 'style' => ['icon' => '🎨', 'label' => 'Visual Style']] as $tabKey => $tabInfo)
+        <div style="display: flex; gap: 0.25rem; padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; background: rgba(0,0,0,0.2); overflow-x: auto;">
+            @foreach(['overview' => ['icon' => '📋', 'label' => 'Overview'], 'characters' => ['icon' => '👥', 'label' => 'Characters'], 'locations' => ['icon' => '🏛️', 'label' => 'Locations'], 'style' => ['icon' => '🎨', 'label' => 'Visual Style'], 'cinematography' => ['icon' => '🎬', 'label' => 'Cinematography']] as $tabKey => $tabInfo)
                 <button type="button"
                         wire:click="setStoryBibleTab('{{ $tabKey }}')"
                         style="padding: 0.4rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; transition: all 0.2s; border: 1px solid {{ $storyBibleTab === $tabKey ? 'rgba(251,191,36,0.5)' : 'transparent' }}; background: {{ $storyBibleTab === $tabKey ? 'rgba(251,191,36,0.15)' : 'transparent' }}; color: {{ $storyBibleTab === $tabKey ? '#fcd34d' : 'rgba(255,255,255,0.6)' }};">
@@ -475,6 +475,151 @@
                             @empty
                                 <span style="color: rgba(255,255,255,0.4); font-size: 0.7rem; font-style: italic;">{{ __('Generate Story Bible to define emotional journey') }}</span>
                             @endforelse
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- CINEMATOGRAPHY TAB --}}
+            @if($storyBibleTab === 'cinematography')
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    {{-- Description --}}
+                    <div style="padding: 0.75rem; background: rgba(236,72,153,0.1); border: 1px solid rgba(236,72,153,0.3); border-radius: 0.5rem;">
+                        <p style="color: rgba(255,255,255,0.8); font-size: 0.75rem; margin: 0;">
+                            <strong style="color: #f9a8d4;">🎬 Cinematography Patterns</strong> control how scenes are decomposed into shots.
+                            These professional filmmaking patterns ensure coherent storytelling through proper shot sequences, camera movements, and visual continuity.
+                        </p>
+                    </div>
+
+                    {{-- Auto-Detect Toggle --}}
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem;">
+                        <div>
+                            <div style="color: white; font-weight: 600; font-size: 0.85rem;">{{ __('Auto-Detect Patterns') }}</div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.7rem;">{{ __('AI automatically detects which patterns to use based on scene content') }}</div>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                            <input type="checkbox"
+                                   wire:model.live="storyBible.cinematography.autoDetect"
+                                   style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; inset: 0; background: {{ ($storyBible['cinematography']['autoDetect'] ?? true) ? 'linear-gradient(135deg, #ec4899, #f97316)' : 'rgba(255,255,255,0.2)' }}; border-radius: 24px; transition: 0.3s;"></span>
+                            <span style="position: absolute; left: {{ ($storyBible['cinematography']['autoDetect'] ?? true) ? '22px' : '2px' }}; top: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s;"></span>
+                        </label>
+                    </div>
+
+                    {{-- Global Rules --}}
+                    <div>
+                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.5rem; text-transform: uppercase;">{{ __('Global Cinematography Rules') }}</label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                            @php
+                                $globalRules = $storyBible['cinematography']['globalRules'] ?? [];
+                            @endphp
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.375rem; cursor: pointer;">
+                                <input type="checkbox" wire:model.live="storyBible.cinematography.globalRules.enforce180Rule"
+                                       {{ ($globalRules['enforce180Rule'] ?? true) ? 'checked' : '' }}
+                                       style="accent-color: #ec4899;">
+                                <span style="color: rgba(255,255,255,0.8); font-size: 0.75rem;">{{ __('Enforce 180° Rule') }}</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.375rem; cursor: pointer;">
+                                <input type="checkbox" wire:model.live="storyBible.cinematography.globalRules.enforceEyeline"
+                                       {{ ($globalRules['enforceEyeline'] ?? true) ? 'checked' : '' }}
+                                       style="accent-color: #ec4899;">
+                                <span style="color: rgba(255,255,255,0.8); font-size: 0.75rem;">{{ __('Maintain Eyeline Match') }}</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.375rem; cursor: pointer;">
+                                <input type="checkbox" wire:model.live="storyBible.cinematography.globalRules.enforceMatchCuts"
+                                       {{ ($globalRules['enforceMatchCuts'] ?? true) ? 'checked' : '' }}
+                                       style="accent-color: #ec4899;">
+                                <span style="color: rgba(255,255,255,0.8); font-size: 0.75rem;">{{ __('Match Action Across Cuts') }}</span>
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.375rem;">
+                                <span style="color: rgba(255,255,255,0.8); font-size: 0.75rem;">{{ __('Min Shot Variety:') }}</span>
+                                <input type="number" wire:model.blur="storyBible.cinematography.globalRules.minShotVariety"
+                                       min="2" max="6" value="{{ $globalRules['minShotVariety'] ?? 3 }}"
+                                       style="width: 50px; padding: 0.25rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.25rem; color: white; font-size: 0.75rem; text-align: center;">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Dialogue Settings --}}
+                    <div>
+                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.5rem; text-transform: uppercase;">{{ __('Dialogue Pattern Settings') }}</label>
+                        <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <span style="color: rgba(255,255,255,0.7); font-size: 0.75rem;">{{ __('Default Pattern:') }}</span>
+                                <select wire:model.live="storyBible.cinematography.dialogueSettings.defaultPattern"
+                                        style="flex: 1; padding: 0.4rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.375rem; color: white; font-size: 0.75rem;">
+                                    <option value="shot_reverse_shot">{{ __('Shot/Reverse Shot (Standard)') }}</option>
+                                    <option value="over_shoulder">{{ __('Over-the-Shoulder') }}</option>
+                                    <option value="two_shot">{{ __('Two-Shot Coverage') }}</option>
+                                    <option value="interview_coverage">{{ __('Interview Style') }}</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 1rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" wire:model.live="storyBible.cinematography.dialogueSettings.insertReactions"
+                                           style="accent-color: #ec4899;">
+                                    <span style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">{{ __('Auto-insert reaction shots') }}</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" wire:model.live="storyBible.cinematography.dialogueSettings.matchEyelines"
+                                           style="accent-color: #ec4899;">
+                                    <span style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">{{ __('Match character eyelines') }}</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Action Settings --}}
+                    <div>
+                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.5rem; text-transform: uppercase;">{{ __('Action Pattern Settings') }}</label>
+                        <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <span style="color: rgba(255,255,255,0.7); font-size: 0.75rem;">{{ __('Default Pattern:') }}</span>
+                                <select wire:model.live="storyBible.cinematography.actionSettings.defaultPattern"
+                                        style="flex: 1; padding: 0.4rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.375rem; color: white; font-size: 0.75rem;">
+                                    <option value="action_reaction">{{ __('Action/Reaction (Standard)') }}</option>
+                                    <option value="object_reveal">{{ __('Object Reveal (Amulet Pattern)') }}</option>
+                                    <option value="chase_sequence">{{ __('Chase Sequence') }}</option>
+                                    <option value="fight_coverage">{{ __('Fight Coverage') }}</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 1rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" wire:model.live="storyBible.cinematography.actionSettings.useInsertShots"
+                                           style="accent-color: #ec4899;">
+                                    <span style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">{{ __('Use insert shots for objects') }}</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" wire:model.live="storyBible.cinematography.actionSettings.matchAction"
+                                           style="accent-color: #ec4899;">
+                                    <span style="color: rgba(255,255,255,0.7); font-size: 0.7rem;">{{ __('Match action across cuts') }}</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Available Patterns Preview --}}
+                    <div>
+                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.65rem; margin-bottom: 0.5rem; text-transform: uppercase;">{{ __('Available Cinematic Patterns') }} <span style="color: rgba(255,255,255,0.4);">(33 patterns)</span></label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
+                            @php
+                                $patternCategories = [
+                                    'Dialogue' => ['shot_reverse_shot', 'over_shoulder', 'two_shot', 'interview_coverage'],
+                                    'Action' => ['action_reaction', 'object_reveal', 'chase_sequence', 'fight_coverage'],
+                                    'Suspense' => ['bomb_under_table', 'ticking_clock', 'creeping_reveal', 'stalker_pov'],
+                                    'Reveals' => ['pov_discovery', 'camera_reveal', 'scale_reveal', 'magic_reveal'],
+                                    'Emotional' => ['emotional_intimacy', 'lingering_shot', 'reflective_moment', 'isolated_character'],
+                                    'Transitions' => ['match_cut', 'flashback', 'parallel_editing', 'time_compression_montage'],
+                                ];
+                            @endphp
+                            @foreach($patternCategories as $category => $patterns)
+                                <div style="padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 0.375rem;">
+                                    <div style="font-weight: 600; color: #f9a8d4; font-size: 0.7rem; margin-bottom: 0.35rem;">{{ $category }}</div>
+                                    @foreach($patterns as $pattern)
+                                        <div style="color: rgba(255,255,255,0.6); font-size: 0.65rem; padding: 0.15rem 0;">• {{ ucwords(str_replace('_', ' ', $pattern)) }}</div>
+                                    @endforeach
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
