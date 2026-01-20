@@ -19181,12 +19181,20 @@ PROMPT;
                     } elseif (str_contains($gender, 'male') || str_contains($gender, 'man')) {
                         return 'onyx'; // Male voice
                     }
+
+                    // Try to infer gender from character description
+                    $description = strtolower($char['description'] ?? '');
+                    if (preg_match('/\b(she|her|woman|female|girl|lady|mother|wife|daughter|sister|actress|queen|princess)\b/', $description)) {
+                        return 'nova'; // Female voice
+                    } elseif (preg_match('/\b(he|his|him|man|male|boy|guy|father|husband|son|brother|actor|king|prince)\b/', $description)) {
+                        return 'onyx'; // Male voice
+                    }
                 }
             }
         }
 
-        // Default voice based on setting or fallback
-        return $this->storyboard['defaultVoice'] ?? 'nova';
+        // Default voice based on setting or fallback - use 'alloy' (neutral) instead of 'nova' (female)
+        return $this->storyboard['defaultVoice'] ?? 'alloy';
     }
 
     /**
@@ -22829,38 +22837,52 @@ PROMPT;
 
         try {
             $animationService = app(\Modules\AppVideoWizard\Services\AnimationService::class);
-            $duration = $shot['selectedDuration'] ?? $shot['duration'] ?? 6;
             $selectedModel = $shot['selectedVideoModel'] ?? 'minimax';
+
+            // Get audio URL for Multitalk lip-sync
+            $audioUrl = null;
+            $audioDuration = null;
+            if ($selectedModel === 'multitalk') {
+                $audioUrl = $shot['audioUrl'] ?? $shot['voiceoverUrl'] ?? null;
+                $audioDuration = $shot['audioDuration'] ?? null;
+            }
+
+            // For Multitalk: use audio duration + padding for smooth transitions
+            // For other models: use selected/shot duration
+            if ($selectedModel === 'multitalk' && $audioDuration) {
+                // Add 0.5 second padding at the end for smooth shot transitions
+                $endPadding = 0.5;
+                $duration = ceil($audioDuration + $endPadding);
+            } else {
+                $duration = $shot['selectedDuration'] ?? $shot['duration'] ?? 6;
+            }
 
             \Log::info('🎬 Animation request', [
                 'model' => $selectedModel,
                 'duration' => $duration,
+                'audioDuration' => $audioDuration,
                 'imageUrl' => substr($shot['imageUrl'], 0, 80) . '...',
             ]);
 
-            // Get audio URL for Multitalk lip-sync
-            $audioUrl = null;
+            // Validate audio availability for Multitalk
+            if ($selectedModel === 'multitalk' && empty($audioUrl)) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = __('Multitalk requires audio');
+                $this->isLoading = false;
+                $this->dispatch('generation-error', [
+                    'message' => __('Multitalk requires audio. Please generate voiceover first.'),
+                    'type' => 'multitalk_no_audio',
+                    'sceneIndex' => $sceneIndex,
+                    'shotIndex' => $shotIndex,
+                ]);
+                \Log::warning('Multitalk selected but no audio available', [
+                    'sceneIndex' => $sceneIndex,
+                    'shotIndex' => $shotIndex,
+                ]);
+                return;
+            }
+
             if ($selectedModel === 'multitalk') {
-                $audioUrl = $shot['audioUrl'] ?? $shot['voiceoverUrl'] ?? null;
-
-                // Validate audio availability for Multitalk
-                if (empty($audioUrl)) {
-                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
-                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = __('Multitalk requires audio');
-                    $this->isLoading = false;
-                    $this->dispatch('generation-error', [
-                        'message' => __('Multitalk requires audio. Please generate voiceover first.'),
-                        'type' => 'multitalk_no_audio',
-                        'sceneIndex' => $sceneIndex,
-                        'shotIndex' => $shotIndex,
-                    ]);
-                    \Log::warning('Multitalk selected but no audio available', [
-                        'sceneIndex' => $sceneIndex,
-                        'shotIndex' => $shotIndex,
-                    ]);
-                    return;
-                }
-
                 \Log::info('🎬 Multitalk audio URL found', ['audioUrl' => substr($audioUrl, 0, 80) . '...']);
             }
 
@@ -22877,6 +22899,7 @@ PROMPT;
                         'model' => $selectedModel,
                         'duration' => $duration,
                         'audioUrl' => $audioUrl,
+                        'audioDuration' => $audioDuration, // For Multitalk: actual audio length (duration includes padding)
                     ]);
 
                     \Log::info('🎬 Animation result', [

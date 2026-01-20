@@ -196,15 +196,21 @@ class AnimationService
             $filename
         );
 
+        // Calculate actual audio duration if provided (duration may include padding)
+        $audioDuration = $options['audioDuration'] ?? $duration;
+        $endPadding = max(0, $duration - $audioDuration);
+
         Log::info("AnimationService: Generating with Multitalk", [
             'project_id' => $project->id,
             'endpoint' => $endpointId,
             'duration' => $duration,
+            'audioDuration' => $audioDuration,
+            'endPadding' => $endPadding,
             'upload_url' => substr($uploadData['upload_url'], 0, 80) . '...',
             'video_url' => $uploadData['video_url'],
         ]);
 
-        // Calculate frame count based on duration (fps * seconds)
+        // Calculate frame count based on total duration (audio + padding)
         $fps = $options['fps'] ?? 25.0;
         $numFrames = (int) ($fps * $duration);
 
@@ -215,9 +221,9 @@ class AnimationService
             'audio_url' => $audioUrl,
             'video_upload_url' => $uploadData['upload_url'],
 
-            // Audio cropping
+            // Audio cropping - use audioDuration so audio ends naturally while video continues with padding
             'audio_crop_start_time' => $options['audio_crop_start_time'] ?? 0,
-            'audio_crop_end_time' => $options['audio_crop_end_time'] ?? $duration,
+            'audio_crop_end_time' => $options['audio_crop_end_time'] ?? $audioDuration,
 
             // Prompts
             'positive_prompt' => $prompt ?: 'natural talking head animation, smooth lip sync, realistic facial expressions',
