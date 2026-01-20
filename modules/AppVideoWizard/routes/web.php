@@ -11,20 +11,55 @@ use Modules\AppVideoWizard\Http\Controllers\AppVideoWizardController;
 
 // RunPod video upload route is defined in api.php (no CSRF protection)
 
+// DEBUG: Test route to check video paths
+Route::get('/wizard-videos-debug/{projectId}', function ($projectId) {
+    $basePath = public_path("wizard-videos/{$projectId}");
+    $files = is_dir($basePath) ? scandir($basePath) : [];
+    $fileDetails = [];
+
+    foreach ($files as $file) {
+        if ($file !== '.' && $file !== '..') {
+            $fullPath = "{$basePath}/{$file}";
+            $fileDetails[] = [
+                'name' => $file,
+                'size' => filesize($fullPath),
+                'path' => $fullPath,
+                'readable' => is_readable($fullPath),
+            ];
+        }
+    }
+
+    return response()->json([
+        'public_path_base' => public_path(),
+        'wizard_videos_path' => $basePath,
+        'dir_exists' => is_dir($basePath),
+        'files' => $fileDetails,
+    ]);
+});
+
 // Public route to serve wizard videos by project ID only (for Multitalk uploads)
 Route::get('/wizard-videos/{projectId}/{filename}', function ($projectId, $filename) {
+    \Log::info('🎥 Video serve route hit', [
+        'projectId' => $projectId,
+        'filename' => $filename,
+        'public_path' => public_path("wizard-videos/{$projectId}/{$filename}"),
+    ]);
+
     $path = public_path("wizard-videos/{$projectId}/{$filename}");
 
     if (!file_exists($path)) {
+        \Log::error('🎥 Video file NOT FOUND', ['path' => $path]);
         abort(404, 'Video not found');
     }
+
+    \Log::info('🎥 Serving video file', ['path' => $path, 'size' => filesize($path)]);
 
     return response()->file($path, [
         'Content-Type' => 'video/mp4',
         'Content-Disposition' => 'inline',
         'Accept-Ranges' => 'bytes',
     ]);
-})->where('filename', '.*\.mp4$')->name('wizard-video.serve-simple');
+})->where('filename', '[A-Za-z0-9_\-\.]+\.mp4')->name('wizard-video.serve-simple');
 
 // Public route to serve wizard videos with userId (legacy format)
 // This is needed because cPanel/nginx routes everything through PHP
