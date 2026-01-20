@@ -248,7 +248,7 @@ class OpenAIService
         $voice = $options['voice'] ?? 'alloy';
 
         try {
-            $response = $this->client->audio()->speech()->create([
+            $response = $this->client->audio()->speech([
                 'model' => $model,
                 'voice' => $voice,
                 'input' => $text,
