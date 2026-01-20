@@ -107,6 +107,14 @@ class GeminiService
      */
     protected function makeAPICall(string $model, string $endpoint, array $payload, int $timeout = 60): array
     {
+        // For image generation (timeout > 60), temporarily increase memory limit
+        // to handle large base64 responses from Gemini API
+        $originalMemoryLimit = null;
+        if ($timeout > 60) {
+            $originalMemoryLimit = ini_get('memory_limit');
+            ini_set('memory_limit', '512M');
+        }
+
         try {
             $response = $this->client->request('POST', $endpoint, [
                 'query'   => ['key' => $this->apiKey],
@@ -116,9 +124,20 @@ class GeminiService
             ]);
 
             $body = json_decode($response->getBody(), true);
+
+            // Restore original memory limit
+            if ($originalMemoryLimit !== null) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
+
             return $body;
 
         } catch (ClientException $e) {
+            // Restore memory limit on error
+            if ($originalMemoryLimit !== null) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
+
             $response  = $e->getResponse();
             $errorBody = $response ? (string)$response->getBody() : null;
             $message   = $e->getMessage();
@@ -140,6 +159,11 @@ class GeminiService
             throw new \Exception($message, $e->getCode(), $e);
 
         } catch (\Throwable $e) {
+            // Restore memory limit on error
+            if ($originalMemoryLimit !== null) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
+
             Log::error("Gemini API Fatal Error", [
                 'model' => $model,
                 'error' => $e->getMessage(),

@@ -21551,9 +21551,11 @@ PROMPT;
     // =========================================================================
 
     /**
-     * Generate all shots for a scene.
+     * Generate shots for a scene.
+     * Auto-generates only the first 4 shots to prevent memory issues.
+     * Users can manually generate remaining shots.
      */
-    public function generateAllShots(int $sceneIndex): void
+    public function generateAllShots(int $sceneIndex, int $maxShots = 4): void
     {
         $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
         if (!$decomposed) {
@@ -21561,9 +21563,19 @@ PROMPT;
             return;
         }
 
+        $generatedCount = 0;
         foreach ($decomposed['shots'] as $shotIndex => $shot) {
+            // Stop after generating maxShots to prevent memory exhaustion
+            if ($generatedCount >= $maxShots) {
+                $this->dispatch('generation-status', [
+                    'message' => "Generated {$generatedCount} shots. Click on remaining shots to generate them manually."
+                ]);
+                break;
+            }
+
             if ($shot['status'] !== 'ready') {
                 $this->generateShotImage($sceneIndex, $shotIndex);
+                $generatedCount++;
             }
         }
     }
