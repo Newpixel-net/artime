@@ -87,30 +87,32 @@ class GeminiService
 
     /**
      * General helper to send requests to the Gemini API (:generateContent endpoint).
+     * @param int $timeout Request timeout in seconds (default: 60, use 180 for image generation)
      */
-    protected function sendGenerateContentRequest(string $model, array $payload, array $generationConfig = []): array
+    protected function sendGenerateContentRequest(string $model, array $payload, array $generationConfig = [], int $timeout = 60): array
     {
         $payload['generationConfig'] = $generationConfig;
-        
+
         // Remove empty config to avoid API errors if config is empty
         if (empty($payload['generationConfig'])) {
             unset($payload['generationConfig']);
         }
 
-        return $this->makeAPICall($model, "models/{$model}:generateContent", $payload);
+        return $this->makeAPICall($model, "models/{$model}:generateContent", $payload, $timeout);
     }
     
     /**
      * General helper to send requests to a custom API endpoint (e.g., :predict for Imagen).
+     * @param int $timeout Request timeout in seconds (default: 60, use 180 for image generation)
      */
-    protected function makeAPICall(string $model, string $endpoint, array $payload): array
+    protected function makeAPICall(string $model, string $endpoint, array $payload, int $timeout = 60): array
     {
         try {
             $response = $this->client->request('POST', $endpoint, [
                 'query'   => ['key' => $this->apiKey],
                 'headers' => ['Content-Type' => 'application/json'],
                 'body'    => json_encode($payload),
-                'timeout' => 60,
+                'timeout' => $timeout,
             ]);
 
             $body = json_decode($response->getBody(), true);
@@ -429,8 +431,8 @@ EOT;
                 'hasImageConfig' => isset($generationConfig['imageConfig']),
             ]);
 
-            // Assume $this->sendGenerateContentRequest handles the model and config correctly
-            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig);
+            // Use longer timeout (180s) for image generation as it can take longer than text
+            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig, 180);
 
             // --- 6. Detailed Response Logging for Debugging ---
             Log::info("Gemini Image Generation Response", [
@@ -627,7 +629,8 @@ EOT;
                 ];
             }
 
-            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig);
+            // Use longer timeout (180s) for image-to-image generation
+            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig, 180);
 
             // Log response for debugging
             Log::info("Gemini Image-to-Image Response", [
@@ -738,7 +741,8 @@ EOT;
                 }
             }
 
-            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig);
+            // Use longer timeout (180s) for image editing
+            $body = $this->sendGenerateContentRequest($model, $payload, $generationConfig, 180);
 
             // Log response
             Log::info("Gemini Image Edit Response", [
