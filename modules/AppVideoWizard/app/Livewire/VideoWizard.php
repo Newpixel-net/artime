@@ -20644,9 +20644,9 @@ PROMPT;
                         ]);
                     }
 
-                    // If collage is ready synchronously, extract quadrants to shots immediately
-                    if ($allReady) {
-                        $this->extractCollageQuadrantsToShots($sceneIndex);
+                    // If first page is ready synchronously, extract first page shots immediately
+                    if ($firstPageReady) {
+                        $this->extractCollagePageToShots($sceneIndex, 0);
                     }
                 }
             }
