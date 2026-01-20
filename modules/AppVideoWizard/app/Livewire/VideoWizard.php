@@ -5282,7 +5282,11 @@ class VideoWizard extends Component
                             'videoUrl' => substr($finalVideoUrl, 0, 100) . '...',
                         ]);
                     } else {
-                        \Log::warning('📡 Completed but no videoUrl', ['result' => $result]);
+                        // Job completed but no video URL - mark as error
+                        \Log::warning('📡 Completed but no videoUrl - marking as error', ['result' => $result]);
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'error';
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError'] = $result['error'] ?? 'Video upload failed - no video URL received';
+                        $hasUpdates = true;
                     }
                     unset($this->pendingJobs[$jobKey]);
 
@@ -22951,6 +22955,70 @@ PROMPT;
             \Log::error('🎬 Video generation error', ['error' => $e->getMessage()]);
         } finally {
             $this->isLoading = false;
+        }
+    }
+
+    /**
+     * Reset a stuck video generation job.
+     * Clears the videoStatus and removes any pending job for this shot.
+     */
+    public function resetShotVideo(int $sceneIndex, int $shotIndex): void
+    {
+        \Log::info('🔄 Resetting stuck video job', [
+            'sceneIndex' => $sceneIndex,
+            'shotIndex' => $shotIndex,
+        ]);
+
+        // Reset the video status
+        if (isset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex])) {
+            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'pending';
+            unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError']);
+            unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId']);
+            unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider']);
+        }
+
+        // Remove any pending job for this shot
+        $jobKey = "shot_video_{$sceneIndex}_{$shotIndex}";
+        if (isset($this->pendingJobs[$jobKey])) {
+            unset($this->pendingJobs[$jobKey]);
+        }
+
+        $this->saveProject();
+        $this->dispatch('generation-status', ['message' => __('Video job reset. You can try generating again.')]);
+    }
+
+    /**
+     * Reset all stuck video jobs in a scene.
+     */
+    public function resetAllStuckVideoJobs(int $sceneIndex): void
+    {
+        \Log::info('🔄 Resetting all stuck video jobs for scene', ['sceneIndex' => $sceneIndex]);
+
+        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
+        if (!$decomposed || empty($decomposed['shots'])) {
+            return;
+        }
+
+        $resetCount = 0;
+        foreach ($decomposed['shots'] as $shotIndex => $shot) {
+            $status = $shot['videoStatus'] ?? 'pending';
+            if (in_array($status, ['generating', 'processing'])) {
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'pending';
+                unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoError']);
+                unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId']);
+                unset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider']);
+
+                $jobKey = "shot_video_{$sceneIndex}_{$shotIndex}";
+                if (isset($this->pendingJobs[$jobKey])) {
+                    unset($this->pendingJobs[$jobKey]);
+                }
+                $resetCount++;
+            }
+        }
+
+        if ($resetCount > 0) {
+            $this->saveProject();
+            $this->dispatch('generation-status', ['message' => __(':count stuck job(s) reset.', ['count' => $resetCount])]);
         }
     }
 

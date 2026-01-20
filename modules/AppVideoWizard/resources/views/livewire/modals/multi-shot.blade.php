@@ -609,6 +609,7 @@ window.multiShotVideoPolling = function() {
                                         <div class="msm-render-status">
                                             <span>⏳ {{ __('Rendering...') }}</span>
                                             <div class="msm-progress-bar"><div></div></div>
+                                            <button wire:click.stop="resetShotVideo({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-reset-btn" title="{{ __('Reset stuck job') }}">🔄</button>
                                         </div>
                                     @endif
                                 </div>
@@ -1051,8 +1052,10 @@ window.multiShotVideoPolling = function() {
 .msm-face-btn { flex: 1; padding: 0.5rem; background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.25)); border: 1px solid rgba(245,158,11,0.5); border-radius: 8px; color: #fbbf24; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .msm-face-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(245,158,11,0.3); background: linear-gradient(135deg, rgba(245,158,11,0.4), rgba(251,191,36,0.35)); }
 
-.msm-render-status { text-align: center; padding: 0.4rem; background: rgba(6,182,212,0.1); border-radius: 6px; }
+.msm-render-status { text-align: center; padding: 0.4rem; background: rgba(6,182,212,0.1); border-radius: 6px; position: relative; }
 .msm-render-status span { font-size: 0.75rem; color: #67e8f9; font-weight: 500; }
+.msm-reset-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4); border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer; color: #fca5a5; transition: all 0.2s ease; }
+.msm-reset-btn:hover { background: rgba(239,68,68,0.4); border-color: rgba(239,68,68,0.6); }
 .msm-progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 0.4rem; }
 .msm-progress-bar div { height: 100%; background: linear-gradient(90deg, #06b6d4, #3b82f6, #8b5cf6); animation: msm-progress 1.5s infinite linear; }
 
