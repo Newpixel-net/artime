@@ -254,7 +254,8 @@ class OpenAIService
                 'input' => $text,
             ]);
 
-            return $this->successResponse($model, [$response->toStream() ?? null]);
+            // New SDK returns audio content directly as string
+            return $this->successResponse($model, [$response ?? null]);
 
         } catch (\Throwable $e) {
             return $this->errorResponse($model, $e, $category);
