@@ -469,7 +469,11 @@ window.multiShotVideoPolling = function() {
                     </div>
 
                     {{-- Shot Grid --}}
-                    <div class="msm-shot-grid">
+                    @php
+                        // Create a hash of all shot imageUrls to detect changes
+                        $shotsHash = md5(json_encode(array_column($decomposed['shots'], 'imageUrl')));
+                    @endphp
+                    <div class="msm-shot-grid" wire:key="shots-grid-{{ $multiShotSceneIndex }}-{{ $shotsHash }}">
                         @foreach($decomposed['shots'] as $shotIndex => $shot)
                             @php
                                 $hasImage = ($shot['status'] ?? '') === 'ready' && !empty($shot['imageUrl']);
@@ -494,7 +498,7 @@ window.multiShotVideoPolling = function() {
                                 $isSelected = ($decomposed['selectedShot'] ?? 0) === $shotIndex;
                             @endphp
 
-                            <div class="msm-shot-card {{ $hasVideo ? 'has-video' : '' }} {{ $wasTransferred ? 'transferred' : '' }} {{ $isSelected ? 'selected' : '' }}" data-video-status="{{ $shot['videoStatus'] ?? 'pending' }}" data-shot-index="{{ $shotIndex }}" wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $shotIndex }})">
+                            <div class="msm-shot-card {{ $hasVideo ? 'has-video' : '' }} {{ $wasTransferred ? 'transferred' : '' }} {{ $isSelected ? 'selected' : '' }}" data-video-status="{{ $shot['videoStatus'] ?? 'pending' }}" data-shot-index="{{ $shotIndex }}" wire:key="shot-{{ $multiShotSceneIndex }}-{{ $shotIndex }}-{{ md5($shot['imageUrl'] ?? 'empty') }}" wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $shotIndex }})">
                                 <div class="msm-shot-header">
                                     <span class="msm-shot-num">{{ $shotIndex + 1 }}</span>
                                     <span class="msm-shot-type">{{ ucfirst(str_replace('_', ' ', $shot['type'] ?? 'shot')) }}</span>

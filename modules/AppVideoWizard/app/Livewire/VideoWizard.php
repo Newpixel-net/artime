@@ -7656,8 +7656,11 @@ PROMPT;
                     // Handle video generation jobs
                     $this->pollVideoJob($jobKey, $job, $animationService);
                 } elseif ($jobType === 'collage') {
-                    // Handle collage generation jobs
+                    // Handle collage generation jobs (legacy single-image collage)
                     $this->pollCollageJob($jobKey, $job, $imageService);
+                } elseif ($jobType === 'collage_region') {
+                    // Handle individual collage region jobs (4 separate images per page)
+                    $this->pollCollageRegionJob($jobKey, $job, $imageService);
                 } else {
                     // Handle image generation jobs (legacy)
                     $this->pollImageJob($jobKey, $job, $imageService);
@@ -7769,6 +7772,130 @@ PROMPT;
             ]);
         }
         // If status is 'generating', job is still in progress - do nothing, will be polled again
+    }
+
+    /**
+     * Poll status of a collage region job (individual image for a collage page).
+     * This handles the new 4-separate-images approach where each region is generated independently.
+     */
+    protected function pollCollageRegionJob(string $jobKey, array $job, ImageGenerationService $imageService): void
+    {
+        $sceneIndex = $job['sceneIndex'] ?? null;
+        $pageIndex = $job['pageIndex'] ?? 0;
+        $regionIndex = $job['regionIndex'] ?? null;
+        $shotIndex = $job['shotIndex'] ?? null;
+        $processingJobId = $job['processingJobId'] ?? null;
+        $jobId = $job['jobId'] ?? null;
+
+        if ($sceneIndex === null || $regionIndex === null) {
+            Log::warning('VideoWizard: pollCollageRegionJob - missing required data', [
+                'jobKey' => $jobKey,
+                'sceneIndex' => $sceneIndex,
+                'regionIndex' => $regionIndex,
+            ]);
+            return;
+        }
+
+        $result = null;
+
+        // Check using processingJobId if available (HiDream model)
+        if ($processingJobId) {
+            $processingJob = WizardProcessingJob::find($processingJobId);
+            if (!$processingJob) {
+                Log::error('VideoWizard: pollCollageRegionJob - processing job not found', [
+                    'processingJobId' => $processingJobId,
+                ]);
+                unset($this->pendingJobs[$jobKey]);
+                return;
+            }
+            $result = $imageService->pollHiDreamJob($processingJob);
+        } elseif ($jobId) {
+            // Direct RunPod job polling
+            $result = $imageService->checkRunPodJobStatus($jobId);
+            // Normalize result format
+            if ($result['status'] === 'COMPLETED') {
+                $result['status'] = 'ready';
+            } elseif ($result['status'] === 'FAILED') {
+                $result['status'] = 'error';
+            }
+        } else {
+            Log::warning('VideoWizard: pollCollageRegionJob - no job ID found', ['jobKey' => $jobKey]);
+            unset($this->pendingJobs[$jobKey]);
+            return;
+        }
+
+        if (!$result) {
+            return;
+        }
+
+        $status = $result['status'] ?? 'unknown';
+
+        if ($status === 'ready' && !empty($result['imageUrl'])) {
+            // Update the collage region with the completed image
+            if (isset($this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex])) {
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex]['imageUrl'] = $result['imageUrl'];
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex]['status'] = 'ready';
+
+                Log::info('VideoWizard: Collage region job completed', [
+                    'sceneIndex' => $sceneIndex,
+                    'pageIndex' => $pageIndex,
+                    'regionIndex' => $regionIndex,
+                    'shotIndex' => $shotIndex,
+                    'imageUrl' => $result['imageUrl'],
+                ]);
+
+                // Check if all regions for this page are now ready
+                $allRegionsReady = true;
+                $regionImages = $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'] ?? [];
+                foreach ($regionImages as $ri) {
+                    if (($ri['status'] ?? '') !== 'ready' || empty($ri['imageUrl'])) {
+                        $allRegionsReady = false;
+                        break;
+                    }
+                }
+
+                if ($allRegionsReady) {
+                    // Mark the page as ready
+                    $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['status'] = 'ready';
+                    $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['previewUrl'] =
+                        $regionImages[0]['imageUrl'] ?? null;
+
+                    // Set overall collage status to ready
+                    $this->sceneCollages[$sceneIndex]['status'] = 'ready';
+
+                    // Extract all region images to their corresponding shots
+                    $this->extractCollagePageToShots($sceneIndex, $pageIndex);
+
+                    Log::info('VideoWizard: All regions for collage page completed, extracted to shots', [
+                        'sceneIndex' => $sceneIndex,
+                        'pageIndex' => $pageIndex,
+                        'regionCount' => count($regionImages),
+                    ]);
+                }
+            }
+
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+        } elseif ($status === 'error') {
+            // Region generation failed
+            if (isset($this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex])) {
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex]['status'] = 'error';
+                $this->sceneCollages[$sceneIndex]['collages'][$pageIndex]['regionImages'][$regionIndex]['error'] =
+                    $result['error'] ?? 'Generation failed';
+            }
+
+            unset($this->pendingJobs[$jobKey]);
+            $this->saveProject();
+
+            Log::error('VideoWizard: Collage region job failed', [
+                'sceneIndex' => $sceneIndex,
+                'pageIndex' => $pageIndex,
+                'regionIndex' => $regionIndex,
+                'error' => $result['error'] ?? 'Unknown error',
+            ]);
+        }
+        // If status is 'generating' or 'processing', job is still in progress - will be polled again
     }
 
     /**
@@ -20360,6 +20487,9 @@ PROMPT;
                 // Determine video model
                 $selectedVideoModel = $this->storyboard['videoModel'] ?? 'wan';
 
+                // Get dialogue content for this shot
+                $shotDialogue = $this->getDialogueForShot($scene, $i, $shotCount);
+
                 $shots[$i] = [
                     'id' => "shot-scene{$sceneIndex}-{$i}",
                     'index' => $i,
@@ -20389,6 +20519,15 @@ PROMPT;
                     'selectedVideoModel' => $selectedVideoModel,
                     'fromSceneImage' => $i === 0,
                     'fromFrameCapture' => $i > 0,
+
+                    // Audio layer for voiceover/lip-sync
+                    'needsLipSync' => !empty($shotDialogue),
+                    'dialogue' => $shotDialogue,
+                    'speakingCharacters' => [],
+                    'monologue' => null,           // Will be populated by enrichShotsWithMonologueStored
+                    'audioUrl' => null,
+                    'audioDuration' => null,
+                    'voiceId' => null,
                 ];
             }
 
@@ -20736,6 +20875,12 @@ PROMPT;
                     if ($firstPageReady) {
                         $this->extractCollagePageToShots($sceneIndex, 0);
                     }
+
+                    // CRITICAL: Enrich shots with monologue/dialogue content
+                    // This was previously missing, causing shots to have no voiceover text
+                    if ($createdDefaultShots) {
+                        $this->enrichShotsWithMonologueStored($sceneIndex);
+                    }
                 }
             }
 
@@ -21063,6 +21208,11 @@ PROMPT;
 
         // Force Livewire to detect the nested array changes
         if ($extractedCount > 0) {
+            // CRITICAL: Force Livewire to detect nested array changes by reassigning the entire array
+            // Livewire's dirty detection doesn't always catch deeply nested changes
+            $this->multiShotMode = $this->multiShotMode;
+
+            // Also dispatch event for any JS listeners
             $this->dispatch('shots-updated', [
                 'sceneIndex' => $sceneIndex,
                 'count' => $extractedCount,

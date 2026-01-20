@@ -820,7 +820,7 @@
     }
 </style>
 
-<div class="vw-storyboard-fullscreen" x-data="{ showSettings: true }">
+<div class="vw-storyboard-fullscreen" x-data="{ showSettings: true, selectedModel: '{{ $storyboard['imageModel'] ?? 'nanobanana' }}' }">
     {{-- Top Header Bar --}}
     <div class="vw-storyboard-topbar">
         {{-- Brand --}}
@@ -929,8 +929,8 @@
                         <div class="vw-model-buttons">
                             @foreach($imageModels as $modelId => $model)
                                 <button type="button"
-                                        class="vw-model-btn {{ $selectedModel === $modelId ? 'selected' : '' }}"
-                                        wire:click="$set('storyboard.imageModel', '{{ $modelId }}')"
+                                        :class="{ 'vw-model-btn': true, 'selected': selectedModel === '{{ $modelId }}' }"
+                                        @click="selectedModel = '{{ $modelId }}'; $wire.set('storyboard.imageModel', '{{ $modelId }}')"
                                         title="{{ $model['desc'] }}">
                                     <span class="vw-model-btn-name">{{ $model['name'] }}</span>
                                     <span class="vw-model-btn-cost">{{ $model['cost'] }}t</span>
