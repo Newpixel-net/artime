@@ -818,9 +818,9 @@ window.multiShotVideoPolling = function() {
                     🎬 {{ __('Generate voice first to use Multitalk') }}
                 </button>
             @else
-                <button type="button" wire:click.stop.prevent="confirmVideoModelAndGenerate" wire:loading.attr="disabled" class="msm-gen-anim-btn">
-                    <span wire:loading.remove>🎬 {{ __('Generate Animation') }}</span>
-                    <span wire:loading>⏳</span>
+                <button type="button" wire:click.stop.prevent="confirmVideoModelAndGenerate" wire:loading.attr="disabled" wire:target="confirmVideoModelAndGenerate" class="msm-gen-anim-btn">
+                    <span wire:loading.remove wire:target="confirmVideoModelAndGenerate">🎬 {{ __('Generate Animation') }}</span>
+                    <span wire:loading wire:target="confirmVideoModelAndGenerate">⏳</span>
                 </button>
             @endif
         </div>
