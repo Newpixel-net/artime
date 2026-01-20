@@ -22,7 +22,7 @@ start = time.time()
 
 endpoint_url = "https://api.runpod.ai/v2/pzi4079jucgobi"
 headers = {
-    'authorization': "rpa_SELBMO2SKWIBSJS68AZP1M0I1ZIJLA8E9KRSFEN81rnu1v",
+    'authorization': "rpa_",
     'content-type': 'application/json',
 }
 
