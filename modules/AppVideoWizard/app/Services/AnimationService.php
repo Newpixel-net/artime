@@ -435,8 +435,14 @@ class AnimationService
                 ]);
 
                 // Extract path from URL to check if file exists
+                // Note: URL may have /public/ prefix for cPanel hosting, but public_path() already points to public dir
                 $urlPath = parse_url($cachedVideoUrl, PHP_URL_PATH);
-                $filePath = public_path(ltrim($urlPath, '/'));
+                $urlPath = ltrim($urlPath, '/');
+                // Remove 'public/' prefix if present (cPanel hosting adds this to URLs but not to file paths)
+                if (str_starts_with($urlPath, 'public/')) {
+                    $urlPath = substr($urlPath, 7); // Remove 'public/' prefix
+                }
+                $filePath = public_path($urlPath);
 
                 if (file_exists($filePath)) {
                     $result['videoUrl'] = $cachedVideoUrl;
