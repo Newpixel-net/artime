@@ -41,8 +41,9 @@ class AppVideoWizardController extends Controller
         $uploadUrl = "{$baseUrl}/api/runpod/video-upload/{$token}";
 
         // Build the final video URL (where the video will be accessible after upload)
-        // Also use config('app.url') for consistency - url() helper can fail on proxied servers
-        $videoPath = "wizard-videos/{$projectId}/{$filename}";
+        // IMPORTANT: On cPanel hosting, web root is public_html but Laravel public is at public_html/public
+        // So we need /public/ prefix for direct file access
+        $videoPath = "public/wizard-videos/{$projectId}/{$filename}";
         $videoUrl = "{$baseUrl}/{$videoPath}";
 
         return [
