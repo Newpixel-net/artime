@@ -20949,6 +20949,14 @@ PROMPT;
             'extractedCount' => $extractedCount,
             'totalRegions' => count($collageData['regionImages']),
         ]);
+
+        // Force Livewire to detect the nested array changes
+        if ($extractedCount > 0) {
+            $this->dispatch('shots-updated', [
+                'sceneIndex' => $sceneIndex,
+                'count' => $extractedCount,
+            ]);
+        }
     }
 
     /**
