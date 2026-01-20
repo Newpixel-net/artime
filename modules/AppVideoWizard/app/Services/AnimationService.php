@@ -412,10 +412,18 @@ class AnimationService
 
         if ($normalizedStatus === 'completed') {
             // First, check our cached video URL (from when we submitted the job)
-            $cachedVideoUrl = \Illuminate\Support\Facades\Cache::get("multitalk_video_url:{$taskId}");
+            $cacheKey = "multitalk_video_url:{$taskId}";
+            $cachedVideoUrl = \Illuminate\Support\Facades\Cache::get($cacheKey);
+
+            \Log::info('🎬 Multitalk completed, checking for video URL', [
+                'taskId' => $taskId,
+                'cacheKey' => $cacheKey,
+                'hasCachedUrl' => !empty($cachedVideoUrl),
+                'cachedUrl' => $cachedVideoUrl ? substr($cachedVideoUrl, 0, 100) : null,
+            ]);
 
             if ($cachedVideoUrl) {
-                \Log::info('🎬 Multitalk completed, checking cached video URL', [
+                \Log::info('🎬 Multitalk: Found cached video URL, verifying file exists', [
                     'taskId' => $taskId,
                     'expectedUrl' => $cachedVideoUrl,
                 ]);

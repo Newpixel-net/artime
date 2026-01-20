@@ -41,8 +41,9 @@ class AppVideoWizardController extends Controller
         $uploadUrl = "{$baseUrl}/api/runpod/video-upload/{$token}";
 
         // Build the final video URL (where the video will be accessible after upload)
+        // Also use config('app.url') for consistency - url() helper can fail on proxied servers
         $videoPath = "wizard-videos/{$projectId}/{$filename}";
-        $videoUrl = url($videoPath);
+        $videoUrl = "{$baseUrl}/{$videoPath}";
 
         return [
             'upload_url' => $uploadUrl,
