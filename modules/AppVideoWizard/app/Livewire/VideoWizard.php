@@ -19942,8 +19942,8 @@ PROMPT;
             if ($this->projectId) {
                 $project = WizardProject::find($this->projectId);
                 if ($project) {
-                    // Use enhanced prompt with shot context
-                    $enhancedPrompt = $this->buildEnhancedShotImagePrompt($sceneIndex, $shotIndex);
+                    // Use enhanced prompt with shot context (pass shot array directly)
+                    $enhancedPrompt = $this->buildEnhancedShotImagePrompt($shot);
 
                     // =================================================================
                     // PHASE 3: Pass shot context for duplicate prevention
@@ -20004,49 +20004,6 @@ PROMPT;
     {
         $storyboardScene = $this->storyboard['scenes'][$sceneIndex] ?? null;
         return $storyboardScene['imageUrl'] ?? null;
-    }
-
-    /**
-     * Build enhanced prompt for shot image generation.
-     * Includes scene context, shot type, and consistency anchors.
-     */
-    protected function buildEnhancedShotImagePrompt(int $sceneIndex, int $shotIndex): string
-    {
-        $decomposed = $this->multiShotMode['decomposedScenes'][$sceneIndex] ?? null;
-        if (!$decomposed || !isset($decomposed['shots'][$shotIndex])) {
-            return '';
-        }
-
-        $shot = $decomposed['shots'][$shotIndex];
-        $scene = $this->script['scenes'][$sceneIndex] ?? [];
-
-        // Start with the shot's image prompt
-        $prompt = $shot['imagePrompt'] ?? $shot['prompt'] ?? '';
-
-        // Add shot type context
-        $shotType = $shot['type'] ?? 'medium';
-        $shotTypeDescriptions = [
-            'establishing' => 'Wide establishing shot showing full environment',
-            'medium' => 'Medium shot focusing on main subject',
-            'close-up' => 'Close-up emphasizing details and expressions',
-            'reaction' => 'Reaction shot capturing emotional response',
-            'detail' => 'Detail shot highlighting specific elements',
-            'wide' => 'Wide shot revealing full context',
-        ];
-        $prompt .= '. ' . ($shotTypeDescriptions[$shotType] ?? '');
-
-        // Add consistency anchors
-        $anchors = $decomposed['consistencyAnchors'] ?? [];
-        if (!empty($anchors['style'])) {
-            $prompt .= '. Style: ' . $anchors['style'];
-        }
-
-        // Add scene mood if available
-        if (!empty($scene['mood'])) {
-            $prompt .= '. Mood: ' . $scene['mood'];
-        }
-
-        return $prompt;
     }
 
     // =========================================================================
