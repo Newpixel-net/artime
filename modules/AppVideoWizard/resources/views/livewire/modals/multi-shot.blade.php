@@ -606,10 +606,34 @@ window.multiShotVideoPolling = function() {
                                             <button wire:click.stop="openShotFaceCorrectionModal({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-face-btn" title="{{ __('Face Correction') }}">👤 {{ __('Fix Face') }}</button>
                                         </div>
                                     @elseif($isGenVid)
-                                        <div class="msm-render-status">
-                                            <span>⏳ {{ __('Rendering...') }}</span>
-                                            <div class="msm-progress-bar"><div></div></div>
-                                            <button wire:click.stop="resetShotVideo({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-reset-btn" title="{{ __('Reset stuck job') }}">🔄</button>
+                                        @php
+                                            $videoProvider = $shot['videoProvider'] ?? 'minimax';
+                                            $jobStartedAt = $shot['videoJobStartedAt'] ?? null;
+                                            $estimatedSecs = $shot['videoEstimatedSeconds'] ?? 180; // default 3 min
+                                            $elapsedSecs = $jobStartedAt ? (now()->timestamp - $jobStartedAt) : 0;
+                                            $remainingSecs = max(0, $estimatedSecs - $elapsedSecs);
+                                            $progressPct = $estimatedSecs > 0 ? min(95, ($elapsedSecs / $estimatedSecs) * 100) : 0;
+                                            $elapsedMin = floor($elapsedSecs / 60);
+                                            $elapsedSecRem = $elapsedSecs % 60;
+                                            $remainingMin = floor($remainingSecs / 60);
+                                            $remainingSecRem = $remainingSecs % 60;
+                                        @endphp
+                                        <div class="msm-render-status msm-render-status-enhanced" wire:poll.5s>
+                                            <div class="msm-render-header">
+                                                <span class="msm-render-provider">
+                                                    @if($videoProvider === 'multitalk')
+                                                        🎤 Multitalk
+                                                    @else
+                                                        🎬 MiniMax
+                                                    @endif
+                                                </span>
+                                                <button wire:click.stop="resetShotVideo({{ $multiShotSceneIndex }}, {{ $shotIndex }})" class="msm-reset-btn" title="{{ __('Reset stuck job') }}">🔄</button>
+                                            </div>
+                                            <div class="msm-render-times">
+                                                <span class="msm-elapsed">{{ $elapsedMin }}:{{ str_pad($elapsedSecRem, 2, '0', STR_PAD_LEFT) }}</span>
+                                                <span class="msm-remaining">~{{ $remainingMin }}:{{ str_pad($remainingSecRem, 2, '0', STR_PAD_LEFT) }} {{ __('left') }}</span>
+                                            </div>
+                                            <div class="msm-progress-bar"><div style="width: {{ $progressPct }}%;"></div></div>
                                         </div>
                                     @endif
                                 </div>
@@ -1106,6 +1130,17 @@ window.multiShotVideoPolling = function() {
 .msm-reset-btn:hover { background: rgba(239,68,68,0.4); border-color: rgba(239,68,68,0.6); }
 .msm-progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 0.4rem; }
 .msm-progress-bar div { height: 100%; background: linear-gradient(90deg, #06b6d4, #3b82f6, #8b5cf6); animation: msm-progress 1.5s infinite linear; }
+
+/* Enhanced Render Status */
+.msm-render-status-enhanced { padding: 0.5rem; }
+.msm-render-status-enhanced .msm-render-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+.msm-render-status-enhanced .msm-render-provider { font-size: 0.7rem; font-weight: 600; color: #a5b4fc; background: rgba(99,102,241,0.2); padding: 2px 6px; border-radius: 4px; }
+.msm-render-status-enhanced .msm-reset-btn { position: static; transform: none; padding: 2px 5px; font-size: 0.65rem; }
+.msm-render-status-enhanced .msm-render-times { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+.msm-render-status-enhanced .msm-elapsed { font-size: 0.8rem; font-weight: 700; color: #fcd34d; font-family: monospace; }
+.msm-render-status-enhanced .msm-remaining { font-size: 0.65rem; color: #9ca3af; font-family: monospace; }
+.msm-render-status-enhanced .msm-progress-bar { margin-top: 0; }
+.msm-render-status-enhanced .msm-progress-bar div { animation: none; transition: width 0.5s ease; }
 
 /* Spinner - Modern Loading */
 .msm-spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.15); border-radius: 50%; animation: msm-spin 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite; }

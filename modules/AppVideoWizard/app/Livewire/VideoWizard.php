@@ -22981,6 +22981,15 @@ PROMPT;
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoStatus'] = 'processing';
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoTaskId'] = $result['taskId'];
                             $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoProvider'] = $result['provider'] ?? 'minimax';
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoJobStartedAt'] = now()->timestamp;
+
+                            // Estimate rendering time based on model and duration
+                            // Multitalk: ~50-60 seconds per second of video (frame-by-frame lip-sync)
+                            // MiniMax: ~30-45 seconds per second of video
+                            $estimatedSeconds = $selectedModel === 'multitalk'
+                                ? ($audioDuration ?? $duration) * 55 // ~55 sec per sec for Multitalk
+                                : $duration * 35; // ~35 sec per sec for MiniMax
+                            $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoEstimatedSeconds'] = (int) $estimatedSeconds;
 
                             \Log::info('🎬 Video task submitted - dispatching video-generation-started', [
                                 'taskId' => $result['taskId'],
