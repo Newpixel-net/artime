@@ -20871,18 +20871,41 @@ PROMPT;
      */
     protected function extractCollagePageToShots(int $sceneIndex, int $pageIndex): void
     {
+        Log::info('extractCollagePageToShots: Starting extraction', [
+            'sceneIndex' => $sceneIndex,
+            'pageIndex' => $pageIndex,
+            'hasCollageData' => isset($this->sceneCollages[$sceneIndex]['collages'][$pageIndex]),
+            'hasDecomposedScenes' => isset($this->multiShotMode['decomposedScenes'][$sceneIndex]),
+        ]);
+
         $collageData = $this->sceneCollages[$sceneIndex]['collages'][$pageIndex] ?? null;
         if (!$collageData || empty($collageData['regionImages'])) {
+            Log::warning('extractCollagePageToShots: No collage data or region images', [
+                'sceneIndex' => $sceneIndex,
+                'pageIndex' => $pageIndex,
+                'hasCollageData' => $collageData !== null,
+                'regionImagesCount' => count($collageData['regionImages'] ?? []),
+            ]);
             return;
         }
 
+        $extractedCount = 0;
         foreach ($collageData['regionImages'] as $regionIdx => $regionData) {
             if (empty($regionData['imageUrl'])) {
+                Log::debug('extractCollagePageToShots: Skipping region - no imageUrl', [
+                    'regionIdx' => $regionIdx,
+                    'status' => $regionData['status'] ?? 'unknown',
+                ]);
                 continue;
             }
 
             $shotIdx = $regionData['shotIndex'] ?? ($collageData['shots'][$regionIdx] ?? null);
             if ($shotIdx === null) {
+                Log::warning('extractCollagePageToShots: No shotIndex for region', [
+                    'regionIdx' => $regionIdx,
+                    'regionDataKeys' => array_keys($regionData),
+                    'collageShotsKeys' => array_keys($collageData['shots'] ?? []),
+                ]);
                 continue;
             }
 
@@ -20890,18 +20913,42 @@ PROMPT;
             if (isset($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx])) {
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['imageUrl'] = $regionData['imageUrl'];
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['imageStatus'] = 'ready';
+                $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['status'] = 'ready';
                 $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['fromCollageRegion'] = [
                     'pageIndex' => $pageIndex,
                     'regionIndex' => $regionIdx,
                 ];
 
                 // Track source
+                if (!isset($this->sceneCollages[$sceneIndex]['shotSources'])) {
+                    $this->sceneCollages[$sceneIndex]['shotSources'] = [];
+                }
                 $this->sceneCollages[$sceneIndex]['shotSources'][$shotIdx] = [
                     'pageIndex' => $pageIndex,
                     'regionIndex' => $regionIdx,
                 ];
+
+                $extractedCount++;
+                Log::info('extractCollagePageToShots: Extracted region to shot', [
+                    'regionIdx' => $regionIdx,
+                    'shotIdx' => $shotIdx,
+                    'imageUrl' => substr($regionData['imageUrl'], 0, 80) . '...',
+                ]);
+            } else {
+                Log::warning('extractCollagePageToShots: Shot not found in decomposedScenes', [
+                    'sceneIndex' => $sceneIndex,
+                    'shotIdx' => $shotIdx,
+                    'availableShots' => array_keys($this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'] ?? []),
+                ]);
             }
         }
+
+        Log::info('extractCollagePageToShots: Extraction complete', [
+            'sceneIndex' => $sceneIndex,
+            'pageIndex' => $pageIndex,
+            'extractedCount' => $extractedCount,
+            'totalRegions' => count($collageData['regionImages']),
+        ]);
     }
 
     /**
