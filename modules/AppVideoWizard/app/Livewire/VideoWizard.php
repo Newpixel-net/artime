@@ -36,6 +36,7 @@ use Modules\AppVideoWizard\Services\BibleOrderingService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class VideoWizard extends Component
 {
