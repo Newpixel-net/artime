@@ -19285,8 +19285,8 @@ PROMPT;
                 throw new \Exception('No monologue text available for voiceover');
             }
 
-            // Get voice selection
-            $voiceId = $options['voice'] ?? $shot['voiceId'] ?? $this->getCharacterVoice($sceneIndex, $shotIndex);
+            // Get voice selection - check component property first, then shot, then character default
+            $voiceId = $options['voice'] ?? $this->shotVoiceSelection ?? $shot['voiceId'] ?? $this->getCharacterVoice($sceneIndex, $shotIndex);
 
             // Generate audio using VoiceoverService
             $project = \Modules\AppVideoWizard\Models\WizardProject::findOrFail($this->projectId);
