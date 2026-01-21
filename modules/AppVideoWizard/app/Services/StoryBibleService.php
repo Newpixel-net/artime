@@ -176,6 +176,9 @@ class StoryBibleService
 
         $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
+        // Extract token usage from AI response
+        $tokensUsed = $result['totalTokens'] ?? null;
+
         if (!empty($result['error'])) {
             Log::error('StoryBible: AI error', ['error' => $result['error']]);
 
@@ -183,7 +186,7 @@ class StoryBibleService
             $this->logGeneration('story_bible_generation', [
                 'topic' => substr($topic, 0, 200),
                 'duration' => $duration,
-            ], [], 'failed', $result['error'], null, $durationMs, $project->id);
+            ], [], 'failed', $result['error'], $tokensUsed, $durationMs, $project->id);
 
             throw new \Exception($result['error']);
         }
@@ -196,7 +199,7 @@ class StoryBibleService
             $this->logGeneration('story_bible_generation', [
                 'topic' => substr($topic, 0, 200),
                 'duration' => $duration,
-            ], [], 'failed', 'Empty AI response', null, $durationMs, $project->id);
+            ], [], 'failed', 'Empty AI response', $tokensUsed, $durationMs, $project->id);
 
             throw new \Exception('AI returned an empty response. Please try again.');
         }
@@ -211,7 +214,13 @@ class StoryBibleService
         $storyBible['structureTemplate'] = $structureTemplate;
         $storyBible['aiModelTier'] = $aiModelTier;
 
-        // Log success
+        // Include token metadata for external tracking
+        $storyBible['_meta'] = [
+            'tokens_used' => $tokensUsed,
+            'model' => $result['model'] ?? null,
+        ];
+
+        // Log success with token usage
         $this->logGeneration('story_bible_generation', [
             'topic' => substr($topic, 0, 200),
             'duration' => $duration,
@@ -219,7 +228,7 @@ class StoryBibleService
             'characterCount' => count($storyBible['characters'] ?? []),
             'locationCount' => count($storyBible['locations'] ?? []),
             'actCount' => count($storyBible['acts'] ?? []),
-        ], 'success', null, null, $durationMs, $project->id);
+        ], 'success', null, $tokensUsed, $durationMs, $project->id);
 
         Log::info('StoryBible: Generation completed', [
             'projectId' => $project->id,

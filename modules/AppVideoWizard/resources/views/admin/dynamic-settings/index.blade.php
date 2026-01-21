@@ -244,7 +244,7 @@
                                                                   id="setting-{{ $setting->slug }}"
                                                                   name="settings[{{ $setting->slug }}]"
                                                                   rows="6"
-                                                                  placeholder="{{ $setting->input_placeholder }}">{{ $currentValue }}</textarea>
+                                                                  placeholder="{{ $setting->input_placeholder }}">{{ is_array($currentValue) ? json_encode($currentValue, JSON_PRETTY_PRINT) : $currentValue }}</textarea>
                                                         @break
 
                                                     @case('json_editor')
@@ -257,12 +257,22 @@
                                                         @break
 
                                                     @default
-                                                        <input type="text"
-                                                               class="form-control"
-                                                               id="setting-{{ $setting->slug }}"
-                                                               name="settings[{{ $setting->slug }}]"
-                                                               value="{{ $currentValue }}"
-                                                               placeholder="{{ $setting->input_placeholder }}">
+                                                        @if(is_array($currentValue))
+                                                            {{-- Array value - show as JSON textarea --}}
+                                                            <textarea class="form-control font-monospace"
+                                                                      id="setting-{{ $setting->slug }}"
+                                                                      name="settings[{{ $setting->slug }}]"
+                                                                      rows="4"
+                                                                      placeholder="{{ $setting->input_placeholder }}">{{ json_encode($currentValue, JSON_PRETTY_PRINT) }}</textarea>
+                                                            <small class="text-muted">{{ __('JSON format') }}</small>
+                                                        @else
+                                                            <input type="text"
+                                                                   class="form-control"
+                                                                   id="setting-{{ $setting->slug }}"
+                                                                   name="settings[{{ $setting->slug }}]"
+                                                                   value="{{ $currentValue }}"
+                                                                   placeholder="{{ $setting->input_placeholder }}">
+                                                        @endif
                                                 @endswitch
 
                                                 @if($setting->input_help)

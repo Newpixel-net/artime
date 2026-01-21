@@ -68,7 +68,15 @@ class ConceptService
 
         \Log::info('ConceptService: AI response length', ['length' => strlen($response)]);
 
-        return $this->parseImproveResponse($response);
+        $parsed = $this->parseImproveResponse($response);
+
+        // Include token usage metadata for logging
+        $parsed['_meta'] = [
+            'tokens_used' => $result['totalTokens'] ?? null,
+            'model' => $result['model'] ?? null,
+        ];
+
+        return $parsed;
     }
 
     /**
@@ -243,6 +251,12 @@ PROMPT;
             $variations = json_decode($response, true);
         }
 
-        return $variations ?? [];
+        return [
+            'variations' => $variations ?? [],
+            '_meta' => [
+                'tokens_used' => $result['totalTokens'] ?? null,
+                'model' => $result['model'] ?? null,
+            ],
+        ];
     }
 }

@@ -196,11 +196,14 @@ class ScriptGenerationService
         ]);
         $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
+        // Extract token usage from AI response
+        $tokensUsed = $result['totalTokens'] ?? null;
+
         if (!empty($result['error'])) {
             \Log::error('VideoWizard: AI error', ['error' => $result['error']]);
 
             // Log the failure
-            $this->logGeneration('script_generation', $promptParams, [], 'failed', $result['error'], null, $durationMs, $project->id);
+            $this->logGeneration('script_generation', $promptParams, [], 'failed', $result['error'], $tokensUsed, $durationMs, $project->id);
 
             throw new \Exception($result['error']);
         }
@@ -211,7 +214,7 @@ class ScriptGenerationService
             \Log::error('VideoWizard: Empty AI response', ['result' => $result]);
 
             // Log the failure
-            $this->logGeneration('script_generation', $promptParams, [], 'failed', 'Empty AI response', null, $durationMs, $project->id);
+            $this->logGeneration('script_generation', $promptParams, [], 'failed', 'Empty AI response', $tokensUsed, $durationMs, $project->id);
 
             throw new \Exception('AI returned an empty response. Please try again.');
         }
@@ -239,8 +242,14 @@ class ScriptGenerationService
             // The new batch system generates scenes incrementally with proper context continuity
         }
 
-        // Log successful generation
-        $this->logGeneration('script_generation', $promptParams, $parsedScript, 'success', null, null, $durationMs, $project->id);
+        // Log successful generation with token usage
+        $this->logGeneration('script_generation', $promptParams, $parsedScript, 'success', null, $tokensUsed, $durationMs, $project->id);
+
+        // Include metadata for external tracking
+        $parsedScript['_meta'] = [
+            'tokens_used' => $tokensUsed,
+            'model' => $result['model'] ?? null,
+        ];
 
         return $parsedScript;
     }

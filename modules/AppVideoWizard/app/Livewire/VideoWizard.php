@@ -2523,13 +2523,16 @@ class VideoWizard extends Component
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
+            // Extract token usage from result metadata
+            $tokensUsed = $result['_meta']['tokens_used'] ?? null;
+
             // Log success to admin panel
             try {
                 VwGenerationLog::logSuccess(
                     $promptSlug,
                     $inputData,
                     $result,
-                    null, // tokens - not available from ConceptService
+                    $tokensUsed,
                     $durationMs,
                     $this->projectId,
                     auth()->id(),
@@ -2711,7 +2714,7 @@ class VideoWizard extends Component
             }
 
             // Generate concept variations
-            $variations = $conceptService->generateVariations(
+            $variationsResult = $conceptService->generateVariations(
                 $this->concept['refinedConcept'] ?: $this->concept['rawInput'],
                 3,
                 [
@@ -2719,6 +2722,10 @@ class VideoWizard extends Component
                     'aiModelTier' => $this->content['aiModelTier'] ?? 'economy',
                 ]
             );
+
+            // Extract variations and token metadata
+            $variations = $variationsResult['variations'] ?? $variationsResult;
+            $tokensUsed = $variationsResult['_meta']['tokens_used'] ?? null;
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
@@ -2728,7 +2735,7 @@ class VideoWizard extends Component
                     $promptSlug,
                     $inputData,
                     ['variations_count' => count($variations)],
-                    null,
+                    $tokensUsed,
                     $durationMs,
                     $this->projectId,
                     auth()->id(),
@@ -2929,13 +2936,16 @@ class VideoWizard extends Component
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
+            // Extract token usage from result metadata (ScriptGenerationService already logs internally)
+            $tokensUsed = $generatedScript['_meta']['tokens_used'] ?? null;
+
             // Log success to admin panel
             try {
                 VwGenerationLog::logSuccess(
                     $promptSlug,
                     $inputData,
                     ['scenes_count' => count($generatedScript['scenes'] ?? [])],
-                    null,
+                    $tokensUsed,
                     $durationMs,
                     $this->projectId,
                     auth()->id(),
@@ -11705,6 +11715,9 @@ PROMPT;
 
             $durationMs = (int)((microtime(true) - $startTime) * 1000);
 
+            // Extract token usage from result metadata
+            $tokensUsed = $generatedBible['_meta']['tokens_used'] ?? null;
+
             // Merge generated bible with existing structure
             $this->storyBible = array_merge($this->storyBible, $generatedBible);
             $this->storyBible['enabled'] = true;
@@ -11721,7 +11734,7 @@ PROMPT;
                         'locationCount' => count($this->storyBible['locations'] ?? []),
                         'actCount' => count($this->storyBible['acts'] ?? []),
                     ],
-                    null,
+                    $tokensUsed,
                     $durationMs,
                     $this->projectId,
                     auth()->id(),

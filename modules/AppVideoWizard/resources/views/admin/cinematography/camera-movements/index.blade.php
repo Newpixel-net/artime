@@ -179,7 +179,11 @@
                             </td>
                             <td class="align-middle">
                                 @php
-                                    $stackable = $movement->stackable_with ?? [];
+                                    // Ensure stackable_with is always an array (handles legacy string data)
+                                    $rawStackable = $movement->stackable_with;
+                                    $stackable = is_array($rawStackable)
+                                        ? $rawStackable
+                                        : (is_string($rawStackable) ? (json_decode($rawStackable, true) ?? []) : []);
                                     $stackCount = count($stackable);
                                 @endphp
                                 @if($stackCount > 0)
