@@ -104,7 +104,7 @@
                                         <span class="badge bg-secondary badge-sm">v{{ $log->prompt_version }}</span>
                                     @endif
                                 </td>
-                                <td class="small">{{ $log->user?->name ?? 'N/A' }}</td>
+                                <td class="small">{{ $log->user?->fullname ?? 'N/A' }}</td>
                                 <td class="small">
                                     @if($log->project)
                                         <a href="{{ route('app.video-wizard.edit', $log->project_id) }}" target="_blank">

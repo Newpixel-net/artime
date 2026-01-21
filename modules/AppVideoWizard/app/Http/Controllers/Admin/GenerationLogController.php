@@ -31,7 +31,15 @@ class GenerationLogController extends Controller
             'date_to' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
-        $query = VwGenerationLog::with(['user', 'project']);
+        // Select only needed columns (exclude large JSON fields for performance)
+        $query = VwGenerationLog::select([
+            'id', 'project_id', 'user_id', 'prompt_slug', 'prompt_version',
+            'tokens_used', 'duration_ms', 'status', 'error_message',
+            'estimated_cost', 'created_at', 'updated_at'
+        ])->with([
+            'user:id,fullname,email',
+            'project:id,name'
+        ]);
 
         // Filters
         if ($request->filled('prompt_slug')) {
@@ -56,7 +64,12 @@ class GenerationLogController extends Controller
 
         $logs = $query->orderBy('created_at', 'desc')->paginate(50);
 
-        $prompts = VwPrompt::orderBy('name')->pluck('name', 'slug');
+        // Get prompts for filter dropdown (with fallback for empty table)
+        try {
+            $prompts = VwPrompt::orderBy('name')->pluck('name', 'slug');
+        } catch (\Exception $e) {
+            $prompts = collect();
+        }
         $statuses = ['success' => 'Success', 'failed' => 'Failed', 'partial' => 'Partial'];
 
         return view('appvideowizard::admin.logs.index', compact('logs', 'prompts', 'statuses'));
