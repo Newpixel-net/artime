@@ -1,5 +1,66 @@
 @extends('layouts.app')
 
+@push('styles')
+<style>
+/* Scrollable tabs for many categories */
+.nav-tabs-scrollable {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+}
+.nav-tabs-scrollable::-webkit-scrollbar {
+    height: 4px;
+}
+.nav-tabs-scrollable::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
+}
+.nav-tabs-scrollable .nav-item {
+    flex-shrink: 0;
+}
+.nav-tabs-scrollable .nav-link {
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+.nav-tabs-scrollable .nav-link .badge {
+    font-size: 0.7rem;
+}
+/* Settings card improvements */
+.card-body .col-md-6 > .border {
+    background: #fff;
+    border-color: #e5e7eb !important;
+}
+.card-body .col-md-6 .form-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+}
+.card-body .col-md-6 .text-muted.small {
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+/* Fix input text overflow */
+.card-body .form-control,
+.card-body .form-select {
+    font-size: 0.875rem;
+}
+.card-body textarea.form-control {
+    min-height: 80px;
+}
+/* Input group text size */
+.card-body .input-group-text {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="border-bottom mb-1 py-4 bg-polygon">
     <div class="container">
@@ -94,25 +155,29 @@
     <form action="{{ route('admin.video-wizard.dynamic-settings.update') }}" method="POST">
         @csrf
 
-        <!-- Category Tabs -->
-        <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
-            @foreach($categories as $categorySlug => $categoryName)
-                @if(isset($settingsByCategory[$categorySlug]) && $settingsByCategory[$categorySlug]->count() > 0)
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {{ $loop->first ? 'active' : '' }}"
-                                id="tab-{{ $categorySlug }}"
-                                data-bs-toggle="tab"
-                                data-bs-target="#content-{{ $categorySlug }}"
-                                type="button"
-                                role="tab">
-                            <i class="{{ $categoryIcons[$categorySlug] ?? 'fa fa-cog' }} me-2"></i>
-                            {{ $categoryName }}
-                            <span class="badge bg-secondary ms-1">{{ $settingsByCategory[$categorySlug]->count() }}</span>
-                        </button>
-                    </li>
-                @endif
-            @endforeach
-        </ul>
+        <!-- Category Tabs (Scrollable) -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-2">
+                <ul class="nav nav-tabs nav-tabs-scrollable border-0" id="settingsTabs" role="tablist">
+                    @foreach($categories as $categorySlug => $categoryName)
+                        @if(isset($settingsByCategory[$categorySlug]) && $settingsByCategory[$categorySlug]->count() > 0)
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {{ $loop->first ? 'active' : '' }}"
+                                        id="tab-{{ $categorySlug }}"
+                                        data-bs-toggle="tab"
+                                        data-bs-target="#content-{{ $categorySlug }}"
+                                        type="button"
+                                        role="tab">
+                                    <i class="{{ $categoryIcons[$categorySlug] ?? 'fa fa-cog' }} me-1"></i>
+                                    {{ $categoryName }}
+                                    <span class="badge bg-secondary ms-1">{{ $settingsByCategory[$categorySlug]->count() }}</span>
+                                </button>
+                            </li>
+                        @endif
+                    @endforeach
+                </ul>
+            </div>
+        </div>
 
         <!-- Tab Content -->
         <div class="tab-content" id="settingsTabContent">
