@@ -15955,9 +15955,9 @@ PROMPT;
                 'lens' => $shotType['lens'] ?? '50mm',
 
                 // Prompts for generation (will be enhanced by story beats)
-                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null),
+                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null, $shotContext),
                 'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription, $shotContext),
-                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null),
+                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null, $shotContext),
 
                 // Image state
                 'imageUrl' => null,
@@ -16012,7 +16012,17 @@ PROMPT;
         // Check scene speechType to determine if dialogue should trigger lip-sync
         $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
         $sceneNeedsLipSync = in_array($speechType, ['monologue', 'dialogue'], true);
-        $shots = $this->applyStoryBeatsToShots($shots, $storyBeats, $visualDescription, $sceneNeedsLipSync);
+
+        // Scene context for story-aware prompts in fallback path
+        $sceneContext = [
+            'narration' => $scene['narration'] ?? '',
+            'mood' => $scene['mood'] ?? 'cinematic',
+            'emotionalBeat' => $scene['emotionalBeat'] ?? '',
+            'sceneTitle' => $scene['title'] ?? '',
+            'characters' => $sceneCharacters ?? [],
+        ];
+
+        $shots = $this->applyStoryBeatsToShots($shots, $storyBeats, $visualDescription, $sceneNeedsLipSync, $sceneContext);
 
         // Detect and fix similar adjacent shots (redundancy prevention)
         $shots = $this->detectAndFixSimilarShots($shots, 0.7);
@@ -16423,13 +16433,14 @@ PROMPT;
      * @param array|null $storyBeats AI-generated story beats
      * @param string $baseVisualDescription Fallback visual description
      * @param bool $sceneNeedsLipSync Whether scene's speechType requires lip-sync (monologue/dialogue)
+     * @param array $sceneContext Scene context for story-aware prompts
      * @return array Enhanced shots with unique content
      */
-    protected function applyStoryBeatsToShots(array $shots, ?array $storyBeats, string $baseVisualDescription, bool $sceneNeedsLipSync = false): array
+    protected function applyStoryBeatsToShots(array $shots, ?array $storyBeats, string $baseVisualDescription, bool $sceneNeedsLipSync = false, array $sceneContext = []): array
     {
         if (empty($storyBeats) || empty($storyBeats['beats'])) {
             // Fallback: add basic variety if no story beats
-            return $this->addBasicShotVariety($shots, $baseVisualDescription);
+            return $this->addBasicShotVariety($shots, $baseVisualDescription, $sceneContext);
         }
 
         // Flatten story beats into individual shots
@@ -16457,8 +16468,8 @@ PROMPT;
                 $enhancedShots[] = $this->mergeStoryBeatWithEngineShot($engineShot, $beatShot, $continuity, $i, $sceneNeedsLipSync);
                 $beatIndex++;
             } else {
-                // No more beat shots, use fallback
-                $enhancedShots[] = $this->addFallbackShotContent($engineShot, $baseVisualDescription, $i);
+                // No more beat shots, use fallback with scene context
+                $enhancedShots[] = $this->addFallbackShotContent($engineShot, $baseVisualDescription, $i, $sceneContext);
             }
         }
 
@@ -16627,12 +16638,21 @@ PROMPT;
     /**
      * Add basic variety to shots when AI decomposition fails.
      * Ensures each shot is visually distinct even without AI story beats.
+     *
+     * @param array $shots The shots to enhance
+     * @param string $baseVisualDescription Base visual description
+     * @param array $sceneContext Scene context for story-aware prompts
+     * @return array Enhanced shots with variety
      */
-    protected function addBasicShotVariety(array $shots, string $baseVisualDescription): array
+    protected function addBasicShotVariety(array $shots, string $baseVisualDescription, array $sceneContext = []): array
     {
         $characterMatch = [];
         $hasCharacter = preg_match('/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:walks|stands|looks|sits|moves)/i', $baseVisualDescription, $characterMatch);
         $characterName = $hasCharacter ? $characterMatch[1] : 'the subject';
+
+        // Try to extract actual story action from narration
+        $extractedAction = $this->extractActualStoryAction($baseVisualDescription, $sceneContext);
+        $hasStoryAction = !empty($extractedAction);
 
         $varietyActions = [
             'establishing' => "Wide view establishing the scene environment and atmosphere",
@@ -16646,7 +16666,13 @@ PROMPT;
 
         foreach ($shots as $i => &$shot) {
             $type = $shot['type'] ?? 'medium';
-            $varietyDesc = $varietyActions[$type] ?? $varietyActions['medium'];
+
+            // Use extracted story action if available, otherwise generic variety
+            if ($hasStoryAction && in_array($type, ['medium', 'medium-close', 'close-up'])) {
+                $varietyDesc = $this->buildEnhancedStoryAction($extractedAction, $type, $sceneContext);
+            } else {
+                $varietyDesc = $varietyActions[$type] ?? $varietyActions['medium'];
+            }
 
             // Make each shot more unique by adding position context
             if ($i === 0) {
@@ -16655,6 +16681,11 @@ PROMPT;
                 $varietyDesc .= '. Scene conclusion.';
             } else {
                 $varietyDesc .= '. Scene progresses.';
+            }
+
+            // Add emotional context from scene mood
+            if (!empty($sceneContext['mood'])) {
+                $varietyDesc .= " Conveying {$sceneContext['mood']} emotion.";
             }
 
             $shot['uniqueVisualDescription'] = $varietyDesc;
@@ -16670,14 +16701,20 @@ PROMPT;
 
     /**
      * Add fallback content to a shot when no beat data exists.
+     *
+     * @param array $shot The shot structure to enhance
+     * @param string $baseVisual Base visual description
+     * @param int $index Shot index
+     * @param array $sceneContext Scene context for story-aware prompts
+     * @return array Enhanced shot structure
      */
-    protected function addFallbackShotContent(array $shot, string $baseVisual, int $index): array
+    protected function addFallbackShotContent(array $shot, string $baseVisual, int $index, array $sceneContext = []): array
     {
         $shotType = $shot['type'] ?? 'medium';
         $fallbackDesc = $this->getHollywoodShotDescription($shotType) . '. ' . $baseVisual;
 
         $shot['uniqueVisualDescription'] = $fallbackDesc;
-        $shot['imagePrompt'] = $this->buildShotPrompt($baseVisual, ['type' => $shotType], $index);
+        $shot['imagePrompt'] = $this->buildShotPrompt($baseVisual, ['type' => $shotType], $index, null, $sceneContext);
         $shot['prompt'] = $shot['imagePrompt'];
 
         return $shot;
@@ -17123,9 +17160,9 @@ PROMPT;
 
                 // Prompts for generation
                 // CRITICAL: Pass AI-generated unique action for visual variety per shot
-                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, $aiShot['subjectAction'] ?? null),
+                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, $aiShot['subjectAction'] ?? null, $shotContext),
                 'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription, $shotContext),
-                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, $aiShot['subjectAction'] ?? null),
+                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, $aiShot['subjectAction'] ?? null, $shotContext),
                 'subjectAction' => $aiShot['subjectAction'] ?? null, // Store for reference
 
                 // Image state
@@ -17238,9 +17275,9 @@ PROMPT;
                 'lens' => $shotType['lens'] ?? 'standard 50mm',
 
                 // Prompts for generation
-                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null),
+                'imagePrompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null, $shotContext),
                 'videoPrompt' => $this->getMotionDescriptionForShot($shotType['type'], $cameraMovement, $visualDescription, $shotContext),
-                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null),
+                'prompt' => $this->buildShotPrompt($visualDescription, $shotType, $i, null, $shotContext),
 
                 // Image state
                 'imageUrl' => null,
@@ -17710,7 +17747,7 @@ PROMPT;
      *
      * Optimal length: 50-100 words (2-4 sentences)
      */
-    protected function buildShotPrompt(string $baseDescription, array $shotType, int $index, ?string $shotAction = null): string
+    protected function buildShotPrompt(string $baseDescription, array $shotType, int $index, ?string $shotAction = null, array $shotContext = []): string
     {
         $parts = [];
 
@@ -17721,15 +17758,34 @@ PROMPT;
         $explicitFraming = $this->getExplicitFramingInstruction($shotType['type'], $index);
         $parts[] = $explicitFraming;
 
-        // 2. SUBJECT + ACTION - Use shot-specific action if available, otherwise enhance base
+        // 2. SUBJECT + ACTION - Use shot-specific action if available, otherwise EXTRACT from story
         // CRITICAL: Each shot needs UNIQUE visual content
         if (!empty($shotAction)) {
             // Use the AI-generated unique action for this specific shot
             $parts[] = $shotAction;
         } else {
-            // Fallback: enhance base description but this is NOT ideal
-            $enhancedSubject = $this->enhanceSubjectDescription($baseDescription, $shotType);
-            $parts[] = $enhancedSubject;
+            // STORY-AWARE FALLBACK: Extract actual action from narration
+            $extractedAction = $this->extractActualStoryAction($baseDescription, $shotContext);
+
+            if (!empty($extractedAction)) {
+                // Build Hollywood-quality action from extracted story content
+                $storyAction = $this->buildEnhancedStoryAction($extractedAction, $shotType['type'], $shotContext);
+                $parts[] = $storyAction;
+            } else {
+                // Last resort: enhance base description
+                $enhancedSubject = $this->enhanceSubjectDescription($baseDescription, $shotType);
+                $parts[] = $enhancedSubject;
+            }
+
+            // Add emotional context from scene mood
+            if (!empty($shotContext['mood'])) {
+                $parts[] = "conveying {$shotContext['mood']} emotion";
+            }
+
+            // Add story purpose if known
+            if (!empty($shotContext['emotionalBeat'])) {
+                $parts[] = "capturing the {$shotContext['emotionalBeat']} moment";
+            }
         }
 
         // 3. ANTI-POSED INSTRUCTION - Characters must be in natural action
