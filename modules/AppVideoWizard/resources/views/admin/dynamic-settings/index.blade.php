@@ -2,7 +2,9 @@
 
 @push('styles')
 <style>
-/* Scrollable tabs for many categories */
+/* ========================================
+   SCROLLABLE TABS
+   ======================================== */
 .nav-tabs-scrollable {
     display: flex;
     flex-wrap: nowrap;
@@ -11,6 +13,7 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     padding-bottom: 2px;
+    gap: 0.25rem;
 }
 .nav-tabs-scrollable::-webkit-scrollbar {
     height: 4px;
@@ -25,68 +28,209 @@
 .nav-tabs-scrollable .nav-link {
     white-space: nowrap;
     padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
 }
 .nav-tabs-scrollable .nav-link .badge {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
 }
-/* Settings card improvements */
-.card-body .col-md-6 {
-    margin-bottom: 1.5rem !important;
+
+/* ========================================
+   TWO-COLUMN LAYOUT
+   ======================================== */
+.settings-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -12px;
 }
-.card-body .col-md-6 > .border {
-    background: #fff;
-    border-color: #e5e7eb !important;
-    padding: 1rem !important;
+.settings-row > .col-md-6 {
+    padding: 0 12px;
+    margin-bottom: 24px !important;
 }
-.card-body .col-md-6 .form-label {
-    font-weight: 600;
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
-    word-break: break-word;
-    line-height: 1.3;
-}
-.card-body .col-md-6 p.text-muted.small {
-    font-size: 0.8rem;
-    line-height: 1.5;
-    margin-bottom: 0.75rem !important;
-    color: #6b7280 !important;
-}
-/* Fix input text overflow */
-.card-body .form-control,
-.card-body .form-select {
-    font-size: 0.875rem;
-}
-.card-body textarea.form-control {
-    min-height: 60px;
-    resize: vertical;
-    line-height: 1.5;
-}
-/* Input group text size */
-.card-body .input-group-text {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
-/* Help text spacing */
-.card-body small.text-muted {
-    display: block;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    line-height: 1.4;
-}
-/* Checkbox switch alignment */
-.card-body .form-check.form-switch {
-    padding-top: 0.25rem;
-}
-/* Setting card specific */
+
+/* ========================================
+   SETTING CARD
+   ======================================== */
 .setting-card {
+    background: #fff;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px;
+    padding: 20px !important;
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
-.setting-card .form-control:last-of-type,
-.setting-card .form-select:last-of-type,
-.setting-card .form-check:last-of-type {
+.setting-card.bg-light {
+    background: #f9fafb !important;
+}
+
+/* ========================================
+   SETTING HEADER (Title + Icon)
+   ======================================== */
+.setting-card .setting-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.setting-card .form-label {
+    font-weight: 600;
+    font-size: 0.875rem;
     margin-bottom: 0;
+    line-height: 1.4;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.setting-card .form-label i {
+    color: #6b7280;
+    font-size: 0.8125rem;
+    width: 16px;
+    text-align: center;
+}
+.setting-card .form-label .badge {
+    font-size: 0.625rem;
+    padding: 2px 6px;
+    font-weight: 500;
+}
+
+/* ========================================
+   DESCRIPTION TEXT
+   ======================================== */
+.setting-card .setting-description {
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: #6b7280;
+    margin-bottom: 16px;
+}
+
+/* ========================================
+   INPUT FIELDS - Unified Styling
+   ======================================== */
+.setting-card .form-control,
+.setting-card .form-select {
+    height: 40px;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background-color: #fff;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+.setting-card .form-control:focus,
+.setting-card .form-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.setting-card textarea.form-control {
+    height: auto;
+    min-height: 64px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+/* Input Group */
+.setting-card .input-group {
+    display: flex;
+    align-items: stretch;
+}
+.setting-card .input-group .form-control {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.setting-card .input-group-text {
+    height: 40px;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+/* ========================================
+   TOGGLE SWITCH
+   ======================================== */
+.setting-card .form-check.form-switch {
+    padding-left: 3rem;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+.setting-card .form-check-input {
+    width: 44px;
+    height: 24px;
+    margin-left: -3rem;
+    margin-top: 0;
+    cursor: pointer;
+}
+.setting-card .form-check-label {
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+    padding-left: 8px;
+    line-height: 24px;
+}
+
+/* ========================================
+   SELECT / DROPDOWN
+   ======================================== */
+.setting-card .form-select {
+    padding-right: 36px;
+    background-position: right 12px center;
+    background-size: 12px;
+}
+
+/* ========================================
+   HELP TEXT
+   ======================================== */
+.setting-card .setting-help {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #9ca3af;
+}
+.setting-card .setting-help i {
+    margin-right: 4px;
+}
+.setting-card .setting-help.text-success {
+    color: #10b981 !important;
+}
+.setting-card .setting-help.text-warning {
+    color: #f59e0b !important;
+}
+
+/* Default value indicator */
+.setting-card .setting-default {
+    display: block;
+    margin-top: 8px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #92400e;
+    background-color: #fef3c7;
+    border-radius: 4px;
+}
+.setting-card .setting-default i {
+    margin-right: 4px;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+@media (max-width: 768px) {
+    .settings-row > .col-md-6 {
+        margin-bottom: 16px !important;
+    }
+    .setting-card {
+        padding: 16px !important;
+    }
 }
 </style>
 @endpush
@@ -233,18 +377,18 @@
                                 </form>
                             </div>
                             <div class="card-body">
-                                <div class="row">
+                                <div class="row settings-row">
                                     @foreach($settingsByCategory[$categorySlug] as $setting)
-                                        <div class="col-md-6 mb-3">
-                                            <div class="border rounded p-3 h-100 setting-card {{ $setting->is_system ? 'bg-light' : '' }}">
-                                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                                    <label class="form-label fw-bold mb-0" for="setting-{{ $setting->slug }}">
+                                        <div class="col-md-6">
+                                            <div class="setting-card {{ $setting->is_system ? 'bg-light' : '' }}">
+                                                <div class="setting-header">
+                                                    <label class="form-label" for="setting-{{ $setting->slug }}">
                                                         @if($setting->icon)
-                                                            <i class="{{ $setting->icon }} me-1 text-muted"></i>
+                                                            <i class="{{ $setting->icon }}"></i>
                                                         @endif
                                                         {{ $setting->name }}
                                                         @if($setting->is_system)
-                                                            <span class="badge bg-secondary ms-1" title="{{ __('System setting') }}">
+                                                            <span class="badge bg-secondary" title="{{ __('System setting') }}">
                                                                 <i class="fa fa-lock"></i>
                                                             </span>
                                                         @endif
@@ -252,7 +396,7 @@
                                                 </div>
 
                                                 @if($setting->description)
-                                                    <p class="text-muted small mb-3">{{ $setting->description }}</p>
+                                                    <p class="setting-description">{{ $setting->description }}</p>
                                                 @endif
 
                                                 @php
@@ -328,13 +472,13 @@
                                                             </button>
                                                         </div>
                                                         @if($currentValue)
-                                                            <small class="text-success d-block mt-1">
-                                                                <i class="fa fa-check-circle me-1"></i>
+                                                            <small class="setting-help text-success">
+                                                                <i class="fa fa-check-circle"></i>
                                                                 {{ __('API key is configured') }}
                                                             </small>
                                                         @else
-                                                            <small class="text-warning d-block mt-1">
-                                                                <i class="fa fa-exclamation-triangle me-1"></i>
+                                                            <small class="setting-help text-warning">
+                                                                <i class="fa fa-exclamation-triangle"></i>
                                                                 {{ __('Not configured') }}
                                                             </small>
                                                         @endif
@@ -354,7 +498,7 @@
                                                                   name="settings[{{ $setting->slug }}]"
                                                                   rows="3"
                                                                   placeholder="{{ $setting->input_placeholder }}">{{ is_array($currentValue) ? json_encode($currentValue, JSON_PRETTY_PRINT) : $currentValue }}</textarea>
-                                                        <small class="text-muted">{{ __('Enter valid JSON') }}</small>
+                                                        <small class="setting-help">{{ __('Enter valid JSON') }}</small>
                                                         @break
 
                                                     @default
@@ -365,7 +509,7 @@
                                                                       name="settings[{{ $setting->slug }}]"
                                                                       rows="4"
                                                                       placeholder="{{ $setting->input_placeholder }}">{{ json_encode($currentValue, JSON_PRETTY_PRINT) }}</textarea>
-                                                            <small class="text-muted">{{ __('JSON format') }}</small>
+                                                            <small class="setting-help">{{ __('JSON format') }}</small>
                                                         @elseif(is_string($currentValue) && (strlen($currentValue) > 40 || str_contains($currentValue, ',')))
                                                             {{-- Long text or comma-separated values - show as textarea --}}
                                                             <textarea class="form-control"
@@ -374,7 +518,7 @@
                                                                       rows="2"
                                                                       placeholder="{{ $setting->input_placeholder }}">{{ $currentValue }}</textarea>
                                                             @if(str_contains($currentValue ?? '', ','))
-                                                                <small class="text-muted">{{ __('Comma-separated list') }}</small>
+                                                                <small class="setting-help">{{ __('Comma-separated list') }}</small>
                                                             @endif
                                                         @else
                                                             <input type="text"
@@ -387,15 +531,15 @@
                                                 @endswitch
 
                                                 @if($setting->input_help)
-                                                    <small class="text-muted d-block mt-1">
-                                                        <i class="fa fa-info-circle me-1"></i>
+                                                    <small class="setting-help">
+                                                        <i class="fa fa-info-circle"></i>
                                                         {{ $setting->input_help }}
                                                     </small>
                                                 @endif
 
                                                 @if($setting->default_value && $setting->value !== $setting->default_value)
-                                                    <small class="text-warning d-block mt-1">
-                                                        <i class="fa fa-exclamation-triangle me-1"></i>
+                                                    <small class="setting-default">
+                                                        <i class="fa fa-exclamation-triangle"></i>
                                                         {{ __('Default:') }} {{ is_array($setting->getTypedDefaultValue()) ? json_encode($setting->getTypedDefaultValue()) : $setting->getTypedDefaultValue() }}
                                                     </small>
                                                 @endif
