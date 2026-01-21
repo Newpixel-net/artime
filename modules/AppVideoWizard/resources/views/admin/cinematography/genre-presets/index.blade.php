@@ -1,5 +1,20 @@
 @extends('layouts.app')
 
+@push('styles')
+<style>
+/* Fix card text bleed issue - cards need solid backgrounds */
+.row.g-4 > .col-md-6 > .card {
+    background-color: #fff !important;
+    isolation: isolate;
+}
+.row.g-4 > .col-md-6 > .card .card-header,
+.row.g-4 > .col-md-6 > .card .card-body,
+.row.g-4 > .col-md-6 > .card .card-footer {
+    background-color: #fff !important;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="border-bottom mb-1 py-4 bg-polygon">
     <div class="container">
@@ -92,8 +107,8 @@
     <div class="row g-4">
         @forelse($presets as $preset)
             <div class="col-md-6 col-lg-4">
-                <div class="card border-0 shadow-sm h-100 {{ !$preset->is_active ? 'opacity-50' : '' }}">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                <div class="card border-0 shadow-sm h-100 {{ !$preset->is_active ? 'opacity-50' : '' }}" style="background-color: #fff !important; isolation: isolate;">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background-color: #fff !important;">
                         <div>
                             <span class="badge bg-{{ $preset->category == 'cinematic' ? 'primary' : ($preset->category == 'documentary' ? 'success' : ($preset->category == 'horror' ? 'danger' : 'secondary')) }}">
                                 {{ ucfirst($preset->category) }}
@@ -142,30 +157,32 @@
                             </ul>
                         </div>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body" style="background-color: #fff !important;">
                         <h6 class="card-title mb-1">{{ $preset->name }}</h6>
-                        <code class="small text-muted">{{ $preset->slug }}</code>
+                        <div class="mb-2">
+                            <code class="small text-muted d-inline-block" style="background: transparent;">{{ $preset->slug }}</code>
+                        </div>
 
                         @if($preset->description)
-                            <p class="text-muted small mt-2 mb-3">{{ Str::limit($preset->description, 80) }}</p>
+                            <p class="text-muted small mb-3">{{ Str::limit($preset->description, 80) }}</p>
                         @endif
 
                         <div class="mt-3">
-                            <div class="mb-2">
-                                <span class="badge bg-light text-dark me-1"><i class="fa fa-video-camera me-1"></i> {{ __('Camera') }}</span>
-                                <small class="text-muted">{{ Str::limit($preset->camera_language, 50) }}</small>
+                            <div class="d-flex align-items-start mb-2">
+                                <span class="badge bg-light text-dark me-2 flex-shrink-0"><i class="fa fa-video-camera me-1"></i> {{ __('Camera') }}</span>
+                                <small class="text-muted text-break">{{ Str::limit($preset->camera_language, 50) }}</small>
                             </div>
-                            <div class="mb-2">
-                                <span class="badge bg-light text-dark me-1"><i class="fa fa-palette me-1"></i> {{ __('Color') }}</span>
-                                <small class="text-muted">{{ Str::limit($preset->color_grade, 50) }}</small>
+                            <div class="d-flex align-items-start mb-2">
+                                <span class="badge bg-light text-dark me-2 flex-shrink-0"><i class="fa fa-palette me-1"></i> {{ __('Color') }}</span>
+                                <small class="text-muted text-break">{{ Str::limit($preset->color_grade, 50) }}</small>
                             </div>
-                            <div>
-                                <span class="badge bg-light text-dark me-1"><i class="fa fa-lightbulb me-1"></i> {{ __('Light') }}</span>
-                                <small class="text-muted">{{ Str::limit($preset->lighting, 50) }}</small>
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-light text-dark me-2 flex-shrink-0"><i class="fa fa-lightbulb me-1"></i> {{ __('Light') }}</span>
+                                <small class="text-muted text-break">{{ Str::limit($preset->lighting, 50) }}</small>
                             </div>
                         </div>
                     </div>
-                    <div class="card-footer bg-white border-0 pt-0">
+                    <div class="card-footer border-0 pt-0" style="background-color: #fff !important;">
                         <a href="{{ route('admin.video-wizard.cinematography.genre-presets.edit', $preset) }}" class="btn btn-sm btn-outline-primary w-100">
                             <i class="fa fa-edit me-1"></i> {{ __('Edit Preset') }}
                         </a>
