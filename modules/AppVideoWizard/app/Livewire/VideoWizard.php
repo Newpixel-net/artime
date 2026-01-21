@@ -15936,7 +15936,10 @@ PROMPT;
             $cameraMovement = $this->getCameraMovementForShot($shotType['type'], $i);
             $duration = $engineShot['duration'] ?? $this->getClipDuration();
 
-            // Shot context for video prompt generation
+            // Get dialogue for this specific shot
+            $shotDialogue = $this->getDialogueForShot($scene, $i, count($analysis['shots'] ?? []));
+
+            // Shot context for prompt generation - includes ALL story elements
             $shotContext = [
                 'index' => $i,
                 'purpose' => $shotType['purpose'] ?? 'narrative',
@@ -15945,6 +15948,9 @@ PROMPT;
                 'narration' => $scene['narration'] ?? '',
                 'emotionalBeat' => $scene['emotionalBeat'] ?? $scene['mood'] ?? '',
                 'sceneTitle' => $scene['title'] ?? '',
+                'dialogue' => $shotDialogue,
+                'characters' => $scene['characters'] ?? [],
+                'mood' => $scene['mood'] ?? '',
             ];
 
             $shots[] = [
@@ -16551,7 +16557,7 @@ PROMPT;
         $engineShot['imagePrompt'] = $this->buildEnhancedShotImagePrompt($engineShot);
         $engineShot['prompt'] = $engineShot['imagePrompt'];
 
-        // Video prompt with story action
+        // Video prompt with story action - includes all story elements
         $shotContext = [
             'index' => $index,
             'purpose' => $engineShot['beatType'],
@@ -16560,6 +16566,9 @@ PROMPT;
             'subject' => $beatShot['subject'] ?? '',
             'emotion' => $beatShot['emotion'] ?? '',
             'narration' => '',
+            'dialogue' => $beatShot['dialogue'] ?? '',
+            'characters' => $beatShot['characters'] ?? [],
+            'mood' => $beatShot['emotion'] ?? '',
         ];
         $engineShot['videoPrompt'] = $this->getMotionDescriptionForShot(
             $engineShot['type'],
@@ -16775,12 +16784,16 @@ PROMPT;
         $shot['imagePrompt'] = $this->buildEnhancedShotImagePrompt($shot);
         $shot['prompt'] = $shot['imagePrompt'];
 
-        // Video prompt
+        // Video prompt - includes all story elements
         $shotContext = [
             'index' => $index,
             'purpose' => $shot['beatType'],
             'isChained' => $index > 0,
             'subjectAction' => $beatShot['action'] ?? '',
+            'dialogue' => $beatShot['dialogue'] ?? $shot['dialogue'] ?? '',
+            'characters' => $beatShot['characters'] ?? $shot['speakingCharacters'] ?? [],
+            'mood' => $beatShot['emotion'] ?? '',
+            'narration' => '',
         ];
         $shot['videoPrompt'] = $this->getMotionDescriptionForShot($shotType, $shot['cameraMovement'], $uniqueVisual, $shotContext);
         $shot['narrativeBeat'] = ['motionDescription' => $shot['videoPrompt']];
@@ -16917,12 +16930,16 @@ PROMPT;
         $shot['imagePrompt'] = $this->buildEnhancedShotImagePrompt($shot);
         $shot['prompt'] = $shot['imagePrompt'];
 
-        // 5. Rebuild video prompt
+        // 5. Rebuild video prompt - includes all story elements
         $shotContext = [
             'index' => $index,
             'purpose' => $shot['beatType'] ?? 'narrative',
             'isChained' => true,
             'subjectAction' => $shot['subjectAction'] ?? '',
+            'dialogue' => $shot['dialogue'] ?? '',
+            'characters' => $shot['speakingCharacters'] ?? [],
+            'mood' => $shot['mood'] ?? '',
+            'narration' => $shot['narration'] ?? '',
         ];
         $shot['videoPrompt'] = $this->getMotionDescriptionForShot(
             $shot['type'],
@@ -17134,21 +17151,26 @@ PROMPT;
             $autoSelectModel = (bool) $this->getDynamicSetting('animation_auto_select_model', true);
             $selectedVideoModel = $autoSelectModel && $needsLipSync ? 'multitalk' : 'minimax';
 
+            // Get dialogue for this specific shot
+            $shotDialogue = $this->getDialogueForShot($scene, $i, count($shots));
+
             // Shot context for subject action generation (Hollywood-quality video prompts)
             // =================================================================
-            // PHASE 4: Include narration and emotional beat for story-driven prompts
+            // STORY-AWARE: Include ALL story elements for better prompts
             // =================================================================
             $shotContext = [
                 'index' => $i,
                 'purpose' => $shotType['purpose'] ?? 'narrative',
                 'isChained' => $i > 0,
                 'description' => $shotType['description'] ?? '',
-                'subjectAction' => $aiShot['subjectAction'] ?? null, // From AI if provided
-                // PHASE 4: Story context for video prompts
+                'subjectAction' => $aiShot['subjectAction'] ?? null,
                 'narration' => $scene['narration'] ?? '',
                 'emotionalBeat' => $scene['emotionalBeat'] ?? $scene['mood'] ?? '',
                 'storyBeat' => $aiShot['storyBeat'] ?? null,
                 'sceneTitle' => $scene['title'] ?? '',
+                'dialogue' => $shotDialogue ?? $aiShot['dialogue'] ?? '',
+                'characters' => $scene['characters'] ?? [],
+                'mood' => $scene['mood'] ?? '',
             ];
 
             $shots[] = [
@@ -17252,19 +17274,24 @@ PROMPT;
             $shotType = $this->getShotTypeForIndex($i, $shotCount, $scene);
             $cameraMovement = $this->getCameraMovementForShot($shotType['type'], $i);
 
+            // Get dialogue for this specific shot
+            $shotDialogue = $this->getDialogueForShot($scene, $i, $shotCount);
+
             // Shot context for subject action generation (Hollywood-quality video prompts)
             // =================================================================
-            // PHASE 4: Include narration and emotional beat for story-driven prompts
+            // STORY-AWARE: Include ALL story elements for better prompts
             // =================================================================
             $shotContext = [
                 'index' => $i,
                 'purpose' => $shotType['purpose'] ?? 'narrative',
                 'isChained' => $i > 0,
                 'description' => $shotType['description'] ?? '',
-                // PHASE 4: Story context for video prompts
                 'narration' => $scene['narration'] ?? '',
                 'emotionalBeat' => $scene['emotionalBeat'] ?? $scene['mood'] ?? '',
                 'sceneTitle' => $scene['title'] ?? '',
+                'dialogue' => $shotDialogue,
+                'characters' => $scene['characters'] ?? [],
+                'mood' => $scene['mood'] ?? '',
             ];
 
             $shots[] = [
@@ -17743,116 +17770,249 @@ PROMPT;
     }
 
     /**
-     * Build prompt for a specific shot using Hollywood-quality formula.
-     * [Camera Shot + Motion] + [Subject + Detailed Action] + [Environment] + [Lighting] + [Cinematic Style]
+     * Build prompt for a specific shot using STORY-FIRST approach.
      *
-     * Based on industry best practices from:
-     * - Runway Text to Video Prompting Guide
-     * - MiniMax/Hailuo Prompt Guide
-     * - Sora 2 Best Practices
+     * Structure: [Story Visual] + [Camera/Shot Type] + [Lens] + [Lighting] + [Style]
      *
-     * Optimal length: 50-100 words (2-4 sentences)
+     * PRIORITY: Story content ALWAYS comes first - what's happening in the scene.
+     * Technical specs (camera, lens, lighting) come after to support the story.
+     *
+     * Optimal length: 50-80 words for focused generation.
      */
     protected function buildShotPrompt(string $baseDescription, array $shotType, int $index, ?string $shotAction = null, array $shotContext = []): string
     {
-        $parts = [];
+        // =====================================================================
+        // 1. STORY VISUAL CONTENT (ALWAYS FIRST)
+        // This is the most important part - what is actually happening
+        // =====================================================================
+        $storyContent = $this->buildStoryVisualContent($baseDescription, $shotAction, $shotContext, $shotType);
 
-        // CRITICAL: CINEMATIC REQUIREMENT FIRST - prevents posed stock photos
-        $parts[] = "CINEMATIC FILM STILL from a movie in progress - NOT a posed photograph";
+        // =====================================================================
+        // 2. DIALOGUE INTEGRATION (if present in shot)
+        // Characters speaking should be reflected in the prompt
+        // =====================================================================
+        $dialogueContent = $this->buildDialogueContent($shotContext);
 
-        // 1. CAMERA SHOT - EXPLICIT framing with SPECIFIC composition instructions
-        $explicitFraming = $this->getExplicitFramingInstruction($shotType['type'], $index);
-        $parts[] = $explicitFraming;
+        // =====================================================================
+        // 3. CAMERA/SHOT TYPE (brief, not verbose)
+        // =====================================================================
+        $cameraShot = $this->getBriefShotTypeInstruction($shotType['type']);
 
-        // 2. SUBJECT + ACTION - Use shot-specific action if available, otherwise EXTRACT from story
-        // CRITICAL: Each shot needs UNIQUE visual content
+        // =====================================================================
+        // 4. TECHNICAL SPECS (lens, lighting, style)
+        // =====================================================================
+        $technicalSpecs = $this->buildTechnicalSpecs($shotType);
+
+        // =====================================================================
+        // BUILD FINAL PROMPT - Story First Structure
+        // =====================================================================
+        $promptParts = [];
+
+        // Story content is ALWAYS first
+        $promptParts[] = $storyContent;
+
+        // Add dialogue if present
+        if (!empty($dialogueContent)) {
+            $promptParts[] = $dialogueContent;
+        }
+
+        // Camera shot type (brief)
+        $promptParts[] = $cameraShot;
+
+        // Technical specs
+        $promptParts[] = $technicalSpecs;
+
+        // Join with proper punctuation
+        $prompt = implode('. ', array_filter($promptParts));
+
+        // Ensure prompt stays in optimal range (50-80 words)
+        $words = str_word_count($prompt);
+        if ($words > 100) {
+            // Truncate to keep it focused - story + camera + basic tech
+            $prompt = $storyContent . '. ' . $cameraShot . '. ' . $technicalSpecs;
+        }
+
+        return trim($prompt);
+    }
+
+    /**
+     * Build the story visual content - what's actually happening in the shot.
+     * This is the CORE of the prompt and should be detailed and specific.
+     */
+    protected function buildStoryVisualContent(string $baseDescription, ?string $shotAction, array $shotContext, array $shotType): string
+    {
+        // Priority 1: Use AI-generated shot-specific action if available
         if (!empty($shotAction)) {
-            // Use the AI-generated unique action for this specific shot
-            $parts[] = $shotAction;
-        } else {
-            // STORY-AWARE FALLBACK: Extract actual action from narration
+            return $this->enhanceStoryAction($shotAction, $shotContext);
+        }
+
+        // Priority 2: Extract action from narration
+        $narration = $shotContext['narration'] ?? '';
+        if (!empty($narration)) {
+            // Try to extract specific character actions
             $extractedAction = $this->extractActualStoryAction($baseDescription, $shotContext);
-
             if (!empty($extractedAction)) {
-                // Build Hollywood-quality action from extracted story content
-                $storyAction = $this->buildEnhancedStoryAction($extractedAction, $shotType['type'], $shotContext);
-                $parts[] = $storyAction;
-            } else {
-                // Last resort: enhance base description
-                $enhancedSubject = $this->enhanceSubjectDescription($baseDescription, $shotType);
-                $parts[] = $enhancedSubject;
+                return $this->enhanceStoryAction($extractedAction, $shotContext);
             }
 
-            // Add emotional context from scene mood
-            if (!empty($shotContext['mood'])) {
-                $parts[] = "conveying {$shotContext['mood']} emotion";
-            }
-
-            // Add story purpose if known
-            if (!empty($shotContext['emotionalBeat'])) {
-                $parts[] = "capturing the {$shotContext['emotionalBeat']} moment";
-            }
+            // Use narration directly - it contains the story
+            return $this->formatNarrationForPrompt($narration, $shotType['type'], $shotContext);
         }
 
-        // 3. ANTI-POSED INSTRUCTION - Characters must be in natural action
-        $parts[] = "Characters CAUGHT IN ACTION - mid-gesture, mid-movement, NOT looking at camera";
+        // Priority 3: Use base description with enhancement
+        return $this->enhanceStoryAction($baseDescription, $shotContext);
+    }
 
-        // 3. LENS specification (critical for cinematic quality)
-        if (!empty($shotType['lens'])) {
-            $parts[] = $shotType['lens'];
-        } else {
-            // Default cinematic lens characteristics
-            $defaultLens = $this->getDefaultLensForShot($shotType['type']);
-            if ($defaultLens) {
-                $parts[] = $defaultLens;
-            }
+    /**
+     * Build dialogue content for shots where characters are speaking.
+     * Returns formatted dialogue instruction for the prompt.
+     */
+    protected function buildDialogueContent(array $shotContext): string
+    {
+        $dialogue = $shotContext['dialogue'] ?? '';
+        if (empty($dialogue)) {
+            return '';
         }
 
-        // 4. Genre-specific styling (uses database-backed CinematographyService)
+        // Extract speaking character if mentioned
+        $characters = $shotContext['characters'] ?? [];
+        $speakingChar = !empty($characters) ? $characters[0] : 'the character';
+
+        // Check if dialogue contains actual quoted speech
+        if (preg_match('/"([^"]+)"/', $dialogue, $matches)) {
+            $spokenText = $matches[1];
+            // Truncate long dialogue for prompt
+            if (strlen($spokenText) > 50) {
+                $spokenText = substr($spokenText, 0, 47) . '...';
+            }
+            return "{$speakingChar} speaks with intensity, mouth forming words";
+        }
+
+        // Check for character speech indicators
+        if (preg_match('/\b(says?|speaks?|asks?|replies?|shouts?|whispers?|exclaims?)\b/i', $dialogue)) {
+            return "{$speakingChar} mid-speech, expressive mouth movement";
+        }
+
+        return '';
+    }
+
+    /**
+     * Get brief shot type instruction - not verbose, just essential info.
+     */
+    protected function getBriefShotTypeInstruction(string $shotType): string
+    {
+        $shotTypes = [
+            'establishing' => 'WIDE ESTABLISHING SHOT',
+            'extreme-wide' => 'EXTREME WIDE SHOT',
+            'wide' => 'WIDE SHOT',
+            'medium-wide' => 'MEDIUM WIDE SHOT',
+            'medium' => 'MEDIUM SHOT',
+            'medium-close' => 'MEDIUM CLOSE-UP',
+            'close-up' => 'CLOSE-UP',
+            'extreme-close-up' => 'EXTREME CLOSE-UP',
+            'reaction' => 'REACTION SHOT',
+            'detail' => 'DETAIL SHOT',
+            'over-shoulder' => 'OVER-THE-SHOULDER',
+            'pov' => 'POV SHOT',
+            'two-shot' => 'TWO-SHOT',
+            'low-angle' => 'LOW ANGLE SHOT',
+            'high-angle' => 'HIGH ANGLE SHOT',
+        ];
+
+        return $shotTypes[$shotType] ?? strtoupper($shotType) . ' SHOT';
+    }
+
+    /**
+     * Build technical specs string - lens, lighting, style combined.
+     */
+    protected function buildTechnicalSpecs(array $shotType): string
+    {
+        $specs = [];
+
+        // Lens
+        $lens = $shotType['lens'] ?? $this->getDefaultLensForShot($shotType['type']);
+        if ($lens) {
+            $specs[] = $lens;
+        }
+
+        // Lighting from genre preset
         $genrePreset = $this->getGenrePreset();
-
-        // 5. LIGHTING - Enhanced with Hollywood terminology
         if (!empty($genrePreset['lighting'])) {
             $lightingElements = explode(',', $genrePreset['lighting']);
-            $enhancedLighting = $this->enhanceLightingDescription(trim($lightingElements[0]));
-            $parts[] = $enhancedLighting;
+            $specs[] = trim($lightingElements[0]) . ' lighting';
         } else {
-            $parts[] = 'cinematic lighting with depth';
+            $specs[] = 'cinematic lighting';
         }
 
-        // 6. COLOR GRADING - Essential for visual consistency
-        if (!empty($genrePreset['colorGrade'])) {
-            $parts[] = $genrePreset['colorGrade'];
-        } else {
-            $parts[] = 'professional color grading';
-        }
-
-        // 7. STYLE - From Style Bible (highest priority) or genre preset
+        // Style from Style Bible or genre
         if ($this->sceneMemory['styleBible']['enabled'] && !empty($this->sceneMemory['styleBible']['style'])) {
-            $parts[] = $this->sceneMemory['styleBible']['style'];
+            $specs[] = $this->sceneMemory['styleBible']['style'];
         } elseif (!empty($genrePreset['style'])) {
-            $parts[] = $genrePreset['style'];
+            $specs[] = $genrePreset['style'];
         }
 
-        // 8. CINEMATIC QUALITY markers
-        $parts[] = 'shallow depth of field, subtle film grain';
+        // Cinematic quality markers (brief)
+        $specs[] = 'shallow depth of field';
 
-        // 9. Technical quality specs (if enabled)
-        if ($this->storyboard['technicalSpecs']['enabled']) {
-            $parts[] = $this->storyboard['technicalSpecs']['positive'];
+        return implode(', ', $specs);
+    }
+
+    /**
+     * Enhance story action with emotional and visual details.
+     */
+    protected function enhanceStoryAction(string $action, array $shotContext): string
+    {
+        $enhanced = $action;
+
+        // Add mood if available
+        $mood = $shotContext['mood'] ?? $shotContext['emotionalBeat'] ?? '';
+        if (!empty($mood) && !stripos($enhanced, $mood)) {
+            // Only add mood if not already in the action
+            $moodDescriptors = [
+                'tense' => 'with visible tension',
+                'dramatic' => 'dramatically',
+                'mysterious' => 'shrouded in mystery',
+                'action' => 'with dynamic intensity',
+                'romantic' => 'with intimate warmth',
+                'horror' => 'with creeping dread',
+                'comedy' => 'with comedic timing',
+            ];
+
+            $moodDesc = $moodDescriptors[strtolower($mood)] ?? "with {$mood} atmosphere";
+            $enhanced .= ", {$moodDesc}";
         }
 
-        // Join with proper punctuation for optimal AI processing
-        $prompt = implode('. ', array_filter($parts));
+        return $enhanced;
+    }
 
-        // Ensure prompt stays under ~100 words for optimal AI processing
-        $words = str_word_count($prompt);
-        if ($words > 120) {
-            // Keep most important elements: shot, subject/action, lighting, style
-            $prompt = implode('. ', array_slice($parts, 0, 6));
+    /**
+     * Format narration text for use as prompt - extract visual essence.
+     */
+    protected function formatNarrationForPrompt(string $narration, string $shotType, array $shotContext): string
+    {
+        // Remove narrative transitions
+        $cleaned = preg_replace('/\b(suddenly|meanwhile|however|therefore|thus|hence|finally|then)\b/i', '', $narration);
+
+        // Remove timestamps and scene markers
+        $cleaned = preg_replace('/\[.*?\]/', '', $cleaned);
+
+        // Extract after colon if present (often the visual description)
+        if (preg_match('/:\s*(.+)$/i', $cleaned, $matches)) {
+            $cleaned = trim($matches[1]);
         }
 
-        return $prompt;
+        // Get first 2 sentences max for focus
+        $sentences = preg_split('/(?<=[.!?])\s+/', $cleaned, -1, PREG_SPLIT_NO_EMPTY);
+        $sentences = array_filter(array_map('trim', $sentences));
+        $visualContent = implode(' ', array_slice($sentences, 0, 2));
+
+        // Add mood from context if available
+        $mood = $shotContext['mood'] ?? $shotContext['emotionalBeat'] ?? '';
+        if (!empty($mood)) {
+            $visualContent .= " - {$mood} atmosphere";
+        }
+
+        return trim($visualContent);
     }
 
     /**
@@ -18378,6 +18538,62 @@ PROMPT;
         }
 
         return null;
+    }
+
+    /**
+     * Clean and format narration text for use in image prompts.
+     * Extracts visual descriptions and formats them for image generation.
+     */
+    protected function cleanNarrationForPrompt(string $narration, string $shotType = 'medium'): string
+    {
+        // Remove common non-visual phrases
+        $cleaned = preg_replace('/\b(suddenly|meanwhile|however|therefore|thus|hence)\b/i', '', $narration);
+
+        // Extract visual description parts (after colons or before periods)
+        if (preg_match('/:\s*(.+)$/i', $cleaned, $matches)) {
+            $cleaned = trim($matches[1]);
+        }
+
+        // Limit to first 2-3 sentences for focus
+        $sentences = preg_split('/[.!?]+/', $cleaned);
+        $sentences = array_filter(array_map('trim', $sentences));
+        $visualSentences = array_slice($sentences, 0, 3);
+        $cleaned = implode('. ', $visualSentences);
+
+        // Add shot-type appropriate framing
+        $shotFraming = $this->getShotTypeVisualFocus($shotType);
+        if (!empty($shotFraming)) {
+            $cleaned = $shotFraming . ' showing: ' . $cleaned;
+        }
+
+        // Trim and ensure proper ending
+        $cleaned = trim($cleaned, '. ');
+        if (!empty($cleaned) && !preg_match('/[.!?]$/', $cleaned)) {
+            $cleaned .= '.';
+        }
+
+        return $cleaned;
+    }
+
+    /**
+     * Get visual focus instruction based on shot type.
+     */
+    protected function getShotTypeVisualFocus(string $shotType): string
+    {
+        $focusMap = [
+            'establishing' => 'Wide establishing view',
+            'wide' => 'Wide shot capturing the full scene',
+            'medium' => 'Medium shot focusing on the subject',
+            'close' => 'Close-up revealing details',
+            'closeup' => 'Close-up revealing details',
+            'extreme_close' => 'Extreme close-up on specific detail',
+            'over_shoulder' => 'Over-the-shoulder perspective',
+            'pov' => 'Point-of-view shot',
+            'reaction' => 'Reaction shot capturing emotion',
+            'insert' => 'Insert shot highlighting key element',
+        ];
+
+        return $focusMap[$shotType] ?? 'Cinematic shot';
     }
 
     /**
@@ -20736,7 +20952,10 @@ PROMPT;
                 // Get camera movement for this shot type
                 $cameraMovement = $this->getCameraMovementForShot($shotType, $i);
 
-                // Build shot context for Hollywood-quality video prompts
+                // Get dialogue for this specific shot
+                $shotDialogue = $this->getDialogueForShot($scene, $i, $shotCount);
+
+                // Build shot context - includes ALL story elements
                 $shotContext = [
                     'index' => $i,
                     'purpose' => $this->getShotPurpose($shotType),
@@ -20745,6 +20964,9 @@ PROMPT;
                     'narration' => $scene['narration'] ?? '',
                     'emotionalBeat' => $scene['emotionalBeat'] ?? $scene['mood'] ?? '',
                     'sceneTitle' => $scene['title'] ?? '',
+                    'dialogue' => $shotDialogue,
+                    'characters' => $scene['characters'] ?? [],
+                    'mood' => $scene['mood'] ?? '',
                 ];
 
                 // Generate Hollywood-quality video prompt
@@ -23772,12 +23994,17 @@ PROMPT;
         // Update video prompt to include new camera movement
         $shot = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex];
 
-        // Build shot context for Hollywood-quality subject action
+        // Build shot context - includes ALL story elements
+        $scene = $this->script['scenes'][$sceneIndex] ?? [];
         $shotContext = [
             'index' => $shotIndex,
             'purpose' => $shot['purpose'] ?? 'narrative',
             'isChained' => $shotIndex > 0,
             'description' => $shot['description'] ?? '',
+            'dialogue' => $shot['dialogue'] ?? '',
+            'characters' => $scene['characters'] ?? [],
+            'mood' => $scene['mood'] ?? '',
+            'narration' => $scene['narration'] ?? '',
         ];
 
         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIndex]['videoPrompt'] =
