@@ -109,6 +109,10 @@ Route::middleware(['web', 'auth'])->group(function () {
                 ->name('admin.video-wizard.logs.show');
         });
 
+        // Performance Dashboard (redirects to analytics with performance focus)
+        Route::get('/performance', [GenerationLogController::class, 'performance'])
+            ->name('admin.video-wizard.performance');
+
         // =============================================
         // PROFESSIONAL CINEMATOGRAPHY SYSTEM
         // =============================================

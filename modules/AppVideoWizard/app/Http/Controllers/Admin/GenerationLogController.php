@@ -114,4 +114,25 @@ class GenerationLogController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
+
+    /**
+     * Show performance dashboard.
+     */
+    public function performance(Request $request)
+    {
+        $days = $request->get('days', 7);
+
+        $performance = $this->logService->getPerformanceMetrics($days);
+        $stats = $this->logService->getDashboardStats($days);
+        $byPrompt = $this->logService->getStatsByPrompt($days);
+        $dailyStats = $this->logService->getDailyStats($days);
+
+        return view('appvideowizard::admin.logs.performance', compact(
+            'performance',
+            'stats',
+            'byPrompt',
+            'dailyStats',
+            'days'
+        ));
+    }
 }

@@ -1,0 +1,172 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="border-bottom mb-1 py-4 bg-polygon">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="mb-0">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{{ route('admin.video-wizard.index') }}">{{ __('Video Creator') }}</a></li>
+                        <li class="breadcrumb-item active">{{ __('Performance') }}</li>
+                    </ol>
+                </nav>
+                <div class="fw-7 fs-20 mx-auto text-primary-700">{{ __('Performance Metrics') }}</div>
+            </div>
+            <div>
+                <form method="GET" class="d-flex gap-2">
+                    <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="7" {{ $days == 7 ? 'selected' : '' }}>{{ __('Last 7 days') }}</option>
+                        <option value="14" {{ $days == 14 ? 'selected' : '' }}>{{ __('Last 14 days') }}</option>
+                        <option value="30" {{ $days == 30 ? 'selected' : '' }}>{{ __('Last 30 days') }}</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+    <!-- Performance Overview -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <div class="fs-11 text-white-50">{{ __('Avg Duration') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['avg_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <div class="fs-11 text-white-50">{{ __('P50') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['p50_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body text-center">
+                    <div class="fs-11 text-dark-50">{{ __('P95') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['p95_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white h-100">
+                <div class="card-body text-center">
+                    <div class="fs-11 text-white-50">{{ __('P99') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['p99_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <div class="fs-11 text-white-50">{{ __('Min') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['min_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card h-100" style="background-color: #6366f1;">
+                <div class="card-body text-center text-white">
+                    <div class="fs-11 opacity-75">{{ __('Max') }}</div>
+                    <div class="fs-24 fw-bold">{{ number_format($performance['max_duration'] / 1000, 2) }}s</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Stats Summary -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">{{ __('Generation Stats') }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">{{ __('Total Generations') }}</span>
+                        <span class="fw-bold">{{ number_format($stats['total_generations']) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">{{ __('Successful') }}</span>
+                        <span class="fw-bold text-success">{{ number_format($stats['successful']) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">{{ __('Failed') }}</span>
+                        <span class="fw-bold text-danger">{{ number_format($stats['failed']) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">{{ __('Success Rate') }}</span>
+                        <span class="fw-bold">{{ $stats['success_rate'] }}%</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-2">
+                        <span class="text-muted">{{ __('Avg Duration') }}</span>
+                        <span class="fw-bold">{{ number_format($stats['avg_duration_ms'] / 1000, 2) }}s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats by Prompt -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">{{ __('Performance by Prompt') }}</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ __('Prompt') }}</th>
+                                    <th class="text-center">{{ __('Count') }}</th>
+                                    <th class="text-center">{{ __('Success Rate') }}</th>
+                                    <th class="text-center">{{ __('Avg Duration') }}</th>
+                                    <th class="text-end">{{ __('Tokens') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($byPrompt as $stat)
+                                    <tr>
+                                        <td><code class="small">{{ $stat->prompt_slug }}</code></td>
+                                        <td class="text-center">{{ number_format($stat->total_count) }}</td>
+                                        <td class="text-center">
+                                            <span class="badge {{ $stat->success_rate >= 90 ? 'bg-success' : ($stat->success_rate >= 70 ? 'bg-warning' : 'bg-danger') }}">
+                                                {{ $stat->success_rate }}%
+                                            </span>
+                                        </td>
+                                        <td class="text-center small">{{ number_format(($stat->avg_duration ?? 0) / 1000, 2) }}s</td>
+                                        <td class="text-end small">{{ number_format($stat->total_tokens / 1000, 1) }}K</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-3">{{ __('No data') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex gap-2">
+                <a href="{{ route('admin.video-wizard.logs.index') }}" class="btn btn-outline-primary">
+                    <i class="fa fa-list me-1"></i> {{ __('View Logs') }}
+                </a>
+                <a href="{{ route('admin.video-wizard.logs.analytics') }}" class="btn btn-outline-info">
+                    <i class="fa fa-chart-bar me-1"></i> {{ __('Full Analytics') }}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
