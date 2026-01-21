@@ -28,7 +28,12 @@
       "WebFetch(domain:artime.ai)",
       "Bash(powershell -Command:*)",
       "Bash(ffmpeg:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(where.exe:*)",
+      "Bash(cmd.exe /c \"where php\")",
+      "Bash(cmd.exe /c:*)",
+      "Bash(cmd.exe /c \"C:\\\\laragon\\\\bin\\\\php\\\\php-8.1*\\\\php.exe -v\")",
+      "Bash(powershell.exe -Command \"Get-Command php -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")"
     ]
   }
 }

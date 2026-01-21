@@ -16787,7 +16787,9 @@ PROMPT;
         $emotionalArc = null;
 
         try {
-            $momentService = app(\Modules\AppVideoWizard\Services\NarrativeMomentService::class);
+            // Create NarrativeMomentService with GeminiService for AI decomposition
+            $geminiService = app(\App\Services\GeminiService::class);
+            $momentService = new \Modules\AppVideoWizard\Services\NarrativeMomentService($geminiService);
 
             // Get scene characters for context
             $sceneCharacters = $this->getCharactersForScene($sceneContext['sceneIndex'] ?? 0);
