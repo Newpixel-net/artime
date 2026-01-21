@@ -3,8 +3,105 @@
 @push('styles')
 <style>
 /* ========================================
-   SCROLLABLE TABS
+   MODERN COLOR PALETTE
    ======================================== */
+:root {
+    --vw-primary: #6366f1;
+    --vw-primary-dark: #4f46e5;
+    --vw-primary-light: #a5b4fc;
+    --vw-secondary: #8b5cf6;
+    --vw-success: #10b981;
+    --vw-warning: #f59e0b;
+    --vw-danger: #ef4444;
+    --vw-info: #0ea5e9;
+    --vw-dark: #1e293b;
+    --vw-gray: #64748b;
+    --vw-light: #f8fafc;
+    --vw-border: #e2e8f0;
+    --vw-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --vw-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --vw-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
+   PAGE CONTAINER
+   ======================================== */
+.settings-page-container {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: calc(100vh - 200px);
+    padding-bottom: 2rem;
+}
+
+/* ========================================
+   STATS CARDS - Modern Design
+   ======================================== */
+.stats-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--vw-shadow);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--vw-primary), var(--vw-secondary));
+}
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--vw-shadow-lg);
+}
+.stats-card .stats-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.stats-card .stats-icon.primary {
+    background: linear-gradient(135deg, var(--vw-primary), var(--vw-secondary));
+    color: white;
+}
+.stats-card .stats-icon.success {
+    background: linear-gradient(135deg, var(--vw-success), #34d399);
+    color: white;
+}
+.stats-card .stats-icon.info {
+    background: linear-gradient(135deg, var(--vw-info), #38bdf8);
+    color: white;
+}
+.stats-card .stats-value {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--vw-dark), var(--vw-gray));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.stats-card .stats-label {
+    color: var(--vw-gray);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* ========================================
+   SCROLLABLE TABS - Modern Design
+   ======================================== */
+.tabs-container {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 16px;
+    box-shadow: var(--vw-shadow);
+    padding: 1rem;
+    border: 1px solid var(--vw-border);
+}
 .nav-tabs-scrollable {
     display: flex;
     flex-wrap: nowrap;
@@ -12,26 +109,101 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    padding-bottom: 2px;
-    gap: 0.25rem;
+    padding-bottom: 4px;
+    gap: 0.5rem;
+    border: none !important;
 }
 .nav-tabs-scrollable::-webkit-scrollbar {
-    height: 4px;
+    height: 6px;
+}
+.nav-tabs-scrollable::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
 }
 .nav-tabs-scrollable::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 2px;
+    background: linear-gradient(90deg, var(--vw-primary), var(--vw-secondary));
+    border-radius: 3px;
 }
 .nav-tabs-scrollable .nav-item {
     flex-shrink: 0;
 }
 .nav-tabs-scrollable .nav-link {
     white-space: nowrap;
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 1rem;
     font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--vw-gray);
+    background: #f1f5f9;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    transition: all 0.25s ease;
+}
+.nav-tabs-scrollable .nav-link:hover {
+    color: var(--vw-primary);
+    background: #e0e7ff;
+    border-color: transparent;
+}
+.nav-tabs-scrollable .nav-link.active {
+    color: white;
+    background: linear-gradient(135deg, var(--vw-primary), var(--vw-secondary));
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 .nav-tabs-scrollable .nav-link .badge {
     font-size: 0.65rem;
+    padding: 3px 6px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.2);
+}
+.nav-tabs-scrollable .nav-link.active .badge {
+    background: rgba(255,255,255,0.3);
+    color: white;
+}
+
+/* ========================================
+   CATEGORY CARD WRAPPER
+   ======================================== */
+.category-card {
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    border: 1px solid var(--vw-border);
+    border-radius: 20px;
+    box-shadow: var(--vw-shadow);
+    overflow: hidden;
+}
+.category-card-header {
+    background: linear-gradient(135deg, var(--vw-primary) 0%, var(--vw-secondary) 100%);
+    color: white;
+    padding: 1.25rem 1.5rem;
+    border: none;
+}
+.category-card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.category-card-header h5 i {
+    font-size: 1.25rem;
+    opacity: 0.9;
+}
+.category-card-header .btn-outline-secondary {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+.category-card-header .btn-outline-secondary:hover {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+}
+.category-card-body {
+    padding: 1.5rem;
+    background: #fafbfc;
 }
 
 /* ========================================
@@ -48,19 +220,45 @@
 }
 
 /* ========================================
-   SETTING CARD
+   SETTING CARD - Modern Design
    ======================================== */
 .setting-card {
-    background: #fff;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 8px;
+    background: #ffffff;
+    border: 2px solid var(--vw-border);
+    border-radius: 14px;
     padding: 20px !important;
     height: 100%;
     display: flex;
     flex-direction: column;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.setting-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--vw-primary), var(--vw-secondary));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.setting-card:hover {
+    border-color: var(--vw-primary-light);
+    box-shadow: var(--vw-shadow-lg);
+    transform: translateY(-2px);
+}
+.setting-card:hover::before {
+    opacity: 1;
 }
 .setting-card.bg-light {
-    background: #f9fafb !important;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border-style: dashed;
+}
+.setting-card.bg-light::before {
+    background: linear-gradient(180deg, var(--vw-gray), #94a3b8);
 }
 
 /* ========================================
@@ -70,28 +268,30 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 .setting-card .form-label {
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     margin-bottom: 0;
     line-height: 1.4;
-    color: #1f2937;
+    color: var(--vw-dark);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 .setting-card .form-label i {
-    color: #6b7280;
-    font-size: 0.8125rem;
-    width: 16px;
+    color: var(--vw-primary);
+    font-size: 1rem;
+    width: 20px;
     text-align: center;
 }
 .setting-card .form-label .badge {
     font-size: 0.625rem;
-    padding: 2px 6px;
-    font-weight: 500;
+    padding: 3px 8px;
+    font-weight: 600;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--vw-gray), #94a3b8);
 }
 
 /* ========================================
@@ -100,31 +300,37 @@
 .setting-card .setting-description {
     font-size: 0.8125rem;
     line-height: 1.6;
-    color: #6b7280;
+    color: var(--vw-gray);
     margin-bottom: 16px;
+    padding-left: 28px;
 }
 
 /* ========================================
-   INPUT FIELDS - Unified Styling
+   INPUT FIELDS - Modern Styling
    ======================================== */
 .setting-card .form-control,
 .setting-card .form-select {
-    height: 40px;
-    padding: 8px 12px;
+    height: 44px;
+    padding: 10px 14px;
     font-size: 0.875rem;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border: 2px solid var(--vw-border);
+    border-radius: 10px;
     background-color: #fff;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    transition: all 0.25s ease;
+}
+.setting-card .form-control:hover,
+.setting-card .form-select:hover {
+    border-color: var(--vw-primary-light);
 }
 .setting-card .form-control:focus,
 .setting-card .form-select:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    border-color: var(--vw-primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+    background-color: #fff;
 }
 .setting-card textarea.form-control {
     height: auto;
-    min-height: 64px;
+    min-height: 72px;
     resize: vertical;
     line-height: 1.5;
 }
@@ -137,88 +343,170 @@
 .setting-card .input-group .form-control {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
+    border-right: none;
 }
 .setting-card .input-group-text {
-    height: 40px;
-    padding: 8px 12px;
+    height: 44px;
+    padding: 10px 14px;
     font-size: 0.75rem;
-    color: #6b7280;
-    background-color: #f3f4f6;
-    border: 1px solid #d1d5db;
+    font-weight: 600;
+    color: var(--vw-primary);
+    background: linear-gradient(135deg, #e0e7ff, #ede9fe);
+    border: 2px solid var(--vw-border);
     border-left: none;
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 10px 10px 0;
     display: flex;
     align-items: center;
     white-space: nowrap;
 }
 
 /* ========================================
-   TOGGLE SWITCH
+   TOGGLE SWITCH - Modern Design
    ======================================== */
 .setting-card .form-check.form-switch {
-    padding-left: 3rem;
-    min-height: 40px;
+    padding-left: 3.5rem;
+    min-height: 44px;
     display: flex;
     align-items: center;
     margin: 0;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 10px;
+    padding-right: 14px;
 }
 .setting-card .form-check-input {
-    width: 44px;
-    height: 24px;
-    margin-left: -3rem;
+    width: 50px;
+    height: 26px;
+    margin-left: -3.5rem;
     margin-top: 0;
     cursor: pointer;
+    border: 2px solid var(--vw-border);
+    background-color: #e2e8f0;
+    transition: all 0.25s ease;
+}
+.setting-card .form-check-input:checked {
+    background-color: var(--vw-success);
+    border-color: var(--vw-success);
+}
+.setting-card .form-check-input:focus {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 .setting-card .form-check-label {
     font-size: 0.875rem;
-    color: #374151;
+    font-weight: 500;
+    color: var(--vw-dark);
     cursor: pointer;
-    padding-left: 8px;
-    line-height: 24px;
+    padding-left: 12px;
+    line-height: 26px;
 }
 
 /* ========================================
-   SELECT / DROPDOWN
+   SELECT / DROPDOWN - Modern
    ======================================== */
 .setting-card .form-select {
-    padding-right: 36px;
-    background-position: right 12px center;
-    background-size: 12px;
+    padding-right: 40px;
+    background-position: right 14px center;
+    background-size: 14px;
+    cursor: pointer;
 }
 
 /* ========================================
-   HELP TEXT
+   HELP TEXT - Modern
    ======================================== */
 .setting-card .setting-help {
-    display: block;
-    margin-top: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px 12px;
     font-size: 0.75rem;
     line-height: 1.5;
-    color: #9ca3af;
+    color: var(--vw-gray);
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 3px solid var(--vw-info);
 }
 .setting-card .setting-help i {
-    margin-right: 4px;
+    color: var(--vw-info);
+    margin-top: 1px;
 }
 .setting-card .setting-help.text-success {
-    color: #10b981 !important;
+    color: var(--vw-success) !important;
+    background: #ecfdf5;
+    border-left-color: var(--vw-success);
+}
+.setting-card .setting-help.text-success i {
+    color: var(--vw-success);
 }
 .setting-card .setting-help.text-warning {
-    color: #f59e0b !important;
+    color: var(--vw-warning) !important;
+    background: #fffbeb;
+    border-left-color: var(--vw-warning);
+}
+.setting-card .setting-help.text-warning i {
+    color: var(--vw-warning);
 }
 
 /* Default value indicator */
 .setting-card .setting-default {
-    display: block;
-    margin-top: 8px;
-    padding: 6px 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px 12px;
     font-size: 0.75rem;
     line-height: 1.4;
     color: #92400e;
-    background-color: #fef3c7;
-    border-radius: 4px;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-radius: 8px;
+    border: 1px solid #fcd34d;
 }
 .setting-card .setting-default i {
-    margin-right: 4px;
+    color: #d97706;
+    margin-top: 1px;
+}
+
+/* ========================================
+   PASSWORD INPUT SPECIAL
+   ======================================== */
+.setting-card .input-group .btn-outline-secondary {
+    border: 2px solid var(--vw-border);
+    border-left: none;
+    border-radius: 0 10px 10px 0;
+    background: #f8fafc;
+    color: var(--vw-gray);
+    transition: all 0.2s ease;
+}
+.setting-card .input-group .btn-outline-secondary:hover {
+    background: var(--vw-primary);
+    border-color: var(--vw-primary);
+    color: white;
+}
+
+/* ========================================
+   SAVE BUTTON AREA
+   ======================================== */
+.save-settings-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 2px solid var(--vw-border);
+    border-radius: 16px;
+    box-shadow: var(--vw-shadow);
+}
+.save-settings-card .btn-primary {
+    background: linear-gradient(135deg, var(--vw-primary), var(--vw-secondary));
+    border: none;
+    padding: 0.875rem 2rem;
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    transition: all 0.3s ease;
+}
+.save-settings-card .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+.save-settings-card .btn-primary:active {
+    transform: translateY(0);
 }
 
 /* ========================================
@@ -231,6 +519,29 @@
     .setting-card {
         padding: 16px !important;
     }
+    .category-card-header {
+        padding: 1rem;
+    }
+    .category-card-body {
+        padding: 1rem;
+    }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.tab-pane.show {
+    animation: fadeInUp 0.3s ease;
 }
 </style>
 @endpush
@@ -267,7 +578,7 @@
     </div>
 </div>
 
-<div class="container py-4">
+<div class="container py-4 settings-page-container">
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
@@ -282,43 +593,43 @@
         </div>
     @endif
 
-    <!-- Stats Overview -->
-    <div class="row g-3 mb-4">
+    <!-- Stats Overview - Modern Cards -->
+    <div class="row g-4 mb-4">
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body d-flex align-items-center">
-                    <div class="bg-primary bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="fa fa-cog fa-lg text-primary"></i>
+            <div class="card stats-card">
+                <div class="card-body d-flex align-items-center p-4">
+                    <div class="stats-icon primary me-4">
+                        <i class="fa fa-cog"></i>
                     </div>
                     <div>
-                        <div class="fs-4 fw-bold">{{ $stats['total'] }}</div>
-                        <div class="text-muted small">{{ __('Total Settings') }}</div>
+                        <div class="stats-value">{{ $stats['total'] }}</div>
+                        <div class="stats-label">{{ __('Total Settings') }}</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="fa fa-check fa-lg text-success"></i>
+            <div class="card stats-card">
+                <div class="card-body d-flex align-items-center p-4">
+                    <div class="stats-icon success me-4">
+                        <i class="fa fa-check"></i>
                     </div>
                     <div>
-                        <div class="fs-4 fw-bold">{{ $stats['active'] }}</div>
-                        <div class="text-muted small">{{ __('Active Settings') }}</div>
+                        <div class="stats-value">{{ $stats['active'] }}</div>
+                        <div class="stats-label">{{ __('Active Settings') }}</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body d-flex align-items-center">
-                    <div class="bg-info bg-opacity-10 rounded-3 p-3 me-3">
-                        <i class="fa fa-layer-group fa-lg text-info"></i>
+            <div class="card stats-card">
+                <div class="card-body d-flex align-items-center p-4">
+                    <div class="stats-icon info me-4">
+                        <i class="fa fa-layer-group"></i>
                     </div>
                     <div>
-                        <div class="fs-4 fw-bold">{{ $stats['categories'] }}</div>
-                        <div class="text-muted small">{{ __('Categories') }}</div>
+                        <div class="stats-value">{{ $stats['categories'] }}</div>
+                        <div class="stats-label">{{ __('Categories') }}</div>
                     </div>
                 </div>
             </div>
@@ -329,10 +640,9 @@
     <form action="{{ route('admin.video-wizard.dynamic-settings.update') }}" method="POST">
         @csrf
 
-        <!-- Category Tabs (Scrollable) -->
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body p-2">
-                <ul class="nav nav-tabs nav-tabs-scrollable border-0" id="settingsTabs" role="tablist">
+        <!-- Category Tabs (Scrollable) - Modern Design -->
+        <div class="tabs-container mb-4">
+            <ul class="nav nav-tabs nav-tabs-scrollable" id="settingsTabs" role="tablist">
                     @foreach($categories as $categorySlug => $categoryName)
                         @if(isset($settingsByCategory[$categorySlug]) && $settingsByCategory[$categorySlug]->count() > 0)
                             <li class="nav-item" role="presentation">
@@ -350,7 +660,6 @@
                         @endif
                     @endforeach
                 </ul>
-            </div>
         </div>
 
         <!-- Tab Content -->
@@ -361,14 +670,12 @@
                          id="content-{{ $categorySlug }}"
                          role="tabpanel">
 
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="mb-0">
-                                        <i class="{{ $categoryIcons[$categorySlug] ?? 'fa fa-cog' }} me-2 text-muted"></i>
-                                        {{ $categoryName }}
-                                    </h5>
-                                </div>
+                        <div class="category-card mb-4">
+                            <div class="category-card-header d-flex justify-content-between align-items-center">
+                                <h5>
+                                    <i class="{{ $categoryIcons[$categorySlug] ?? 'fa fa-cog' }}"></i>
+                                    {{ $categoryName }}
+                                </h5>
                                 <form action="{{ route('admin.video-wizard.dynamic-settings.reset-category', $categorySlug) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('{{ __('Reset all settings in this category to defaults?') }}')">
@@ -376,7 +683,7 @@
                                     </button>
                                 </form>
                             </div>
-                            <div class="card-body">
+                            <div class="category-card-body">
                                 <div class="row settings-row">
                                     @foreach($settingsByCategory[$categorySlug] as $setting)
                                         <div class="col-md-6">
@@ -554,11 +861,11 @@
             @endforeach
         </div>
 
-        <!-- Save Button -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div class="text-muted">
-                    <i class="fa fa-info-circle me-1"></i>
+        <!-- Save Button - Modern Design -->
+        <div class="card save-settings-card">
+            <div class="card-body d-flex justify-content-between align-items-center p-4">
+                <div class="text-muted d-flex align-items-center gap-2">
+                    <i class="fa fa-info-circle text-info"></i>
                     {{ __('Changes take effect immediately after saving. Caches will be automatically cleared.') }}
                 </div>
                 <button type="submit" class="btn btn-primary btn-lg">
