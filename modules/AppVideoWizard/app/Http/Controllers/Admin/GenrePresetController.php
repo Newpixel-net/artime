@@ -267,33 +267,80 @@ class GenrePresetController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:json'],
+            'file' => ['required', 'file', 'mimes:json', 'max:2048'],
         ]);
 
-        $content = file_get_contents($request->file('file')->getRealPath());
-        $presets = json_decode($content, true);
+        try {
+            $content = $request->file('file')->get();
+            $presets = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return back()->withErrors(['file' => 'Invalid JSON format: ' . $e->getMessage()]);
+        }
 
         if (!is_array($presets)) {
-            return back()->withErrors(['file' => 'Invalid JSON format']);
+            return back()->withErrors(['file' => 'Invalid JSON format: expected array']);
         }
+
+        // Whitelist of allowed fields for import
+        $allowedFields = [
+            'slug', 'name', 'category', 'description', 'camera_language',
+            'color_grade', 'lighting', 'atmosphere', 'style', 'lens_preferences',
+            'prompt_prefix', 'prompt_suffix', 'sort_order',
+        ];
+
+        $allowedCategories = [
+            'documentary', 'cinematic', 'horror', 'comedy',
+            'social', 'commercial', 'experimental', 'educational'
+        ];
 
         $imported = 0;
-        foreach ($presets as $preset) {
-            if (!isset($preset['slug'])) continue;
+        $updated = 0;
+        $skipped = 0;
 
-            VwGenrePreset::updateOrCreate(
-                ['slug' => $preset['slug']],
-                array_merge($preset, [
-                    'is_active' => true,
-                    'lens_preferences' => isset($preset['lens_preferences'])
-                        ? json_encode($preset['lens_preferences'])
-                        : null,
-                ])
-            );
-            $imported++;
+        foreach ($presets as $preset) {
+            // Validate required fields
+            if (!isset($preset['slug']) || !is_string($preset['slug']) || !preg_match('/^[a-z0-9-]+$/', $preset['slug'])) {
+                $skipped++;
+                continue;
+            }
+
+            // Filter to only allowed fields
+            $filteredData = array_intersect_key($preset, array_flip($allowedFields));
+
+            // Validate category if present
+            if (isset($filteredData['category']) && !in_array($filteredData['category'], $allowedCategories)) {
+                $skipped++;
+                continue;
+            }
+
+            // Handle lens_preferences JSON encoding
+            if (isset($filteredData['lens_preferences']) && is_array($filteredData['lens_preferences'])) {
+                $filteredData['lens_preferences'] = json_encode($filteredData['lens_preferences']);
+            }
+
+            // Add default is_active
+            $filteredData['is_active'] = true;
+
+            $existing = VwGenrePreset::where('slug', $filteredData['slug'])->first();
+
+            if ($existing) {
+                $slug = $filteredData['slug'];
+                unset($filteredData['slug']); // Don't update the slug
+                $existing->update($filteredData);
+                $updated++;
+            } else {
+                VwGenrePreset::create($filteredData);
+                $imported++;
+            }
         }
 
-        session()->flash('success', "{$imported} genre presets imported successfully.");
+        VwGenrePreset::clearCache();
+
+        $message = "{$imported} new presets imported, {$updated} existing updated.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} invalid entries skipped.";
+        }
+        session()->flash('success', $message);
 
         return redirect()->route('admin.video-wizard.cinematography.genre-presets.index');
     }

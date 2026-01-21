@@ -190,7 +190,13 @@ class PromptController extends Controller
 
             // Optionally call AI to test
             if ($request->boolean('call_ai')) {
-                $teamId = session('current_team_id', 0);
+                // Get team ID safely: prefer session, fallback to authenticated user's team
+                $teamId = session('current_team_id');
+                if ($teamId === null && auth()->check()) {
+                    $teamId = auth()->user()->current_team_id ?? auth()->user()->team_id ?? 0;
+                }
+                $teamId = (int) ($teamId ?? 0);
+
                 $result = AI::process($compiledPrompt, 'text', ['maxResult' => 1], $teamId);
 
                 return response()->json([

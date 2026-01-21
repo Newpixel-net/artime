@@ -22,6 +22,15 @@ class GenerationLogController extends Controller
      */
     public function index(Request $request)
     {
+        // Validate filter inputs
+        $request->validate([
+            'prompt_slug' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:success,failed,partial'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
+            'date_from' => ['nullable', 'date', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+
         $query = VwGenerationLog::with(['user', 'project']);
 
         // Filters
@@ -38,7 +47,7 @@ class GenerationLogController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->get('date_from'));
+            $query->where('created_at', '>=', $request->get('date_from') . ' 00:00:00');
         }
 
         if ($request->filled('date_to')) {

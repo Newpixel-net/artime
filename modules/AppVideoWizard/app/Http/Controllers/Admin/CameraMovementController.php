@@ -327,34 +327,82 @@ class CameraMovementController extends Controller
             'file' => ['required', 'file', 'mimes:json', 'max:2048'],
         ]);
 
-        $content = file_get_contents($request->file('file')->path());
-        $data = json_decode($content, true);
-
-        if (!$data || !isset($data['cameraMovements'])) {
-            session()->flash('error', 'Invalid import file format.');
+        try {
+            $content = $request->file('file')->get();
+            $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            session()->flash('error', 'Invalid JSON format: ' . $e->getMessage());
             return redirect()->back();
         }
 
+        if (!isset($data['cameraMovements']) || !is_array($data['cameraMovements'])) {
+            session()->flash('error', 'Invalid import file format. Expected "cameraMovements" array.');
+            return redirect()->back();
+        }
+
+        // Whitelist of allowed fields for import
+        $allowedFields = [
+            'slug', 'name', 'category', 'description', 'prompt_syntax',
+            'intensity', 'typical_duration_min', 'typical_duration_max',
+            'stackable_with', 'best_for_shot_types', 'best_for_emotions',
+            'natural_continuation', 'ending_state', 'is_active', 'sort_order',
+        ];
+
+        $allowedCategories = ['zoom', 'dolly', 'crane', 'pan_tilt', 'arc', 'specialty'];
+        $allowedIntensities = ['subtle', 'moderate', 'dynamic', 'intense'];
+
         $imported = 0;
         $updated = 0;
+        $skipped = 0;
 
         foreach ($data['cameraMovements'] as $movement) {
-            $existing = VwCameraMovement::where('slug', $movement['slug'])->first();
+            // Validate required fields
+            if (!isset($movement['slug']) || !is_string($movement['slug'])) {
+                $skipped++;
+                continue;
+            }
+
+            // Filter to only allowed fields
+            $filteredData = array_intersect_key($movement, array_flip($allowedFields));
+
+            // Validate category if present
+            if (isset($filteredData['category']) && !in_array($filteredData['category'], $allowedCategories)) {
+                $skipped++;
+                continue;
+            }
+
+            // Validate intensity if present
+            if (isset($filteredData['intensity']) && !in_array($filteredData['intensity'], $allowedIntensities)) {
+                $skipped++;
+                continue;
+            }
+
+            // Ensure JSON fields are properly encoded
+            foreach (['stackable_with', 'best_for_shot_types', 'best_for_emotions'] as $jsonField) {
+                if (isset($filteredData[$jsonField]) && is_array($filteredData[$jsonField])) {
+                    $filteredData[$jsonField] = json_encode($filteredData[$jsonField]);
+                }
+            }
+
+            $existing = VwCameraMovement::where('slug', $filteredData['slug'])->first();
 
             if ($existing) {
-                unset($movement['id'], $movement['created_at'], $movement['updated_at']);
-                $existing->update($movement);
+                unset($filteredData['slug']); // Don't update the slug
+                $existing->update($filteredData);
                 $updated++;
             } else {
-                unset($movement['id'], $movement['created_at'], $movement['updated_at']);
-                VwCameraMovement::create($movement);
+                VwCameraMovement::create($filteredData);
                 $imported++;
             }
         }
 
         VwCameraMovement::clearCache();
 
-        session()->flash('success', "Imported {$imported} new movements, updated {$updated} existing.");
+        $message = "Imported {$imported} new movements, updated {$updated} existing.";
+        if ($skipped > 0) {
+            $message .= " Skipped {$skipped} invalid entries.";
+        }
+        session()->flash('success', $message);
 
         return redirect()->route('admin.video-wizard.cinematography.camera-movements');
     }

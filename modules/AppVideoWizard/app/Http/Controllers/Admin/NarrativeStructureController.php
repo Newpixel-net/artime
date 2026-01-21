@@ -175,17 +175,45 @@ class NarrativeStructureController extends Controller
     {
         $validated = $request->validate([
             'type' => 'required|in:arc,preset,curve,journey,shot_type,lighting,color_grade,composition,retention_hook,transition',
-            'key' => 'required|string|max:100',
+            'key' => ['required', 'string', 'max:100', 'regex:/^[a-z0-9_-]+$/i'],
         ]);
 
+        // Map type to config key for validation
+        $configMap = [
+            'arc' => 'appvideowizard.story_arcs',
+            'preset' => 'appvideowizard.narrative_presets',
+            'curve' => 'appvideowizard.tension_curves',
+            'journey' => 'appvideowizard.emotional_journeys',
+            'shot_type' => 'appvideowizard.shot_types',
+            'lighting' => 'appvideowizard.lighting_styles',
+            'color_grade' => 'appvideowizard.color_grades',
+            'composition' => 'appvideowizard.compositions',
+            'retention_hook' => 'appvideowizard.retention_hooks',
+            'transition' => 'appvideowizard.transitions',
+        ];
+
+        $key = $validated['key'];
+        $type = $validated['type'];
+
+        // Verify the key exists in the corresponding config
+        $configKey = $configMap[$type] ?? null;
+        if ($configKey) {
+            $configData = config($configKey, []);
+            if (!array_key_exists($key, $configData)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid key: does not exist in configuration.',
+                ], 422);
+            }
+        }
+
         $settings = $this->getSettings();
-        $disabledKey = 'disabled_' . $validated['type'] . 's';
+        $disabledKey = 'disabled_' . $type . 's';
 
         if (!isset($settings[$disabledKey])) {
             $settings[$disabledKey] = [];
         }
 
-        $key = $validated['key'];
         if (in_array($key, $settings[$disabledKey])) {
             // Enable it
             $settings[$disabledKey] = array_values(array_diff($settings[$disabledKey], [$key]));
