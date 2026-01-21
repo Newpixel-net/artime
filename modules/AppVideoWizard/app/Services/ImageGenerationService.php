@@ -190,6 +190,32 @@ class ImageGenerationService
                 // Get all references using the cascade system
                 $references = $this->getAllReferencesForScene($sceneMemory, $sceneIndex, $storyboard);
 
+                // COLLAGE OPTIMIZATION: Limit references for collage shots to prevent Gemini timeout
+                // Collage shots generate multiple images rapidly, so we reduce payload size
+                $isCollageShot = $options['is_collage_shot'] ?? false;
+                if ($isCollageShot && $references['totalImages'] > 2) {
+                    Log::info('[generateSceneImage] Limiting references for collage shot (timeout prevention)', [
+                        'originalTotal' => $references['totalImages'],
+                        'originalCharacters' => count($references['characters']),
+                    ]);
+
+                    // Keep only 1 primary character reference
+                    if (count($references['characters']) > 1) {
+                        $references['characters'] = [$references['characters'][0]];
+                    }
+                    // Keep location but skip style and continuity for collage
+                    $references['style'] = null;
+                    $references['continuity'] = null;
+                    // Recalculate total
+                    $references['totalImages'] = count($references['characters']) + ($references['location'] ? 1 : 0);
+
+                    Log::info('[generateSceneImage] References limited for collage', [
+                        'newTotal' => $references['totalImages'],
+                        'characterCount' => count($references['characters']),
+                        'hasLocation' => !empty($references['location']),
+                    ]);
+                }
+
                 // Use cascade generation if we have multiple references (more powerful consistency)
                 // Cascade triggers when: 2+ characters, OR character + location, OR total 2+ images
                 $shouldUseCascade = (
