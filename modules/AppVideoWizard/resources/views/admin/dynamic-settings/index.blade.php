@@ -185,8 +185,14 @@
                                                         <select class="form-select"
                                                                 id="setting-{{ $setting->slug }}"
                                                                 name="settings[{{ $setting->slug }}]">
-                                                            @if($setting->allowed_values)
-                                                                @foreach($setting->allowed_values as $option)
+                                                            @php
+                                                                $allowedValues = $setting->allowed_values;
+                                                                if (is_string($allowedValues)) {
+                                                                    $allowedValues = json_decode($allowedValues, true) ?? [];
+                                                                }
+                                                            @endphp
+                                                            @if(!empty($allowedValues) && is_array($allowedValues))
+                                                                @foreach($allowedValues as $option)
                                                                     <option value="{{ $option }}" {{ $currentValue == $option ? 'selected' : '' }}>
                                                                         {{ is_string($option) ? ucfirst($option) : $option }}
                                                                     </option>
