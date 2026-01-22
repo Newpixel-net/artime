@@ -8,10 +8,10 @@
 ## Current Position
 
 **Phase:** 1.5 of ongoing (Automatic Speech Flow)
-**Plan:** 01 of 4+ (in phase)
-**Status:** Plan 01 complete
+**Plan:** 02 of 4 (in phase)
+**Status:** Plan 02 complete
 
-**Progress:** [##--------] 25% of Phase 1.5
+**Progress:** [#####-----] 50% of Phase 1.5
 
 ---
 
@@ -32,6 +32,21 @@ The system should be sophisticated and automatically updated based on previous s
 ---
 
 ## Completed This Session
+
+### Plan 1.5-02: Detection Summary UI (COMPLETE)
+**Summary:** Replace Character Intelligence UI with read-only Detection Summary panel
+
+**Tasks:**
+1. [x] Remove Character Intelligence UI section
+2. [x] Add Detection Summary panel
+3. [x] Add supporting CSS if needed
+
+**Commits:**
+- `c9b67aa` - feat(1.5-02): remove Character Intelligence UI section
+- `add0cbe` - feat(1.5-02): add Detection Summary panel
+- `bf10d4f` - style(1.5-02): add Detection Summary panel animation
+
+**SUMMARY:** `.planning/phases/1.5-automatic-speech-flow/1.5-02-SUMMARY.md`
 
 ### Plan 1.5-01: Automatic Speech Segment Parsing (COMPLETE)
 **Summary:** Auto-parse script into speech segments with speaker-to-Character-Bible linking
@@ -70,15 +85,18 @@ The system should be sophisticated and automatically updated based on previous s
 | 2026-01-23 | Speaker Matching | Use fuzzy matching (exact, partial, Levenshtein<=2) | Tolerates typos and name variations |
 | 2026-01-23 | Unknown Speakers | Auto-create Character Bible entry with autoDetected flag | User can configure voice later |
 | 2026-01-23 | Parse Timing | Parse after generateScript and on narration blur | Instant, invisible parsing |
+| 2026-01-23 | Character Intelligence UI | Remove entirely, replace with Detection Summary | Manual config no longer needed |
+| 2026-01-23 | Detection Summary Styling | Use Tailwind utility classes | Consistent with existing design |
+| 2026-01-23 | Voice Status Indicators | Green=assigned, Yellow=needs voice | Clear visual feedback |
 
 ---
 
 ## Remaining Tasks (Phase 1.5)
 
-1. **Plan 02:** Remove Character Intelligence UI section from `concept.blade.php`
-2. **Plan 03:** Add Detection Summary panel (read-only, informational)
-3. **Plan 04:** Ensure segment data flows to shots correctly
-4. **Plan 05:** Refactor `characterIntelligence` property usage throughout codebase
+1. ~~**Plan 01:** Automatic Speech Segment Parsing~~ COMPLETE
+2. ~~**Plan 02:** Detection Summary UI~~ COMPLETE
+3. **Plan 03:** Ensure segment data flows to shots correctly
+4. **Plan 04:** Refactor `characterIntelligence` property usage throughout codebase
 
 ---
 
@@ -94,8 +112,9 @@ None currently
 |------|---------|--------|
 | `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` | Implementation decisions | Created |
 | `.planning/phases/1.5-automatic-speech-flow/1.5-01-SUMMARY.md` | Plan 01 summary | Created |
-| `views/livewire/steps/concept.blade.php` | Character Intelligence UI (to remove) | Pending |
-| `Livewire/VideoWizard.php` | Auto-parsing triggers | **Updated** |
+| `.planning/phases/1.5-automatic-speech-flow/1.5-02-SUMMARY.md` | Plan 02 summary | **Created** |
+| `views/livewire/steps/concept.blade.php` | Detection Summary UI | **Updated** |
+| `Livewire/VideoWizard.php` | Auto-parsing triggers | Updated |
 | `Services/SpeechSegmentParser.php` | Auto-parsing service | Exists |
 
 ---
@@ -103,8 +122,8 @@ None currently
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 1.5-01-PLAN.md (Automatic Speech Segment Parsing)
-**Resume file:** None - Plan 01 complete, ready for Plan 02
+**Stopped at:** Completed 1.5-02-PLAN.md (Detection Summary UI)
+**Resume file:** None - Plan 02 complete, ready for Plan 03
 
 ---
 
