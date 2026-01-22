@@ -1,94 +1,58 @@
 # Video Wizard - Current State
 
-> Last Updated: 2026-01-22 (continued session)
-> Session: Dynamic Speech Segments Implementation - COMPLETE
+> Last Updated: 2026-01-23
+> Session: Milestone 1.5 - Automatic Speech Flow System
 
 ---
 
 ## Current Focus
 
-**Dynamic Speech Segments** - Transform static per-scene speech type into segment-based mixed narration/dialogue system.
+**Milestone 1.5: Automatic Speech Flow System** - Remove Character Intelligence bottleneck, connect Speech Segments to Character Bible for automatic flow.
 
-See: `.planning/DYNAMIC_SPEECH_SEGMENTS.md` for full implementation plan.
-
----
-
-## Completed This Session
-
-1. **Reverted codebase** to commit 78d88d0 (stable state)
-2. **Research completed** - Hollywood screenplay format, AI lip-sync patterns, existing parser analysis
-3. **Implementation plan created** - GSD + Ralph Loop methodology applied
-4. **Architecture designed** - SpeechSegment data model, parser service, UI components
-5. **Phase 1 COMPLETE** - Core infrastructure implemented
-6. **Phase 2 COMPLETE** - Parser integration into VoiceoverService
-7. **Phase 3 COMPLETE** - AI generation integration with LAYER 14
-8. **Phase 4 COMPLETE** - Segmented audio generation
-9. **Phase 5 COMPLETE** - UI implementation with segment editor
-10. **Phase 6 COMPLETE** - Video generation integration with segment-aware lip-sync routing
-11. **Phase 7 COMPLETE** - Polish & documentation with error handling
+See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementation decisions.
 
 ---
 
-## Completed Phases
+## Guiding Principle
 
-**Phase 1: Core Infrastructure** ✅
-- [x] 1.1 Create `SpeechSegment` data class
-- [x] 1.2 Create `SpeechSegmentParser` service
-- [x] 1.3 Add `speechSegments` to scene structure
-- [x] 1.4 Update `sanitizeScene()` for segments
-- [x] 1.5 Migration logic for existing projects
+**"Automatic, effortless, Hollywood-quality output from button clicks."**
 
-**Phase 2: Parser Implementation** ✅
-- [x] 2.1 Implement `parse()` method with regex patterns
-- [x] 2.2 Implement `toDisplayText()` for segment → text conversion
-- [x] 2.3 Implement `validateSpeakers()` against Character Bible
-- [x] 2.4 Add unit tests (deferred - manual testing first)
-- [x] 2.5 Integrate parser into VoiceoverService
-
-**Phase 3: AI Generation Integration** ✅
-- [x] 3.1 Update `buildMultiLayerPrompt()` to request segmented output
-- [x] 3.2 Add segment format instructions to AI prompt (LAYER 14)
-- [x] 3.3 Parse AI response into segments (via sanitizeSpeechSegments)
-- [x] 3.4 Auto-detect speech types when AI doesn't specify
-- [x] 3.5 Map speakers to Character Bible entries
-
-**Phase 4: Audio Generation** ✅
-- [x] 4.1 Added `generateSegmentedAudio()` method to VoiceoverService
-- [x] 4.2 Generate separate audio track per segment
-- [x] 4.3 Calculate timing/duration per segment
-- [x] 4.4 Store audio URLs in segment data
-- [x] 4.5 Create combined timeline for playback
-
-**Phase 5: UI Implementation** ✅
-- [x] 5.1 Create SpeechSegmentEditor CSS styles
-- [x] 5.2 Add 'mixed' option to speech type dropdown
-- [x] 5.3 Create segment list view with type badges
-- [x] 5.4 Add inline edit form for segments
-- [x] 5.5 Add segment CRUD Livewire methods (add, delete, move, update)
-- [x] 5.6 Add "Parse from Text" button for bulk entry
-
-**Phase 6: Video Generation Integration** ✅
-- [x] 6.1 Update `ShotIntelligenceService.needsLipSync()` for segment awareness
-- [x] 6.2 Add `getSegmentLipSyncInfo()` helper method with per-segment routing
-- [x] 6.3 Add `getModelForSegment()`, `getLipSyncSegments()`, `getVoiceoverOnlySegments()` methods
-- [x] 6.4 Add `sceneNeedsLipSync()` and `getSceneLipSyncInfo()` helpers in VideoWizard
-- [x] 6.5 Update shot decomposition to use segment-aware lip-sync detection
-
-**Phase 7: Polish & Documentation** ✅
-- [x] 7.1 Add comprehensive error handling to all segment CRUD methods
-- [x] 7.2 Add `validateSegments()`, `safeParse()`, `normalizeSegments()` to SpeechSegmentParser
-- [x] 7.3 Add JSDoc/PHPDoc comments to all new methods
-- [x] 7.4 Add `MAX_TEXT_LENGTH`, `MAX_SEGMENTS_PER_SCENE`, `VALID_TYPES` constants
-- [x] 7.5 Enhanced `validate()` method in SpeechSegment with comprehensive checks
-- [x] 7.6 User feedback via toast notifications for all segment operations
+The system should be sophisticated and automatically updated based on previous steps in the wizard. Users click buttons and perform complete actions without effort.
 
 ---
 
-## Next Up
+## Previous Session (Complete)
 
-1. **End-to-end testing** with mixed speech type scenes
-2. **Browser testing** of segment editor UI
-3. **Integration testing** with video generation pipeline
+**Dynamic Speech Segments Implementation** - All 7 phases complete:
+- Phase 1: Core Infrastructure (SpeechSegment, SpeechSegmentParser)
+- Phase 2: Parser Implementation
+- Phase 3: AI Generation Integration (LAYER 14)
+- Phase 4: Audio Generation (segmented audio)
+- Phase 5: UI Implementation (segment editor)
+- Phase 6: Video Generation Integration (segment-aware lip-sync)
+- Phase 7: Polish & Documentation
+
+---
+
+## Current Phase: 1.5 - Automatic Speech Flow
+
+**Status:** Context gathered, ready for planning
+
+### Key Decisions
+| Area | Decision |
+|------|----------|
+| Character Bible | Auto-create & auto-link speakers |
+| Parsing | Automatic on AI generation and edits |
+| UI | Remove Character Intelligence, add read-only Detection Summary |
+| Data Flow | Full automatic: Script → Segments → Bible → Scenes → Shots |
+
+### Tasks Overview
+1. Remove Character Intelligence UI section from `concept.blade.php`
+2. Add automatic parsing trigger after script generation
+3. Add auto-link speakers to Character Bible
+4. Add Detection Summary panel (read-only, informational)
+5. Refactor `characterIntelligence` property usage throughout codebase
+6. Ensure segment data flows to shots correctly
 
 ---
 
@@ -98,66 +62,25 @@ None currently
 
 ---
 
-## Technical Decisions
-
-### Data Model
-```php
-SpeechSegment {
-    id, type, text, speaker, characterId,
-    voiceId, needsLipSync, startTime, duration, audioUrl
-}
-```
-
-### Speech Types
-- `narrator` - External V.O., no lip-sync
-- `dialogue` - Character speaking, lip-sync required
-- `internal` - Character thoughts as V.O., no lip-sync
-- `monologue` - Character speaking alone, lip-sync required
-
-### Backwards Compatibility
-- Keep `speechType` field at scene level
-- Add value `mixed` for segmented scenes
-- Migration converts `voiceover.text` to single segment
-
----
-
 ## Key Files
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `.planning/DYNAMIC_SPEECH_SEGMENTS.md` | Full implementation plan | ✅ |
-| `Services/SpeechSegment.php` | Data class | ✅ CREATED |
-| `Services/SpeechSegmentParser.php` | Parser service | ✅ CREATED |
-| `Services/VoiceoverService.php` | Audio generation | ✅ MODIFIED |
-| `Services/ScriptGenerationService.php` | Scene sanitization + AI prompt | ✅ MODIFIED |
-| `Services/ShotIntelligenceService.php` | Segment-aware lip-sync routing | ✅ MODIFIED |
-| `Livewire/VideoWizard.php` | Segment CRUD + lip-sync helpers | ✅ MODIFIED |
-| `views/livewire/steps/script.blade.php` | Segment editor UI | ✅ MODIFIED |
+| `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` | Implementation decisions | Created |
+| `views/livewire/steps/concept.blade.php` | Character Intelligence UI (to remove) | Pending |
+| `Livewire/VideoWizard.php` | `characterIntelligence` property, parsing triggers | Pending |
+| `Services/SpeechSegmentParser.php` | Auto-parsing service | Exists |
+| `Services/ScriptGenerationService.php` | Script generation + parsing | Pending |
 
 ---
 
-## Notes
+## Next Steps
 
-- GSD v1.9.4 installed
-- Ralph Loop at `~/.ralph/`
-- Hollywood cinematography skill at `~/.claude/skills/hollywood-cinematography/`
-- New `generateSegmentedAudio()` method added to VoiceoverService
-- Parser supports: `[NARRATOR]`, `[INTERNAL: CHAR]`, `[MONOLOGUE: CHAR]`, `CHARACTER:` formats
-- ShotIntelligenceService now has segment-aware lip-sync routing methods
-- VideoWizard uses `sceneNeedsLipSync()` helper for segment-aware decomposition
+1. `/gsd:plan-phase 1.5` - Create detailed execution plan
+2. Execute plan tasks
+3. Test end-to-end flow
 
 ---
 
-## Phase Overview
-
-| Phase | Description | Priority | Status |
-|-------|-------------|----------|--------|
-| 1 | Core Infrastructure | HIGH | ✅ Complete |
-| 2 | Parser Implementation | HIGH | ✅ Complete |
-| 3 | AI Generation Integration | MEDIUM | ✅ Complete |
-| 4 | Audio Generation | MEDIUM | ✅ Complete |
-| 5 | UI Implementation | MEDIUM | ✅ Complete |
-| 6 | Video Generation Integration | MEDIUM | ✅ Complete |
-| 7 | Polish & Documentation | LOW | ✅ Complete |
-
-**🎉 ALL PHASES COMPLETE - Ready for Testing**
+*Session: Automatic Speech Flow System*
+*Phase: 1.5*
