@@ -301,6 +301,9 @@ window.multiShotVideoPolling = function() {
                                         $pageStatus = $currentCollage['status'] ?? 'ready';
                                         $isPagePending = $pageStatus === 'pending';
                                         $isPageGenerating = $pageStatus === 'generating';
+                                        // Check if shots have generated images (for showing in preview when no collage exists)
+                                        $shotsWithImages = collect($decomposed['shots'] ?? [])->filter(fn($s) => ($s['status'] ?? '') === 'ready' && !empty($s['imageUrl']))->values()->all();
+                                        $hasShotImages = count($shotsWithImages) > 0;
                                     @endphp
 
                                     @if($isPagePending)
@@ -380,6 +383,53 @@ window.multiShotVideoPolling = function() {
                                                 </div>
                                             @endfor
                                         </div>
+                                    @elseif($hasShotImages)
+                                        {{-- NEW: Display generated shot images when no collage but shots have images --}}
+                                        <div class="msm-region-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 100%; aspect-ratio: 1;">
+                                            @for($r = 0; $r < min(4, count($decomposed['shots'] ?? [])); $r++)
+                                                @php
+                                                    $shotData = $decomposed['shots'][$r] ?? null;
+                                                    $shotImageUrl = $shotData['imageUrl'] ?? null;
+                                                    $shotStatus = $shotData['status'] ?? 'pending';
+                                                    $hasLipSync = $shotData['needsLipSync'] ?? false;
+                                                @endphp
+                                                <div class="msm-region-cell"
+                                                     style="position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 4px; cursor: pointer; border: 2px solid {{ $hasLipSync ? '#ec4899' : 'transparent' }};"
+                                                     wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $r }})"
+                                                     title="{{ $shotData['type'] ?? 'Shot' }} {{ $r + 1 }}{{ $hasLipSync ? ' (Lip-sync)' : '' }}">
+                                                    @if($shotStatus === 'generating')
+                                                        <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: rgba(0,0,0,0.3);">
+                                                            <div class="msm-spinner pink" style="width: 24px; height: 24px;"></div>
+                                                        </div>
+                                                    @elseif($shotImageUrl)
+                                                        <img src="{{ $shotImageUrl }}" alt="Shot {{ $r + 1 }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                                    @else
+                                                        <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: rgba(0,0,0,0.2); color: #666;">
+                                                            <span>—</span>
+                                                        </div>
+                                                    @endif
+                                                    {{-- Overlay with shot number and type --}}
+                                                    <div style="position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">
+                                                        {{ $r + 1 }}
+                                                    </div>
+                                                    {{-- Shot type badge --}}
+                                                    <div style="position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem;">
+                                                        {{ ucfirst(str_replace(['_', '-'], ' ', $shotData['type'] ?? 'shot')) }}
+                                                    </div>
+                                                    @if($hasLipSync)
+                                                        <div style="position: absolute; top: 4px; right: 4px; background: rgba(236, 72, 153, 0.9); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem;">
+                                                            👄
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endfor
+                                        </div>
+                                        {{-- Show remaining shots indicator if more than 4 --}}
+                                        @if(count($decomposed['shots'] ?? []) > 4)
+                                            <p style="text-align: center; color: #9ca3af; font-size: 0.75rem; margin-top: 0.5rem;">
+                                                +{{ count($decomposed['shots']) - 4 }} {{ __('more shots in panel →') }}
+                                            </p>
+                                        @endif
                                     @else
                                         <div class="msm-no-preview">{{ __('No preview') }}</div>
                                     @endif

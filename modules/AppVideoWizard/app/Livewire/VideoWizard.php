@@ -15901,6 +15901,51 @@ PROMPT;
     {
         $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
 
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // DIALOGUE SCENE DETECTION - Shot/Reverse Shot Pattern
+        // If scene contains multi-character dialogue, use Hollywood dialogue decomposition
+        // Each character gets their own shot with their dialogue line for Multitalk lip-sync
+        // ═══════════════════════════════════════════════════════════════════════════════
+        $dialogueDecomposer = app(\Modules\AppVideoWizard\App\Services\DialogueSceneDecomposerService::class);
+
+        if ($dialogueDecomposer->isDialogueScene($scene)) {
+            Log::info('VideoWizard: Detected dialogue scene, using Shot/Reverse Shot decomposition', [
+                'scene_id' => $sceneId,
+                'scene_index' => $sceneIndex,
+            ]);
+
+            // Get Character Bible for voice/character mapping
+            $characterBible = $this->sceneMemory['characterBible'] ?? [];
+
+            // Decompose using Hollywood dialogue pattern
+            $dialogueShots = $dialogueDecomposer->decomposeDialogueScene($scene, $characterBible, [
+                'includeEstablishing' => true,
+                'includeReactionShots' => true,
+            ]);
+
+            if (!empty($dialogueShots)) {
+                // Convert dialogue shots to standard shot structure
+                $shots = $this->convertDialogueShotsToStandardFormat(
+                    $dialogueShots,
+                    $sceneId,
+                    $scene,
+                    $visualDescription
+                );
+
+                // Log summary
+                $summary = $dialogueDecomposer->getDecompositionSummary($dialogueShots);
+                Log::info('VideoWizard: Dialogue scene decomposed', [
+                    'scene_id' => $sceneId,
+                    'total_shots' => $summary['totalShots'],
+                    'speaking_shots' => $summary['speakingShots'],
+                    'speakers' => $summary['speakers'],
+                ]);
+
+                return $shots;
+            }
+        }
+        // ═══════════════════════════════════════════════════════════════════════════════
+
         // Build context for dynamic analysis
         $context = $this->buildDecompositionContext($sceneIndex, $scene);
 
@@ -15938,6 +15983,13 @@ PROMPT;
 
             // Get dialogue for this specific shot
             $shotDialogue = $this->getDialogueForShot($scene, $i, count($analysis['shots'] ?? []));
+
+            // Check if scene speechType requires lip-sync (monologue/dialogue vs narrator/internal)
+            $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
+            $sceneNeedsLipSync = in_array($speechType, ['monologue', 'dialogue'], true);
+
+            // Shot needs lip-sync if it has dialogue AND scene speechType requires it
+            $shotNeedsLipSync = !empty($shotDialogue) && $sceneNeedsLipSync;
 
             // Shot context for prompt generation - includes ALL story elements
             $shotContext = [
@@ -15993,14 +16045,14 @@ PROMPT;
                 // Camera movement
                 'cameraMovement' => $cameraMovement,
 
-                // Video model (default to minimax)
-                'selectedVideoModel' => 'minimax',
-                'needsLipSync' => false,
+                // Video model (default to minimax, or multitalk if lip-sync needed)
+                'selectedVideoModel' => $shotNeedsLipSync ? 'multitalk' : 'minimax',
+                'needsLipSync' => $shotNeedsLipSync,
 
                 // Audio layer for Multitalk lip-sync
-                'dialogue' => $this->getDialogueForShot($scene, $i, count($analysis['shots'] ?? [])),
+                'dialogue' => $shotDialogue,
+                'monologue' => $shotNeedsLipSync ? $shotDialogue : null, // Text content for voiceover
                 'speakingCharacters' => [],
-                'monologue' => null,           // Text content for voiceover
                 'audioUrl' => null,            // URL of generated voiceover
                 'audioDuration' => null,       // Duration of audio in seconds
                 'voiceId' => null,             // Selected voice for this shot
@@ -16552,6 +16604,256 @@ PROMPT;
 
     /**
      * Apply story beats to shot generation.
+     * Convert dialogue shots from DialogueSceneDecomposerService to standard shot format.
+     * This ensures dialogue shots integrate seamlessly with the existing pipeline.
+     *
+     * HOLLYWOOD SHOT/REVERSE SHOT PATTERN:
+     * - Each speaking character gets their own shot
+     * - Their dialogue line becomes the monologue for Multitalk
+     * - Voice ID is assigned from Character Bible
+     * - Shot type follows emotional intensity arc
+     *
+     * @param array $dialogueShots Shots from DialogueSceneDecomposerService
+     * @param string $sceneId Scene identifier
+     * @param array $scene Scene data
+     * @param string $visualDescription Base visual description
+     * @return array Standard shot format compatible with the rest of the pipeline
+     */
+    protected function convertDialogueShotsToStandardFormat(
+        array $dialogueShots,
+        string $sceneId,
+        array $scene,
+        string $visualDescription
+    ): array {
+        $shots = [];
+        $totalShots = count($dialogueShots);
+
+        foreach ($dialogueShots as $i => $dialogueShot) {
+            $shotType = $dialogueShot['type'] ?? 'close-up';
+            $isSpeaking = $dialogueShot['useMultitalk'] ?? false;
+            $speakingCharacter = $dialogueShot['speakingCharacter'] ?? null;
+
+            // Build enhanced visual prompt for this shot
+            $visualPrompt = $this->buildDialogueShotVisualPrompt(
+                $visualDescription,
+                $dialogueShot,
+                $scene,
+                $i,
+                $totalShots
+            );
+
+            // Get camera movement based on shot type and purpose
+            $cameraMovement = $this->getCameraMovementForDialogueShot($dialogueShot);
+
+            // Build standard shot structure
+            $shot = [
+                // Identification
+                'id' => "shot-{$sceneId}-{$i}",
+                'sceneId' => $sceneId,
+                'index' => $i,
+
+                // Shot type and description
+                'type' => $shotType,
+                'shotType' => $shotType,
+                'description' => $dialogueShot['description'] ?? "{$shotType} shot",
+                'purpose' => $dialogueShot['purpose'] ?? 'dialogue',
+                'lens' => $this->getLensForShotType($shotType),
+
+                // UNIQUE visual prompt per shot (character-specific)
+                'imagePrompt' => $visualPrompt,
+                'videoPrompt' => $cameraMovement['motion'] ?? 'subtle movement',
+                'prompt' => $visualPrompt,
+                'uniqueVisualDescription' => $visualPrompt,
+
+                // Image state
+                'imageUrl' => null,
+                'imageStatus' => 'pending',
+                'status' => 'pending',
+
+                // Video state
+                'videoUrl' => null,
+                'videoStatus' => 'pending',
+
+                // Frame chain
+                'fromSceneImage' => $i === 0,
+                'fromFrameCapture' => $i > 0,
+                'capturedFrameUrl' => null,
+
+                // Timing (calculated from word count for speaking shots)
+                'duration' => $dialogueShot['duration'] ?? 5,
+                'selectedDuration' => $dialogueShot['duration'] ?? 5,
+                'durationClass' => $this->getDurationClass($dialogueShot['duration'] ?? 5),
+
+                // Camera movement
+                'cameraMovement' => $cameraMovement,
+
+                // ═══════════════════════════════════════════════════════════════════
+                // DIALOGUE/MULTITALK SPECIFIC FIELDS
+                // These enable the Shot/Reverse Shot pattern with character voices
+                // ═══════════════════════════════════════════════════════════════════
+
+                // Video model selection
+                'selectedVideoModel' => $isSpeaking ? 'multitalk' : 'minimax',
+                'needsLipSync' => $isSpeaking,
+
+                // Speaking character info
+                'speakingCharacter' => $speakingCharacter,
+                'characterIndex' => $dialogueShot['characterIndex'] ?? null,
+                'charactersInShot' => $dialogueShot['charactersInShot'] ?? ($speakingCharacter ? [$speakingCharacter] : []),
+
+                // Dialogue/monologue text (for Multitalk lip-sync)
+                'dialogue' => $dialogueShot['dialogue'] ?? null,
+                'monologue' => $dialogueShot['monologue'] ?? $dialogueShot['dialogue'] ?? null,
+
+                // Voice configuration
+                'voiceId' => $dialogueShot['voiceId'] ?? null,
+                'audioUrl' => null,
+                'audioDuration' => null,
+                'audioStatus' => 'pending',
+
+                // Emotional intensity for visual styling
+                'emotionalIntensity' => $dialogueShot['emotionalIntensity'] ?? 0.5,
+                'dialoguePosition' => $dialogueShot['position'] ?? 'middle',
+
+                // Motion/Action description
+                'narrativeBeat' => [
+                    'motionDescription' => $cameraMovement['motion'] ?? 'subtle movement',
+                    'action' => $isSpeaking ? "{$speakingCharacter} speaking" : 'reaction',
+                    'emotion' => $dialogueShot['emotionalIntensity'] ?? 0.5,
+                ],
+
+                // Analysis metadata
+                'engineAnalysis' => [
+                    'sceneType' => 'dialogue',
+                    'confidence' => 0.9,
+                    'decompositionType' => 'shot_reverse_shot',
+                ],
+
+                // Original dialogue shot data for reference
+                'dialogueShotData' => $dialogueShot,
+            ];
+
+            $shots[] = $shot;
+        }
+
+        // Detect and fix similar adjacent shots
+        $shots = $this->detectAndFixSimilarShots($shots, 0.7);
+
+        return $shots;
+    }
+
+    /**
+     * Build visual prompt for a dialogue shot.
+     * Ensures each character's shot has a unique, character-specific prompt.
+     */
+    protected function buildDialogueShotVisualPrompt(
+        string $baseDescription,
+        array $dialogueShot,
+        array $scene,
+        int $index,
+        int $totalShots
+    ): string {
+        $shotType = $dialogueShot['type'] ?? 'close-up';
+        $purpose = $dialogueShot['purpose'] ?? 'dialogue';
+        $speakingCharacter = $dialogueShot['speakingCharacter'] ?? null;
+        $visualAddition = $dialogueShot['visualPromptAddition'] ?? '';
+
+        // Start with base scene description
+        $parts = [$baseDescription];
+
+        // Add character-specific framing
+        if ($speakingCharacter) {
+            if ($dialogueShot['useMultitalk'] ?? false) {
+                // Speaking shot - emphasize mouth/expression
+                $parts[] = "Focus on {$speakingCharacter}, {$shotType} framing";
+                $parts[] = "{$speakingCharacter} is speaking, mouth slightly open, engaged expression";
+            } else {
+                // Reaction shot - emphasize listening/processing
+                $parts[] = "Focus on {$speakingCharacter}, {$shotType} framing";
+                $parts[] = "{$speakingCharacter} listening intently, subtle emotional reaction visible";
+            }
+        }
+
+        // Add the visual prompt addition from decomposer
+        if (!empty($visualAddition)) {
+            $parts[] = $visualAddition;
+        }
+
+        // Add shot type specific framing
+        $framingHint = match($shotType) {
+            'extreme-close-up' => 'Extreme close-up on face, eyes and mouth prominent, every detail visible',
+            'close-up' => 'Close-up shot, face fills most of frame, clear view of expression',
+            'medium-close' => 'Medium close-up, head and shoulders visible, natural conversation framing',
+            'over-the-shoulder' => 'Over-the-shoulder angle, foreground shoulder slightly blurred',
+            'medium' => 'Medium shot, waist up visible, body language included',
+            'two-shot' => 'Two-shot showing both characters, establishing their spatial relationship',
+            default => "{$shotType} shot",
+        };
+        $parts[] = $framingHint;
+
+        // Add emotional intensity cue
+        $intensity = $dialogueShot['emotionalIntensity'] ?? 0.5;
+        if ($intensity >= 0.8) {
+            $parts[] = 'Dramatic lighting, heightened emotional moment';
+        } elseif ($intensity >= 0.6) {
+            $parts[] = 'Engaged, tension building';
+        }
+
+        return implode('. ', array_filter($parts));
+    }
+
+    /**
+     * Get camera movement for dialogue shot.
+     */
+    protected function getCameraMovementForDialogueShot(array $dialogueShot): array
+    {
+        $shotType = $dialogueShot['type'] ?? 'close-up';
+        $purpose = $dialogueShot['purpose'] ?? 'dialogue';
+        $intensity = $dialogueShot['emotionalIntensity'] ?? 0.5;
+
+        // Dialogue shots typically have minimal camera movement
+        // Focus is on the character's face/expression
+        if ($dialogueShot['useMultitalk'] ?? false) {
+            // Speaking shot - very subtle push in
+            return [
+                'type' => 'slow_push_in',
+                'motion' => 'Very subtle slow push in toward speaker, maintaining focus on face',
+                'speed' => 'very_slow',
+                'intensity' => 0.2,
+            ];
+        }
+
+        // Reaction shot - static or very subtle
+        return [
+            'type' => 'static',
+            'motion' => 'Static or imperceptible drift, focused on character reaction',
+            'speed' => 'static',
+            'intensity' => 0.1,
+        ];
+    }
+
+    /**
+     * Get appropriate lens for shot type.
+     */
+    protected function getLensForShotType(string $shotType): string
+    {
+        return match($shotType) {
+            'extreme-close-up' => '85mm',
+            'close-up' => '85mm',
+            'medium-close' => '50mm',
+            'over-the-shoulder' => '50mm',
+            'medium' => '35mm',
+            'wide', 'two-shot' => '35mm',
+            'establishing' => '24mm',
+            default => '50mm',
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // END DIALOGUE SCENE DECOMPOSITION HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
      * Enhances the basic shot structure with AI-generated story beats.
      *
      * @param array $shots Basic shots from DynamicShotEngine
@@ -19844,7 +20146,12 @@ PROMPT;
 
     /**
      * Get dialogue portion for a specific shot.
-     * Distributes scene narration across shots.
+     * Properly parses dialogue by speaker and distributes to shots.
+     *
+     * Supports formats:
+     * - "SPEAKER: dialogue text" (screenplay format)
+     * - "Speaker Name: dialogue text"
+     * - "quoted dialogue" said Character (prose format)
      */
     protected function getDialogueForShot(array $scene, int $shotIndex, int $totalShots): ?string
     {
@@ -19853,7 +20160,42 @@ PROMPT;
             return null;
         }
 
-        // Split narration into sentences
+        // First, try to parse structured dialogue (SPEAKER: text format)
+        $dialogueLines = $this->parseDialogueLines($narration);
+
+        if (!empty($dialogueLines)) {
+            // Distribute dialogue lines across shots
+            $linesPerShot = max(1, (int) ceil(count($dialogueLines) / $totalShots));
+            $start = $shotIndex * $linesPerShot;
+
+            if ($start >= count($dialogueLines)) {
+                return null;
+            }
+
+            $end = min($start + $linesPerShot, count($dialogueLines));
+            $shotDialogue = array_slice($dialogueLines, $start, $end - $start);
+
+            // Format dialogue for display
+            return implode(' ', array_map(function ($line) {
+                return $line['text'];
+            }, $shotDialogue));
+        }
+
+        // Fallback: Try to extract quoted text as dialogue
+        $quotedTexts = $this->extractQuotedDialogue($narration);
+        if (!empty($quotedTexts)) {
+            $quotesPerShot = max(1, (int) ceil(count($quotedTexts) / $totalShots));
+            $start = $shotIndex * $quotesPerShot;
+
+            if ($start >= count($quotedTexts)) {
+                return null;
+            }
+
+            $end = min($start + $quotesPerShot, count($quotedTexts));
+            return implode(' ', array_slice($quotedTexts, $start, $end - $start));
+        }
+
+        // Final fallback: Split narration by sentences
         $sentences = preg_split('/(?<=[.!?])\s+/', trim($narration), -1, PREG_SPLIT_NO_EMPTY);
         $sentenceCount = count($sentences);
 
@@ -19871,6 +20213,88 @@ PROMPT;
         }
 
         return implode(' ', array_slice($sentences, $start, $end - $start));
+    }
+
+    /**
+     * Parse dialogue lines in screenplay format (SPEAKER: text).
+     *
+     * @param string $narration
+     * @return array Array of ['speaker' => string, 'text' => string]
+     */
+    protected function parseDialogueLines(string $narration): array
+    {
+        $dialogueLines = [];
+        $lines = preg_split('/\n+/', trim($narration));
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue;
+            }
+
+            // Skip narrator tags
+            if (preg_match('/^\[NARRATOR\]/i', $line)) {
+                continue;
+            }
+
+            // Skip parenthetical directions
+            if (preg_match('/^\(.+\)$/', $line)) {
+                continue;
+            }
+
+            // Match "SPEAKER: text" or "Speaker Name: text"
+            if (preg_match('/^([A-Z][A-Za-z\s\-\']+):\s*(.+)$/u', $line, $matches)) {
+                $speaker = trim($matches[1]);
+                $text = trim($matches[2]);
+
+                // Skip if it's narrator
+                if (strtoupper($speaker) === 'NARRATOR') {
+                    continue;
+                }
+
+                if (!empty($text)) {
+                    $dialogueLines[] = [
+                        'speaker' => $speaker,
+                        'text' => $text,
+                    ];
+                }
+            }
+        }
+
+        return $dialogueLines;
+    }
+
+    /**
+     * Extract quoted dialogue from prose-style narration.
+     *
+     * @param string $narration
+     * @return array Array of quoted strings
+     */
+    protected function extractQuotedDialogue(string $narration): array
+    {
+        $quotes = [];
+
+        // Match text in double quotes
+        if (preg_match_all('/"([^"]+)"/', $narration, $matches)) {
+            foreach ($matches[1] as $quote) {
+                $quote = trim($quote);
+                if (strlen($quote) > 5) { // Skip very short quotes
+                    $quotes[] = $quote;
+                }
+            }
+        }
+
+        // Also match text in single quotes (less common but valid)
+        if (preg_match_all("/\'([^\']+)\'/", $narration, $matches)) {
+            foreach ($matches[1] as $quote) {
+                $quote = trim($quote);
+                if (strlen($quote) > 5) {
+                    $quotes[] = $quote;
+                }
+            }
+        }
+
+        return $quotes;
     }
 
     /**
@@ -21436,6 +21860,12 @@ PROMPT;
                         $allRegionsReady = true;
                         $hasAsyncJobs = false;
 
+                        // FACE CONSISTENCY: Track previous shot for continuity chain
+                        // Each shot will use the previous shot's image as an additional reference
+                        // This creates a "chain" that maintains character consistency across shots
+                        $previousShotBase64 = null;
+                        $previousShotMimeType = 'image/png';
+
                         // Generate each shot as a SEPARATE, COMPLETE image
                         foreach ($pageShots as $regionIdx => $shot) {
                             $shotType = $shot['type'] ?? 'medium';
@@ -21514,10 +21944,8 @@ PROMPT;
                                 "4) Characters should be DOING something, not standing still. " .
                                 "5) Capture genuine emotion and movement like a real film frame.";
 
-                            $result = $imageService->generateSceneImage($project, [
-                                'id' => "collage_{$sceneIndex}_page_{$pageIdx}_region_{$regionIdx}",
-                                'visualDescription' => $shotPrompt,
-                            ], [
+                            // Build options for image generation
+                            $generationOptions = [
                                 'model' => $this->storyboard['imageModel'] ?? 'hidream',
                                 'sceneIndex' => $sceneIndex,
                                 'shot_type' => $shotType,
@@ -21528,7 +21956,27 @@ PROMPT;
                                 'sceneMemory' => $this->sceneMemory,
                                 'storyboard' => $this->storyboard,
                                 'useCascade' => true,
-                            ]);
+                            ];
+
+                            // FACE CONSISTENCY CHAIN: Pass previous shot as continuity reference
+                            // This ensures each shot references the previous one for consistent faces
+                            if ($regionIdx > 0 && !empty($previousShotBase64)) {
+                                $generationOptions['collageContinuityReference'] = [
+                                    'base64' => $previousShotBase64,
+                                    'mimeType' => $previousShotMimeType,
+                                    'description' => 'Previous shot in collage - maintain EXACT same character face and appearance',
+                                ];
+                                Log::info('VideoWizard: Using previous shot as continuity reference for face consistency', [
+                                    'sceneIndex' => $sceneIndex,
+                                    'currentRegion' => $regionIdx,
+                                    'previousBase64Length' => strlen($previousShotBase64),
+                                ]);
+                            }
+
+                            $result = $imageService->generateSceneImage($project, [
+                                'id' => "collage_{$sceneIndex}_page_{$pageIdx}_region_{$regionIdx}",
+                                'visualDescription' => $shotPrompt,
+                            ], $generationOptions);
 
                             if ($result['success'] && !empty($result['imageUrl'])) {
                                 $collageData['regionImages'][$regionIdx] = [
@@ -21537,6 +21985,26 @@ PROMPT;
                                     'shotType' => $shotType,
                                     'shotIndex' => $shotIndex,
                                 ];
+
+                                // FACE CONSISTENCY CHAIN: Save this shot as reference for next iteration
+                                // Fetch the generated image as base64 for the continuity chain
+                                try {
+                                    $fetchedBase64 = $this->fetchImageAsBase64($result['imageUrl']);
+                                    if ($fetchedBase64) {
+                                        $previousShotBase64 = $fetchedBase64;
+                                        $previousShotMimeType = 'image/png';
+                                        Log::debug('VideoWizard: Saved shot for continuity chain', [
+                                            'regionIdx' => $regionIdx,
+                                            'base64Length' => strlen($fetchedBase64),
+                                        ]);
+                                    }
+                                } catch (\Exception $e) {
+                                    Log::warning('VideoWizard: Could not fetch shot for continuity chain', [
+                                        'regionIdx' => $regionIdx,
+                                        'error' => $e->getMessage(),
+                                    ]);
+                                    // Continue without continuity reference - not fatal
+                                }
                             } elseif (isset($result['jobId']) || isset($result['processingJobId'])) {
                                 // Async job for this specific region
                                 $jobKey = "collage_{$sceneIndex}_page_{$pageIdx}_region_{$regionIdx}";

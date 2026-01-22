@@ -216,6 +216,25 @@ class ImageGenerationService
                     ]);
                 }
 
+                // FACE CONSISTENCY CHAIN: Add collage continuity reference from previous shot
+                // This ensures each shot in the collage references the previous one for consistent faces
+                $collageContinuityReference = $options['collageContinuityReference'] ?? null;
+                if ($isCollageShot && $collageContinuityReference && !empty($collageContinuityReference['base64'])) {
+                    // Use continuity reference to maintain face consistency between collage shots
+                    $references['continuity'] = [
+                        'base64' => $collageContinuityReference['base64'],
+                        'mimeType' => $collageContinuityReference['mimeType'] ?? 'image/png',
+                        'description' => $collageContinuityReference['description'] ?? 'Previous shot in sequence',
+                    ];
+                    $references['totalImages']++;
+
+                    Log::info('[generateSceneImage] Added collage continuity reference for face consistency', [
+                        'sceneIndex' => $sceneIndex,
+                        'base64Length' => strlen($collageContinuityReference['base64']),
+                        'newTotal' => $references['totalImages'],
+                    ]);
+                }
+
                 // Use cascade generation if we have multiple references (more powerful consistency)
                 // Cascade triggers when: 2+ characters, OR character + location, OR total 2+ images
                 $shouldUseCascade = (
@@ -1239,10 +1258,28 @@ class ImageGenerationService
                 "Same color temperature, contrast levels, and cinematic mood.";
         }
 
-        // Continuity anchor
+        // Continuity anchor - enhanced for face consistency when from collage chain
         if ($references['continuity']) {
-            $sections[] = "CONTINUITY: This scene follows directly from the previous scene. " .
-                "Maintain consistent lighting direction, color grading, and visual flow.";
+            $continuityDesc = $references['continuity']['description'] ?? '';
+            $isCollageContinuity = str_contains(strtolower($continuityDesc), 'face') ||
+                                   str_contains(strtolower($continuityDesc), 'collage') ||
+                                   str_contains(strtolower($continuityDesc), 'previous shot');
+
+            if ($isCollageContinuity) {
+                // Collage chain continuity - emphasize face consistency
+                $sections[] = "COLLAGE CONTINUITY (CRITICAL FOR FACE CONSISTENCY):\n" .
+                    "The continuity reference shows the SAME CHARACTER from the previous shot in this sequence.\n" .
+                    "- FACE: Generate the EXACT SAME FACE as shown in the continuity reference\n" .
+                    "- HAIR: Same hairstyle, same hair color, same hair texture\n" .
+                    "- CLOTHING: Same outfit, same accessories\n" .
+                    "- BODY: Same build, same proportions\n" .
+                    "The character in THIS shot must be VISUALLY IDENTICAL to the character in the continuity reference.\n" .
+                    "A viewer must recognize this as the SAME PERSON across both shots.";
+            } else {
+                // Standard scene continuity
+                $sections[] = "CONTINUITY: This scene follows directly from the previous scene. " .
+                    "Maintain consistent lighting direction, color grading, and visual flow.";
+            }
         }
 
         // Assemble prompt
@@ -1266,7 +1303,13 @@ class ImageGenerationService
             "- Same skin tone, same complexion, same facial proportions\n" .
             "- This is the SAME PERSON, not a similar-looking person\n\n";
 
-        $enhancedPrompt .= "OUTPUT: Generate a single high-quality image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT facial features, hair, and clothing from the reference.";
+        $enhancedPrompt .= "PROP/OBJECT CONSISTENCY:\n" .
+            "- Any objects the character is holding, wearing, or interacting with must maintain CONSISTENT SIZE\n" .
+            "- A handheld object should remain the SAME SIZE relative to the character's hands/body\n" .
+            "- Artifacts, weapons, tools, or props must keep their exact proportions across shots\n" .
+            "- If the reference shows an object, generate it at the SAME scale and dimensions\n\n";
+
+        $enhancedPrompt .= "OUTPUT: Generate a single high-quality image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT facial features, hair, clothing, and any props/objects at consistent sizes from the reference.";
 
         return $enhancedPrompt;
     }
@@ -1866,7 +1909,12 @@ QUALITY REQUIREMENTS:
 - Professional cinematography lighting
 - Sharp focus on face, cinematic depth of field
 
-OUTPUT: Generate a single high-quality image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT appearance (same hair, same clothing, same accessories) in the described scene.
+PROP/OBJECT CONSISTENCY:
+- Any objects the character is holding must maintain CONSISTENT SIZE relative to their hands/body
+- Artifacts, weapons, tools, or props must keep their exact proportions from the reference
+- If the reference shows an object, generate it at the SAME scale and dimensions
+
+OUTPUT: Generate a single high-quality image showing THIS EXACT SAME PERSON (not a similar person, THE SAME person) with their EXACT appearance (same hair, same clothing, same accessories, same props at consistent sizes) in the described scene.
 EOT;
 
             $result = $this->geminiService->generateImageFromImage(
