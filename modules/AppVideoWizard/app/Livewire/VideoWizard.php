@@ -739,6 +739,24 @@ class VideoWizard extends Component
     public ?string $transitionMessage = null;  // Message to show during transition
     public ?string $error = null;
 
+    /**
+     * Flag to prevent re-entry during parsing.
+     */
+    protected bool $isParsing = false;
+
+    /**
+     * Detection summary for UI display (read-only).
+     * Populated after script parsing.
+     */
+    public array $detectionSummary = [
+        'characters' => [],
+        'speechTypes' => [],
+        'totalSegments' => 0,
+        'needsLipSync' => 0,
+        'voiceoverOnly' => 0,
+        'estimatedDuration' => 0,
+    ];
+
     // Phase 5: Async Job Tracking
     public array $activeAsyncJobs = [];    // Currently running async jobs for this project
 
@@ -4924,6 +4942,239 @@ class VideoWizard extends Component
             Log::warning('VideoWizard: Character Intelligence auto-detection failed', [
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    // =========================================================================
+    // AUTOMATIC SPEECH SEGMENT PARSING (Phase 1.5)
+    // =========================================================================
+
+    /**
+     * Auto-parse all scene narrations into speech segments.
+     * Called automatically after script generation.
+     */
+    protected function parseScriptIntoSegments(): void
+    {
+        $parser = new \Modules\AppVideoWizard\Services\SpeechSegmentParser();
+        $characterBible = $this->sceneMemory['characterBible'] ?? [];
+
+        foreach ($this->script['scenes'] as $idx => &$scene) {
+            $narration = $scene['narration'] ?? '';
+            if (empty(trim($narration))) {
+                continue;
+            }
+
+            // Parse narration into segments
+            $segments = $parser->parse($narration, $characterBible);
+
+            // Auto-link speakers to Character Bible and create missing entries
+            $this->autoLinkAndCreateCharacters($segments);
+
+            // Store as array for JSON serialization
+            $scene['speechSegments'] = $parser->toArray($segments);
+            $scene['speechType'] = 'mixed'; // Indicate segment-based system
+        }
+
+        Log::info('VideoWizard: Auto-parsed script into segments', [
+            'project_id' => $this->projectId,
+            'scene_count' => count($this->script['scenes'] ?? []),
+        ]);
+    }
+
+    /**
+     * Auto-link speech segments to Character Bible entries.
+     * Creates new Character Bible entries for unknown speakers.
+     *
+     * @param SpeechSegment[] $segments
+     */
+    protected function autoLinkAndCreateCharacters(array &$segments): void
+    {
+        $characterBible = &$this->sceneMemory['characterBible']['characters'];
+        if (!is_array($characterBible)) {
+            $characterBible = [];
+        }
+
+        foreach ($segments as $segment) {
+            if (!$segment->hasSpeaker()) {
+                continue; // Narrator segments skip
+            }
+
+            // Find matching character by name (fuzzy)
+            $matchedCharId = $this->findCharacterByNameFuzzy($segment->speaker, $characterBible);
+
+            if ($matchedCharId) {
+                // Link to existing character
+                $segment->characterId = $matchedCharId;
+                $segment->voiceId = $this->getCharacterVoiceIdFromBible($matchedCharId);
+            } else {
+                // Auto-create new Character Bible entry
+                $newCharId = 'char_' . time() . '_' . Str::random(4);
+                $characterBible[] = [
+                    'id' => $newCharId,
+                    'name' => $segment->speaker,
+                    'description' => '',
+                    'scenes' => [],
+                    'voiceId' => null,
+                    'autoDetected' => true,
+                ];
+                $segment->characterId = $newCharId;
+
+                Log::info('VideoWizard: Auto-created Character Bible entry', [
+                    'name' => $segment->speaker,
+                    'characterId' => $newCharId,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find character by name using fuzzy matching (case-insensitive + Levenshtein).
+     */
+    protected function findCharacterByNameFuzzy(string $speaker, array $characterBible): ?string
+    {
+        $speakerUpper = strtoupper(trim($speaker));
+
+        foreach ($characterBible as $char) {
+            $charName = strtoupper(trim($char['name'] ?? ''));
+
+            // Exact match
+            if ($charName === $speakerUpper) {
+                return $char['id'] ?? null;
+            }
+
+            // Partial match (contains)
+            if (!empty($charName) && (str_contains($charName, $speakerUpper) || str_contains($speakerUpper, $charName))) {
+                return $char['id'] ?? null;
+            }
+
+            // Fuzzy match with Levenshtein (allow 2-character difference)
+            if (!empty($charName) && levenshtein($speakerUpper, $charName) <= 2) {
+                return $char['id'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get voice ID for a character from Character Bible.
+     */
+    protected function getCharacterVoiceIdFromBible(string $characterId): ?string
+    {
+        $characterBible = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        foreach ($characterBible as $char) {
+            if (($char['id'] ?? null) === $characterId) {
+                return $char['voiceId'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Build detection summary from parsed speech segments.
+     * Used for the read-only Detection Summary UI panel.
+     */
+    protected function buildDetectionSummary(): void
+    {
+        $parser = new \Modules\AppVideoWizard\Services\SpeechSegmentParser();
+        $allSegments = [];
+
+        // Collect all segments from all scenes
+        foreach ($this->script['scenes'] ?? [] as $scene) {
+            $segments = $scene['speechSegments'] ?? [];
+            foreach ($segments as $seg) {
+                $allSegments[] = $seg;
+            }
+        }
+
+        // Get statistics
+        $stats = $parser->getStatistics($allSegments);
+
+        // Build character list with voice status
+        $characters = [];
+        $characterBible = $this->sceneMemory['characterBible']['characters'] ?? [];
+
+        foreach ($stats['speakers'] as $speakerName) {
+            $charEntry = [
+                'name' => $speakerName,
+                'voiceId' => null,
+                'linked' => false,
+            ];
+
+            // Find in Character Bible
+            foreach ($characterBible as $char) {
+                if (strtoupper(trim($char['name'] ?? '')) === strtoupper(trim($speakerName))) {
+                    $charEntry['voiceId'] = $char['voiceId'] ?? null;
+                    $charEntry['linked'] = true;
+                    break;
+                }
+            }
+
+            $characters[] = $charEntry;
+        }
+
+        // Store detection summary
+        $this->detectionSummary = [
+            'characters' => $characters,
+            'speechTypes' => $stats['byType'],
+            'totalSegments' => $stats['total'],
+            'needsLipSync' => $stats['needsLipSync'],
+            'voiceoverOnly' => $stats['voiceoverOnly'],
+            'estimatedDuration' => $stats['estimatedDuration'],
+        ];
+    }
+
+    /**
+     * Parse a single scene's narration into segments.
+     * Called when user edits narration text (wire:model.blur).
+     */
+    protected function parseSceneNarration(int $sceneIndex): void
+    {
+        if ($this->isParsing) {
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            return;
+        }
+
+        $this->isParsing = true;
+
+        try {
+            $scene = &$this->script['scenes'][$sceneIndex];
+            $narration = $scene['narration'] ?? '';
+
+            if (empty(trim($narration))) {
+                $scene['speechSegments'] = [];
+                $scene['speechType'] = 'narrator'; // Default for empty
+                return;
+            }
+
+            $parser = new \Modules\AppVideoWizard\Services\SpeechSegmentParser();
+            $characterBible = $this->sceneMemory['characterBible'] ?? [];
+
+            // Parse narration into segments
+            $segments = $parser->parse($narration, $characterBible);
+
+            // Auto-link speakers to Character Bible
+            $this->autoLinkAndCreateCharacters($segments);
+
+            // Store segments
+            $scene['speechSegments'] = $parser->toArray($segments);
+            $scene['speechType'] = 'mixed';
+
+            // Rebuild detection summary
+            $this->buildDetectionSummary();
+
+            Log::info('VideoWizard: Auto-parsed scene narration', [
+                'scene_index' => $sceneIndex,
+                'segment_count' => count($segments),
+            ]);
+
+        } finally {
+            $this->isParsing = false;
         }
     }
 
