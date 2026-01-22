@@ -17982,25 +17982,6 @@ PROMPT;
     }
 
     /**
-     * Get lens recommendation for a shot type.
-     * Professional cinematography lens selection.
-     */
-    protected function getLensForShotType(string $shotType): string
-    {
-        return match($shotType) {
-            'establishing' => 'wide-angle 24mm',
-            'wide' => 'ultra-wide 16mm',
-            'medium' => 'standard 50mm',
-            'medium-close' => 'portrait 85mm',
-            'close-up' => 'telephoto 85mm',
-            'detail' => 'macro 100mm',
-            'reaction' => 'portrait 85mm',
-            'insert' => 'macro 100mm',
-            default => 'standard 50mm',
-        };
-    }
-
-    /**
      * Get shot type configuration based on index, total count, and narrative context.
      * Uses professional Hollywood shot sequencing patterns.
      */
