@@ -469,15 +469,76 @@ window.multiShotVideoPolling = function() {
                                 </div>
                             @endif
                         @else
-                            {{-- Empty State --}}
-                            <div class="msm-collage-empty">
-                                <span>🖼️</span>
-                                <p>{{ __('Generate a 2x2 collage to quickly assign visuals to shots') }}</p>
-                                <button type="button" wire:click="generateCollagePreview({{ $multiShotSceneIndex }})" wire:loading.attr="disabled" wire:target="generateCollagePreview">
-                                    <span wire:loading.remove wire:target="generateCollagePreview">🖼️ {{ __('Generate Collage') }}</span>
-                                    <span wire:loading wire:target="generateCollagePreview">⏳</span>
-                                </button>
-                            </div>
+                            {{-- No collage exists - check if shots have images to display --}}
+                            @php
+                                $shotsWithImages = collect($decomposed['shots'] ?? [])->filter(fn($s) => ($s['status'] ?? '') === 'ready' && !empty($s['imageUrl']))->values()->all();
+                                $hasShotImages = count($shotsWithImages) > 0;
+                            @endphp
+
+                            @if($hasShotImages)
+                                {{-- Show shot images in 2x2 grid when no collage but shots have images --}}
+                                <div class="msm-region-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 100%; aspect-ratio: 1;">
+                                    @for($r = 0; $r < min(4, count($decomposed['shots'] ?? [])); $r++)
+                                        @php
+                                            $shotData = $decomposed['shots'][$r] ?? null;
+                                            $shotImageUrl = $shotData['imageUrl'] ?? null;
+                                            $shotStatus = $shotData['status'] ?? 'pending';
+                                            $hasLipSync = $shotData['needsLipSync'] ?? false;
+                                        @endphp
+                                        <div class="msm-region-cell"
+                                             style="position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 4px; cursor: pointer; border: 2px solid {{ $hasLipSync ? '#ec4899' : 'transparent' }};"
+                                             wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $r }})"
+                                             title="{{ $shotData['type'] ?? 'Shot' }} {{ $r + 1 }}{{ $hasLipSync ? ' (Lip-sync)' : '' }}">
+                                            @if($shotStatus === 'generating')
+                                                <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: rgba(0,0,0,0.3);">
+                                                    <div class="msm-spinner pink" style="width: 24px; height: 24px;"></div>
+                                                </div>
+                                            @elseif($shotImageUrl)
+                                                <img src="{{ $shotImageUrl }}" alt="Shot {{ $r + 1 }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            @else
+                                                <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: rgba(0,0,0,0.2); color: #666;">
+                                                    <span>—</span>
+                                                </div>
+                                            @endif
+                                            {{-- Overlay with shot number --}}
+                                            <div style="position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">
+                                                {{ $r + 1 }}
+                                            </div>
+                                            {{-- Shot type badge --}}
+                                            <div style="position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem;">
+                                                {{ ucfirst(str_replace(['_', '-'], ' ', $shotData['type'] ?? 'shot')) }}
+                                            </div>
+                                            @if($hasLipSync)
+                                                <div style="position: absolute; top: 4px; right: 4px; background: rgba(236, 72, 153, 0.9); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem;">
+                                                    👄
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endfor
+                                </div>
+                                @if(count($decomposed['shots'] ?? []) > 4)
+                                    <p style="text-align: center; color: #9ca3af; font-size: 0.75rem; margin-top: 0.5rem;">
+                                        +{{ count($decomposed['shots']) - 4 }} {{ __('more shots in panel →') }}
+                                    </p>
+                                @endif
+                                {{-- Still show Generate Collage option --}}
+                                <div style="margin-top: 0.75rem; text-align: center;">
+                                    <button type="button" wire:click="generateCollagePreview({{ $multiShotSceneIndex }})" wire:loading.attr="disabled" wire:target="generateCollagePreview" class="msm-gen-btn" style="padding: 6px 12px; font-size: 0.75rem;">
+                                        <span wire:loading.remove wire:target="generateCollagePreview">🖼️ {{ __('Generate New Collage') }}</span>
+                                        <span wire:loading wire:target="generateCollagePreview">⏳</span>
+                                    </button>
+                                </div>
+                            @else
+                                {{-- Empty State - no shots have images --}}
+                                <div class="msm-collage-empty">
+                                    <span>🖼️</span>
+                                    <p>{{ __('Generate a 2x2 collage to quickly assign visuals to shots') }}</p>
+                                    <button type="button" wire:click="generateCollagePreview({{ $multiShotSceneIndex }})" wire:loading.attr="disabled" wire:target="generateCollagePreview">
+                                        <span wire:loading.remove wire:target="generateCollagePreview">🖼️ {{ __('Generate Collage') }}</span>
+                                        <span wire:loading wire:target="generateCollagePreview">⏳</span>
+                                    </button>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </aside>
