@@ -33,6 +33,7 @@ use Modules\AppVideoWizard\Services\QueuedJobsManager;
 use Modules\AppVideoWizard\Services\SmartReferenceService;
 use Modules\AppVideoWizard\Services\CharacterLookService;
 use Modules\AppVideoWizard\Services\BibleOrderingService;
+use Modules\AppVideoWizard\Services\SpeechSegment;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -3795,8 +3796,8 @@ class VideoWizard extends Component
             return;
         }
 
-        // Validate speech type
-        $validTypes = ['narrator', 'internal', 'monologue', 'dialogue'];
+        // Validate speech type (now includes 'mixed' for dynamic segments)
+        $validTypes = ['narrator', 'internal', 'monologue', 'dialogue', 'mixed'];
         if (!in_array($speechType, $validTypes, true)) {
             $speechType = 'narrator'; // Default to narrator if invalid
         }
@@ -3817,6 +3818,12 @@ class VideoWizard extends Component
         // Also set at scene level for backward compatibility
         $this->script['scenes'][$sceneIndex]['speechType'] = $speechType;
 
+        // If switching to 'mixed', initialize speechSegments array if needed
+        if ($speechType === 'mixed' && empty($this->script['scenes'][$sceneIndex]['speechSegments'])) {
+            // Parse existing narration into segments if available
+            $this->parseNarrationToSegments($sceneIndex);
+        }
+
         $this->saveProject();
 
         Log::info('VideoWizard: Updated scene speech type', [
@@ -3824,6 +3831,447 @@ class VideoWizard extends Component
             'speechType' => $speechType,
             'needsLipSync' => in_array($speechType, ['monologue', 'dialogue'], true),
         ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SPEECH SEGMENT CRUD OPERATIONS
+    // Dynamic multi-voice system for mixed narrator/dialogue/internal scenes
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Add a new speech segment to a scene.
+     */
+    public function addSegment(int $sceneIndex, string $type = 'narrator'): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        // Initialize speechSegments array if needed
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'])) {
+            $this->script['scenes'][$sceneIndex]['speechSegments'] = [];
+        }
+
+        // Check max segments limit for performance
+        $currentCount = count($this->script['scenes'][$sceneIndex]['speechSegments']);
+        if ($currentCount >= SpeechSegment::MAX_SEGMENTS_PER_SCENE) {
+            $this->dispatch('toast-error', message: __('Maximum :max segments per scene reached', [
+                'max' => SpeechSegment::MAX_SEGMENTS_PER_SCENE
+            ]));
+            return;
+        }
+
+        // Validate type using SpeechSegment constants
+        if (!in_array($type, SpeechSegment::VALID_TYPES, true)) {
+            $type = SpeechSegment::TYPE_NARRATOR;
+        }
+
+        // Create new segment using SpeechSegment class
+        $segment = new SpeechSegment([
+            'type' => $type,
+            'text' => '',
+            'speaker' => $type === SpeechSegment::TYPE_NARRATOR ? null : '',
+            'order' => $currentCount,
+        ]);
+
+        $this->script['scenes'][$sceneIndex]['speechSegments'][] = $segment->toArray();
+
+        // Update speech type to 'mixed' if we now have multiple segment types
+        $this->updateSpeechTypeIfMixed($sceneIndex);
+
+        $this->saveProject();
+
+        Log::info('VideoWizard: Added speech segment', [
+            'sceneIndex' => $sceneIndex,
+            'segmentType' => $type,
+            'segmentCount' => count($this->script['scenes'][$sceneIndex]['speechSegments']),
+        ]);
+    }
+
+    /**
+     * Delete a speech segment from a scene.
+     */
+    public function deleteSegment(int $sceneIndex, int $segmentIndex): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex])) {
+            $this->dispatch('toast-error', message: __('Segment not found'));
+            return;
+        }
+
+        // Prevent deleting the last segment - keep at least one
+        if (count($this->script['scenes'][$sceneIndex]['speechSegments']) <= 1) {
+            $this->dispatch('toast-error', message: __('Cannot delete the last segment. A scene must have at least one speech segment.'));
+            return;
+        }
+
+        // Remove segment
+        array_splice($this->script['scenes'][$sceneIndex]['speechSegments'], $segmentIndex, 1);
+
+        // Re-index orders
+        foreach ($this->script['scenes'][$sceneIndex]['speechSegments'] as $i => &$seg) {
+            $seg['order'] = $i;
+        }
+
+        // Update speech type based on remaining segments
+        $this->updateSpeechTypeIfMixed($sceneIndex);
+
+        $this->saveProject();
+
+        Log::info('VideoWizard: Deleted speech segment', [
+            'sceneIndex' => $sceneIndex,
+            'segmentIndex' => $segmentIndex,
+            'remainingCount' => count($this->script['scenes'][$sceneIndex]['speechSegments']),
+        ]);
+
+        $this->dispatch('toast-success', message: __('Segment deleted'));
+    }
+
+    /**
+     * Move a speech segment up or down within a scene.
+     *
+     * @param int $sceneIndex The scene containing the segment
+     * @param int $segmentIndex The segment to move
+     * @param string $direction 'up' or 'down'
+     */
+    public function moveSegment(int $sceneIndex, int $segmentIndex, string $direction): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex])) {
+            $this->dispatch('toast-error', message: __('Segment not found'));
+            return;
+        }
+
+        if (!in_array($direction, ['up', 'down'], true)) {
+            $this->dispatch('toast-error', message: __('Invalid direction'));
+            return;
+        }
+
+        $segments = &$this->script['scenes'][$sceneIndex]['speechSegments'];
+        $newIndex = $direction === 'up' ? $segmentIndex - 1 : $segmentIndex + 1;
+
+        // Bounds check - silently ignore if at boundary
+        if ($newIndex < 0 || $newIndex >= count($segments)) {
+            return;
+        }
+
+        // Swap
+        $temp = $segments[$segmentIndex];
+        $segments[$segmentIndex] = $segments[$newIndex];
+        $segments[$newIndex] = $temp;
+
+        // Update orders
+        foreach ($segments as $i => &$seg) {
+            $seg['order'] = $i;
+        }
+
+        $this->saveProject();
+
+        Log::debug('VideoWizard: Moved speech segment', [
+            'sceneIndex' => $sceneIndex,
+            'segmentIndex' => $segmentIndex,
+            'direction' => $direction,
+            'newIndex' => $newIndex,
+        ]);
+    }
+
+    /**
+     * Update a segment's type (narrator, dialogue, internal, monologue).
+     *
+     * @param int $sceneIndex The scene containing the segment
+     * @param int $segmentIndex The segment to update
+     * @param string $type One of SpeechSegment::VALID_TYPES
+     */
+    public function updateSegmentType(int $sceneIndex, int $segmentIndex, string $type): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex])) {
+            $this->dispatch('toast-error', message: __('Segment not found'));
+            return;
+        }
+
+        // Use SpeechSegment constants for validation
+        if (!in_array($type, SpeechSegment::VALID_TYPES, true)) {
+            $this->dispatch('toast-error', message: __('Invalid speech type: :type', ['type' => $type]));
+            return;
+        }
+
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['type'] = $type;
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['needsLipSync'] =
+            in_array($type, SpeechSegment::LIP_SYNC_TYPES, true);
+
+        // Clear speaker if switching to narrator
+        if ($type === SpeechSegment::TYPE_NARRATOR) {
+            $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['speaker'] = null;
+            $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['characterId'] = null;
+        }
+
+        // Update scene-level speech type if needed
+        $this->updateSpeechTypeIfMixed($sceneIndex);
+
+        $this->saveProject();
+
+        Log::debug('VideoWizard: Updated segment type', [
+            'sceneIndex' => $sceneIndex,
+            'segmentIndex' => $segmentIndex,
+            'type' => $type,
+            'needsLipSync' => in_array($type, SpeechSegment::LIP_SYNC_TYPES, true),
+        ]);
+    }
+
+    /**
+     * Update a segment's speaker name.
+     *
+     * Automatically matches speaker to Character Bible entries for voice ID lookup.
+     *
+     * @param int $sceneIndex The scene containing the segment
+     * @param int $segmentIndex The segment to update
+     * @param string $speaker The speaker name (e.g., "JACK", "NARRATOR")
+     */
+    public function updateSegmentSpeaker(int $sceneIndex, int $segmentIndex, string $speaker): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex])) {
+            $this->dispatch('toast-error', message: __('Segment not found'));
+            return;
+        }
+
+        // Validate speaker name length
+        $speaker = trim($speaker);
+        if (strlen($speaker) > 100) {
+            $this->dispatch('toast-error', message: __('Speaker name is too long (max 100 characters)'));
+            return;
+        }
+
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['speaker'] = $speaker;
+
+        // Reset character linkage
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['characterId'] = null;
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['voiceId'] = null;
+
+        // Try to match speaker to Character Bible
+        $characterBible = $this->sceneMemory['characterBible'] ?? [];
+        $matched = false;
+        if (!empty($characterBible['characters']) && !empty($speaker)) {
+            $speakerUpper = strtoupper($speaker);
+            foreach ($characterBible['characters'] as $char) {
+                $charName = strtoupper(trim($char['name'] ?? ''));
+                if ($charName === $speakerUpper || str_contains($charName, $speakerUpper)) {
+                    $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['characterId'] = $char['id'] ?? null;
+                    $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['voiceId'] = $char['voiceId'] ?? null;
+                    $matched = true;
+                    break;
+                }
+            }
+        }
+
+        $this->saveProject();
+
+        Log::debug('VideoWizard: Updated segment speaker', [
+            'sceneIndex' => $sceneIndex,
+            'segmentIndex' => $segmentIndex,
+            'speaker' => $speaker,
+            'characterMatched' => $matched,
+        ]);
+    }
+
+    /**
+     * Update a segment's text content.
+     *
+     * Clears cached audio data since text has changed.
+     *
+     * @param int $sceneIndex The scene containing the segment
+     * @param int $segmentIndex The segment to update
+     * @param string $text The new speech text content
+     */
+    public function updateSegmentText(int $sceneIndex, int $segmentIndex, string $text): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        if (!isset($this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex])) {
+            $this->dispatch('toast-error', message: __('Segment not found'));
+            return;
+        }
+
+        // Validate text length using SpeechSegment constant
+        if (strlen($text) > SpeechSegment::MAX_TEXT_LENGTH) {
+            $this->dispatch('toast-error', message: __('Text exceeds maximum length (:max characters). Consider splitting into multiple segments.', [
+                'max' => SpeechSegment::MAX_TEXT_LENGTH
+            ]));
+            return;
+        }
+
+        // Warn if text is empty (but still allow it)
+        if (empty(trim($text))) {
+            $this->dispatch('toast-warning', message: __('Segment text is empty'));
+        }
+
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['text'] = $text;
+
+        // Clear audio info since text changed
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['audioUrl'] = null;
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['duration'] = null;
+        $this->script['scenes'][$sceneIndex]['speechSegments'][$segmentIndex]['startTime'] = null;
+
+        $this->saveProject();
+
+        Log::debug('VideoWizard: Updated segment text', [
+            'sceneIndex' => $sceneIndex,
+            'segmentIndex' => $segmentIndex,
+            'textLength' => strlen($text),
+        ]);
+    }
+
+    /**
+     * Parse existing narration text into speech segments.
+     *
+     * Uses SpeechSegmentParser to detect Hollywood-style speech formatting:
+     * - [NARRATOR] for external voiceover
+     * - [INTERNAL: CHARACTER] for inner thoughts
+     * - [MONOLOGUE: CHARACTER] for solo speech
+     * - CHARACTER: for dialogue
+     *
+     * @param int $sceneIndex The scene to parse narration for
+     */
+    public function parseNarrationToSegments(int $sceneIndex): void
+    {
+        if (!isset($this->script['scenes'][$sceneIndex])) {
+            $this->dispatch('toast-error', message: __('Scene not found'));
+            return;
+        }
+
+        $narration = $this->script['scenes'][$sceneIndex]['narration'] ??
+                     $this->script['scenes'][$sceneIndex]['voiceover']['text'] ?? '';
+
+        if (empty(trim($narration))) {
+            $this->dispatch('toast-warning', message: __('No narration text to parse'));
+            return;
+        }
+
+        try {
+            $parser = app(\Modules\AppVideoWizard\Services\SpeechSegmentParser::class);
+            $characterBible = $this->sceneMemory['characterBible'] ?? [];
+
+            // Use safeParse for better error handling
+            $result = $parser->safeParse($narration, $characterBible);
+
+            if (!$result['success']) {
+                $this->dispatch('toast-error', message: __('Failed to parse narration: :error', [
+                    'error' => $result['error'] ?? 'Unknown error'
+                ]));
+                return;
+            }
+
+            $segments = $result['segments'];
+
+            // Validate segments before saving
+            $validation = $parser->validateSegments($segments, $characterBible);
+            if (!empty($validation['warnings'])) {
+                foreach ($validation['warnings'] as $warning) {
+                    Log::warning('VideoWizard: Segment validation warning', [
+                        'sceneIndex' => $sceneIndex,
+                        'warning' => $warning,
+                    ]);
+                }
+            }
+
+            // Convert SpeechSegment objects to arrays
+            $segmentArrays = [];
+            foreach ($segments as $i => $segment) {
+                if ($segment instanceof \Modules\AppVideoWizard\Services\SpeechSegment) {
+                    $arr = $segment->toArray();
+                    $arr['order'] = $i;
+                    $segmentArrays[] = $arr;
+                } elseif (is_array($segment)) {
+                    $segment['order'] = $i;
+                    $segmentArrays[] = $segment;
+                }
+            }
+
+            // Check max segments limit
+            if (count($segmentArrays) > SpeechSegment::MAX_SEGMENTS_PER_SCENE) {
+                $this->dispatch('toast-warning', message: __('Parsed :count segments, but only :max are allowed. Extra segments were trimmed.', [
+                    'count' => count($segmentArrays),
+                    'max' => SpeechSegment::MAX_SEGMENTS_PER_SCENE
+                ]));
+                $segmentArrays = array_slice($segmentArrays, 0, SpeechSegment::MAX_SEGMENTS_PER_SCENE);
+            }
+
+            $this->script['scenes'][$sceneIndex]['speechSegments'] = $segmentArrays;
+
+            // Update speech type to mixed if multiple segments
+            if (count($segmentArrays) > 1) {
+                $this->script['scenes'][$sceneIndex]['voiceover']['speechType'] = 'mixed';
+                $this->script['scenes'][$sceneIndex]['speechType'] = 'mixed';
+            }
+
+            $this->saveProject();
+
+            Log::info('VideoWizard: Parsed narration into segments', [
+                'sceneIndex' => $sceneIndex,
+                'segmentCount' => count($segmentArrays),
+            ]);
+
+            $this->dispatch('toast-success', message: __('Parsed :count speech segments', [
+                'count' => count($segmentArrays)
+            ]));
+
+        } catch (\Exception $e) {
+            Log::error('VideoWizard: Failed to parse narration', [
+                'sceneIndex' => $sceneIndex,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            $this->dispatch('toast-error', message: __('Failed to parse narration. Please check the format.'));
+        }
+    }
+
+    /**
+     * Helper: Update speech type to 'mixed' if scene has multiple segment types.
+     */
+    protected function updateSpeechTypeIfMixed(int $sceneIndex): void
+    {
+        $segments = $this->script['scenes'][$sceneIndex]['speechSegments'] ?? [];
+
+        if (empty($segments)) {
+            // No segments, revert to narrator
+            $this->script['scenes'][$sceneIndex]['voiceover']['speechType'] = 'narrator';
+            $this->script['scenes'][$sceneIndex]['speechType'] = 'narrator';
+            return;
+        }
+
+        // Check if we have multiple segment types
+        $types = array_unique(array_column($segments, 'type'));
+
+        if (count($types) > 1 || count($segments) > 1) {
+            $this->script['scenes'][$sceneIndex]['voiceover']['speechType'] = 'mixed';
+            $this->script['scenes'][$sceneIndex]['speechType'] = 'mixed';
+        } elseif (count($segments) === 1) {
+            // Single segment, use its type
+            $type = $segments[0]['type'] ?? 'narrator';
+            $this->script['scenes'][$sceneIndex]['voiceover']['speechType'] = $type;
+            $this->script['scenes'][$sceneIndex]['speechType'] = $type;
+        }
     }
 
     /**
@@ -15984,9 +16432,9 @@ PROMPT;
             // Get dialogue for this specific shot
             $shotDialogue = $this->getDialogueForShot($scene, $i, count($analysis['shots'] ?? []));
 
-            // Check if scene speechType requires lip-sync (monologue/dialogue vs narrator/internal)
-            $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
-            $sceneNeedsLipSync = in_array($speechType, ['monologue', 'dialogue'], true);
+            // Check if scene speechType requires lip-sync (segment-aware)
+            // Supports: mixed speechType with per-segment lip-sync requirements
+            $sceneNeedsLipSync = $this->sceneNeedsLipSync($scene);
 
             // Shot needs lip-sync if it has dialogue AND scene speechType requires it
             $shotNeedsLipSync = !empty($shotDialogue) && $sceneNeedsLipSync;
@@ -16073,9 +16521,8 @@ PROMPT;
 
         // PHASE 6: Apply story beats to enhance shots with unique content
         // This gives each shot a unique visual description instead of sharing the same one
-        // Check scene speechType to determine if dialogue should trigger lip-sync
-        $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
-        $sceneNeedsLipSync = in_array($speechType, ['monologue', 'dialogue'], true);
+        // Check if scene requires lip-sync (segment-aware for mixed speechTypes)
+        $sceneNeedsLipSync = $this->sceneNeedsLipSync($scene);
 
         // Scene context for story-aware prompts in fallback path
         $sceneContext = [
@@ -20551,11 +20998,11 @@ PROMPT;
             return;
         }
 
-        // Check speechType to determine if lip-sync should be applied
+        // Check speechType to determine if lip-sync should be applied (segment-aware)
         // narrator/internal = NO lip-sync (voiceover only)
         // monologue/dialogue = lip-sync required (character speaks on screen)
-        $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
-        $sceneNeedsLipSync = in_array($speechType, ['monologue', 'dialogue'], true);
+        // mixed = check per-segment lip-sync requirements
+        $sceneNeedsLipSync = $this->sceneNeedsLipSync($scene);
 
         // Parse dialogue
         $segments = $this->parseSceneDialogue($narration);
@@ -21424,6 +21871,68 @@ PROMPT;
             }
         }
         return null;
+    }
+
+    /**
+     * Check if a scene requires lip-sync animation.
+     *
+     * This method is segment-aware: for scenes with 'mixed' speechType and
+     * speechSegments array, it checks if ANY segment requires lip-sync.
+     *
+     * @param array $scene Scene data
+     * @return bool True if scene requires lip-sync animation for any part
+     */
+    protected function sceneNeedsLipSync(array $scene): bool
+    {
+        // Use ShotIntelligenceService for segment-aware lip-sync detection
+        try {
+            $shotIntelService = app(ShotIntelligenceService::class);
+            return $shotIntelService->needsLipSync($scene);
+        } catch (\Throwable $e) {
+            // Fallback to basic check if service unavailable
+            $speechType = $scene['voiceover']['speechType'] ?? $scene['speechType'] ?? 'narrator';
+            if ($speechType === 'mixed') {
+                // Mixed without service - check segments directly
+                $segments = $scene['voiceover']['speechSegments'] ?? $scene['speechSegments'] ?? [];
+                foreach ($segments as $segment) {
+                    $segType = $segment['type'] ?? 'narrator';
+                    if (in_array($segType, ['monologue', 'dialogue'], true)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return in_array($speechType, ['monologue', 'dialogue'], true);
+        }
+    }
+
+    /**
+     * Get detailed lip-sync info for a scene's speech segments.
+     *
+     * For segment-based scenes, returns per-segment routing info so video
+     * generation can use the appropriate model for each segment.
+     *
+     * @param array $scene Scene data
+     * @return array Segment lip-sync information with routing details
+     */
+    protected function getSceneLipSyncInfo(array $scene): array
+    {
+        try {
+            $shotIntelService = app(ShotIntelligenceService::class);
+            return $shotIntelService->getSegmentLipSyncInfo($scene);
+        } catch (\Throwable $e) {
+            // Fallback to basic info
+            $needsLipSync = $this->sceneNeedsLipSync($scene);
+            return [
+                'hasSegments' => false,
+                'totalSegments' => 0,
+                'lipSyncSegments' => $needsLipSync ? 1 : 0,
+                'voiceoverSegments' => $needsLipSync ? 0 : 1,
+                'segments' => [],
+                'sceneNeedsLipSync' => $needsLipSync,
+                'recommendedModel' => $needsLipSync ? 'multitalk' : 'minimax',
+            ];
+        }
     }
 
     /**

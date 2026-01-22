@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\WizardAsset;
 use Modules\AppVideoWizard\Models\VwSetting;
+use Modules\AppVideoWizard\Services\SpeechSegment;
+use Modules\AppVideoWizard\Services\SpeechSegmentParser;
 
 class VoiceoverService
 {
@@ -765,5 +767,251 @@ class VoiceoverService
         }
 
         return $mapping;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SPEECH SEGMENTS - Dynamic Multi-Type Audio Generation
+    // Supports mixed narration/dialogue/internal/monologue within a single scene
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Generate audio for all speech segments in a scene.
+     * Each segment gets its own audio track with appropriate voice.
+     *
+     * @param WizardProject $project The project
+     * @param array $scene Scene data with speechSegments array
+     * @param array $options Options including characterBible, narratorVoice, teamId
+     * @return array Result with segment audio URLs and timeline
+     */
+    public function generateSegmentedAudio(WizardProject $project, array $scene, array $options = []): array
+    {
+        $speechSegments = $scene['speechSegments'] ?? [];
+        $characterBible = $options['characterBible'] ?? [];
+        $narratorVoice = $options['narratorVoice'] ?? 'fable';
+        $speed = $options['speed'] ?? 1.0;
+        $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+
+        // If no segments, try to parse from narration text
+        if (empty($speechSegments)) {
+            $parser = new SpeechSegmentParser();
+            $narration = $scene['narration'] ?? $scene['voiceover']['text'] ?? '';
+
+            if (empty($narration)) {
+                throw new \Exception('No speech segments or narration text provided');
+            }
+
+            $speechSegments = $parser->parse($narration, $characterBible);
+        }
+
+        // Convert array data to SpeechSegment objects if needed
+        $segments = array_map(function ($seg) {
+            return $seg instanceof SpeechSegment ? $seg : SpeechSegment::fromArray($seg);
+        }, $speechSegments);
+
+        if (empty($segments)) {
+            throw new \Exception('No speech segments to generate audio for');
+        }
+
+        Log::info('VoiceoverService: Generating segmented audio', [
+            'project_id' => $project->id,
+            'scene_id' => $scene['id'] ?? 'unknown',
+            'segment_count' => count($segments),
+        ]);
+
+        $results = [];
+        $totalDuration = 0;
+        $basePath = "wizard-projects/{$project->id}/audio";
+        $sceneSlug = Str::slug($scene['id'] ?? 'scene');
+        $timestamp = time();
+
+        foreach ($segments as $index => $segment) {
+            try {
+                // Determine voice for this segment
+                $voice = $this->getVoiceForSegment($segment, $characterBible, $narratorVoice);
+
+                // Generate audio
+                $audioResult = AI::process($segment->text, 'speech', [
+                    'voice' => $voice,
+                ], $teamId);
+
+                if (!empty($audioResult['error'])) {
+                    Log::warning('VoiceoverService: Segment audio generation failed', [
+                        'segment_id' => $segment->id,
+                        'error' => $audioResult['error'],
+                    ]);
+                    continue;
+                }
+
+                $audioContent = $audioResult['data'][0] ?? null;
+                if (!$audioContent) {
+                    continue;
+                }
+
+                // Calculate duration
+                $wordCount = str_word_count($segment->text);
+                $duration = ($wordCount / 150) * 60 / $speed;
+
+                // Store audio file
+                $filename = "{$sceneSlug}-seg-{$index}-{$segment->type}-{$timestamp}.mp3";
+                $path = "{$basePath}/{$filename}";
+                Storage::disk('public')->put($path, $audioContent);
+
+                $audioUrl = url('/files/' . $path);
+
+                // Update segment with audio info
+                $segment->audioUrl = $audioUrl;
+                $segment->duration = $duration;
+                $segment->startTime = $totalDuration;
+                $segment->voiceId = $voice;
+
+                $totalDuration += $duration;
+
+                $results[] = [
+                    'id' => $segment->id,
+                    'type' => $segment->type,
+                    'speaker' => $segment->speaker,
+                    'text' => $segment->text,
+                    'voice' => $voice,
+                    'audioUrl' => $audioUrl,
+                    'duration' => $duration,
+                    'startTime' => $segment->startTime,
+                    'needsLipSync' => $segment->needsLipSync,
+                    'characterId' => $segment->characterId,
+                    'order' => $segment->order,
+                ];
+            } catch (\Exception $e) {
+                Log::error('VoiceoverService: Failed to generate segment audio', [
+                    'segment_id' => $segment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Create combined audio file for playback
+        $combinedUrl = null;
+        if (!empty($results)) {
+            $combinedContent = '';
+            foreach ($results as $res) {
+                $segPath = str_replace(url('/files/'), '', $res['audioUrl']);
+                $content = Storage::disk('public')->get($segPath);
+                if ($content) {
+                    $combinedContent .= $content;
+                }
+            }
+
+            if (!empty($combinedContent)) {
+                $combinedFilename = "{$sceneSlug}-segments-combined-{$timestamp}.mp3";
+                $combinedPath = "{$basePath}/{$combinedFilename}";
+                Storage::disk('public')->put($combinedPath, $combinedContent);
+                $combinedUrl = url('/files/' . $combinedPath);
+            }
+        }
+
+        // Create asset record
+        $asset = WizardAsset::create([
+            'project_id' => $project->id,
+            'user_id' => $project->user_id,
+            'type' => WizardAsset::TYPE_VOICEOVER,
+            'name' => ($scene['title'] ?? $scene['id'] ?? 'Scene') . ' - Segmented Audio',
+            'path' => $combinedPath ?? '',
+            'url' => $combinedUrl ?? '',
+            'mime_type' => 'audio/mpeg',
+            'scene_index' => $options['sceneIndex'] ?? null,
+            'scene_id' => $scene['id'] ?? null,
+            'metadata' => [
+                'type' => 'segmented',
+                'segments' => $results,
+                'narratorVoice' => $narratorVoice,
+                'totalDuration' => $totalDuration,
+                'segmentCount' => count($results),
+                'lipSyncCount' => count(array_filter($results, fn($r) => $r['needsLipSync'])),
+            ],
+        ]);
+
+        return [
+            'success' => true,
+            'audioUrl' => $combinedUrl,
+            'assetId' => $asset->id,
+            'duration' => $totalDuration,
+            'segments' => $results,
+            'statistics' => [
+                'total' => count($results),
+                'needsLipSync' => count(array_filter($results, fn($r) => $r['needsLipSync'])),
+                'voiceoverOnly' => count(array_filter($results, fn($r) => !$r['needsLipSync'])),
+                'speakers' => array_unique(array_filter(array_column($results, 'speaker'))),
+            ],
+        ];
+    }
+
+    /**
+     * Get the appropriate voice for a speech segment.
+     *
+     * @param SpeechSegment $segment The segment
+     * @param array $characterBible Character Bible for voice lookup
+     * @param string $narratorVoice Default narrator voice
+     * @return string Voice ID
+     */
+    protected function getVoiceForSegment(SpeechSegment $segment, array $characterBible, string $narratorVoice): string
+    {
+        // Narrator segments use narrator voice
+        if ($segment->isNarrator()) {
+            return $narratorVoice;
+        }
+
+        // If segment has a pre-assigned voice ID, use it
+        if (!empty($segment->voiceId)) {
+            return $segment->voiceId;
+        }
+
+        // Look up voice by speaker name in Character Bible
+        if (!empty($segment->speaker)) {
+            return $this->getVoiceForSpeaker($segment->speaker, $characterBible, $narratorVoice);
+        }
+
+        // Fallback to narrator voice for internal thoughts without speaker
+        if ($segment->isInternal()) {
+            return $narratorVoice;
+        }
+
+        return $narratorVoice;
+    }
+
+    /**
+     * Parse scene narration into speech segments using SpeechSegmentParser.
+     * This is the preferred method for extracting segments from raw text.
+     *
+     * @param string $narration The raw narration text
+     * @param array $characterBible Character Bible for speaker validation
+     * @return SpeechSegment[] Array of parsed segments
+     */
+    public function parseNarrationToSegments(string $narration, array $characterBible = []): array
+    {
+        $parser = new SpeechSegmentParser();
+        return $parser->parse($narration, $characterBible);
+    }
+
+    /**
+     * Get segment statistics for a scene.
+     *
+     * @param array $segments Array of segments (SpeechSegment objects or arrays)
+     * @return array Statistics about the segments
+     */
+    public function getSegmentStatistics(array $segments): array
+    {
+        $parser = new SpeechSegmentParser();
+        return $parser->getStatistics($segments);
+    }
+
+    /**
+     * Validate segments against Character Bible.
+     *
+     * @param array $segments Array of segments
+     * @param array $characterBible Character Bible data
+     * @return array Validation result with warnings
+     */
+    public function validateSegmentSpeakers(array $segments, array $characterBible): array
+    {
+        $parser = new SpeechSegmentParser();
+        return $parser->validateSpeakers($segments, $characterBible);
     }
 }

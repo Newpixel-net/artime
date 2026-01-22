@@ -5,6 +5,8 @@ namespace Modules\AppVideoWizard\Services;
 use App\Facades\AI;
 use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\VwGenerationLog;
+use Modules\AppVideoWizard\Services\SpeechSegment;
+use Modules\AppVideoWizard\Services\SpeechSegmentParser;
 
 class ScriptGenerationService
 {
@@ -1214,7 +1216,28 @@ PROMPT;
             $prompt .= "\n";
         }
 
-        // === LAYER 14: OUTPUT FORMAT ===
+        // === LAYER 14: SPEECH SEGMENTS (Dynamic Multi-Voice) ===
+        $prompt .= "=== SPEECH SEGMENTS (HOLLYWOOD-STYLE MIXED NARRATION) ===\n";
+        $prompt .= "Each scene can mix NARRATOR, DIALOGUE, INTERNAL THOUGHTS, and MONOLOGUE.\n";
+        $prompt .= "Use these segment markers in the narration field:\n\n";
+        $prompt .= "SEGMENT FORMATS:\n";
+        $prompt .= "[NARRATOR] Text here         → External narrator voiceover (no lip-sync)\n";
+        $prompt .= "[INTERNAL: CHARACTER] Text   → Character's inner thoughts as V.O. (no lip-sync)\n";
+        $prompt .= "[MONOLOGUE: CHARACTER] Text  → Character speaking alone/to camera (lip-sync)\n";
+        $prompt .= "CHARACTER: Text              → Character dialogue (lip-sync required)\n\n";
+        $prompt .= "EXAMPLE MIXED NARRATION:\n";
+        $prompt .= "[NARRATOR] The city never sleeps. Neither does Jack.\n";
+        $prompt .= "JACK: They're everywhere...\n";
+        $prompt .= "[INTERNAL: JACK] I should never have come here.\n";
+        $prompt .= "THUG: End of the line.\n\n";
+        $prompt .= "RULES:\n";
+        $prompt .= "- Use [NARRATOR] for scene-setting, exposition, describing action\n";
+        $prompt .= "- Use CHARACTER: for spoken dialogue between characters\n";
+        $prompt .= "- Use [INTERNAL: CHARACTER] for thoughts/reactions (heard but lips don't move)\n";
+        $prompt .= "- Character names MUST match those in visualDescription\n";
+        $prompt .= "- For simple narrator-only scenes, you can omit tags (defaults to narrator)\n\n";
+
+        // === LAYER 15: OUTPUT FORMAT ===
         $prompt .= "=== OUTPUT FORMAT ===\n";
         $prompt .= "RESPOND WITH ONLY THIS JSON (no markdown code blocks, no explanation, just pure JSON):\n";
         $prompt .= <<<JSON
@@ -1225,7 +1248,7 @@ PROMPT;
     {
       "id": "scene-1",
       "title": "Descriptive scene title",
-      "narration": "Narrator text (~{$wordsPerScene} words) - emotionally resonant, matches tension curve",
+      "narration": "Mixed speech segments using [NARRATOR], CHARACTER:, [INTERNAL: CHAR] markers (~{$wordsPerScene} words)",
       "visualDescription": "Cinematic visual: [SHOT TYPE] [SUBJECT/ACTION]. [LIGHTING]. [COLOR MOOD]. [COMPOSITION]. [ATMOSPHERE]",
       "mood": "Scene emotional tone (matches emotional journey beat)",
       "musicMood": "Soundtrack mood (epic, emotional, tense, upbeat, ambient, corporate, dramatic, playful, horror, electronic)",
@@ -2580,6 +2603,21 @@ JSON;
      */
     public function sanitizeScene(array $scene, int $index = 0, int $defaultDuration = 15): array
     {
+        // Sanitize voiceover first to determine speechType
+        $voiceover = $this->sanitizeVoiceover($scene['voiceover'] ?? []);
+
+        // Sanitize speech segments (new dynamic speech system)
+        $speechSegments = $this->sanitizeSpeechSegments(
+            $scene['speechSegments'] ?? [],
+            $scene,
+            $voiceover
+        );
+
+        // If we have segments, mark speechType as 'mixed'
+        if (!empty($speechSegments) && count($speechSegments) > 1) {
+            $voiceover['speechType'] = 'mixed';
+        }
+
         return [
             // Core identifiers
             'id' => $this->ensureString($scene['id'] ?? null, 'scene-' . ($index + 1)),
@@ -2602,7 +2640,10 @@ JSON;
             'duration' => $this->ensureNumeric($scene['duration'] ?? null, $defaultDuration, 5, 300),
 
             // Voiceover structure
-            'voiceover' => $this->sanitizeVoiceover($scene['voiceover'] ?? []),
+            'voiceover' => $voiceover,
+
+            // NEW: Speech segments for dynamic mixed narration/dialogue
+            'speechSegments' => $speechSegments,
 
             // Ken Burns effect
             'kenBurns' => $this->sanitizeKenBurns($scene['kenBurns'] ?? null),
@@ -2621,6 +2662,7 @@ JSON;
      * - 'internal': Character's inner thoughts, heard but not spoken (NO lip-sync)
      * - 'monologue': Character speaking aloud to themselves (lip-sync REQUIRED)
      * - 'dialogue': Characters speaking to each other (lip-sync REQUIRED)
+     * - 'mixed': Dynamic segments with mixed narrator/dialogue/internal (NEW)
      */
     protected function sanitizeVoiceover($voiceover): array
     {
@@ -2628,8 +2670,8 @@ JSON;
             $voiceover = [];
         }
 
-        // Validate speechType
-        $validSpeechTypes = ['narrator', 'internal', 'monologue', 'dialogue'];
+        // Validate speechType - now includes 'mixed' for dynamic segments
+        $validSpeechTypes = ['narrator', 'internal', 'monologue', 'dialogue', 'mixed'];
         $speechType = $voiceover['speechType'] ?? 'narrator';
         if (!in_array($speechType, $validSpeechTypes)) {
             $speechType = 'narrator';
@@ -2640,10 +2682,106 @@ JSON;
             'text' => $this->ensureString($voiceover['text'] ?? null, ''),
             'voiceId' => $voiceover['voiceId'] ?? null,
             'status' => $this->ensureString($voiceover['status'] ?? null, 'pending'),
-            // NEW: Speech type for determining lip-sync requirements
+            // Speech type for determining lip-sync requirements
             'speechType' => $speechType,
-            // NEW: Character who is speaking (for monologue/dialogue)
+            // Character who is speaking (for monologue/dialogue)
             'speakingCharacter' => $voiceover['speakingCharacter'] ?? null,
+        ];
+    }
+
+    /**
+     * Sanitize speech segments array.
+     *
+     * If no segments exist but narration text does, parse it for segment markers.
+     * This enables both backwards compatibility and new AI-generated segmented scripts.
+     *
+     * @param array $segments Existing segments array
+     * @param array $scene Full scene data for migration context
+     * @param array $voiceover Sanitized voiceover data
+     * @return array Sanitized segments array
+     */
+    protected function sanitizeSpeechSegments(array $segments, array $scene, array $voiceover): array
+    {
+        // If segments already exist, sanitize them
+        if (!empty($segments)) {
+            return array_map(function ($segment, $index) {
+                return $this->sanitizeSingleSegment($segment, $index);
+            }, $segments, array_keys($segments));
+        }
+
+        // No segments - get narration text (prefer narration field over voiceover.text)
+        $narrationText = $scene['narration'] ?? '';
+        $voiceoverText = $voiceover['text'] ?? '';
+        $text = !empty(trim($narrationText)) ? $narrationText : $voiceoverText;
+
+        if (empty(trim($text))) {
+            return [];
+        }
+
+        // Check if text contains segment markers (AI-generated or manually formatted)
+        $hasSegmentMarkers = preg_match('/\[(NARRATOR|INTERNAL|MONOLOGUE|DIALOGUE)[:\]]|^[A-Z][A-Za-z\s\-\']+:\s/m', $text);
+
+        try {
+            $parser = app(SpeechSegmentParser::class);
+
+            if ($hasSegmentMarkers) {
+                // Parse segmented text directly
+                $parsed = $parser->parse($text, $scene['characterBible'] ?? []);
+            } else {
+                // Migrate from legacy single-type format
+                $parsed = $parser->migrateFromLegacy([
+                    'voiceover' => $voiceover,
+                    'narration' => $narrationText,
+                    'speechType' => $voiceover['speechType'] ?? 'narrator',
+                    'characterBible' => $scene['characterBible'] ?? [],
+                ]);
+            }
+
+            return array_map(function ($segment, $index) {
+                if ($segment instanceof SpeechSegment) {
+                    return $segment->toArray();
+                }
+                return $this->sanitizeSingleSegment($segment, $index);
+            }, $parsed, array_keys($parsed));
+        } catch (\Exception $e) {
+            // Fallback: create single narrator segment
+            return [
+                $this->sanitizeSingleSegment([
+                    'type' => $voiceover['speechType'] ?? 'narrator',
+                    'text' => $text,
+                    'speaker' => $voiceover['speakingCharacter'] ?? null,
+                ], 0),
+            ];
+        }
+    }
+
+    /**
+     * Sanitize a single speech segment.
+     */
+    protected function sanitizeSingleSegment(array $segment, int $index): array
+    {
+        $validTypes = ['narrator', 'dialogue', 'internal', 'monologue'];
+        $type = $segment['type'] ?? 'narrator';
+        if (!in_array($type, $validTypes)) {
+            $type = 'narrator';
+        }
+
+        // Calculate needsLipSync based on type
+        $needsLipSync = in_array($type, ['dialogue', 'monologue']);
+
+        return [
+            'id' => $segment['id'] ?? 'seg-' . \Illuminate\Support\Str::random(8),
+            'type' => $type,
+            'text' => $this->ensureString($segment['text'] ?? null, ''),
+            'speaker' => $segment['speaker'] ?? null,
+            'characterId' => $segment['characterId'] ?? null,
+            'voiceId' => $segment['voiceId'] ?? null,
+            'needsLipSync' => $segment['needsLipSync'] ?? $needsLipSync,
+            'startTime' => $segment['startTime'] ?? null,
+            'duration' => $segment['duration'] ?? null,
+            'audioUrl' => $segment['audioUrl'] ?? null,
+            'order' => $segment['order'] ?? $index,
+            'emotion' => $segment['emotion'] ?? null,
         ];
     }
 

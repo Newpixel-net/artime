@@ -930,6 +930,9 @@ class ShotIntelligenceService
      * This checks the voiceover speechType which explicitly indicates whether
      * the audio is narrator voiceover (no lip-sync) or character speech (lip-sync).
      *
+     * For scenes with speechSegments (mixed speech types), this returns true
+     * if ANY segment requires lip-sync, enabling proper model routing.
+     *
      * Speech types requiring lip-sync:
      * - 'monologue': Character speaking aloud to themselves
      * - 'dialogue': Characters speaking to each other
@@ -939,12 +942,36 @@ class ShotIntelligenceService
      * - 'internal': Character's inner thoughts (voiceover)
      *
      * @param array $scene Scene data with voiceover structure
-     * @return bool True if lip-sync animation is needed
+     * @return bool True if lip-sync animation is needed for any part of the scene
      */
     public function needsLipSync(array $scene): bool
     {
-        // Check speechType from voiceover structure (new system)
+        // NEW: Check for speech segments (mixed speech types system)
+        $speechSegments = $scene['voiceover']['speechSegments'] ?? $scene['speechSegments'] ?? [];
+
+        if (!empty($speechSegments)) {
+            // Scene uses dynamic segments - check if ANY segment needs lip-sync
+            foreach ($speechSegments as $segment) {
+                $segmentType = $segment['type'] ?? 'narrator';
+                if (in_array($segmentType, ['monologue', 'dialogue'], true)) {
+                    return true; // At least one segment needs lip-sync
+                }
+                // Also check the explicit needsLipSync flag if set
+                if (!empty($segment['needsLipSync'])) {
+                    return true;
+                }
+            }
+            return false; // All segments are narrator/internal (no lip-sync)
+        }
+
+        // Check speechType from voiceover structure (single speech type system)
         $speechType = $scene['voiceover']['speechType'] ?? null;
+
+        // Handle 'mixed' speechType - should have segments but fallback to lip-sync
+        if ($speechType === 'mixed') {
+            // Mixed without segments - assume some lip-sync needed
+            return true;
+        }
 
         if ($speechType !== null) {
             // Only monologue and dialogue require lip-sync
@@ -953,6 +980,9 @@ class ShotIntelligenceService
 
         // Fallback: Check if speechType is set at scene level
         $sceneSpeechType = $scene['speechType'] ?? null;
+        if ($sceneSpeechType === 'mixed') {
+            return true;
+        }
         if ($sceneSpeechType !== null) {
             return in_array($sceneSpeechType, ['monologue', 'dialogue'], true);
         }
@@ -961,6 +991,123 @@ class ShotIntelligenceService
         // This maintains backward compatibility but defaults to NO lip-sync
         // to avoid incorrectly applying lip-sync to narrator voiceovers
         return false; // Default to no lip-sync for legacy scripts
+    }
+
+    /**
+     * Get detailed lip-sync information for each speech segment.
+     *
+     * For scenes with mixed speech types, this returns per-segment routing
+     * information so video generation can use the appropriate model for each.
+     *
+     * @param array $scene Scene data with voiceover and speechSegments
+     * @return array Segment lip-sync information with routing details
+     */
+    public function getSegmentLipSyncInfo(array $scene): array
+    {
+        $speechSegments = $scene['voiceover']['speechSegments'] ?? $scene['speechSegments'] ?? [];
+
+        if (empty($speechSegments)) {
+            // No segments - return single-segment info based on scene speechType
+            $needsLipSync = $this->needsLipSync($scene);
+            return [
+                'hasSegments' => false,
+                'totalSegments' => 0,
+                'lipSyncSegments' => $needsLipSync ? 1 : 0,
+                'voiceoverSegments' => $needsLipSync ? 0 : 1,
+                'segments' => [],
+                'sceneNeedsLipSync' => $needsLipSync,
+                'recommendedModel' => $needsLipSync ? 'multitalk' : 'minimax',
+            ];
+        }
+
+        $segmentInfo = [];
+        $lipSyncCount = 0;
+        $voiceoverCount = 0;
+
+        foreach ($speechSegments as $index => $segment) {
+            $segmentType = $segment['type'] ?? 'narrator';
+            $needsLipSync = in_array($segmentType, ['monologue', 'dialogue'], true)
+                || !empty($segment['needsLipSync']);
+
+            if ($needsLipSync) {
+                $lipSyncCount++;
+            } else {
+                $voiceoverCount++;
+            }
+
+            $segmentInfo[] = [
+                'index' => $index,
+                'id' => $segment['id'] ?? $index,
+                'type' => $segmentType,
+                'speaker' => $segment['speaker'] ?? null,
+                'characterId' => $segment['characterId'] ?? null,
+                'needsLipSync' => $needsLipSync,
+                'recommendedModel' => $needsLipSync ? 'multitalk' : 'minimax',
+                'text' => $segment['text'] ?? '',
+                'duration' => $segment['duration'] ?? null,
+                'startTime' => $segment['startTime'] ?? null,
+            ];
+        }
+
+        return [
+            'hasSegments' => true,
+            'totalSegments' => count($speechSegments),
+            'lipSyncSegments' => $lipSyncCount,
+            'voiceoverSegments' => $voiceoverCount,
+            'segments' => $segmentInfo,
+            'sceneNeedsLipSync' => $lipSyncCount > 0,
+            'isMixed' => ($lipSyncCount > 0 && $voiceoverCount > 0),
+            'recommendedModel' => $lipSyncCount > 0 ? 'multitalk' : 'minimax',
+        ];
+    }
+
+    /**
+     * Get the recommended video model for a specific segment.
+     *
+     * @param array $segment Speech segment data
+     * @return string Model name ('multitalk' or 'minimax')
+     */
+    public function getModelForSegment(array $segment): string
+    {
+        $segmentType = $segment['type'] ?? 'narrator';
+        $needsLipSync = in_array($segmentType, ['monologue', 'dialogue'], true)
+            || !empty($segment['needsLipSync']);
+
+        return $needsLipSync ? 'multitalk' : 'minimax';
+    }
+
+    /**
+     * Get lip-sync segments only (for Multitalk routing).
+     *
+     * @param array $scene Scene data
+     * @return array Only segments that need lip-sync animation
+     */
+    public function getLipSyncSegments(array $scene): array
+    {
+        $info = $this->getSegmentLipSyncInfo($scene);
+
+        if (!$info['hasSegments']) {
+            return [];
+        }
+
+        return array_filter($info['segments'], fn($seg) => $seg['needsLipSync']);
+    }
+
+    /**
+     * Get voiceover-only segments (for Minimax routing).
+     *
+     * @param array $scene Scene data
+     * @return array Only segments that are voiceover (no lip-sync)
+     */
+    public function getVoiceoverOnlySegments(array $scene): array
+    {
+        $info = $this->getSegmentLipSyncInfo($scene);
+
+        if (!$info['hasSegments']) {
+            return [];
+        }
+
+        return array_filter($info['segments'], fn($seg) => !$seg['needsLipSync']);
     }
 
     /**

@@ -974,6 +974,269 @@
         margin-left: auto;
     }
 
+    /* Speech Segment Editor - Dynamic Multi-Voice System */
+    .vw-script-step .vw-segments-container {
+        margin-top: 0.75rem;
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .vw-script-step .vw-segments-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.75rem;
+        background: rgba(139, 92, 246, 0.1);
+        border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+    }
+
+    .vw-script-step .vw-segments-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .vw-script-step .vw-segments-stats {
+        font-size: 0.7rem;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .vw-script-step .vw-segment-item {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(0, 0, 0, 0.2);
+        transition: background 0.2s;
+    }
+
+    .vw-script-step .vw-segment-item:hover {
+        background: rgba(139, 92, 246, 0.05);
+    }
+
+    .vw-script-step .vw-segment-item:last-child {
+        border-bottom: none;
+    }
+
+    .vw-script-step .vw-segment-type-badge {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.375rem;
+        font-size: 1rem;
+    }
+
+    .vw-script-step .vw-segment-type-badge.narrator {
+        background: rgba(34, 211, 238, 0.15);
+        border: 1px solid rgba(34, 211, 238, 0.3);
+    }
+
+    .vw-script-step .vw-segment-type-badge.dialogue {
+        background: rgba(139, 92, 246, 0.15);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .vw-script-step .vw-segment-type-badge.internal {
+        background: rgba(251, 191, 36, 0.15);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+
+    .vw-script-step .vw-segment-type-badge.monologue {
+        background: rgba(236, 72, 153, 0.15);
+        border: 1px solid rgba(236, 72, 153, 0.3);
+    }
+
+    .vw-script-step .vw-segment-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .vw-script-step .vw-segment-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .vw-script-step .vw-segment-speaker {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+        text-transform: uppercase;
+    }
+
+    .vw-script-step .vw-segment-type-label {
+        font-size: 0.65rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .vw-script-step .vw-segment-lipsync-badge {
+        font-size: 0.65rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+    }
+
+    .vw-script-step .vw-segment-lipsync-badge.required {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+    }
+
+    .vw-script-step .vw-segment-lipsync-badge.voiceover {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+    }
+
+    .vw-script-step .vw-segment-text {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.4;
+    }
+
+    .vw-script-step .vw-segment-text-input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.9);
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .vw-script-step .vw-segment-text-input:focus {
+        border-color: rgba(139, 92, 246, 0.5);
+        outline: none;
+    }
+
+    .vw-script-step .vw-segment-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .vw-script-step .vw-segment-action-btn {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.25rem;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        font-size: 0.7rem;
+        transition: all 0.2s;
+    }
+
+    .vw-script-step .vw-segment-action-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .vw-script-step .vw-segment-action-btn.danger:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+    }
+
+    .vw-script-step .vw-segments-add-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    .vw-script-step .vw-segment-add-btn {
+        flex: 1;
+        padding: 0.5rem;
+        background: rgba(139, 92, 246, 0.1);
+        border: 1px dashed rgba(139, 92, 246, 0.3);
+        border-radius: 0.375rem;
+        color: rgba(139, 92, 246, 0.8);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-script-step .vw-segment-add-btn:hover {
+        background: rgba(139, 92, 246, 0.15);
+        border-color: rgba(139, 92, 246, 0.5);
+        color: #a78bfa;
+    }
+
+    .vw-script-step .vw-segments-parse-btn {
+        padding: 0.375rem 0.75rem;
+        background: rgba(34, 211, 238, 0.1);
+        border: 1px solid rgba(34, 211, 238, 0.3);
+        border-radius: 0.375rem;
+        color: #22d3ee;
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .vw-script-step .vw-segments-parse-btn:hover {
+        background: rgba(34, 211, 238, 0.2);
+    }
+
+    /* Segment Edit Modal */
+    .vw-script-step .vw-segment-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: rgba(139, 92, 246, 0.05);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .vw-script-step .vw-segment-edit-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .vw-script-step .vw-segment-type-select,
+    .vw-script-step .vw-segment-speaker-select {
+        padding: 0.375rem 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.375rem;
+        color: white;
+        font-size: 0.75rem;
+    }
+
+    .vw-script-step .vw-segment-save-btn {
+        padding: 0.375rem 0.75rem;
+        background: rgba(34, 197, 94, 0.2);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 0.375rem;
+        color: #4ade80;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+
+    .vw-script-step .vw-segment-cancel-btn {
+        padding: 0.375rem 0.75rem;
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 0.375rem;
+        color: #94a3b8;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+
     /* Narrative Structure Intelligence Styles */
     .vw-script-step .vw-narrative-section {
         background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.05) 100%);
@@ -2298,7 +2561,14 @@
                                 'internal' => ['label' => '💭 Internal', 'desc' => 'Character thoughts (no lip movement)'],
                                 'monologue' => ['label' => '🗣️ Monologue', 'desc' => 'Character speaks aloud (lips move)'],
                                 'dialogue' => ['label' => '💬 Dialogue', 'desc' => 'Characters talking (lips move)'],
+                                'mixed' => ['label' => '🎬 Mixed', 'desc' => 'Multiple speakers/types (dynamic segments)'],
                             ];
+                            $speechSegments = $scene['speechSegments'] ?? [];
+                            $hasMultipleSegments = count($speechSegments) > 1;
+                            // Auto-detect mixed if we have multiple segments
+                            if ($hasMultipleSegments && $currentSpeechType !== 'mixed') {
+                                $currentSpeechType = 'mixed';
+                            }
                         @endphp
                         <div class="vw-scene-section">
                             <div class="vw-scene-section-header">
@@ -2340,16 +2610,154 @@
                                         @endforeach
                                     </select>
                                     <span class="vw-speech-type-hint">
-                                        @if(in_array($currentSpeechType, ['monologue', 'dialogue']))
+                                        @if($currentSpeechType === 'mixed')
+                                            🎬 {{ __('Dynamic segments (mixed voices)') }}
+                                        @elseif(in_array($currentSpeechType, ['monologue', 'dialogue']))
                                             👄 {{ __('Lip-sync will be applied') }}
                                         @else
                                             🎙️ {{ __('Voiceover only (no lip-sync)') }}
                                         @endif
                                     </span>
                                 </div>
-                                <textarea class="vw-scene-textarea"
-                                          placeholder="{{ __('Voiceover text for this scene...') }}"
-                                          wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $safeNarration }}</textarea>
+
+                                @if($currentSpeechType === 'mixed')
+                                    {{-- Segment Editor for Mixed Mode --}}
+                                    @php
+                                        $segmentTypeIcons = [
+                                            'narrator' => '🎙️',
+                                            'dialogue' => '💬',
+                                            'internal' => '💭',
+                                            'monologue' => '🗣️',
+                                        ];
+                                        $lipSyncCount = 0;
+                                        $voiceoverCount = 0;
+                                        foreach ($speechSegments as $seg) {
+                                            if (($seg['needsLipSync'] ?? false) || in_array($seg['type'] ?? 'narrator', ['dialogue', 'monologue'])) {
+                                                $lipSyncCount++;
+                                            } else {
+                                                $voiceoverCount++;
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="vw-segments-container" x-data="{ editingSegment: null }">
+                                        <div class="vw-segments-header">
+                                            <span class="vw-segments-title">🎬 {{ __('Speech Segments') }}</span>
+                                            <span class="vw-segments-stats">
+                                                {{ count($speechSegments) }} {{ __('segments') }}
+                                                @if($lipSyncCount > 0)
+                                                    · 👄 {{ $lipSyncCount }} {{ __('lip-sync') }}
+                                                @endif
+                                                @if($voiceoverCount > 0)
+                                                    · 🎙️ {{ $voiceoverCount }} {{ __('V.O.') }}
+                                                @endif
+                                            </span>
+                                        </div>
+
+                                        @forelse($speechSegments as $segIndex => $segment)
+                                            @php
+                                                $segType = $segment['type'] ?? 'narrator';
+                                                $segSpeaker = $segment['speaker'] ?? null;
+                                                $segText = $segment['text'] ?? '';
+                                                $segNeedsLipSync = $segment['needsLipSync'] ?? in_array($segType, ['dialogue', 'monologue']);
+                                                $segIcon = $segmentTypeIcons[$segType] ?? '🎙️';
+                                            @endphp
+                                            <div class="vw-segment-item"
+                                                 x-show="editingSegment !== {{ $segIndex }}">
+                                                <div class="vw-segment-type-badge {{ $segType }}">
+                                                    {{ $segIcon }}
+                                                </div>
+                                                <div class="vw-segment-content">
+                                                    <div class="vw-segment-meta">
+                                                        <span class="vw-segment-speaker">
+                                                            {{ $segSpeaker ?? strtoupper($segType) }}
+                                                        </span>
+                                                        <span class="vw-segment-type-label">{{ ucfirst($segType) }}</span>
+                                                        @if($segNeedsLipSync)
+                                                            <span class="vw-segment-lipsync-badge required">👄 {{ __('Lip-sync') }}</span>
+                                                        @else
+                                                            <span class="vw-segment-lipsync-badge voiceover">🎙️ {{ __('V.O.') }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="vw-segment-text">{{ $segText }}</div>
+                                                </div>
+                                                <div class="vw-segment-actions">
+                                                    <button class="vw-segment-action-btn"
+                                                            @click="editingSegment = {{ $segIndex }}"
+                                                            title="{{ __('Edit') }}">✏️</button>
+                                                    <button class="vw-segment-action-btn"
+                                                            wire:click="moveSegment({{ $index }}, {{ $segIndex }}, 'up')"
+                                                            {{ $segIndex === 0 ? 'disabled' : '' }}
+                                                            title="{{ __('Move Up') }}">↑</button>
+                                                    <button class="vw-segment-action-btn"
+                                                            wire:click="moveSegment({{ $index }}, {{ $segIndex }}, 'down')"
+                                                            {{ $segIndex === count($speechSegments) - 1 ? 'disabled' : '' }}
+                                                            title="{{ __('Move Down') }}">↓</button>
+                                                    <button class="vw-segment-action-btn danger"
+                                                            wire:click="deleteSegment({{ $index }}, {{ $segIndex }})"
+                                                            wire:confirm="{{ __('Delete this segment?') }}"
+                                                            title="{{ __('Delete') }}">🗑️</button>
+                                                </div>
+                                            </div>
+
+                                            {{-- Inline Edit Form --}}
+                                            <div class="vw-segment-edit-form"
+                                                 x-show="editingSegment === {{ $segIndex }}"
+                                                 x-cloak>
+                                                <div class="vw-segment-edit-row">
+                                                    <select class="vw-segment-type-select"
+                                                            id="seg-type-{{ $index }}-{{ $segIndex }}"
+                                                            wire:change="updateSegmentType({{ $index }}, {{ $segIndex }}, $event.target.value)">
+                                                        <option value="narrator" {{ $segType === 'narrator' ? 'selected' : '' }}>🎙️ {{ __('Narrator') }}</option>
+                                                        <option value="dialogue" {{ $segType === 'dialogue' ? 'selected' : '' }}>💬 {{ __('Dialogue') }}</option>
+                                                        <option value="internal" {{ $segType === 'internal' ? 'selected' : '' }}>💭 {{ __('Internal') }}</option>
+                                                        <option value="monologue" {{ $segType === 'monologue' ? 'selected' : '' }}>🗣️ {{ __('Monologue') }}</option>
+                                                    </select>
+                                                    @if(in_array($segType, ['dialogue', 'internal', 'monologue']))
+                                                        <input type="text"
+                                                               class="vw-segment-speaker-select"
+                                                               placeholder="{{ __('Speaker name...') }}"
+                                                               value="{{ $segSpeaker }}"
+                                                               wire:blur="updateSegmentSpeaker({{ $index }}, {{ $segIndex }}, $event.target.value)">
+                                                    @endif
+                                                </div>
+                                                <textarea class="vw-segment-text-input"
+                                                          placeholder="{{ __('Segment text...') }}"
+                                                          wire:blur="updateSegmentText({{ $index }}, {{ $segIndex }}, $event.target.value)">{{ $segText }}</textarea>
+                                                <div class="vw-segment-edit-row">
+                                                    <button class="vw-segment-save-btn" @click="editingSegment = null">
+                                                        ✓ {{ __('Done') }}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="vw-segment-item" style="justify-content: center; color: rgba(255,255,255,0.5);">
+                                                {{ __('No segments yet. Add one below or parse from text.') }}
+                                            </div>
+                                        @endforelse
+
+                                        {{-- Add Segment Row --}}
+                                        <div class="vw-segments-add-row">
+                                            <button class="vw-segment-add-btn"
+                                                    wire:click="addSegment({{ $index }}, 'narrator')">
+                                                + 🎙️ {{ __('Narrator') }}
+                                            </button>
+                                            <button class="vw-segment-add-btn"
+                                                    wire:click="addSegment({{ $index }}, 'dialogue')">
+                                                + 💬 {{ __('Dialogue') }}
+                                            </button>
+                                            <button class="vw-segments-parse-btn"
+                                                    wire:click="parseNarrationToSegments({{ $index }})"
+                                                    title="{{ __('Parse existing narration text into segments') }}">
+                                                📝 {{ __('Parse Text') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                @else
+                                    {{-- Simple Textarea for Single Speech Type --}}
+                                    <textarea class="vw-scene-textarea"
+                                              placeholder="{{ __('Voiceover text for this scene...') }}"
+                                              wire:blur="updateSceneNarration({{ $index }}, $event.target.value)">{{ $safeNarration }}</textarea>
+                                @endif
                             @endif
                         </div>
 
