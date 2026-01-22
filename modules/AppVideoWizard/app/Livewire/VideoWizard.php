@@ -1261,6 +1261,18 @@ class VideoWizard extends Component
     }
 
     /**
+     * Called when component hydrates from session.
+     * Handles Phase 1.5 backward compatibility migration.
+     */
+    public function hydrate(): void
+    {
+        // Migrate legacy data if needed (Phase 1.5 backward compatibility)
+        if (!($this->characterIntelligence['migrated'] ?? false) && !empty($this->script['scenes'])) {
+            $this->migrateCharacterIntelligence();
+        }
+    }
+
+    /**
      * Livewire lifecycle hook - called when properties are updated.
      * Auto-rebuilds Scene DNA when Bibles change (if autoSync is enabled).
      * Auto-parses scene narration into speech segments when narration changes.
@@ -1728,6 +1740,11 @@ class VideoWizard extends Component
             }
             if (isset($config['content'])) {
                 $this->content = array_merge($this->content, $config['content']);
+            }
+
+            // Migrate legacy characterIntelligence data if needed (Phase 1.5)
+            if (!($this->characterIntelligence['migrated'] ?? false)) {
+                $this->migrateCharacterIntelligence();
             }
 
         }
