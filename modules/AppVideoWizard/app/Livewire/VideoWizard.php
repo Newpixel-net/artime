@@ -1263,12 +1263,27 @@ class VideoWizard extends Component
     /**
      * Livewire lifecycle hook - called when properties are updated.
      * Auto-rebuilds Scene DNA when Bibles change (if autoSync is enabled).
+     * Auto-parses scene narration into speech segments when narration changes.
      */
     public function updated($property, $value): void
     {
         // Skip during batch operations to prevent cascading updates
         if ($this->isBatchUpdating) {
             return;
+        }
+
+        // =====================================================================
+        // AUTO-PARSE NARRATION ON EDIT (Phase 1.5)
+        // When scene narration changes (wire:model.blur), auto-parse into segments
+        // =====================================================================
+        if (preg_match('/^script\.scenes\.(\d+)\.narration$/', $property, $matches)) {
+            if ($this->isParsing) {
+                return; // Prevent re-entry
+            }
+
+            $sceneIndex = (int) $matches[1];
+            $this->parseSceneNarration($sceneIndex);
+            return; // Exit early - this is a narration change
         }
 
         // PERFORMANCE: Skip auto-sync when bible modals are open
