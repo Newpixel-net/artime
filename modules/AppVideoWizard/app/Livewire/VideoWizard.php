@@ -2986,6 +2986,28 @@ class VideoWizard extends Component
             // Recalculate voice status based on new script
             $this->recalculateVoiceStatus();
 
+            // =====================================================================
+            // AUTO-PARSE SCRIPT INTO SPEECH SEGMENTS (Phase 1.5)
+            // =====================================================================
+            try {
+                $this->parseScriptIntoSegments();
+
+                // Build detection summary for UI
+                $this->buildDetectionSummary();
+
+                $this->dispatch('vw-debug', [
+                    'action' => 'auto-parse-complete',
+                    'message' => 'Script auto-parsed into speech segments',
+                    'data' => [
+                        'scenes_parsed' => count($this->script['scenes'] ?? []),
+                    ],
+                ]);
+            } catch (\Exception $parseEx) {
+                Log::warning('VideoWizard: Auto-parse failed (non-critical)', [
+                    'error' => $parseEx->getMessage(),
+                ]);
+            }
+
             $this->saveProject();
 
             // =====================================================================
