@@ -5,6 +5,16 @@
 
 ---
 
+## Current Position
+
+**Phase:** 1.5 of ongoing (Automatic Speech Flow)
+**Plan:** 01 of 4+ (in phase)
+**Status:** Plan 01 complete
+
+**Progress:** [##--------] 25% of Phase 1.5
+
+---
+
 ## Current Focus
 
 **Milestone 1.5: Automatic Speech Flow System** - Remove Character Intelligence bottleneck, connect Speech Segments to Character Bible for automatic flow.
@@ -21,6 +31,25 @@ The system should be sophisticated and automatically updated based on previous s
 
 ---
 
+## Completed This Session
+
+### Plan 1.5-01: Automatic Speech Segment Parsing (COMPLETE)
+**Summary:** Auto-parse script into speech segments with speaker-to-Character-Bible linking
+
+**Tasks:**
+1. [x] Add parseScriptIntoSegments method to VideoWizard
+2. [x] Integrate auto-parse into generateScript flow
+3. [x] Add auto-parse on manual narration edit
+
+**Commits:**
+- `ca01291` - feat(1.5-01): add parseScriptIntoSegments method to VideoWizard
+- `24840ac` - feat(1.5-01): integrate auto-parse into generateScript flow
+- `0b59341` - feat(1.5-01): add auto-parse on manual narration edit
+
+**SUMMARY:** `.planning/phases/1.5-automatic-speech-flow/1.5-01-SUMMARY.md`
+
+---
+
 ## Previous Session (Complete)
 
 **Dynamic Speech Segments Implementation** - All 7 phases complete:
@@ -34,25 +63,22 @@ The system should be sophisticated and automatically updated based on previous s
 
 ---
 
-## Current Phase: 1.5 - Automatic Speech Flow
+## Decisions Made
 
-**Status:** Context gathered, ready for planning
+| Date | Area | Decision | Context |
+|------|------|----------|---------|
+| 2026-01-23 | Speaker Matching | Use fuzzy matching (exact, partial, Levenshtein<=2) | Tolerates typos and name variations |
+| 2026-01-23 | Unknown Speakers | Auto-create Character Bible entry with autoDetected flag | User can configure voice later |
+| 2026-01-23 | Parse Timing | Parse after generateScript and on narration blur | Instant, invisible parsing |
 
-### Key Decisions
-| Area | Decision |
-|------|----------|
-| Character Bible | Auto-create & auto-link speakers |
-| Parsing | Automatic on AI generation and edits |
-| UI | Remove Character Intelligence, add read-only Detection Summary |
-| Data Flow | Full automatic: Script → Segments → Bible → Scenes → Shots |
+---
 
-### Tasks Overview
-1. Remove Character Intelligence UI section from `concept.blade.php`
-2. Add automatic parsing trigger after script generation
-3. Add auto-link speakers to Character Bible
-4. Add Detection Summary panel (read-only, informational)
-5. Refactor `characterIntelligence` property usage throughout codebase
-6. Ensure segment data flows to shots correctly
+## Remaining Tasks (Phase 1.5)
+
+1. **Plan 02:** Remove Character Intelligence UI section from `concept.blade.php`
+2. **Plan 03:** Add Detection Summary panel (read-only, informational)
+3. **Plan 04:** Ensure segment data flows to shots correctly
+4. **Plan 05:** Refactor `characterIntelligence` property usage throughout codebase
 
 ---
 
@@ -67,18 +93,18 @@ None currently
 | File | Purpose | Status |
 |------|---------|--------|
 | `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` | Implementation decisions | Created |
+| `.planning/phases/1.5-automatic-speech-flow/1.5-01-SUMMARY.md` | Plan 01 summary | Created |
 | `views/livewire/steps/concept.blade.php` | Character Intelligence UI (to remove) | Pending |
-| `Livewire/VideoWizard.php` | `characterIntelligence` property, parsing triggers | Pending |
+| `Livewire/VideoWizard.php` | Auto-parsing triggers | **Updated** |
 | `Services/SpeechSegmentParser.php` | Auto-parsing service | Exists |
-| `Services/ScriptGenerationService.php` | Script generation + parsing | Pending |
 
 ---
 
-## Next Steps
+## Session Continuity
 
-1. `/gsd:plan-phase 1.5` - Create detailed execution plan
-2. Execute plan tasks
-3. Test end-to-end flow
+**Last session:** 2026-01-23
+**Stopped at:** Completed 1.5-01-PLAN.md (Automatic Speech Segment Parsing)
+**Resume file:** None - Plan 01 complete, ready for Plan 02
 
 ---
 
