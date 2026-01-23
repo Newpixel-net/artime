@@ -17,20 +17,20 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 ## Current Position
 
 **Milestone:** 8 (Cinematic Shot Architecture)
-**Phase:** 11 (Speech-Driven Shot Creation)
-**Plan:** 02 of 02 complete
-**Status:** Phase 11 complete, ready for Phase 12
+**Phase:** 12 (Shot/Reverse-Shot Patterns)
+**Plan:** 01 of 02 complete
+**Status:** Plan 12-01 complete, ready for Plan 12-02
 
 ```
 Phase 11: ██████████ 100% (2/2 plans complete)
-Phase 12: ░░░░░░░░░░ 0%
+Phase 12: █████░░░░░ 50% (1/2 plans complete)
 Phase 13: ░░░░░░░░░░ 0%
 Phase 14: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ████░░░░░░ 25% (2/8 plans)
+Overall:  █████░░░░░ 37.5% (3/8 plans)
 ```
 
-**Last activity:** 2026-01-23 - Completed 11-02-PLAN.md (Narrator Overlay and Voiceover Handling)
+**Last activity:** 2026-01-23 - Completed 12-01-PLAN.md (Shot/Reverse-Shot Validation)
 
 ---
 
@@ -44,7 +44,9 @@ Transform scene decomposition so every shot is purposeful, speech-driven, and ci
 - Plan 11-01: Speech segments CREATE shots (1:1 mapping) instead of proportional distribution
 - Plan 11-02: Narrator and internal thought segments handled as voiceover overlays
 
-**Next:** Phase 12 (Shot/Reverse-Shot Enhancement)
+**Phase 12 In Progress:** Shot/Reverse-Shot Patterns
+- Plan 12-01: Validation methods for 180-degree rule, single-character constraint, character alternation - COMPLETE
+- Plan 12-02: Additional enhancements (pending)
 
 ---
 
@@ -71,6 +73,9 @@ The system should be sophisticated and automatically updated based on previous s
 | 2026-01-23 | Shot limits | Remove artificial caps | 10+ shots per scene if speech demands it |
 | 2026-01-23 | Single character | Embrace model constraint | Multitalk = 1 char/shot, use shot/reverse-shot pattern |
 | 2026-01-23 | Deprecate old method | Keep distributeSpeechSegmentsToShots() but deprecated | Allows rollback if issues discovered |
+| 2026-01-23 | Validation non-blocking | Log violations but don't halt | Missing validation shouldn't break video generation |
+| 2026-01-23 | Constraint enforcement | Convert two-shots to wide | FLOW-02 model constraint must be enforced |
+| 2026-01-23 | Alternation threshold | 3+ consecutive triggers warning | 2 consecutive common, 3+ likely missing variety |
 
 ### Research Insights
 
@@ -85,6 +90,11 @@ The system should be sophisticated and automatically updated based on previous s
 - Narrator segments now overlay as metadata (not dedicated shots)
 - Internal thought segments flagged for voiceover-only processing
 
+**Validation added (Phase 12-01):**
+- `validate180DegreeRule()` checks camera axis and eyeline opposition
+- `enforceSingleCharacterConstraint()` converts multi-character shots to single
+- `validateCharacterAlternation()` flags same-speaker streaks
+
 ### Known Issues
 
 | Issue | Impact | Plan | Status |
@@ -92,7 +102,26 @@ The system should be sophisticated and automatically updated based on previous s
 | Proportional segment distribution | HIGH - Non-cinematic results | M8 (CSA-01) | FIXED (Plan 11-01) |
 | No narrator overlay | MEDIUM - Narrator gets dedicated shots | M8 (CSA-02) | FIXED (Plan 11-02) |
 | Internal thought handling | LOW - Needs voiceover flag | M8 (CSA-04) | FIXED (Plan 11-02) |
-| Multi-character in single shot | HIGH - Model can't render | M8 (CSA-03) | Pending (Phase 12) |
+| Multi-character in single shot | HIGH - Model can't render | M8 (CSA-03) | FIXED (Plan 12-01) |
+
+---
+
+## Phase 12 Summary (In Progress)
+
+**Shot/Reverse-Shot Patterns** - In Progress
+
+### Plan 12-01: Shot/Reverse-Shot Validation - COMPLETE
+**Key accomplishments:**
+- validate180DegreeRule() for camera axis and eyeline validation
+- enforceSingleCharacterConstraint() for FLOW-02 model constraint
+- validateCharacterAlternation() for FLOW-04 coverage analysis
+- All validators integrated into enhanceShotsWithDialoguePatterns()
+
+**Commits:**
+- `95018c9` feat(12-01): add shot/reverse-shot validation methods
+
+**Files modified:**
+- DialogueSceneDecomposerService.php (+284 lines)
 
 ---
 
@@ -176,7 +205,7 @@ None currently.
 | `.planning/PROJECT.md` | Project context | Updated (2026-01-23) |
 | `.planning/STATE.md` | Current state tracking | Updated (2026-01-23) |
 | `modules/AppVideoWizard/app/Livewire/VideoWizard.php` | Main component | Modified (Phase 11) |
-| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Modified (Plan 11-01) |
+| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Modified (Plan 12-01) |
 | `modules/AppVideoWizard/app/Services/DynamicShotEngine.php` | Shot count/type | Target for Phase 12 |
 
 ---
@@ -184,9 +213,9 @@ None currently.
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 11-02-PLAN.md (Narrator Overlay and Voiceover Handling)
-**Resume file:** .planning/phases/11-speech-driven-shot-creation/11-02-SUMMARY.md
-**Next step:** Plan Phase 12 (Shot/Reverse-Shot Enhancement)
+**Stopped at:** Completed 12-01-PLAN.md (Shot/Reverse-Shot Validation)
+**Resume file:** .planning/phases/12-shot-reverse-shot-patterns/12-01-SUMMARY.md
+**Next step:** Execute 12-02-PLAN.md
 
 ---
 
