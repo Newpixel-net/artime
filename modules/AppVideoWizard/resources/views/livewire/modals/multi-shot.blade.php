@@ -57,6 +57,60 @@ window.multiShotVideoPolling = function() {
 
 @if($showMultiShotModal)
 @php
+    // PHASE 6: Shot type badge helper functions
+    if (!function_exists('getShotTypeBadgeClass')) {
+        function getShotTypeBadgeClass($type) {
+            $type = strtolower($type ?? '');
+            $map = [
+                'extreme-close-up' => 'xcu',
+                'close-up' => 'cu',
+                'medium-close' => 'mcu',
+                'medium' => 'med',
+                'wide' => 'wide',
+                'establishing' => 'est',
+                'over-the-shoulder' => 'ots',
+                'reaction' => 'reaction',
+                'two-shot' => 'two-shot',
+            ];
+            return $map[$type] ?? 'med';
+        }
+    }
+
+    if (!function_exists('getShotTypeLabel')) {
+        function getShotTypeLabel($type) {
+            $type = strtolower($type ?? '');
+            $labels = [
+                'extreme-close-up' => 'XCU',
+                'close-up' => 'CU',
+                'medium-close' => 'MCU',
+                'medium' => 'MED',
+                'wide' => 'WIDE',
+                'establishing' => 'EST',
+                'over-the-shoulder' => 'OTS',
+                'reaction' => 'REACT',
+                'two-shot' => '2-SHOT',
+            ];
+            return $labels[$type] ?? strtoupper(substr($type, 0, 4));
+        }
+    }
+
+    if (!function_exists('getCameraMovementIcon')) {
+        function getCameraMovementIcon($movement) {
+            $icons = [
+                'push-in' => '→●',
+                'pull-out' => '●→',
+                'pan-left' => '←',
+                'pan-right' => '→',
+                'tilt-up' => '↑',
+                'tilt-down' => '↓',
+                'static' => '●',
+                'slow-push' => '→',
+                'slight-drift' => '~',
+            ];
+            return $icons[strtolower($movement ?? '')] ?? '';
+        }
+    }
+
     $scene = $script['scenes'][$multiShotSceneIndex] ?? null;
     $decomposed = $multiShotMode['decomposedScenes'][$multiShotSceneIndex] ?? null;
     $storyboardScene = $storyboard['scenes'][$multiShotSceneIndex] ?? null;
@@ -645,6 +699,78 @@ window.multiShotVideoPolling = function() {
                                         </div>
                                     @endif
                                 </div>
+
+                                {{-- PHASE 6: Shot Type Badges --}}
+                                <div class="vw-shot-badges" style="padding: 0 0.5rem;">
+                                    {{-- Shot Type --}}
+                                    @if(!empty($shot['type']))
+                                        <span class="vw-shot-badge vw-shot-badge-{{ getShotTypeBadgeClass($shot['type']) }}">
+                                            {{ getShotTypeLabel($shot['type']) }}
+                                        </span>
+                                    @endif
+
+                                    {{-- Purpose (if different from type) --}}
+                                    @if(!empty($shot['purpose']) && $shot['purpose'] !== $shot['type'])
+                                        <span class="vw-shot-badge vw-shot-badge-{{ getShotTypeBadgeClass($shot['purpose']) }}">
+                                            {{ strtoupper(substr($shot['purpose'], 0, 4)) }}
+                                        </span>
+                                    @endif
+
+                                    {{-- Camera Movement --}}
+                                    @if(!empty($shot['cameraMovement']) && $shot['cameraMovement'] !== 'static')
+                                        <span class="vw-shot-badge vw-shot-badge-movement" title="{{ $shot['cameraMovement'] }}">
+                                            {{ getCameraMovementIcon($shot['cameraMovement']) }} {{ strtoupper(substr($shot['cameraMovement'], 0, 4)) }}
+                                        </span>
+                                    @endif
+
+                                    {{-- Climax Indicator --}}
+                                    @if(!empty($shot['isClimax']))
+                                        <span class="vw-shot-badge vw-shot-badge-climax">
+                                            CLIMAX
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- PHASE 6: Shot Dialogue Display --}}
+                                @if(!empty($shot['dialogue']))
+                                    <div class="msm-shot-dialogue" style="
+                                        background: rgba(59, 130, 246, 0.1);
+                                        border-left: 2px solid rgba(59, 130, 246, 0.5);
+                                        padding: 0.35rem 0.5rem;
+                                        margin: 0.35rem 0.5rem;
+                                        border-radius: 0 0.25rem 0.25rem 0;
+                                        font-size: 0.7rem;
+                                    ">
+                                        @if(!empty($shot['speakingCharacter']))
+                                            <span style="
+                                                color: rgba(139, 92, 246, 0.9);
+                                                font-weight: 600;
+                                                font-size: 0.65rem;
+                                            ">{{ $shot['speakingCharacter'] }}:</span>
+                                        @endif
+                                        <span style="color: rgba(255,255,255,0.85);">
+                                            {{ Str::limit($shot['dialogue'], 60) }}
+                                        </span>
+                                    </div>
+                                @elseif(!empty($shot['needsLipSync']))
+                                    <div style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 0.25rem;
+                                        background: rgba(139, 92, 246, 0.2);
+                                        padding: 0.15rem 0.4rem;
+                                        border-radius: 0.25rem;
+                                        font-size: 0.6rem;
+                                        color: rgba(139, 92, 246, 0.9);
+                                        margin: 0.25rem 0.5rem;
+                                    ">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        </svg>
+                                        <span>{{ __('Lip Sync') }}</span>
+                                    </div>
+                                @endif
 
                                 <div class="msm-shot-preview" wire:click.stop="openShotPreviewModal({{ $multiShotSceneIndex }}, {{ $shotIndex }})">
                                     @if($hasImage)
@@ -1472,4 +1598,19 @@ window.multiShotVideoPolling = function() {
     .msm-shot-info { flex-direction: column; gap: 0.15rem; }
     .msm-camera { max-width: 100%; }
 }
+
+/* PHASE 6: Shot Type Badges */
+.vw-shot-badge { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+.vw-shot-badge-xcu { background: rgba(239, 68, 68, 0.25); color: rgba(239, 68, 68, 0.95); }
+.vw-shot-badge-cu { background: rgba(249, 115, 22, 0.25); color: rgba(249, 115, 22, 0.95); }
+.vw-shot-badge-mcu { background: rgba(245, 158, 11, 0.25); color: rgba(245, 158, 11, 0.95); }
+.vw-shot-badge-med { background: rgba(34, 197, 94, 0.25); color: rgba(34, 197, 94, 0.95); }
+.vw-shot-badge-wide { background: rgba(59, 130, 246, 0.25); color: rgba(59, 130, 246, 0.95); }
+.vw-shot-badge-est { background: rgba(99, 102, 241, 0.25); color: rgba(99, 102, 241, 0.95); }
+.vw-shot-badge-ots { background: rgba(139, 92, 246, 0.25); color: rgba(139, 92, 246, 0.95); }
+.vw-shot-badge-reaction { background: rgba(236, 72, 153, 0.25); color: rgba(236, 72, 153, 0.95); }
+.vw-shot-badge-two-shot { background: rgba(20, 184, 166, 0.25); color: rgba(20, 184, 166, 0.95); }
+.vw-shot-badge-movement { background: rgba(168, 162, 158, 0.2); color: rgba(168, 162, 158, 0.9); }
+.vw-shot-badge-climax { background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.3)); color: rgba(255, 255, 255, 0.95); border: 1px solid rgba(139, 92, 246, 0.5); }
+.vw-shot-badges { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.25rem 0; }
 </style>

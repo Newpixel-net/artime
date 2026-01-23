@@ -847,7 +847,152 @@
     .vw-alert-close:hover {
         opacity: 1;
     }
+
+    /* ========================================
+       PHASE 6: Shot Type Badges
+       ======================================== */
+    .vw-shot-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 0.25rem;
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
+    /* Shot Type Colors - Gradient from red (XCU/tight) to blue (Wide) */
+    .vw-shot-badge-xcu { background: rgba(239, 68, 68, 0.25); color: rgba(239, 68, 68, 0.95); }
+    .vw-shot-badge-cu { background: rgba(249, 115, 22, 0.25); color: rgba(249, 115, 22, 0.95); }
+    .vw-shot-badge-mcu { background: rgba(245, 158, 11, 0.25); color: rgba(245, 158, 11, 0.95); }
+    .vw-shot-badge-med { background: rgba(34, 197, 94, 0.25); color: rgba(34, 197, 94, 0.95); }
+    .vw-shot-badge-wide { background: rgba(59, 130, 246, 0.25); color: rgba(59, 130, 246, 0.95); }
+    .vw-shot-badge-est { background: rgba(99, 102, 241, 0.25); color: rgba(99, 102, 241, 0.95); }
+
+    /* Purpose Badges */
+    .vw-shot-badge-ots { background: rgba(139, 92, 246, 0.25); color: rgba(139, 92, 246, 0.95); }
+    .vw-shot-badge-reaction { background: rgba(236, 72, 153, 0.25); color: rgba(236, 72, 153, 0.95); }
+    .vw-shot-badge-two-shot { background: rgba(20, 184, 166, 0.25); color: rgba(20, 184, 166, 0.95); }
+
+    /* Camera Movement */
+    .vw-shot-badge-movement { background: rgba(168, 162, 158, 0.2); color: rgba(168, 162, 158, 0.9); }
+
+    /* Climax indicator - special gradient */
+    .vw-shot-badge-climax {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.3));
+        color: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(139, 92, 246, 0.5);
+    }
+
+    .vw-shot-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        margin: 0.25rem 0;
+    }
+
+    /* PHASE 6: Dialogue Display Styles */
+    .vw-scene-dialogue {
+        background: rgba(59, 130, 246, 0.1);
+        border-left: 3px solid rgba(59, 130, 246, 0.5);
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0 0.25rem 0.25rem 0;
+        font-size: 0.75rem;
+        max-height: 80px;
+        overflow-y: auto;
+    }
+
+    .vw-scene-dialogue::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .vw-scene-dialogue::-webkit-scrollbar-thumb {
+        background: rgba(59, 130, 246, 0.3);
+        border-radius: 2px;
+    }
+
+    .vw-dialogue-label {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-bottom: 0.25rem;
+        font-size: 0.65rem;
+        color: rgba(59, 130, 246, 0.9);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .vw-dialogue-speaker {
+        color: rgba(139, 92, 246, 0.9);
+        font-weight: 600;
+        font-size: 0.7rem;
+    }
+
+    .vw-dialogue-text {
+        color: rgba(255, 255, 255, 0.85);
+        line-height: 1.4;
+    }
+
+    .vw-dialogue-more {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.65rem;
+        font-style: italic;
+    }
 </style>
+
+@php
+// PHASE 6: Shot type badge helper functions
+function getShotTypeBadgeClass($type) {
+    $type = strtolower($type ?? '');
+    $map = [
+        'extreme-close-up' => 'xcu',
+        'close-up' => 'cu',
+        'medium-close' => 'mcu',
+        'medium' => 'med',
+        'wide' => 'wide',
+        'establishing' => 'est',
+        'over-the-shoulder' => 'ots',
+        'reaction' => 'reaction',
+        'two-shot' => 'two-shot',
+    ];
+    return $map[$type] ?? 'med';
+}
+
+function getShotTypeLabel($type) {
+    $type = strtolower($type ?? '');
+    $labels = [
+        'extreme-close-up' => 'XCU',
+        'close-up' => 'CU',
+        'medium-close' => 'MCU',
+        'medium' => 'MED',
+        'wide' => 'WIDE',
+        'establishing' => 'EST',
+        'over-the-shoulder' => 'OTS',
+        'reaction' => 'REACT',
+        'two-shot' => '2-SHOT',
+    ];
+    return $labels[$type] ?? strtoupper(substr($type, 0, 4));
+}
+
+function getCameraMovementIcon($movement) {
+    $icons = [
+        'push-in' => '→●',
+        'pull-out' => '●→',
+        'pan-left' => '←',
+        'pan-right' => '→',
+        'tilt-up' => '↑',
+        'tilt-down' => '↓',
+        'static' => '●',
+        'slow-push' => '→',
+        'slight-drift' => '~',
+    ];
+    return $icons[strtolower($movement ?? '')] ?? '';
+}
+@endphp
 
 <div class="vw-storyboard-fullscreen" x-data="{ showSettings: true, selectedModel: '{{ $storyboard['imageModel'] ?? 'nanobanana' }}' }">
     {{-- Top Header Bar --}}
@@ -1567,6 +1712,32 @@
                                 <span style="background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; padding: 0.3rem 0.65rem; border-radius: 0.35rem; font-size: 0.8rem; font-weight: 600;">
                                     📽️ {{ count($decomposed['shots']) }} {{ __('shots') }}
                                 </span>
+
+                                {{-- PHASE 6: Enhanced Multi-Shot Summary --}}
+                                @php
+                                    $shots = $decomposed['shots'];
+                                    $shotTypeCounts = [];
+                                    foreach ($shots as $shot) {
+                                        $type = getShotTypeLabel($shot['type'] ?? 'medium');
+                                        $shotTypeCounts[$type] = ($shotTypeCounts[$type] ?? 0) + 1;
+                                    }
+                                @endphp
+
+                                <div style="
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    gap: 0.2rem;
+                                    margin-top: 0.35rem;
+                                    padding-top: 0.35rem;
+                                    border-top: 1px solid rgba(255,255,255,0.2);
+                                    justify-content: flex-end;
+                                ">
+                                    @foreach($shotTypeCounts as $type => $count)
+                                        <span class="vw-shot-badge vw-shot-badge-{{ getShotTypeBadgeClass($type) }}" style="font-size: 0.55rem;">
+                                            {{ $count }}x {{ $type }}
+                                        </span>
+                                    @endforeach
+                                </div>
                             </div>
                         @endif
 
@@ -2048,6 +2219,48 @@
                                     @endif
                                 </div>
                             @endif
+                        </div>
+                    @endif
+
+                    {{-- PHASE 6: Dialogue/Narration Text --}}
+                    @php
+                        $scriptScene = $script['scenes'][$index] ?? null;
+                        $speechSegments = $scriptScene['speechSegments'] ?? [];
+                        $narration = $scriptScene['narration'] ?? '';
+                    @endphp
+
+                    @if(!empty($speechSegments) || !empty($narration))
+                        <div style="padding: 0 1rem;">
+                            <div class="vw-scene-dialogue">
+                                <div class="vw-dialogue-label">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                    </svg>
+                                    <span>{{ __('Dialogue') }}</span>
+                                </div>
+
+                                @if(!empty($speechSegments))
+                                    @foreach(array_slice($speechSegments, 0, 2) as $segment)
+                                        <div style="margin-bottom: 0.25rem;">
+                                            @if(!empty($segment['speaker']))
+                                                <span class="vw-dialogue-speaker">{{ $segment['speaker'] }}:</span>
+                                            @endif
+                                            <span class="vw-dialogue-text">
+                                                {{ Str::limit($segment['text'] ?? '', 80) }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                    @if(count($speechSegments) > 2)
+                                        <div class="vw-dialogue-more">
+                                            +{{ count($speechSegments) - 2 }} {{ __('more segments...') }}
+                                        </div>
+                                    @endif
+                                @elseif(!empty($narration))
+                                    <div class="vw-dialogue-text">
+                                        {{ Str::limit($narration, 120) }}
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endif
 
