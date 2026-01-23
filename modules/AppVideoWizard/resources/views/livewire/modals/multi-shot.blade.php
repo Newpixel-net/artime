@@ -1667,7 +1667,7 @@ window.multiShotVideoPolling = function() {
     overflow-y: hidden;
     display: flex;
     gap: 1.25rem;
-    align-items: stretch;
+    align-items: flex-start;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
     scroll-padding: 0 1.5rem;
@@ -1691,7 +1691,7 @@ window.multiShotVideoPolling = function() {
 .msm-carousel-container {
     flex: 1;
     display: flex;
-    align-items: stretch;
+    align-items: flex-start;
     position: relative;
     min-height: 0;
     padding: 0 3.5rem;
@@ -1760,12 +1760,13 @@ window.multiShotVideoPolling = function() {
     flex: 0 0 400px;
     min-width: 360px;
     max-width: 450px;
-    height: auto;
-    min-height: 100%;
+    height: fit-content;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
     background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
     border: 2px solid rgba(255,255,255,0.12);
     border-radius: 20px;
-    overflow: hidden;
+    overflow-x: hidden;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     scroll-snap-align: center;
