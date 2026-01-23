@@ -18,19 +18,19 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 
 **Milestone:** 7 (Scene Text Inspector)
 **Phase:** 7 (Foundation - Modal Shell + Scene Card Fixes + Metadata)
-**Plan:** 02 of 04 complete
-**Status:** In progress - Modal shell complete
+**Plan:** 03 of 04 complete
+**Status:** In progress - Metadata display complete
 
 ```
-Phase 7:  ████░░░░░░ 50% (2/4 complete)
+Phase 7:  ███████░░░ 75% (3/4 complete)
 Phase 8:  ░░░░░░░░░░ 0% (Pending)
 Phase 9:  ░░░░░░░░░░ 0% (Pending)
 Phase 10: ░░░░░░░░░░ 0% (Pending)
 ─────────────────────
-Overall:  ████░░░░░░ 50%
+Overall:  ███████░░░ 75%
 ```
 
-**Last activity:** 2026-01-23 - Completed 07-02-PLAN.md (Scene Text Inspector modal shell)
+**Last activity:** 2026-01-23 - Completed 07-03-PLAN.md (Scene metadata display with 6 badge types)
 
 ---
 
@@ -96,6 +96,9 @@ The system should be sophisticated and automatically updated based on previous s
 | 2026-01-23 | Computed property pattern | Use computed properties for scene data in modal | Prevents 10-100KB payload bloat on every Livewire request (16x reduction) |
 | 2026-01-23 | Modal layout | Three-section layout (fixed header/scrollable content/fixed footer) | Matches Character Bible pattern for consistency |
 | 2026-01-23 | Read-only modal | No rebuild on close for Scene Text Inspector | Inspector is read-only, rebuilds would cause unnecessary delays |
+| 2026-01-23 | Metadata badge colors | Use semantic colors (blue=time, purple=action, green=place, yellow=people) | Creates instant visual categorization for different metadata types |
+| 2026-01-23 | Intensity gradient | Map intensity 1-3 to blue, 4-6 to yellow, 7-10 to red | Color progression provides instant understanding of emotional level |
+| 2026-01-23 | Climax badge prominence | Make climax badge full-width with gradient border | Pivotal moments deserve prominent visual treatment |
 
 ### Known Issues
 
@@ -103,8 +106,8 @@ The system should be sophisticated and automatically updated based on previous s
 |-------|--------|------|--------|
 | Hardcoded "Dialogue" label | HIGH - Users see incorrect type labels for all segments | Phase 7 (CARD-01) | ✓ FIXED (07-01) |
 | No modal inspector | HIGH - Users cannot view full scene content | Phase 7 (MODL-01 to MODL-04) | ✓ FIXED (07-02) |
+| No metadata visibility | MEDIUM - Users cannot inspect scene details | Phase 7 (META-01 to META-06) | ✓ FIXED (07-03) |
 | Text truncation | HIGH - Users cannot see full speech segments or prompts | Phase 8 (SPCH-01) and Phase 9 (PRMT-01/02) | Pending |
-| No metadata visibility | MEDIUM - Users cannot inspect scene details | Phase 7 (META-01 to META-06) | Pending |
 
 ### Research Insights
 
@@ -159,8 +162,8 @@ The system should be sophisticated and automatically updated based on previous s
 ### Immediate (Phase 7)
 - [x] Fix scene card type labels (replace hardcoded "Dialogue") - 07-01 complete
 - [x] Implement modal shell following Character Bible pattern - 07-02 complete
-- [ ] Display scene metadata badges in modal - 07-03 next
-- [ ] Modal UX polish (scroll, mobile) - 07-04
+- [x] Display scene metadata badges in modal - 07-03 complete
+- [ ] Modal UX polish (scroll, mobile) - 07-04 next
 
 ### Upcoming (Phase 8)
 - [ ] Display full speech segments with type badges
@@ -192,24 +195,27 @@ None currently.
 | `.planning/PROJECT.md` | Project context | Current |
 | `.planning/phases/07-foundation-modal-shell-scene-card-fixes-metadata/07-01-SUMMARY.md` | Scene card label fixes | Complete (2026-01-23) |
 | `.planning/phases/07-foundation-modal-shell-scene-card-fixes-metadata/07-02-SUMMARY.md` | Scene Text Inspector modal shell | Complete (2026-01-23) |
-| `modules/AppVideoWizard/resources/views/livewire/modals/scene-text-inspector.blade.php` | Inspector modal template | Created (2026-01-23) |
+| `.planning/phases/07-foundation-modal-shell-scene-card-fixes-metadata/07-03-SUMMARY.md` | Scene metadata display with 6 badge types | Complete (2026-01-23) |
+| `modules/AppVideoWizard/resources/views/livewire/modals/scene-text-inspector.blade.php` | Inspector modal template | Updated (2026-01-23) |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Plan 07-02 complete
+**Stopped at:** Plan 07-03 complete
 **Resume file:** None
-**Milestone 7 status:** 50% (2/4 plans complete)
+**Milestone 7 status:** 75% (3/4 plans complete)
 
 **Context preserved:**
-- Phase 7 Plans 01-02 complete: Scene card fixes and modal shell
+- Phase 7 Plans 01-03 complete: Scene card fixes, modal shell, and metadata display
 - Plan 01: Type label accuracy improved from 0% to 100%
 - Plan 02: Modal shell with open/close functionality, computed property pattern
-- Modal opens from Inspect button with scene header display
+- Plan 03: Complete metadata display with 6 badge types (duration, transition, location, characters, intensity, climax)
+- Modal opens from Inspect button with scene header and metadata
 - Performance optimized: 16x payload reduction via computed properties
-- Ready for Plan 07-03: Metadata display in modal
+- Metadata uses semantic colors and responsive grid layout
+- Ready for Plan 07-04: Modal UX polish (scroll, mobile)
 
 ---
 
