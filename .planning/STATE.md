@@ -17,20 +17,20 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 ## Current Position
 
 **Milestone:** 8 (Cinematic Shot Architecture)
-**Phase:** 11 (Speech-Driven Shot Creation) - Ready to plan
-**Plan:** —
-**Status:** Roadmap complete, ready for phase planning
+**Phase:** 11 (Speech-Driven Shot Creation)
+**Plan:** 01 of 02 complete
+**Status:** Plan 11-01 complete, ready for Plan 11-02
 
 ```
-Phase 11: ░░░░░░░░░░ 0%
+Phase 11: ████████░░ 80% (1/2 plans, Plan 01 complete)
 Phase 12: ░░░░░░░░░░ 0%
 Phase 13: ░░░░░░░░░░ 0%
 Phase 14: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ░░░░░░░░░░ 0%
+Overall:  ██░░░░░░░░ 12.5% (1/8 plans)
 ```
 
-**Last activity:** 2026-01-23 — Milestone 8 roadmap created (4 phases, 16 requirements)
+**Last activity:** 2026-01-23 - Completed 11-01-PLAN.md (Speech-to-Shot Inversion)
 
 ---
 
@@ -40,9 +40,12 @@ Overall:  ░░░░░░░░░░ 0%
 
 Transform scene decomposition so every shot is purposeful, speech-driven, and cinematically connected.
 
-**Core problem:** Speech segments are distributed proportionally across shots instead of driving shot creation. This produces non-cinematic results where dialogue doesn't flow naturally.
+**Plan 11-01 Complete:** Speech segments now CREATE shots (1:1 mapping) instead of being distributed proportionally.
+- createShotsFromSpeechSegments() added for 1:1 mapping
+- enhanceShotsWithDialoguePatterns() added for shot enhancement
+- distributeSpeechSegmentsToShots() deprecated
 
-**Target outcome:** Each dialogue/monologue segment creates its own shot with proper shot/reverse-shot patterns, dynamic camera selection, and continuous cinematic flow.
+**Next:** Plan 11-02 (Narrator & Internal Thought Overlay)
 
 ---
 
@@ -61,28 +64,50 @@ The system should be sophisticated and automatically updated based on previous s
 | Date | Area | Decision | Rationale |
 |------|------|----------|-----------|
 | 2026-01-23 | Speech-to-shot | 1:1 mapping for dialogue/monologue | Each speech drives its own shot for cinematic flow |
-| 2026-01-23 | Narrator handling | Overlay across multiple shots | Narrator is voiceover, not on-screen character |
+| 2026-01-23 | Speech-driven PRIMARY | Speech segments create shots, exchange-based is fallback | More reliable and cinematic than parsing narration |
+| 2026-01-23 | Narrator handling | Skip in shot creation (handled in Plan 02) | Narrator is voiceover overlay, not on-screen character |
 | 2026-01-23 | Shot limits | Remove artificial caps | 10+ shots per scene if speech demands it |
 | 2026-01-23 | Single character | Embrace model constraint | Multitalk = 1 char/shot, use shot/reverse-shot pattern |
+| 2026-01-23 | Deprecate old method | Keep distributeSpeechSegmentsToShots() but deprecated | Allows rollback if issues discovered |
 
 ### Research Insights
 
 **Existing foundation (from M4):**
 - DialogueSceneDecomposerService handles shot/reverse-shot, 180-degree rule, reactions
 - DynamicShotEngine does content-driven shot counts
-- Speech segments exist but distribution is proportional (needs to be 1:1)
+- Speech segments exist but distribution was proportional (now fixed with 1:1 mapping)
 
-**Gap identified:**
-- `distributeSpeechSegmentsToShots()` divides segments across shots proportionally
-- Needed: Segments should CREATE shots, not be distributed to them
+**Gap fixed (Plan 11-01):**
+- OLD: `distributeSpeechSegmentsToShots()` divides segments across shots proportionally
+- NEW: `createShotsFromSpeechSegments()` creates one shot per segment (1:1)
 
 ### Known Issues
 
 | Issue | Impact | Plan | Status |
 |-------|--------|------|--------|
-| Proportional segment distribution | HIGH - Non-cinematic results | M8 (CSA-01) | Pending |
-| No narrator overlay | MEDIUM - Narrator gets dedicated shots | M8 (CSA-02) | Pending |
-| Multi-character in single shot | HIGH - Model can't render | M8 (CSA-03) | Pending |
+| Proportional segment distribution | HIGH - Non-cinematic results | M8 (CSA-01) | FIXED (Plan 11-01) |
+| No narrator overlay | MEDIUM - Narrator gets dedicated shots | M8 (CSA-02) | Pending (Plan 11-02) |
+| Multi-character in single shot | HIGH - Model can't render | M8 (CSA-03) | Pending (Plan 11-03) |
+
+---
+
+## Plan 11-01 Summary
+
+**Speech-to-Shot Inversion** - Complete
+
+**Key accomplishments:**
+- createShotsFromSpeechSegments() creates 1:1 segment-to-shot mapping
+- enhanceShotsWithDialoguePatterns() assigns shot types by intensity
+- Speech-driven path is PRIMARY in decomposeSceneWithDynamicEngine()
+- No artificial shot count caps (12 segments = 12 shots)
+
+**Commits:**
+- `6532e1d` feat(11-01): add createShotsFromSpeechSegments for 1:1 speech-to-shot mapping
+- `30c6627` feat(11-01): enhance DialogueSceneDecomposerService for speech-driven shots
+
+**Files modified:**
+- VideoWizard.php (createShotsFromSpeechSegments, calculateDurationFromText, flow updates)
+- DialogueSceneDecomposerService.php (enhanceShotsWithDialoguePatterns, createShotFromSegment)
 
 ---
 
@@ -134,8 +159,8 @@ None currently.
 |------|---------|--------|
 | `.planning/PROJECT.md` | Project context | Updated (2026-01-23) |
 | `.planning/STATE.md` | Current state tracking | Updated (2026-01-23) |
-| `modules/AppVideoWizard/app/Livewire/VideoWizard.php` | Main component | Target for M8 |
-| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Foundation for M8 |
+| `modules/AppVideoWizard/app/Livewire/VideoWizard.php` | Main component | Modified (Plan 11-01) |
+| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Modified (Plan 11-01) |
 | `modules/AppVideoWizard/app/Services/DynamicShotEngine.php` | Shot count/type | Target for M8 |
 
 ---
@@ -143,9 +168,9 @@ None currently.
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Milestone 8 roadmap complete
-**Resume command:** `/gsd:discuss-phase 11` or `/gsd:plan-phase 11`
-**Next step:** Plan Phase 11 (Speech-Driven Shot Creation)
+**Stopped at:** Completed 11-01-PLAN.md (Speech-to-Shot Inversion)
+**Resume file:** .planning/phases/11-speech-driven-shot-creation/11-01-SUMMARY.md
+**Next step:** Execute Plan 11-02 (Narrator & Internal Thought Overlay)
 
 ---
 
