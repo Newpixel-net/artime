@@ -36,9 +36,15 @@ This builds on the M4 DialogueSceneDecomposerService foundation while inverting 
 
 **Goal:** Refactor decomposition so speech segments CREATE shots instead of being distributed to them
 
-**Status:** Pending
+**Status:** Ready for execution
 
 **Dependencies:** None (starts new milestone)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Speech-to-shot inversion (1:1 mapping for dialogue/monologue)
+- [ ] 11-02-PLAN.md — Narrator overlay and internal thought voiceover handling
 
 **Requirements:**
 - CSA-01: Each dialogue segment creates its own shot (1:1 mapping)
