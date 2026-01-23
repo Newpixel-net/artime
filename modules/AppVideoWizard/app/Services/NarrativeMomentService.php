@@ -322,15 +322,26 @@ PROMPT;
             ];
         }
 
-        // If no moments extracted, create a single default moment
+        // If no moments extracted, try meaningful extraction from narration
         if (empty($moments)) {
-            $moments[] = [
-                'action' => $narration,
-                'subject' => $characterName,
-                'emotion' => 'focus',
-                'intensity' => 0.5,
-                'visualDescription' => $narration,
-            ];
+            $moments = $this->generateMeaningfulMomentsFromNarration($narration, 3, $context);
+
+            if (!empty($moments)) {
+                Log::info('NarrativeMomentService: Generated meaningful fallback moments', [
+                    'count' => count($moments),
+                    'actions' => array_column($moments, 'action'),
+                ]);
+            } else {
+                // Last resort: use the narration itself as a single moment
+                $moments[] = [
+                    'action' => $this->extractFirstActionFromNarration($narration),
+                    'subject' => $characterName,
+                    'emotion' => 'focus',
+                    'intensity' => 0.5,
+                    'visualDescription' => $narration,
+                    'source' => 'raw_narration',
+                ];
+            }
         }
 
         // Ensure intensity curve has variation (Hollywood standard)
@@ -362,10 +373,10 @@ PROMPT;
 
         // Check for "he/she" to infer single character
         if (preg_match('/\b(he|she)\b/i', $narration)) {
-            return 'the subject';
+            return 'the protagonist';
         }
 
-        return 'the subject';
+        return 'the character';
     }
 
     /**
@@ -534,19 +545,14 @@ PROMPT;
         $currentCount = count($moments);
 
         if ($currentCount === 0) {
-            // Generate placeholder moments
-            $placeholders = [];
-            for ($i = 0; $i < $targetCount; $i++) {
-                $progress = $i / max(1, $targetCount - 1);
-                $placeholders[] = [
-                    'action' => 'continues the scene',
-                    'subject' => 'the subject',
-                    'emotion' => 'focus',
-                    'intensity' => 0.3 + ($progress * 0.4), // 0.3 → 0.7
-                    'visualDescription' => 'Scene continues',
-                ];
-            }
-            return $placeholders;
+            // PHASE 3: Generate meaningful moments from narration analysis
+            // Never return useless placeholders like "continues the scene"
+            // Note: At this point we may not have narration context, so use narrative arc fallback
+            $arcMoments = $this->generateNarrativeArcMoments($targetCount, []);
+            Log::warning('NarrativeMomentService: Using narrative arc fallback for empty moments', [
+                'count' => count($arcMoments),
+            ]);
+            return $arcMoments;
         }
 
         if ($currentCount === $targetCount) {
@@ -635,7 +641,7 @@ PROMPT;
 
                 $expanded[] = [
                     'action' => $lower['action'], // Use lower action
-                    'subject' => $lower['subject'] ?? $upper['subject'] ?? 'the subject',
+                    'subject' => $lower['subject'] ?? $upper['subject'] ?? 'the character',
                     'emotion' => $lower['emotion'], // Use lower emotion
                     'intensity' => $lower['intensity'] + ($interpolation * (($upper['intensity'] ?? 0.5) - ($lower['intensity'] ?? 0.5))),
                     'visualDescription' => $lower['visualDescription'] ?? $lower['action'],
@@ -818,5 +824,292 @@ PROMPT;
         }
 
         return 'establishing';  // Location/scale (Frame 285)
+    }
+
+    /**
+     * Generate meaningful moments by analyzing narration text.
+     * Uses keyword extraction and ACTION_EMOTION_MAP for valid actions.
+     *
+     * @param string $narration Raw narration text
+     * @param int $targetCount Number of moments to generate
+     * @param array $context Scene context
+     * @return array Array of moment objects with unique actions
+     */
+    protected function generateMeaningfulMomentsFromNarration(string $narration, int $targetCount, array $context = []): array
+    {
+        $moments = [];
+        $usedActions = [];
+
+        // Split narration into sentences/chunks
+        $chunks = preg_split('/[.!?]+/', $narration, -1, PREG_SPLIT_NO_EMPTY);
+        $chunks = array_filter(array_map('trim', $chunks));
+
+        if (empty($chunks)) {
+            return [];
+        }
+
+        // Extract actions from each chunk
+        foreach ($chunks as $index => $chunk) {
+            if (count($moments) >= $targetCount) {
+                break;
+            }
+
+            // Try to find an action verb in this chunk
+            $action = $this->extractActionFromText($chunk, $usedActions);
+
+            if ($action) {
+                $emotion = self::ACTION_EMOTION_MAP[$action] ?? 'focus';
+                $progress = count($moments) / max(1, $targetCount - 1);
+
+                $moments[] = [
+                    'action' => $action,
+                    'subject' => $this->extractSubjectFromChunk($chunk, $context),
+                    'emotion' => $emotion,
+                    'intensity' => $this->calculateIntensityFromEmotion($emotion, $progress),
+                    'visualDescription' => $this->summarizeChunk($chunk),
+                    'source' => 'narration_analysis',
+                ];
+
+                $usedActions[] = $action;
+            }
+        }
+
+        // If we don't have enough moments, interpolate
+        if (count($moments) < $targetCount && count($moments) > 0) {
+            $moments = $this->interpolateMoments($moments, $targetCount);
+            $moments = $this->deduplicateActions($moments);
+        }
+
+        return $moments;
+    }
+
+    /**
+     * Extract an action verb from text chunk.
+     *
+     * @param string $text Text to analyze
+     * @param array $usedActions Actions already used (to avoid duplicates)
+     * @return string|null Action found or null
+     */
+    protected function extractActionFromText(string $text, array $usedActions = []): ?string
+    {
+        $text = strtolower($text);
+
+        // Priority actions from ACTION_EMOTION_MAP
+        $actionPriority = [
+            // High-value actions (dramatic)
+            'discovers', 'realizes', 'confronts', 'reveals', 'escapes', 'attacks',
+            'defends', 'surrenders', 'sacrifices', 'transforms',
+            // Movement actions
+            'enters', 'arrives', 'approaches', 'retreats', 'chases', 'flees',
+            'walks', 'runs', 'stops',
+            // Perception actions
+            'notices', 'spots', 'watches', 'observes', 'sees', 'looks',
+            // Interaction actions
+            'speaks', 'meets', 'greets', 'argues', 'agrees', 'refuses',
+            // State actions
+            'waits', 'stands', 'sits', 'hides', 'searches',
+        ];
+
+        foreach ($actionPriority as $action) {
+            // Check if action appears in text and hasn't been used
+            $patterns = [$action, rtrim($action, 's'), $action . 's', $action . 'ing', $action . 'ed'];
+            foreach ($patterns as $pattern) {
+                if (strpos($text, $pattern) !== false && !in_array($action, $usedActions)) {
+                    return $action;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract subject from text chunk.
+     *
+     * @param string $text Text to analyze
+     * @param array $context Scene context with characters
+     * @return string Subject description
+     */
+    protected function extractSubjectFromChunk(string $text, array $context = []): string
+    {
+        // Check for known characters
+        $characters = $context['characters'] ?? [];
+        foreach ($characters as $character) {
+            $name = is_array($character) ? ($character['name'] ?? '') : (string) $character;
+            if (!empty($name) && stripos($text, $name) !== false) {
+                return $name;
+            }
+        }
+
+        // Check for common subject words
+        $subjectPatterns = [
+            '/\b(he|him|his)\b/i' => 'the protagonist',
+            '/\b(she|her|hers)\b/i' => 'the protagonist',
+            '/\b(they|them|their)\b/i' => 'the characters',
+            '/\bthe\s+(man|woman|person|figure|character)\b/i' => 'the $1',
+        ];
+
+        foreach ($subjectPatterns as $pattern => $replacement) {
+            if (preg_match($pattern, $text, $matches)) {
+                if (strpos($replacement, '$1') !== false && isset($matches[1])) {
+                    return 'the ' . strtolower($matches[1]);
+                }
+                return $replacement;
+            }
+        }
+
+        return 'the character';
+    }
+
+    /**
+     * Summarize a text chunk for visual description.
+     *
+     * @param string $chunk Text chunk
+     * @return string Summarized visual description
+     */
+    protected function summarizeChunk(string $chunk): string
+    {
+        // Clean up the chunk
+        $cleaned = trim($chunk);
+
+        // Truncate to reasonable length
+        if (strlen($cleaned) > 100) {
+            $cleaned = substr($cleaned, 0, 97) . '...';
+        }
+
+        return ucfirst($cleaned) ?: 'Scene moment';
+    }
+
+    /**
+     * Extract the first meaningful action from narration text.
+     * Used as last resort when no structured moments can be extracted.
+     *
+     * @param string $narration Full narration text
+     * @return string First action found or summarized narration
+     */
+    protected function extractFirstActionFromNarration(string $narration): string
+    {
+        // Try to find an action verb
+        $action = $this->extractActionFromText($narration, []);
+        if ($action) {
+            return $action;
+        }
+
+        // Summarize the narration
+        $summary = $this->summarizeChunk($narration);
+        if (strlen($summary) > 50) {
+            $summary = substr($summary, 0, 47) . '...';
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Calculate intensity based on emotion and progress.
+     *
+     * @param string $emotion Emotion name
+     * @param float $progress Progress through scene (0-1)
+     * @return float Intensity (0-1)
+     */
+    protected function calculateIntensityFromEmotion(string $emotion, float $progress): float
+    {
+        $baseIntensity = self::EMOTION_INTENSITY_MAP[$emotion] ?? 0.5;
+
+        // Apply slight variation based on progress (build toward middle)
+        $arcModifier = sin($progress * M_PI) * 0.1;
+
+        return min(1.0, max(0.1, $baseIntensity + $arcModifier));
+    }
+
+    /**
+     * Generate moments based on standard narrative arc structure.
+     * Used as last resort when text analysis fails.
+     *
+     * @param int $targetCount Number of moments
+     * @param array $context Scene context
+     * @return array Narrative arc moments
+     */
+    protected function generateNarrativeArcMoments(int $targetCount, array $context = []): array
+    {
+        // Standard narrative arc actions that tell a story
+        $arcActions = [
+            // Setup (first 20%)
+            ['action' => 'observes', 'emotion' => 'curiosity', 'phase' => 'setup'],
+            ['action' => 'approaches', 'emotion' => 'anticipation', 'phase' => 'setup'],
+            // Rising action (20-50%)
+            ['action' => 'discovers', 'emotion' => 'surprise', 'phase' => 'rising'],
+            ['action' => 'confronts', 'emotion' => 'determination', 'phase' => 'rising'],
+            ['action' => 'struggles', 'emotion' => 'tension', 'phase' => 'rising'],
+            // Climax (50-70%)
+            ['action' => 'faces', 'emotion' => 'tension', 'phase' => 'climax'],
+            ['action' => 'overcomes', 'emotion' => 'triumph', 'phase' => 'climax'],
+            // Falling action (70-90%)
+            ['action' => 'reflects', 'emotion' => 'contemplation', 'phase' => 'falling'],
+            // Resolution (90-100%)
+            ['action' => 'resolves', 'emotion' => 'resolution', 'phase' => 'resolution'],
+        ];
+
+        $moments = [];
+        $subject = $context['mainCharacter'] ?? 'the protagonist';
+
+        // Select appropriate arc moments based on target count
+        if ($targetCount <= 3) {
+            // Short: setup -> climax -> resolution
+            $selectedIndices = [0, 5, 8];
+        } elseif ($targetCount <= 5) {
+            // Medium: setup -> rising -> climax -> falling -> resolution
+            $selectedIndices = [0, 2, 5, 7, 8];
+        } else {
+            // Long: use all arc points and interpolate
+            $selectedIndices = range(0, min(count($arcActions) - 1, $targetCount - 1));
+        }
+
+        foreach ($selectedIndices as $i => $arcIndex) {
+            if ($arcIndex >= count($arcActions)) {
+                $arcIndex = count($arcActions) - 1;
+            }
+
+            $arc = $arcActions[$arcIndex];
+            $progress = $i / max(1, count($selectedIndices) - 1);
+
+            $moments[] = [
+                'action' => $arc['action'],
+                'subject' => $subject,
+                'emotion' => $arc['emotion'],
+                'intensity' => $this->calculateArcIntensity($arc['phase'], $progress),
+                'visualDescription' => sprintf('%s %s the situation', ucfirst($subject), $arc['action']),
+                'source' => 'narrative_arc',
+                'arcPhase' => $arc['phase'],
+            ];
+        }
+
+        // Interpolate if needed
+        if (count($moments) < $targetCount) {
+            $moments = $this->expandMoments($moments, $targetCount);
+            $moments = $this->deduplicateActions($moments);
+        }
+
+        return $moments;
+    }
+
+    /**
+     * Calculate intensity based on narrative arc phase.
+     *
+     * @param string $phase Arc phase
+     * @param float $progress Overall progress (0-1)
+     * @return float Intensity (0-1)
+     */
+    protected function calculateArcIntensity(string $phase, float $progress): float
+    {
+        // Intensity curves by phase
+        $phaseIntensity = [
+            'setup' => 0.3,
+            'rising' => 0.5 + ($progress * 0.2),
+            'climax' => 0.85,
+            'falling' => 0.6,
+            'resolution' => 0.4,
+        ];
+
+        return $phaseIntensity[$phase] ?? 0.5;
     }
 }
