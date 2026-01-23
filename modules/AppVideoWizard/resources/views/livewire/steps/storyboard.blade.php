@@ -625,6 +625,8 @@
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
         gap: 1.5rem;
+        /* Anti-jitter: prevent layout recalculations during updates */
+        contain: layout;
     }
 
     @media (max-width: 1024px) {
@@ -646,7 +648,10 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 1rem;
         overflow: hidden;
-        transition: all 0.2s;
+        transition: border-color 0.2s, background-color 0.2s;
+        /* Anti-jitter: fixed dimensions prevent layout shift */
+        contain: layout style;
+        will-change: border-color, background-color;
     }
 
     .vw-scene-card:hover {
@@ -660,6 +665,8 @@
         aspect-ratio: 16/9;
         background: rgba(0, 0, 0, 0.4);
         overflow: hidden;
+        /* Anti-jitter: prevent layout recalculations */
+        contain: strict;
     }
 
     .vw-scene-image {
@@ -1939,7 +1946,7 @@ function getCameraMovementIcon($movement) {
                     $decomposed = $hasMultiShot ? $multiShotMode['decomposedScenes'][$index] : null;
                     $hasChainData = isset($storyboard['promptChain']['scenes'][$index]) && ($storyboard['promptChain']['status'] ?? '') === 'ready';
                 @endphp
-                <div class="vw-scene-card">
+                <div class="vw-scene-card" wire:key="scene-card-{{ $index }}">
                     {{-- Image Container with Overlays --}}
                     <div style="position: relative;">
                         {{-- Scene Number Badge - Always visible, top-left --}}
@@ -2042,6 +2049,7 @@ function getCameraMovementIcon($movement) {
                                 <img src="{{ $imageUrl }}"
                                      alt="Scene {{ $index + 1 }}"
                                      class="vw-scene-image"
+                                     loading="lazy"
                                      data-scene-id="{{ $scene['id'] }}"
                                      data-retry-count="0"
                                      onload="this.dataset.loaded='true'; this.parentElement.querySelector('.vw-image-placeholder')?.style && (this.parentElement.querySelector('.vw-image-placeholder').style.display='none');"
@@ -2273,10 +2281,11 @@ function getCameraMovementIcon($movement) {
                                                     {{ __('Click a quadrant to use as scene image:') }}
                                                 </div>
                                                 {{-- Single collage image with clickable quadrant overlay --}}
-                                                <div style="position: relative; border-radius: 0.25rem; overflow: hidden;">
+                                                <div style="position: relative; border-radius: 0.25rem; overflow: hidden; contain: layout;">
                                                     {{-- The single collage image --}}
                                                     <img src="{{ $currentCollageData['previewUrl'] }}"
                                                          alt="Collage Preview"
+                                                         loading="lazy"
                                                          style="width: 100%; display: block; border-radius: 0.25rem;">
 
                                                     {{-- Clickable quadrant overlay grid (2x2) --}}
@@ -2358,7 +2367,7 @@ function getCameraMovementIcon($movement) {
                             $shotChainStatus = $this->getShotChainStatus($index);
                             $totalShotDuration = $decomposed['totalDuration'] ?? array_sum(array_column($decomposed['shots'], 'duration'));
                         @endphp
-                        <div style="padding: 0.6rem 0.75rem; border-top: 1px solid rgba(139,92,246,0.2); background: linear-gradient(180deg, rgba(139,92,246,0.08), rgba(139,92,246,0.03));">
+                        <div wire:key="multi-shot-timeline-{{ $index }}" style="padding: 0.6rem 0.75rem; border-top: 1px solid rgba(139,92,246,0.2); background: linear-gradient(180deg, rgba(139,92,246,0.08), rgba(139,92,246,0.03)); contain: layout;">
                             {{-- Header row with stats --}}
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -2384,8 +2393,8 @@ function getCameraMovementIcon($movement) {
                                     <span wire:loading wire:target="openMultiShotModal({{ $index }})">⏳</span>
                                 </button>
                             </div>
-                            {{-- Shots Grid with Frame Chain --}}
-                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 0.35rem;">
+                            {{-- Shots Grid with Frame Chain (4 columns for better visibility) --}}
+                            <div wire:key="shots-grid-{{ $index }}" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; contain: layout;">
                                 @foreach($decomposed['shots'] as $shotIdx => $shot)
                                     @php
                                         $isSelected = ($decomposed['selectedShot'] ?? 0) === $shotIdx;
@@ -2410,13 +2419,14 @@ function getCameraMovementIcon($movement) {
                                         $shotIcon = $shotTypeIcons[strtolower($shot['type'] ?? '')] ?? '🎬';
                                         $borderColor = $hasVideo ? 'rgba(6,182,212,0.6)' : ($hasImage ? 'rgba(16,185,129,0.5)' : ($isSelected ? '#8b5cf6' : 'rgba(255,255,255,0.1)'));
                                     @endphp
-                                    <div style="cursor: pointer; position: relative; border-radius: 0.35rem; overflow: hidden; border: 2px solid {{ $borderColor }}; background: {{ $isSelected ? 'rgba(139,92,246,0.15)' : 'rgba(0,0,0,0.2)' }}; transition: all 0.2s;"
+                                    <div wire:key="shot-thumb-{{ $index }}-{{ $shotIdx }}"
+                                         style="cursor: pointer; position: relative; border-radius: 0.35rem; overflow: hidden; border: 2px solid {{ $borderColor }}; background: {{ $isSelected ? 'rgba(139,92,246,0.15)' : 'rgba(0,0,0,0.2)' }}; transition: border-color 0.2s, background-color 0.2s;"
                                          wire:click="openMultiShotModal({{ $index }})"
                                          title="{{ $shot['description'] ?? 'Shot ' . ($shotIdx + 1) }} ({{ $shotDuration }}s)">
                                         {{-- Thumbnail --}}
-                                        <div style="aspect-ratio: 16/10; position: relative;">
+                                        <div style="aspect-ratio: 16/10; position: relative; contain: strict;">
                                             @if($hasImage)
-                                                <img src="{{ $shot['imageUrl'] }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                                <img src="{{ $shot['imageUrl'] }}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
                                                 {{-- Video play indicator --}}
                                                 @if($hasVideo)
                                                     <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
