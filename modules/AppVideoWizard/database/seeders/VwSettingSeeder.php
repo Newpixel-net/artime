@@ -1505,6 +1505,53 @@ Return ONLY valid JSON (no markdown, no explanation):
             ],
 
             // =============================================
+            // HOLLYWOOD PRODUCTION FEATURES (Phase 3)
+            // These enable Hollywood-quality shot patterns
+            // =============================================
+            [
+                'slug' => 'hollywood_shot_sequences_enabled',
+                'name' => 'Enable Hollywood Shot Sequences',
+                'category' => 'hollywood',
+                'description' => 'Enable Hollywood-standard shot sequence patterns (establishing → medium → close-up progression).',
+                'value_type' => 'boolean',
+                'value' => 'true',
+                'default_value' => 'true',
+                'input_type' => 'checkbox',
+                'input_help' => 'Uses professional cinematography patterns for shot sequencing',
+                'icon' => 'fa-solid fa-clapperboard',
+                'is_system' => true,
+                'sort_order' => 1,
+            ],
+            [
+                'slug' => 'emotional_arc_shot_mapping_enabled',
+                'name' => 'Emotional Arc Shot Mapping',
+                'category' => 'hollywood',
+                'description' => 'Map emotional intensity to shot types (high emotion = close-ups, calm = wide shots).',
+                'value_type' => 'boolean',
+                'value' => 'true',
+                'default_value' => 'true',
+                'input_type' => 'checkbox',
+                'input_help' => 'Shot types dynamically adjust based on narrative emotional intensity',
+                'icon' => 'fa-solid fa-heart-pulse',
+                'is_system' => true,
+                'sort_order' => 2,
+            ],
+            [
+                'slug' => 'dialogue_coverage_patterns_enabled',
+                'name' => 'Dialogue Coverage Patterns',
+                'category' => 'hollywood',
+                'description' => 'Apply shot/reverse shot patterns to dialogue scenes automatically.',
+                'value_type' => 'boolean',
+                'value' => 'true',
+                'default_value' => 'true',
+                'input_type' => 'checkbox',
+                'input_help' => 'Enables professional dialogue coverage (two-shot, over-shoulder, singles)',
+                'icon' => 'fa-solid fa-comments',
+                'is_system' => true,
+                'sort_order' => 3,
+            ],
+
+            // =============================================
             // NARRATIVE BEAT PATTERNS (Phase 6+)
             // Defines how actions should progress within shots
             // =============================================
