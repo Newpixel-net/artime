@@ -176,16 +176,47 @@ Plans:
 
 ---
 
-## Milestone 5: Emotional Arc System
+## Milestone 5: Emotional Arc System -- COMPLETE
 **Target:** Intensity-driven cinematography
-**Status:** Not Started
+**Status:** Complete (2026-01-23)
+**Plans:** 4 plans in 2 waves -- ALL COMPLETE
 
-| Task | Status | Priority |
-|------|--------|----------|
-| Build intensity curve extraction | Pending | HIGH |
-| Emotion to shot type mapping | Pending | HIGH |
-| Climax framing logic | Pending | MEDIUM |
-| Arc visualization | Pending | LOW |
+**Goal:** Transform raw emotional intensity into Hollywood-quality shot sequences with intelligent climax detection, curve smoothing, and template-based pacing.
+
+Plans:
+- [x] 05-01-PLAN.md -- Intelligent Climax Detection (content analysis, peak detection)
+- [x] 05-02-PLAN.md -- Intensity Curve Enhancement (smoothing, arc templates)
+- [x] 05-03-PLAN.md -- Arc Data Exposure (Livewire properties, UI helpers)
+- [x] 05-04-PLAN.md -- Enhanced Shot Mapping (climax-aware types, camera movement)
+
+### Wave 1: Backend Intelligence (05-01, 05-02) ✅
+- ✅ `CLIMAX_KEYWORDS` and `RESOLUTION_KEYWORDS` for content analysis
+- ✅ `detectIntensityPeaks()` finds local maxima in intensity array
+- ✅ `detectClimaxFromContent()` replaces fixed 70% rule
+- ✅ `smoothIntensityCurve()` with weighted moving average
+- ✅ `ARC_TEMPLATES` with 6 genre-specific curves (hollywood, action, drama, thriller, comedy, documentary)
+- ✅ `blendWithArcTemplate()` combines content intensity with template
+
+### Wave 2: Integration & Mapping (05-03, 05-04) ✅
+- ✅ `$emotionalArcData` Livewire property for UI access
+- ✅ `updateEmotionalArcData()` syncs arc with storyboard
+- ✅ `getIntensityDisplayData()` provides color-coded intensity indicators
+- ✅ `selectShotTypeWithClimaxAwareness()` gives climax tight framing
+- ✅ `getCameraMovementForIntensity()` suggests movement based on intensity
+- ✅ `applySmoothedIntensityToShots()` updates shot types from processed arc
+
+| Wave | Plans | Focus | Status |
+|------|-------|-------|--------|
+| 1 | 05-01, 05-02 | Backend intelligence | ✅ Complete |
+| 2 | 05-03, 05-04 | Integration & mapping | ✅ Complete |
+
+**Success Metrics:**
+| Metric | Target | Status |
+|--------|--------|--------|
+| Climax from content analysis | Yes | ✅ Yes |
+| Intensity smoothing active | Yes | ✅ Yes |
+| Arc templates available | 6+ | ✅ 6 templates |
+| Climax shots get tight framing | Yes | ✅ Yes |
 
 ---
 
@@ -210,10 +241,10 @@ Milestone 1.5: ██████████ 100% COMPLETE
 Milestone 2:   ██████████ 100% COMPLETE
 Milestone 3:   ██████████ 100% COMPLETE
 Milestone 4:   ██████████ 100% COMPLETE
-Milestone 5:   ░░░░░░░░░░  0%
+Milestone 5:   ██████████ 100% COMPLETE
 Milestone 6:   ░░░░░░░░░░  0%
 ─────────────────────────
-Overall:       ██████████ 80%
+Overall:       ██████████ 95%
 ```
 
 ---
@@ -226,4 +257,4 @@ The system should be sophisticated and automatically updated based on previous s
 
 ---
 
-*Last Updated: 2026-01-23 (Milestone 4 Completed)*
+*Last Updated: 2026-01-23 (Milestone 5 Completed)*
