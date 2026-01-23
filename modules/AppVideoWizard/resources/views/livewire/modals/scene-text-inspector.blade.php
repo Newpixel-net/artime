@@ -1,7 +1,62 @@
 {{-- Scene Text Inspector Modal --}}
+{{-- Mobile Responsive Styles --}}
+<style>
+    /* Mobile fullscreen layout */
+    @media (max-width: 768px) {
+        .vw-scene-inspector-overlay { padding: 0 !important; }
+        .vw-scene-inspector-modal {
+            width: 100% !important;
+            max-width: none !important;
+            height: 100% !important;
+            max-height: 100dvh !important;
+            border-radius: 0 !important;
+        }
+        /* Footer sticky at bottom for thumb access */
+        .vw-scene-inspector-modal > div:last-child {
+            position: sticky;
+            bottom: 0;
+            background: rgba(20,20,35,0.98);
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding: 0.75rem 1rem;
+        }
+        /* Full-width close button on mobile */
+        .vw-scene-inspector-modal > div:last-child button {
+            width: 100%;
+            min-height: 48px;
+            font-size: 0.875rem;
+        }
+        /* Larger text for readability */
+        .vw-scene-inspector-modal h3 { font-size: 1.125rem !important; }
+        .vw-scene-inspector-modal h4 { font-size: 0.9rem !important; }
+        /* Larger badges for touch */
+        .vw-scene-inspector-modal .vw-badge-touch {
+            font-size: 0.7rem !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+    }
+
+    /* Prevent body scroll when modal open */
+    body.vw-modal-open {
+        position: fixed;
+        width: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+</style>
+
 @if($showSceneTextInspectorModal ?? false)
-<div class="vw-modal-overlay"
-     x-data="{ show: @entangle('showSceneTextInspectorModal') }"
+<div class="vw-modal-overlay vw-scene-inspector-overlay"
+     x-data="{
+         show: @entangle('showSceneTextInspectorModal'),
+         scrollY: 0
+     }"
+     x-init="
+         scrollY = window.scrollY;
+         document.body.style.position = 'fixed';
+         document.body.style.top = `-${scrollY}px`;
+         document.body.style.width = '100%';
+         document.body.classList.add('vw-modal-open');
+     "
      x-show="show"
      x-transition:enter="transition ease-out duration-200"
      x-transition:enter-start="opacity-0"
@@ -9,13 +64,27 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     @keydown.escape.window="$wire.closeSceneTextInspector()"
+     @keydown.escape.window="
+         document.body.style.position = '';
+         document.body.style.top = '';
+         document.body.style.width = '';
+         document.body.classList.remove('vw-modal-open');
+         window.scrollTo(0, scrollY);
+         $wire.closeSceneTextInspector();
+     "
      wire:key="scene-inspector-{{ $inspectorSceneIndex ?? 'main' }}"
      style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 0.5rem;">
 
-    <div class="vw-modal"
-         @click.outside="$wire.closeSceneTextInspector()"
-         style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.75rem; width: 100%; max-width: 920px; max-height: 96vh; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="vw-modal vw-scene-inspector-modal"
+         @click.outside="
+             document.body.style.position = '';
+             document.body.style.top = '';
+             document.body.style.width = '';
+             document.body.classList.remove('vw-modal-open');
+             window.scrollTo(0, $data.scrollY);
+             $wire.closeSceneTextInspector();
+         "
+         style="background: linear-gradient(135deg, rgba(30,30,45,0.98), rgba(20,20,35,0.99)); border: 1px solid rgba(139,92,246,0.3); border-radius: 0.75rem; width: 100%; max-width: 920px; max-height: 96vh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden;">
 
         {{-- Header --}}
         <div style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
@@ -32,12 +101,19 @@
                 </p>
             </div>
             <button type="button"
-                    wire:click="closeSceneTextInspector"
-                    style="background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
+                    @click="
+                        document.body.style.position = '';
+                        document.body.style.top = '';
+                        document.body.style.width = '';
+                        document.body.classList.remove('vw-modal-open');
+                        window.scrollTo(0, $data.scrollY);
+                        $wire.closeSceneTextInspector();
+                    "
+                    style="background: none; border: none; color: white; font-size: 1.25rem; cursor: pointer; min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: center;">&times;</button>
         </div>
 
         {{-- Content --}}
-        <div style="flex: 1; overflow-y: auto; padding: 1rem;">
+        <div style="flex: 1; overflow-y: auto; padding: 1rem; -webkit-overflow-scrolling: touch;">
             @if($scene)
                 {{-- Metadata Section --}}
                 <div style="margin-bottom: 1.5rem;">
@@ -223,7 +299,7 @@
                     @endphp
 
                     @if(!empty($speechSegments))
-                        <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding-right: 0.25rem;">
+                        <div style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding-right: 0.25rem; -webkit-overflow-scrolling: touch;">
                             @foreach($speechSegments as $index => $segment)
                                 @php
                                     $segType = $segment['type'] ?? 'narrator';
@@ -367,7 +443,7 @@
                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                                                 <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Image Prompt</span>
                                                 <button type="button"
-                                                        x-data="{ copied: false }"
+                                                        x-data="{ copied: false, touching: false }"
                                                         @click="
                                                             const prompt = JSON.parse($el.closest('[data-prompt]').dataset.prompt);
                                                             navigator.clipboard.writeText(prompt)
@@ -389,12 +465,15 @@
                                                                     setTimeout(() => copied = false, 2000);
                                                                 })
                                                         "
-                                                        style="padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.6rem; cursor: pointer;">
+                                                        @touchstart="touching = true"
+                                                        @touchend="touching = false"
+                                                        :style="touching ? 'background: rgba(139,92,246,0.4)' : 'background: rgba(139,92,246,0.2)'"
+                                                        style="padding: 0.5rem 0.75rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.7rem; cursor: pointer; min-width: 48px; min-height: 44px; touch-action: manipulation; display: flex; align-items: center; justify-content: center;">
                                                     <span x-show="!copied">Copy</span>
                                                     <span x-show="copied" style="color: #10b981;">Copied!</span>
                                                 </button>
                                             </div>
-                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto;">
+                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch;">
                                                 {{ $imagePrompt }}
                                             </div>
                                         </div>
@@ -406,7 +485,7 @@
                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                                                 <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Video Prompt</span>
                                                 <button type="button"
-                                                        x-data="{ copied: false }"
+                                                        x-data="{ copied: false, touching: false }"
                                                         @click="
                                                             const prompt = JSON.parse($el.closest('[data-prompt]').dataset.prompt);
                                                             navigator.clipboard.writeText(prompt)
@@ -428,12 +507,15 @@
                                                                     setTimeout(() => copied = false, 2000);
                                                                 })
                                                         "
-                                                        style="padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.6rem; cursor: pointer;">
+                                                        @touchstart="touching = true"
+                                                        @touchend="touching = false"
+                                                        :style="touching ? 'background: rgba(139,92,246,0.4)' : 'background: rgba(139,92,246,0.2)'"
+                                                        style="padding: 0.5rem 0.75rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.7rem; cursor: pointer; min-width: 48px; min-height: 44px; touch-action: manipulation; display: flex; align-items: center; justify-content: center;">
                                                     <span x-show="!copied">Copy</span>
                                                     <span x-show="copied" style="color: #10b981;">Copied!</span>
                                                 </button>
                                             </div>
-                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto;">
+                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto; -webkit-overflow-scrolling: touch;">
                                                 {{ $videoPrompt }}
                                             </div>
                                         </div>
@@ -464,8 +546,15 @@
         {{-- Footer --}}
         <div style="padding: 0.5rem 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end; gap: 0.5rem; flex-shrink: 0;">
             <button type="button"
-                    wire:click="closeSceneTextInspector"
-                    style="padding: 0.4rem 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.375rem; color: white; font-size: 0.75rem; cursor: pointer;">
+                    @click="
+                        document.body.style.position = '';
+                        document.body.style.top = '';
+                        document.body.style.width = '';
+                        document.body.classList.remove('vw-modal-open');
+                        window.scrollTo(0, $data.scrollY);
+                        $wire.closeSceneTextInspector();
+                    "
+                    style="padding: 0.75rem 1.5rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.375rem; color: white; font-size: 0.75rem; cursor: pointer; min-width: 48px; min-height: 48px; touch-action: manipulation;">
                 {{ __('Close') }}
             </button>
         </div>
