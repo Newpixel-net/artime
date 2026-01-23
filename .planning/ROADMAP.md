@@ -103,7 +103,7 @@ Plans:
 
 ---
 
-## Phase 13: Dynamic Camera Intelligence ✓ COMPLETE
+## Phase 13: Dynamic Camera Intelligence - COMPLETE
 
 **Goal:** Smart camera selection that responds to emotion and conversation position
 
@@ -140,9 +140,15 @@ Plans:
 
 **Goal:** Smooth shot transitions and improved non-dialogue scene handling
 
-**Status:** Pending
+**Status:** Planned (2026-01-23)
 
 **Dependencies:** Phase 13 (requires camera working)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md - Transition validation (jump cut prevention, scale change enforcement)
+- [ ] 14-02-PLAN.md - Action scene decomposition and scene type routing
 
 **Requirements:**
 - FLOW-03: Shots build cinematically on each other (no jarring cuts)
@@ -157,9 +163,10 @@ Plans:
 5. Visual prompt continuity verified across shot sequence
 
 **Key changes:**
-- Add transition validator to prevent jarring cuts
-- Improve `DynamicShotEngine` for action-only scenes
-- Create hybrid decomposer for dialogue+action scenes
+- Add transition validator to prevent jarring cuts (Plan 14-01)
+- Add decomposeActionScene() using action coverage pattern (Plan 14-02)
+- Add scene type routing via SceneTypeDetectorService (Plan 14-02)
+- Add visual continuity helper for prompt consistency (Plan 14-02)
 
 ---
 
@@ -183,17 +190,17 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 11: Speech-Driven | ✓ Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
-| Phase 12: Shot/Reverse-Shot | ✓ Complete | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 4/4 |
-| Phase 13: Camera Intelligence | ✓ Complete | CAM-01 to CAM-04 (4) | 4/4 |
-| Phase 14: Flow & Action | ○ Pending | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
+| Phase 11: Speech-Driven | Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
+| Phase 12: Shot/Reverse-Shot | Complete | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 4/4 |
+| Phase 13: Camera Intelligence | Complete | CAM-01 to CAM-04 (4) | 4/4 |
+| Phase 14: Flow & Action | Planned | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
 
 **Overall Progress:**
 
 ```
-Phase 11: ██████████ 100% ✓
-Phase 12: ██████████ 100% ✓
-Phase 13: ██████████ 100% ✓
+Phase 11: ██████████ 100%
+Phase 12: ██████████ 100%
+Phase 13: ██████████ 100%
 Phase 14: ░░░░░░░░░░ 0%
 ─────────────────────
 Overall:  ███████░░░ 75%
@@ -251,4 +258,4 @@ Cinematic shot architecture ensures users get professional-quality shot sequence
 
 *Milestone 8 roadmap created: 2026-01-23*
 *Phases 11-14 defined*
-*Phase 13 planned: 2026-01-23*
+*Phase 14 planned: 2026-01-23*
