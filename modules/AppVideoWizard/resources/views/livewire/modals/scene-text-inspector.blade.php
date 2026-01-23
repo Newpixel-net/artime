@@ -99,7 +99,76 @@
                             </div>
                         </div>
 
-                        {{-- Characters, Intensity, and Climax badges will be added in task 3 --}}
+                        {{-- META-04: Characters --}}
+                        @php
+                            $characters = $scene['characters'] ?? [];
+                            $charCount = count($characters);
+                            $charDisplay = '';
+                            if ($charCount === 0) {
+                                $charDisplay = 'None';
+                            } elseif ($charCount <= 3) {
+                                $charDisplay = implode(', ', array_map(function($char) {
+                                    return is_array($char) ? ($char['name'] ?? 'Unknown') : $char;
+                                }, $characters));
+                            } else {
+                                $firstThree = array_slice($characters, 0, 3);
+                                $names = array_map(function($char) {
+                                    return is_array($char) ? ($char['name'] ?? 'Unknown') : $char;
+                                }, $firstThree);
+                                $charDisplay = implode(', ', $names) . ' +' . ($charCount - 3) . ' more';
+                            }
+                        @endphp
+                        <div style="padding: 0.5rem 0.75rem; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.3); border-radius: 0.375rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.875rem;">👥</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Characters</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.95); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $charDisplay }}">{{ $charDisplay }}</div>
+                            </div>
+                        </div>
+
+                        {{-- META-05: Emotional Intensity --}}
+                        @php
+                            $intensity = $scene['emotionalIntensity'] ?? null;
+                            $intensityColor = 'rgba(100,116,139,0.15)';
+                            $intensityBorder = 'rgba(100,116,139,0.3)';
+                            $intensityLabel = 'N/A';
+
+                            if ($intensity !== null && is_numeric($intensity)) {
+                                $intensityLabel = (int)$intensity . '/10';
+                                if ($intensity >= 1 && $intensity <= 3) {
+                                    $intensityColor = 'rgba(59,130,246,0.15)';
+                                    $intensityBorder = 'rgba(59,130,246,0.3)';
+                                } elseif ($intensity >= 4 && $intensity <= 6) {
+                                    $intensityColor = 'rgba(251,191,36,0.15)';
+                                    $intensityBorder = 'rgba(251,191,36,0.3)';
+                                } elseif ($intensity >= 7 && $intensity <= 10) {
+                                    $intensityColor = 'rgba(239,68,68,0.15)';
+                                    $intensityBorder = 'rgba(239,68,68,0.3)';
+                                }
+                            }
+                        @endphp
+                        <div style="padding: 0.5rem 0.75rem; background: {{ $intensityColor }}; border: 1px solid {{ $intensityBorder }}; border-radius: 0.375rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.875rem;">🔥</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Intensity</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.95); font-weight: 500;">{{ $intensityLabel }}</div>
+                            </div>
+                        </div>
+
+                        {{-- META-06: Climax Badge (full-width, only for climax scenes) --}}
+                        @if(($scene['isClimax'] ?? false) || ($scene['metadata']['isClimax'] ?? false))
+                            <div style="grid-column: 1 / -1; padding: 0.75rem 1rem; background: linear-gradient(135deg, rgba(236,72,153,0.2), rgba(139,92,246,0.2)); border: 2px solid transparent; background-clip: padding-box; border-radius: 0.5rem; position: relative; overflow: hidden;">
+                                <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(236,72,153,0.4), rgba(139,92,246,0.4)); border-radius: 0.5rem; z-index: 0; opacity: 0.3;"></div>
+                                <div style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                                    <span style="font-size: 1.25rem;">⭐</span>
+                                    <div>
+                                        <div style="font-size: 0.7rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Climactic Scene</div>
+                                        <div style="font-size: 0.85rem; color: rgba(255,255,255,0.95); font-weight: 500; margin-top: 0.15rem;">This is a pivotal moment in the story</div>
+                                    </div>
+                                    <span style="font-size: 1.25rem;">⭐</span>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
