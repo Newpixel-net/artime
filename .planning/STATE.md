@@ -11,7 +11,7 @@
 **Plan:** 02 of 3 (in phase)
 **Status:** In progress
 
-**Progress:** [######----] 60% of Phase 3 (Plans 01-02 complete)
+**Progress:** [######----] 66% of Phase 3 (Plans 01-02 complete)
 
 ---
 
@@ -22,7 +22,7 @@
 Enhance the production pipeline with Hollywood-standard moment extraction and shot generation.
 
 Plans:
-1. ~~TBD (previous plan)~~ COMPLETE
+1. ~~Activate Hollywood Shot Sequence~~ COMPLETE
 2. ~~Eliminate Placeholder Moments~~ COMPLETE
 3. Shot Generation Integration (next)
 
@@ -37,6 +37,19 @@ The system should be sophisticated and automatically updated based on previous s
 ---
 
 ## Completed This Session
+
+### Plan 03-01: Activate Hollywood Shot Sequence (COMPLETE)
+**Summary:** VideoWizard now calls generateHollywoodShotSequence instead of analyzeScene, activating emotion-driven shot types and dialogue coverage patterns
+
+**Tasks:**
+1. [x] Fix decomposeSceneWithDynamicEngine to use Hollywood patterns
+2. [x] Fix generateCollagePreview to use Hollywood patterns
+3. [x] Ensure NarrativeMomentService is available (inline creation pattern)
+
+**Commits:**
+- `0bb6542` - feat(03-01): activate Hollywood shot sequence in VideoWizard
+
+**SUMMARY:** `.planning/phases/03-hollywood-production-system/03-01-SUMMARY.md`
 
 ### Plan 03-02: Eliminate Placeholder Moments (COMPLETE)
 **Summary:** Two-tier fallback system (narration analysis + narrative arc) that NEVER returns useless "continues the scene" placeholders
@@ -80,6 +93,7 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 | Date | Area | Decision | Context |
 |------|------|----------|---------|
+| 2026-01-23 | Service Creation | Inline creation of NarrativeMomentService | Matches existing VideoWizard pattern |
 | 2026-01-23 | Fallback Strategy | Two-tier fallback (narration analysis -> narrative arc) | Ensures meaningful output even when AI and rule-based extraction fail |
 | 2026-01-23 | Subject Naming | Use 'the character' or 'the protagonist' instead of 'the subject' | More meaningful and consistent terminology for shot generation |
 | 2026-01-23 | Arc Structure | Standard narrative arc (setup->rising->climax->falling->resolution) | Hollywood-standard story structure ensures dramatic progression |
@@ -104,6 +118,12 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 ## Phase 3 Progress - What Was Built
 
+### Plan 03-01: Hollywood Shot Sequence Activation
+1. **VideoWizard Integration:** generateHollywoodShotSequence called instead of analyzeScene
+2. **Emotional Arc Flow:** NarrativeMomentService extracts intensity values for shot type selection
+3. **Character Integration:** Scene characters from characterBible passed for dialogue coverage
+4. **Two Locations Fixed:** decomposeSceneWithDynamicEngine and generateCollagePreview
+
 ### Plan 03-02: Meaningful Moment Fallback
 1. **Two-Tier Fallback:** generateMeaningfulMomentsFromNarration -> generateNarrativeArcMoments
 2. **Action Extraction:** Priority-ordered verb extraction from ACTION_EMOTION_MAP
@@ -111,15 +131,20 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 4. **Narrative Arc:** Setup->Rising->Climax->Falling->Resolution structure
 5. **Intensity Calculation:** Phase-based and emotion-based intensity
 
-### Key Methods Added (03-02)
-- `NarrativeMomentService::generateMeaningfulMomentsFromNarration()`
-- `NarrativeMomentService::extractActionFromText()`
-- `NarrativeMomentService::extractSubjectFromChunk()`
-- `NarrativeMomentService::summarizeChunk()`
-- `NarrativeMomentService::extractFirstActionFromNarration()`
-- `NarrativeMomentService::generateNarrativeArcMoments()`
-- `NarrativeMomentService::calculateArcIntensity()`
-- `NarrativeMomentService::calculateIntensityFromEmotion()`
+### Key Methods Added
+**03-01 (VideoWizard.php):**
+- Updated `decomposeSceneWithDynamicEngine()` for Hollywood patterns
+- Updated `generateCollagePreview()` for Hollywood patterns
+
+**03-02 (NarrativeMomentService.php):**
+- `generateMeaningfulMomentsFromNarration()`
+- `extractActionFromText()`
+- `extractSubjectFromChunk()`
+- `summarizeChunk()`
+- `extractFirstActionFromNarration()`
+- `generateNarrativeArcMoments()`
+- `calculateArcIntensity()`
+- `calculateIntensityFromEmotion()`
 
 ---
 
@@ -133,19 +158,21 @@ None currently
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `.planning/phases/03-hollywood-production-system/03-02-SUMMARY.md` | Plan 02 summary | **Created** |
-| `Services/NarrativeMomentService.php` | Narrative decomposition | **Updated** |
+| `.planning/phases/03-hollywood-production-system/03-01-SUMMARY.md` | Plan 01 summary | **Created** |
+| `.planning/phases/03-hollywood-production-system/03-02-SUMMARY.md` | Plan 02 summary | Created |
+| `Livewire/VideoWizard.php` | Hollywood patterns activated | **Updated** |
+| `Services/NarrativeMomentService.php` | Narrative decomposition | Updated |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 03-02-PLAN.md (Eliminate Placeholder Moments)
+**Stopped at:** Completed 03-01-PLAN.md (Activate Hollywood Shot Sequence)
 **Resume file:** None
 **Phase 3 Status:** IN PROGRESS (2/3 plans complete)
 
 ---
 
 *Session: Phase 3 - Hollywood Production System*
-*Plan 03-02 COMPLETE - Meaningful moment extraction implemented*
+*Plans 03-01 and 03-02 COMPLETE - Hollywood shot sequencing activated*
