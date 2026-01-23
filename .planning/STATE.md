@@ -8,10 +8,10 @@
 ## Current Position
 
 **Phase:** 4 of ongoing (Dialogue Scene Excellence)
-**Plan:** 01-02 of 4 (in phase) - COMPLETE
+**Plan:** 04 of 4 (in phase) - COMPLETE
 **Status:** In Progress
 
-**Progress:** [##--------] Phase 4 (2/4 plans complete - 04-01, 04-02)
+**Progress:** [####------] Phase 4 (3/4 plans complete - 04-01, 04-02, 04-04)
 
 ---
 
@@ -25,7 +25,7 @@ Plans:
 1. ~~Spatial Continuity~~ COMPLETE
 2. ~~OTS Shot Depth and Framing~~ COMPLETE
 3. Reaction Shot Variety (pending)
-4. Additional enhancements (pending)
+4. ~~Coverage Completeness Validation~~ COMPLETE
 
 ---
 
@@ -67,6 +67,20 @@ The system should be sophisticated and automatically updated based on previous s
 - `3f14f75` - feat(04-02): add OTS shot depth and framing enhancements
 
 **SUMMARY:** `.planning/phases/04-dialogue-scene-excellence/04-02-SUMMARY.md`
+
+### Plan 04-04: Coverage Completeness Validation (COMPLETE)
+**Summary:** Coverage validation ensures Hollywood-standard shot variety with auto-fix for missing types and OTS monotony
+
+**Tasks:**
+1. [x] Define coverage requirements ($coverageRequirements, $shotTypeCategories)
+2. [x] Add coverage analysis method (analyzeCoverage)
+3. [x] Add coverage correction methods (fixCoverageIssues, insertTwoShotBreaks)
+4. [x] Integrate validation into main decomposition
+
+**Commits:**
+- `ead2b40` - feat(04-04): add coverage completeness validation for dialogue scenes
+
+**SUMMARY:** `.planning/phases/04-dialogue-scene-excellence/04-04-SUMMARY.md`
 
 ---
 
@@ -135,6 +149,9 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 | 2026-01-23 | Shot Variety | DynamicShotEngine handles variety through Hollywood patterns | Not ShotProgressionService |
 | 2026-01-23 | Service Creation | Inline creation of NarrativeMomentService | Matches existing VideoWizard pattern |
 | 2026-01-23 | Fallback Strategy | Two-tier fallback (narration analysis -> narrative arc) | Ensures meaningful output |
+| 2026-01-23 | Coverage Requirements | 1 establishing, 2 OTS, 1 close-up minimum | Hollywood standard coverage |
+| 2026-01-23 | OTS Break Threshold | Two-shot break after 4 consecutive OTS | Prevents visual monotony |
+| 2026-01-23 | Character Coverage | 30% minimum per character | Ensures balanced screen time |
 
 ---
 
@@ -155,6 +172,27 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 4. **OTS Detection:** `shouldUseOTS()` for intelligent OTS triggering
 5. **Integration:** OTS logic integrated into `createDialogueShot()` flow
 6. **Dialogue Pattern:** DynamicShotEngine `$dialoguePattern` has `otsSpecs`
+
+### Plan 04-04: Coverage Completeness Validation
+1. **Coverage Requirements:** `$coverageRequirements` with type/character/pattern minimums
+2. **Shot Categories:** `$shotTypeCategories` groups shots for analysis
+3. **Analysis Method:** `analyzeCoverage()` identifies coverage gaps
+4. **Fix Methods:** `fixCoverageIssues()`, `insertTwoShotBreaks()`, helpers
+5. **Integration:** Validation runs after shot generation, logs coverage summary
+
+---
+
+## Coverage Validation Structure
+
+| Property | Purpose | Values |
+|----------|---------|--------|
+| `requiredTypes.establishing` | Minimum establishing shots | 1 |
+| `requiredTypes.over-the-shoulder` | Minimum OTS shots | 2 |
+| `requiredTypes.close-up` | Minimum close-ups | 1 |
+| `perCharacter.speakingShots` | Min shots per character | 1 |
+| `perCharacter.coverage` | Min coverage ratio | 0.3 (30%) |
+| `patterns.maxConsecutiveOTS` | Max OTS before break | 4 |
+| `patterns.minVariety` | Min unique shot types | 3 |
 
 ---
 
@@ -184,9 +222,10 @@ None currently
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `.planning/phases/04-dialogue-scene-excellence/04-01-SUMMARY.md` | Plan 01 summary | **Created** |
+| `.planning/phases/04-dialogue-scene-excellence/04-01-SUMMARY.md` | Plan 01 summary | Created |
 | `.planning/phases/04-dialogue-scene-excellence/04-02-SUMMARY.md` | Plan 02 summary | Created |
-| `Services/DialogueSceneDecomposerService.php` | Spatial + OTS data + prompts | **Updated** |
+| `.planning/phases/04-dialogue-scene-excellence/04-04-SUMMARY.md` | Plan 04 summary | **Created** |
+| `Services/DialogueSceneDecomposerService.php` | Spatial + OTS + Coverage | **Updated** |
 | `Services/DynamicShotEngine.php` | Dialogue pattern with OTS specs | Updated |
 
 ---
@@ -194,12 +233,13 @@ None currently
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 04-01-PLAN.md (Spatial Continuity Tracking)
+**Stopped at:** Completed 04-04-PLAN.md (Coverage Completeness Validation)
 **Resume file:** None
-**Phase 4 Status:** In Progress (2/4 plans complete)
+**Phase 4 Status:** In Progress (3/4 plans complete)
 
 ---
 
 *Session: Phase 4 - Dialogue Scene Excellence*
 *Plan 04-01 COMPLETE - Spatial continuity tracking*
 *Plan 04-02 COMPLETE - OTS shot depth and framing enhancements*
+*Plan 04-04 COMPLETE - Coverage completeness validation*
