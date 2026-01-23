@@ -2499,37 +2499,146 @@ function getCameraMovementIcon($movement) {
                         $scriptScene = $script['scenes'][$index] ?? null;
                         $speechSegments = $scriptScene['speechSegments'] ?? [];
                         $narration = $scriptScene['narration'] ?? '';
+
+                        // Count segment types (not just boolean presence) for accurate representation
+                        $typeCounts = collect($speechSegments)->groupBy('type')->map->count();
+                        $totalSegments = count($speechSegments);
+                        $hasMultipleTypes = $typeCounts->count() > 1;
+
+                        // Determine dominant type (>80% threshold) or use "Mixed"
+                        $dominantType = null;
+                        $speechLabel = 'NARRATION'; // Default
+                        $speechIcon = '🎙️';
+                        $speechDetailLabel = '';
+
+                        if ($totalSegments > 0) {
+                            foreach ($typeCounts as $type => $count) {
+                                $percentage = ($count / $totalSegments) * 100;
+                                if ($percentage > 80) {
+                                    $dominantType = $type;
+                                    break;
+                                }
+                            }
+
+                            if ($dominantType) {
+                                // Single dominant type
+                                $speechLabel = strtoupper($dominantType === 'narrator' ? 'NARRATION' : $dominantType);
+                                $speechIcon = [
+                                    'narrator' => '🎙️',
+                                    'dialogue' => '💬',
+                                    'internal' => '💭',
+                                    'monologue' => '🗣️',
+                                ][$dominantType] ?? '🎙️';
+                                $speechDetailLabel = "({$totalSegments} segment" . ($totalSegments > 1 ? 's' : '') . ')';
+                            } else {
+                                // Mixed types
+                                $speechLabel = 'MIXED';
+                                $speechIcon = '🎭'; // Mixed icon
+
+                                // Build detailed breakdown: "5 segments: 3 dialogue, 2 narration"
+                                $typeBreakdown = [];
+                                foreach ($typeCounts->sortDesc() as $type => $count) {
+                                    $typeName = $type === 'narrator' ? 'narration' : $type;
+                                    $typeBreakdown[] = "{$count} {$typeName}";
+                                }
+                                $speechDetailLabel = "({$totalSegments} segments: " . implode(', ', $typeBreakdown) . ')';
+                            }
+                        }
+
+                        // Type icons mapping for segments with accessibility labels
+                        $typeIcons = [
+                            'narrator' => ['icon' => '🎙️', 'color' => 'rgba(14, 165, 233, 0.4)', 'label' => 'NARRATION'],
+                            'dialogue' => ['icon' => '💬', 'color' => 'rgba(34, 197, 94, 0.4)', 'label' => 'DIALOGUE'],
+                            'internal' => ['icon' => '💭', 'color' => 'rgba(168, 85, 247, 0.4)', 'label' => 'INTERNAL'],
+                            'monologue' => ['icon' => '🗣️', 'color' => 'rgba(251, 191, 36, 0.4)', 'label' => 'MONOLOGUE'],
+                        ];
                     @endphp
 
                     @if(!empty($speechSegments) || !empty($narration))
                         <div style="padding: 0 1rem;">
                             <div class="vw-scene-dialogue">
-                                <div class="vw-dialogue-label">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                                    </svg>
-                                    <span>{{ __('Dialogue') }}</span>
+                                <div class="vw-dialogue-label" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        <span style="font-size: 0.9rem;">{{ $speechIcon }}</span>
+                                        <span style="font-weight: 600;">{{ $speechLabel }}</span>
+                                        @if(!empty($speechDetailLabel))
+                                            <span style="opacity: 0.6; font-size: 0.7rem;">{{ $speechDetailLabel }}</span>
+                                        @endif
+                                    </div>
+                                    <button
+                                        wire:click="openSceneTextInspector({{ $index }})"
+                                        class="vw-inspect-btn"
+                                        title="{{ __('Click to view all scene text and prompts') }}"
+                                        style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #a78bfa; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; cursor: pointer; transition: all 0.2s;"
+                                    >
+                                        🔍 {{ __('Inspect') }}
+                                    </button>
                                 </div>
 
                                 @if(!empty($speechSegments))
-                                    @foreach(array_slice($speechSegments, 0, 2) as $segment)
-                                        <div style="margin-bottom: 0.25rem;">
-                                            @if(!empty($segment['speaker']))
-                                                <span class="vw-dialogue-speaker">{{ $segment['speaker'] }}:</span>
-                                            @endif
-                                            <span class="vw-dialogue-text">
-                                                {{ Str::limit($segment['text'] ?? '', 80) }}
+                                    @php
+                                        // Show first 2 segments, but ensure type diversity if mixed
+                                        $previewSegments = [];
+                                        if ($hasMultipleTypes && count($speechSegments) > 2) {
+                                            // Group by type and pick one from each for diversity
+                                            $grouped = collect($speechSegments)->groupBy('type');
+                                            foreach ($grouped as $segments) {
+                                                $previewSegments[] = $segments->first();
+                                                if (count($previewSegments) >= 2) break;
+                                            }
+                                        } else {
+                                            // Just take first 2
+                                            $previewSegments = array_slice($speechSegments, 0, 2);
+                                        }
+                                    @endphp
+                                    @foreach($previewSegments as $segment)
+                                        @php
+                                            $segType = $segment['type'] ?? 'narrator';
+                                            $typeData = $typeIcons[$segType] ?? ['icon' => '🎙️', 'color' => 'rgba(14, 165, 233, 0.4)', 'label' => 'NARRATION'];
+                                            $needsLipSync = in_array($segType, ['dialogue', 'monologue']);
+                                        @endphp
+                                        <div style="margin-bottom: 0.35rem; padding-left: 0.5rem; border-left: 2px solid {{ $typeData['color'] }};">
+                                            <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.15rem; flex-wrap: wrap;">
+                                                <span style="font-size: 0.75rem;">{{ $typeData['icon'] }}</span>
+                                                <span style="font-size: 0.65rem; font-weight: 600; opacity: 0.7;">{{ $typeData['label'] }}</span>
+                                                @if(!empty($segment['speaker']))
+                                                    <span class="vw-dialogue-speaker" style="margin-left: 0.25rem;">{{ $segment['speaker'] }}</span>
+                                                @endif
+                                                @if($needsLipSync)
+                                                    <span style="font-size: 0.55rem; background: rgba(251, 191, 36, 0.2); color: rgba(251, 191, 36, 1); padding: 0.1rem 0.3rem; border-radius: 0.15rem; font-weight: 600;">LIP-SYNC</span>
+                                                @endif
+                                            </div>
+                                            <span class="vw-dialogue-text" style="font-size: 0.85rem;">
+                                                {{ Str::limit($segment['text'] ?? '', 100) }}
                                             </span>
                                         </div>
                                     @endforeach
                                     @if(count($speechSegments) > 2)
-                                        <div class="vw-dialogue-more">
-                                            +{{ count($speechSegments) - 2 }} {{ __('more segments...') }}
+                                        @php
+                                            // Build truncation indicator showing type breakdown
+                                            $remainingCount = count($speechSegments) - 2;
+                                            $remainingSegments = array_slice($speechSegments, 2);
+                                            $remainingTypes = collect($remainingSegments)->groupBy('type')->map->count();
+                                            $typeBreakdownParts = [];
+                                            foreach ($remainingTypes as $type => $count) {
+                                                $typeName = $type === 'narrator' ? 'narration' : $type;
+                                                $typeBreakdownParts[] = "{$count} {$typeName}";
+                                            }
+                                            $truncationText = "+{$remainingCount} more (" . implode(', ', $typeBreakdownParts) . ')';
+                                        @endphp
+                                        <div class="vw-dialogue-more" wire:click="openSceneTextInspector({{ $index }})" style="cursor: pointer;">
+                                            {{ $truncationText }} - <span style="opacity: 0.5;">{{ __('click Inspect to view all') }}</span>
                                         </div>
                                     @endif
                                 @elseif(!empty($narration))
-                                    <div class="vw-dialogue-text">
-                                        {{ Str::limit($narration, 120) }}
+                                    <div style="margin-bottom: 0.35rem; padding-left: 0.5rem; border-left: 2px solid rgba(14, 165, 233, 0.4);">
+                                        <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.15rem;">
+                                            <span style="font-size: 0.75rem;">🎙️</span>
+                                            <span style="font-size: 0.65rem; text-transform: uppercase; opacity: 0.5;">{{ __('Narrator') }}</span>
+                                        </div>
+                                        <span class="vw-dialogue-text" style="font-size: 0.85rem;">
+                                            {{ Str::limit($narration, 150) }}
+                                        </span>
                                     </div>
                                 @endif
                             </div>
