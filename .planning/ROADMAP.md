@@ -32,7 +32,7 @@ This builds on the M4 DialogueSceneDecomposerService foundation while inverting 
 
 ---
 
-## Phase 11: Speech-Driven Shot Creation ✓ COMPLETE
+## Phase 11: Speech-Driven Shot Creation - COMPLETE
 
 **Goal:** Refactor decomposition so speech segments CREATE shots instead of being distributed to them
 
@@ -43,8 +43,8 @@ This builds on the M4 DialogueSceneDecomposerService foundation while inverting 
 **Plans:** 2 plans (2/2 complete)
 
 Plans:
-- [x] 11-01-PLAN.md — Speech-to-shot inversion (1:1 mapping for dialogue/monologue)
-- [x] 11-02-PLAN.md — Narrator overlay and internal thought voiceover handling
+- [x] 11-01-PLAN.md - Speech-to-shot inversion (1:1 mapping for dialogue/monologue)
+- [x] 11-02-PLAN.md - Narrator overlay and internal thought voiceover handling
 
 **Requirements:**
 - CSA-01: Each dialogue segment creates its own shot (1:1 mapping)
@@ -61,7 +61,7 @@ Plans:
 5. Scene with 12 speech segments produces 12+ shots without error
 
 **Key changes:**
-- Invert `distributeSpeechSegmentsToShots()` → `createShotsFromSpeechSegments()`
+- Invert `distributeSpeechSegmentsToShots()` -> `createShotsFromSpeechSegments()`
 - Separate narrator handling from dialogue/monologue
 - Remove shot count caps that limit cinematic expression
 
@@ -69,11 +69,17 @@ Plans:
 
 ## Phase 12: Shot/Reverse-Shot Patterns
 
-**Goal:** Implement proper Hollywood conversation coverage with alternating characters
+**Goal:** Validate and enforce proper Hollywood conversation coverage with alternating characters
 
-**Status:** Pending
+**Status:** Planned (2026-01-23)
 
 **Dependencies:** Phase 11 (requires shots to exist from speech)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 12-01-PLAN.md - Add validation methods to DialogueSceneDecomposerService (180-degree rule, single-character constraint, character alternation)
+- [ ] 12-02-PLAN.md - Integrate validation into VideoWizard flow with quality reporting
 
 **Requirements:**
 - FLOW-01: Shot/reverse-shot pattern for 2-character conversations
@@ -82,15 +88,18 @@ Plans:
 - SCNE-04: Scene maintains 180-degree rule throughout
 
 **Success Criteria:**
-1. Two-character dialogue alternates Character A → Character B → A → B
+1. Two-character dialogue alternates Character A -> Character B -> A -> B
 2. Each shot shows exactly one speaking character (validated before generation)
 3. Camera stays on same side of action axis (180-degree rule)
 4. OTS shots show foreground character blurred, background in focus
 
+**Key insight from research:** Phase 12 is NOT about building new shot/reverse-shot logic. The infrastructure exists in DialogueSceneDecomposerService (pairReverseShots at line 534, calculateSpatialData at line 488). Phase 12 ACTIVATES and VALIDATES these existing patterns.
+
 **Key changes:**
-- Enhance `DialogueSceneDecomposerService` to enforce single-character shots
-- Validate shot sequence before generation
-- Add 180-degree continuity check across full scene
+- Add validate180DegreeRule() to DialogueSceneDecomposerService
+- Add enforceSingleCharacterConstraint() to enforce FLOW-02
+- Add validateCharacterAlternation() to check FLOW-04
+- Integrate validation into VideoWizard scene decomposition flow
 
 ---
 
@@ -118,7 +127,7 @@ Plans:
 **Key changes:**
 - Enhance `selectShotTypeForIntensity()` with conversation position awareness
 - Add per-speaker emotion analysis
-- Implement shot progression arc (wide → medium → tight as tension builds)
+- Implement shot progression arc (wide -> medium -> tight as tension builds)
 
 ---
 
@@ -137,7 +146,7 @@ Plans:
 
 **Success Criteria:**
 1. No jump cuts (same character, same framing back-to-back)
-2. Shot scale changes by at least one step (CU → MS, not CU → CU)
+2. Shot scale changes by at least one step (CU -> MS, not CU -> CU)
 3. Action scenes produce varied shot types (establishing, action, reaction, detail)
 4. Mixed dialogue/action scenes transition smoothly between modes
 5. Visual prompt continuity verified across shot sequence
@@ -153,12 +162,12 @@ Plans:
 
 ```
 Phase 11 (Speech-Driven)
-    ↓
-Phase 12 (Shot/Reverse-Shot) ← depends on shots existing
-    ↓
-Phase 13 (Camera Intelligence) ← depends on pattern working
-    ↓
-Phase 14 (Flow & Polish) ← depends on camera working
+    |
+Phase 12 (Shot/Reverse-Shot) <- depends on shots existing
+    |
+Phase 13 (Camera Intelligence) <- depends on pattern working
+    |
+Phase 14 (Flow & Polish) <- depends on camera working
 ```
 
 Sequential execution required.
@@ -169,20 +178,20 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 11: Speech-Driven | ✓ Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
-| Phase 12: Shot/Reverse-Shot | ○ Pending | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 0/4 |
-| Phase 13: Camera Intelligence | ○ Pending | CAM-01 to CAM-04 (4) | 0/4 |
-| Phase 14: Flow & Action | ○ Pending | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
+| Phase 11: Speech-Driven | Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
+| Phase 12: Shot/Reverse-Shot | Planned | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 0/4 |
+| Phase 13: Camera Intelligence | Pending | CAM-01 to CAM-04 (4) | 0/4 |
+| Phase 14: Flow & Action | Pending | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
 
 **Overall Progress:**
 
 ```
-Phase 11: ██████████ 100% ✓
-Phase 12: ░░░░░░░░░░ 0%
-Phase 13: ░░░░░░░░░░ 0%
-Phase 14: ░░░░░░░░░░ 0%
-─────────────────────
-Overall:  ██░░░░░░░░ 25%
+Phase 11: ********** 100%
+Phase 12: ---------- 0%
+Phase 13: ---------- 0%
+Phase 14: ---------- 0%
+---------------------
+Overall:  **-------- 25%
 ```
 
 **Coverage:** 16/16 requirements mapped (100%)
@@ -220,10 +229,10 @@ After each phase:
 
 | Phase | Status |
 |-------|--------|
-| Phase 7: Foundation | ✓ Complete |
-| Phase 8: Speech Segments | ✓ Complete |
-| Phase 9: Prompts + Copy | ✓ Complete |
-| Phase 10: Mobile + Polish | ✓ Complete |
+| Phase 7: Foundation | Complete |
+| Phase 8: Speech Segments | Complete |
+| Phase 9: Prompts + Copy | Complete |
+| Phase 10: Mobile + Polish | Complete |
 
 ---
 
@@ -237,3 +246,4 @@ Cinematic shot architecture ensures users get professional-quality shot sequence
 
 *Milestone 8 roadmap created: 2026-01-23*
 *Phases 11-14 defined*
+*Phase 12 planned: 2026-01-23*
