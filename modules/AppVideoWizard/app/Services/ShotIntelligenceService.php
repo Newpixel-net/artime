@@ -11,6 +11,7 @@ use Modules\AppVideoWizard\Services\CameraMovementService;
 use Modules\AppVideoWizard\Services\VideoPromptBuilderService;
 use Modules\AppVideoWizard\Services\ShotProgressionService;
 use Modules\AppVideoWizard\Services\DynamicShotEngine;
+use Modules\AppVideoWizard\Services\NarrativeMomentService;
 
 /**
  * ShotIntelligenceService - AI-driven shot decomposition for scenes.
@@ -67,12 +68,18 @@ class ShotIntelligenceService
      */
     protected ?ShotProgressionService $progressionService = null;
 
+    /**
+     * Phase 2: Narrative moment service for Hollywood-standard decomposition.
+     */
+    protected ?NarrativeMomentService $narrativeMomentService = null;
+
     public function __construct(
         ?ShotContinuityService $continuityService = null,
         ?SceneTypeDetectorService $sceneTypeDetector = null,
         ?CameraMovementService $cameraMovementService = null,
         ?VideoPromptBuilderService $videoPromptBuilder = null,
-        ?ShotProgressionService $progressionService = null
+        ?ShotProgressionService $progressionService = null,
+        ?NarrativeMomentService $narrativeMomentService = null
     ) {
         $this->shotTypes = VwShotType::getAllActive();
         $this->continuityService = $continuityService;
@@ -80,6 +87,7 @@ class ShotIntelligenceService
         $this->cameraMovementService = $cameraMovementService;
         $this->videoPromptBuilder = $videoPromptBuilder;
         $this->progressionService = $progressionService;
+        $this->narrativeMomentService = $narrativeMomentService;
     }
 
     /**
@@ -123,6 +131,14 @@ class ShotIntelligenceService
     }
 
     /**
+     * Set the narrative moment service (for dependency injection).
+     */
+    public function setNarrativeMomentService(NarrativeMomentService $service): void
+    {
+        $this->narrativeMomentService = $service;
+    }
+
+    /**
      * Analyze a scene and determine optimal shot breakdown.
      *
      * PHASE 5 INTEGRATION: This method now integrates all phases:
@@ -145,6 +161,49 @@ class ShotIntelligenceService
                 $context['sceneType'] = $sceneTypeDetection['sceneType'];
                 $context['coveragePattern'] = $sceneTypeDetection['patternSlug'] ?? null;
                 $context['sceneTypeConfidence'] = $sceneTypeDetection['confidence'] ?? 0;
+            }
+
+            // PHASE 2 NARRATIVE: Decompose narration into narrative moments if service available
+            $narrativeMoments = null;
+            $emotionalArc = null;
+            if ($this->narrativeMomentService) {
+                $narration = $scene['narration'] ?? '';
+                if (!empty($narration)) {
+                    // Calculate target shot count from settings
+                    $targetShotCount = (int) VwSetting::getValue('shot_min_per_scene', 5);
+
+                    // Build decomposition context
+                    $momentContext = [
+                        'characters' => $context['characters'] ?? [],
+                        'mood' => $scene['mood'] ?? $context['mood'] ?? 'neutral',
+                        'genre' => $context['genre'] ?? 'general',
+                        'sceneType' => $context['sceneType'] ?? 'dialogue',
+                    ];
+
+                    try {
+                        $narrativeMoments = $this->narrativeMomentService->decomposeNarrationIntoMoments(
+                            $narration,
+                            $targetShotCount,
+                            $momentContext
+                        );
+
+                        if (!empty($narrativeMoments)) {
+                            $emotionalArc = $this->narrativeMomentService->extractEmotionalArc($narrativeMoments);
+                            $context['narrativeMoments'] = $narrativeMoments;
+                            $context['emotionalArc'] = $emotionalArc;
+
+                            Log::info('ShotIntelligenceService: Narrative moments decomposed', [
+                                'scene_id' => $scene['id'] ?? 'unknown',
+                                'moment_count' => count($narrativeMoments),
+                                'arc' => $emotionalArc,
+                            ]);
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('ShotIntelligenceService: Narrative decomposition failed', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
 
             // Get settings - fallbacks must match VwSettingSeeder defaults
@@ -179,6 +238,12 @@ class ShotIntelligenceService
 
             // PHASE 6: Add progression analysis (story beats, energy levels, action continuity)
             $analysis = $this->addProgressionAnalysis($analysis, $scene, $context);
+
+            // Add narrative moment analysis if available
+            if (!empty($narrativeMoments)) {
+                $analysis['narrativeMoments'] = $narrativeMoments;
+                $analysis['emotionalArc'] = $emotionalArc;
+            }
 
             // Add scene type detection results
             if ($sceneTypeDetection) {
