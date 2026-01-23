@@ -192,6 +192,34 @@
                             'internal' => ['icon' => '💭', 'color' => 'rgba(168, 85, 247, 0.4)', 'label' => 'INTERNAL', 'lipSync' => false],
                             'monologue' => ['icon' => '🗣️', 'color' => 'rgba(251, 191, 36, 0.4)', 'label' => 'MONOLOGUE', 'lipSync' => true],
                         ];
+
+                        // Shot type abbreviations (PRMT-05)
+                        $shotTypeAbbrev = [
+                            'extreme-wide' => 'EWS',
+                            'wide' => 'WS',
+                            'medium-wide' => 'MWS',
+                            'medium' => 'MS',
+                            'medium-close' => 'MCU',
+                            'close-up' => 'CU',
+                            'extreme-close' => 'ECU',
+                            'over-shoulder' => 'OTS',
+                            'pov' => 'POV',
+                            'aerial' => 'AERIAL',
+                        ];
+
+                        // Camera movement icons (PRMT-06)
+                        $cameraIcons = [
+                            'static' => '',
+                            'push-in' => '🔍',
+                            'pull-out' => '🔭',
+                            'pan-left' => '⬅️',
+                            'pan-right' => '➡️',
+                            'tilt-up' => '⬆️',
+                            'tilt-down' => '⬇️',
+                            'tracking' => '🎯',
+                            'zoom-in' => '🔎',
+                            'zoom-out' => '🔭',
+                        ];
                     @endphp
 
                     @if(!empty($speechSegments))
@@ -292,12 +320,139 @@
 
                 {{-- Prompts Section (Phase 9) --}}
                 <div style="margin-bottom: 1.5rem;">
+                    @php
+                        $shots = $this->inspectorScene['shots'] ?? [];
+                    @endphp
                     <h4 style="margin: 0 0 0.75rem 0; color: rgba(255,255,255,0.9); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
                         Prompts
+                        @if(!empty($shots))
+                            <span style="opacity: 0.6; font-weight: normal; font-size: 0.7rem; text-transform: none; margin-left: 0.5rem;">({{ count($shots) }} shots)</span>
+                        @endif
                     </h4>
-                    <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem; text-align: center; color: rgba(255,255,255,0.6); font-size: 0.75rem;">
-                        Prompt display coming in Phase 9
-                    </div>
+
+                    @if(!empty($shots))
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            @foreach($shots as $shotIndex => $shot)
+                                @php
+                                    $shotType = $shot['type'] ?? 'medium';
+                                    $shotAbbrev = $shotTypeAbbrev[$shotType] ?? strtoupper(substr($shotType, 0, 3));
+                                    $cameraMove = $shot['cameraMovement'] ?? 'static';
+                                    $cameraIcon = $cameraIcons[$cameraMove] ?? '';
+                                    $imagePrompt = $shot['imagePrompt'] ?? '';
+                                    $videoPrompt = $shot['videoPrompt'] ?? ($shot['narrativeBeat']['motionDescription'] ?? '');
+                                    $imagePromptJson = json_encode($imagePrompt);
+                                    $videoPromptJson = json_encode($videoPrompt);
+                                @endphp
+
+                                <div style="padding: 0.75rem; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); border-radius: 0.5rem;">
+                                    {{-- Shot Header with badges (PRMT-05, PRMT-06) --}}
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                        <span style="font-size: 0.75rem; font-weight: 600; color: white;">Shot {{ $shotIndex + 1 }}</span>
+
+                                        {{-- Shot Type Badge (PRMT-05) --}}
+                                        <span style="font-size: 0.6rem; font-weight: 600; color: #a5b4fc; padding: 0.15rem 0.4rem; background: rgba(99,102,241,0.3); border-radius: 0.25rem; border: 1px solid rgba(99,102,241,0.4);">
+                                            {{ $shotAbbrev }}
+                                        </span>
+
+                                        {{-- Camera Movement Indicator (PRMT-06) --}}
+                                        @if($cameraIcon && $cameraMove !== 'static')
+                                            <span style="font-size: 0.75rem;" title="{{ ucwords(str_replace('-', ' ', $cameraMove)) }}">{{ $cameraIcon }}</span>
+                                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.5);">{{ ucwords(str_replace('-', ' ', $cameraMove)) }}</span>
+                                        @endif
+                                    </div>
+
+                                    {{-- Image Prompt (PRMT-01, PRMT-03) --}}
+                                    @if($imagePrompt)
+                                        <div style="margin-bottom: 0.75rem;" data-prompt="{{ $imagePromptJson }}">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                                <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Image Prompt</span>
+                                                <button type="button"
+                                                        x-data="{ copied: false }"
+                                                        @click="
+                                                            const prompt = JSON.parse($el.closest('[data-prompt]').dataset.prompt);
+                                                            navigator.clipboard.writeText(prompt)
+                                                                .then(() => {
+                                                                    copied = true;
+                                                                    setTimeout(() => copied = false, 2000);
+                                                                })
+                                                                .catch(() => {
+                                                                    // Fallback for iOS Safari pre-16.4
+                                                                    const ta = document.createElement('textarea');
+                                                                    ta.value = prompt;
+                                                                    ta.style.position = 'fixed';
+                                                                    ta.style.opacity = '0';
+                                                                    document.body.appendChild(ta);
+                                                                    ta.select();
+                                                                    document.execCommand('copy');
+                                                                    document.body.removeChild(ta);
+                                                                    copied = true;
+                                                                    setTimeout(() => copied = false, 2000);
+                                                                })
+                                                        "
+                                                        style="padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.6rem; cursor: pointer;">
+                                                    <span x-show="!copied">Copy</span>
+                                                    <span x-show="copied" style="color: #10b981;">Copied!</span>
+                                                </button>
+                                            </div>
+                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto;">
+                                                {{ $imagePrompt }}
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- Video Prompt (PRMT-02, PRMT-04) --}}
+                                    @if($videoPrompt)
+                                        <div data-prompt="{{ $videoPromptJson }}">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                                <span style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Video Prompt</span>
+                                                <button type="button"
+                                                        x-data="{ copied: false }"
+                                                        @click="
+                                                            const prompt = JSON.parse($el.closest('[data-prompt]').dataset.prompt);
+                                                            navigator.clipboard.writeText(prompt)
+                                                                .then(() => {
+                                                                    copied = true;
+                                                                    setTimeout(() => copied = false, 2000);
+                                                                })
+                                                                .catch(() => {
+                                                                    // Fallback for iOS Safari pre-16.4
+                                                                    const ta = document.createElement('textarea');
+                                                                    ta.value = prompt;
+                                                                    ta.style.position = 'fixed';
+                                                                    ta.style.opacity = '0';
+                                                                    document.body.appendChild(ta);
+                                                                    ta.select();
+                                                                    document.execCommand('copy');
+                                                                    document.body.removeChild(ta);
+                                                                    copied = true;
+                                                                    setTimeout(() => copied = false, 2000);
+                                                                })
+                                                        "
+                                                        style="padding: 0.2rem 0.5rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.6rem; cursor: pointer;">
+                                                    <span x-show="!copied">Copy</span>
+                                                    <span x-show="copied" style="color: #10b981;">Copied!</span>
+                                                </button>
+                                            </div>
+                                            <div style="font-size: 0.75rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 0.25rem; max-height: 150px; overflow-y: auto;">
+                                                {{ $videoPrompt }}
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- No prompts for this shot --}}
+                                    @if(!$imagePrompt && !$videoPrompt)
+                                        <div style="font-size: 0.7rem; color: rgba(255,255,255,0.4); font-style: italic;">
+                                            Prompts not generated for this shot
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div style="padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.75rem;">
+                            {{ __('No shots decomposed for this scene') }}
+                        </div>
+                    @endif
                 </div>
             @else
                 <div style="padding: 2rem; text-align: center; color: rgba(255,255,255,0.4);">
