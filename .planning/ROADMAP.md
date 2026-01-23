@@ -67,7 +67,7 @@ Plans:
 
 ---
 
-## Phase 12: Shot/Reverse-Shot Patterns ✓ COMPLETE
+## Phase 12: Shot/Reverse-Shot Patterns - COMPLETE
 
 **Goal:** Validate and enforce proper Hollywood conversation coverage with alternating characters
 
@@ -78,8 +78,8 @@ Plans:
 **Plans:** 2 plans (2/2 complete)
 
 Plans:
-- [x] 12-01-PLAN.md — Add validation methods to DialogueSceneDecomposerService (180-degree rule, single-character constraint, character alternation)
-- [x] 12-02-PLAN.md — Integrate validation into VideoWizard flow with quality reporting
+- [x] 12-01-PLAN.md - Add validation methods to DialogueSceneDecomposerService (180-degree rule, single-character constraint, character alternation)
+- [x] 12-02-PLAN.md - Integrate validation into VideoWizard flow with quality reporting
 
 **Requirements:**
 - FLOW-01: Shot/reverse-shot pattern for 2-character conversations
@@ -107,9 +107,14 @@ Plans:
 
 **Goal:** Smart camera selection that responds to emotion and conversation position
 
-**Status:** Pending
+**Status:** Planned (2026-01-23)
 
 **Dependencies:** Phase 12 (requires pattern working)
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 13-01-PLAN.md - Position-enforced shot selection and speaker emotion analysis
 
 **Requirements:**
 - CAM-01: Dynamic CU/MS/OTS selection based on emotional intensity
@@ -126,7 +131,7 @@ Plans:
 
 **Key changes:**
 - Enhance `selectShotTypeForIntensity()` with conversation position awareness
-- Add per-speaker emotion analysis
+- Add per-speaker emotion analysis via `analyzeSpeakerEmotion()`
 - Implement shot progression arc (wide -> medium -> tight as tension builds)
 
 ---
@@ -178,20 +183,20 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 11: Speech-Driven | ✓ Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
-| Phase 12: Shot/Reverse-Shot | ✓ Complete | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 4/4 |
-| Phase 13: Camera Intelligence | ○ Pending | CAM-01 to CAM-04 (4) | 0/4 |
-| Phase 14: Flow & Action | ○ Pending | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
+| Phase 11: Speech-Driven | Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
+| Phase 12: Shot/Reverse-Shot | Complete | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 4/4 |
+| Phase 13: Camera Intelligence | Planned | CAM-01 to CAM-04 (4) | 0/4 |
+| Phase 14: Flow & Action | Pending | FLOW-03, SCNE-02, SCNE-03 (3) | 0/3 |
 
 **Overall Progress:**
 
 ```
-Phase 11: ██████████ 100% ✓
-Phase 12: ██████████ 100% ✓
-Phase 13: ░░░░░░░░░░ 0%
-Phase 14: ░░░░░░░░░░ 0%
-─────────────────────
-Overall:  █████░░░░░ 50%
+Phase 11: ********** 100%
+Phase 12: ********** 100%
+Phase 13: __________ 0% (1 plan ready)
+Phase 14: __________ 0%
+---------------------
+Overall:  *****_____ 50%
 ```
 
 **Coverage:** 16/16 requirements mapped (100%)
@@ -246,4 +251,4 @@ Cinematic shot architecture ensures users get professional-quality shot sequence
 
 *Milestone 8 roadmap created: 2026-01-23*
 *Phases 11-14 defined*
-*Phase 12 planned: 2026-01-23*
+*Phase 13 planned: 2026-01-23*
