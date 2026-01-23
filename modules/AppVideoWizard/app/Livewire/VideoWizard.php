@@ -1250,6 +1250,114 @@ class VideoWizard extends Component
     }
 
     /**
+     * PHASE 3: Get overall pipeline progress as percentage.
+     * Weights: Script 20%, Storyboard 40%, Animation 30%, Assembly 10%
+     */
+    public function getOverallProgressProperty(): array
+    {
+        $progress = [
+            'percentage' => 0,
+            'stage' => 'Not started',
+            'details' => [],
+        ];
+
+        // Script progress (20%)
+        $scriptProgress = !empty($this->script['scenes']) ? 100 : 0;
+        $progress['details']['script'] = $scriptProgress;
+        $progress['percentage'] += $scriptProgress * 0.20;
+
+        // Storyboard progress (40%)
+        $storyboardProgress = $this->calculateStoryboardProgress();
+        $progress['details']['storyboard'] = $storyboardProgress;
+        $progress['percentage'] += $storyboardProgress * 0.40;
+
+        // Animation progress (30%)
+        $animationProgress = $this->calculateAnimationProgress();
+        $progress['details']['animation'] = $animationProgress;
+        $progress['percentage'] += $animationProgress * 0.30;
+
+        // Assembly progress (10%)
+        $assemblyProgress = $this->currentStep >= 6 ? 100 : 0;
+        $progress['details']['assembly'] = $assemblyProgress;
+        $progress['percentage'] += $assemblyProgress * 0.10;
+
+        // Determine current stage
+        if ($progress['percentage'] >= 100) {
+            $progress['stage'] = 'Complete';
+        } elseif ($animationProgress > 0) {
+            $progress['stage'] = 'Animating';
+        } elseif ($storyboardProgress > 0) {
+            $progress['stage'] = 'Generating images';
+        } elseif ($scriptProgress > 0) {
+            $progress['stage'] = 'Script ready';
+        }
+
+        $progress['percentage'] = round($progress['percentage']);
+
+        return $progress;
+    }
+
+    /**
+     * PHASE 3: Calculate storyboard progress percentage.
+     */
+    protected function calculateStoryboardProgress(): float
+    {
+        if (empty($this->storyboard['scenes'])) {
+            return 0;
+        }
+
+        $total = count($this->storyboard['scenes']);
+        $completed = 0;
+
+        foreach ($this->storyboard['scenes'] as $scene) {
+            if (!empty($scene['imageUrl'])) {
+                $completed++;
+            } else {
+                // Check multi-shot mode
+                $shots = $scene['shots'] ?? [];
+                if (!empty($shots)) {
+                    $shotsDone = count(array_filter($shots, fn($s) => !empty($s['imageUrl'])));
+                    $completed += $shotsDone / count($shots);
+                }
+            }
+        }
+
+        return ($completed / $total) * 100;
+    }
+
+    /**
+     * PHASE 3: Calculate animation progress percentage.
+     */
+    protected function calculateAnimationProgress(): float
+    {
+        // Check multi-shot mode first (primary video storage)
+        $decomposedScenes = $this->multiShotMode['decomposedScenes'] ?? [];
+
+        if (!empty($decomposedScenes)) {
+            $total = 0;
+            $completed = 0;
+
+            foreach ($decomposedScenes as $scene) {
+                $shots = $scene['shots'] ?? [];
+                $total += count($shots);
+                $completed += count(array_filter($shots, fn($s) => !empty($s['videoUrl'])));
+            }
+
+            return $total > 0 ? ($completed / $total) * 100 : 0;
+        }
+
+        // Fallback: check animation array (legacy single-shot mode)
+        if (empty($this->animation['scenes'])) {
+            return 0;
+        }
+
+        $total = count($this->animation['scenes']);
+        $completed = count(array_filter($this->animation['scenes'], fn($s) => !empty($s['videoUrl'])));
+
+        return ($completed / $total) * 100;
+    }
+
+    /**
      * Navigate to storyboard page.
      */
     public function goToStoryboardPage(int $page): void
