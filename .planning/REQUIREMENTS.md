@@ -28,26 +28,26 @@ Requirements for Milestone 7. Each maps to roadmap phases.
 
 ### Scene Metadata
 
-- [ ] **META-01**: User can view scene duration
-- [ ] **META-02**: User can view scene transition type
-- [ ] **META-03**: User can view scene location
-- [ ] **META-04**: User can view characters present in scene
-- [ ] **META-05**: User can view emotional intensity indicator
-- [ ] **META-06**: Climax scenes show climax badge
+- [x] **META-01**: User can view scene duration ✓
+- [x] **META-02**: User can view scene transition type ✓
+- [x] **META-03**: User can view scene location ✓
+- [x] **META-04**: User can view characters present in scene ✓
+- [x] **META-05**: User can view emotional intensity indicator ✓
+- [x] **META-06**: Climax scenes show climax badge ✓
 
 ### Modal UX
 
-- [ ] **MODL-01**: User can open inspector from scene card (🔍 Inspect button)
-- [ ] **MODL-02**: Modal shows scene number and title
-- [ ] **MODL-03**: Modal content is scrollable for long scenes
-- [ ] **MODL-04**: Modal has close button
+- [x] **MODL-01**: User can open inspector from scene card (🔍 Inspect button) ✓
+- [x] **MODL-02**: Modal shows scene number and title ✓
+- [x] **MODL-03**: Modal content is scrollable for long scenes ✓
+- [x] **MODL-04**: Modal has close button ✓
 - [ ] **MODL-05**: Modal works on mobile (responsive)
 
 ### Scene Card Fixes
 
-- [ ] **CARD-01**: Scene card shows dynamic label based on segment types present (not hardcoded "Dialogue")
-- [ ] **CARD-02**: Scene card shows type-specific icons for segments
-- [ ] **CARD-03**: Scene card indicates "click to view all" when truncated
+- [x] **CARD-01**: Scene card shows dynamic label based on segment types present (not hardcoded "Dialogue") ✓
+- [x] **CARD-02**: Scene card shows type-specific icons for segments ✓
+- [x] **CARD-03**: Scene card indicates "click to view all" when truncated ✓
 
 ## Future Requirements
 
@@ -89,20 +89,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRMT-04 | Phase 9 | Pending |
 | PRMT-05 | Phase 9 | Pending |
 | PRMT-06 | Phase 9 | Pending |
-| META-01 | Phase 7 | Pending |
-| META-02 | Phase 7 | Pending |
-| META-03 | Phase 7 | Pending |
-| META-04 | Phase 7 | Pending |
-| META-05 | Phase 7 | Pending |
-| META-06 | Phase 7 | Pending |
-| MODL-01 | Phase 7 | Pending |
-| MODL-02 | Phase 7 | Pending |
-| MODL-03 | Phase 7 | Pending |
-| MODL-04 | Phase 7 | Pending |
+| META-01 | Phase 7 | Complete |
+| META-02 | Phase 7 | Complete |
+| META-03 | Phase 7 | Complete |
+| META-04 | Phase 7 | Complete |
+| META-05 | Phase 7 | Complete |
+| META-06 | Phase 7 | Complete |
+| MODL-01 | Phase 7 | Complete |
+| MODL-02 | Phase 7 | Complete |
+| MODL-03 | Phase 7 | Complete |
+| MODL-04 | Phase 7 | Complete |
 | MODL-05 | Phase 10 | Pending |
-| CARD-01 | Phase 7 | Pending |
-| CARD-02 | Phase 7 | Pending |
-| CARD-03 | Phase 7 | Pending |
+| CARD-01 | Phase 7 | Complete |
+| CARD-02 | Phase 7 | Complete |
+| CARD-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total
@@ -117,4 +117,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after roadmap creation*
+*Last updated: 2026-01-23 after Phase 7 completion (14 requirements complete)*

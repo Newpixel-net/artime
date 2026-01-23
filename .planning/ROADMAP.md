@@ -16,42 +16,37 @@ The implementation follows established modal patterns from Character Bible and L
 
 ---
 
-## Phase 7: Foundation - Modal Shell + Scene Card Fixes + Metadata
+## Phase 7: Foundation - Modal Shell + Scene Card Fixes + Metadata ✓
 
 **Goal:** Users can open a working inspector modal and see scene metadata correctly displayed
 
+**Status:** Complete (2026-01-23)
+
 **Dependencies:** None (starts new milestone)
 
-**Plans:** 3 plans
+**Plans:** 3 plans (all complete)
 
 **Requirements:**
-- MODL-01: User can open inspector from scene card
-- MODL-02: Modal shows scene number and title
-- MODL-03: Modal content is scrollable for long scenes
-- MODL-04: Modal has close button
-- CARD-01: Scene card shows dynamic label based on segment types present
-- CARD-02: Scene card shows type-specific icons for segments
-- CARD-03: Scene card indicates "click to view all" when truncated
-- META-01: User can view scene duration
-- META-02: User can view scene transition type
-- META-03: User can view scene location
-- META-04: User can view characters present in scene
-- META-05: User can view emotional intensity indicator
-- META-06: Climax scenes show climax badge
+- MODL-01: User can open inspector from scene card ✓
+- MODL-02: Modal shows scene number and title ✓
+- MODL-03: Modal content is scrollable for long scenes ✓
+- MODL-04: Modal has close button ✓
+- CARD-01: Scene card shows dynamic label based on segment types present ✓
+- CARD-02: Scene card shows type-specific icons for segments ✓
+- CARD-03: Scene card indicates "click to view all" when truncated ✓
+- META-01: User can view scene duration ✓
+- META-02: User can view scene transition type ✓
+- META-03: User can view scene location ✓
+- META-04: User can view characters present in scene ✓
+- META-05: User can view emotional intensity indicator ✓
+- META-06: Climax scenes show climax badge ✓
 
-**Success Criteria:**
-1. User clicks Inspect button (magnifying glass icon) on scene card and modal opens immediately
-2. Modal displays correct scene number and title in header with close button (X and ESC key work)
-3. Scene card shows accurate segment type summary (not hardcoded "Dialogue") with type-specific icons matching segment content
-4. Modal displays scene metadata badges including duration, transition, location, characters, and intensity with climax badge for climax scenes
-5. Modal content scrolls smoothly for long scenes without body scroll behind modal
-
-**Estimated time:** 2 hours
+**Success Criteria:** All 5 criteria verified ✓
 
 Plans:
-- [ ] 07-01-PLAN.md — Scene card fixes (dynamic labels, type-specific icons, truncation indicators)
-- [ ] 07-02-PLAN.md — Modal shell creation (VideoWizard backend, modal blade template, layout inclusion)
-- [ ] 07-03-PLAN.md — Metadata display (duration, transition, location, characters, intensity, climax badge)
+- [x] 07-01-PLAN.md — Scene card fixes (dynamic labels, type-specific icons, truncation indicators)
+- [x] 07-02-PLAN.md — Modal shell creation (VideoWizard backend, modal blade template, layout inclusion)
+- [x] 07-03-PLAN.md — Metadata display (duration, transition, location, characters, intensity, climax badge)
 
 ---
 
@@ -130,7 +125,7 @@ Plans:
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 7: Foundation | Planning Complete | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5 criteria |
+| Phase 7: Foundation | ✓ Complete | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5/5 verified |
 | Phase 8: Speech Segments | Pending | SPCH-01 to SPCH-07 (7) | 5 criteria |
 | Phase 9: Prompts + Copy | Pending | PRMT-01 to PRMT-06 (6) | 5 criteria |
 | Phase 10: Mobile + Polish | Pending | MODL-05 (1) | 5 criteria |
@@ -138,12 +133,12 @@ Plans:
 **Overall Progress:**
 
 ```
-Phase 7:  ░░░░░░░░░░ 0%
+Phase 7:  ██████████ 100% ✓
 Phase 8:  ░░░░░░░░░░ 0%
 Phase 9:  ░░░░░░░░░░ 0%
 Phase 10: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ░░░░░░░░░░ 0%
+Overall:  ██░░░░░░░░ 25%
 ```
 
 **Coverage:** 28/28 requirements mapped (100%)
@@ -175,7 +170,7 @@ Research confirms:
 | Modal open time | <300ms | TBD |
 | Copy success rate | >98% | TBD |
 | Mobile usability | Thumb-friendly | TBD |
-| Type label accuracy | 100% | 0% (hardcoded) |
+| Type label accuracy | 100% | 100% ✓ |
 
 ---
 
