@@ -18027,6 +18027,12 @@ PROMPT;
                     $visualDescription
                 );
 
+                // Phase 12: Validate shot/reverse-shot pattern quality
+                $patternQuality = $this->validateShotReversePatternQuality($shots, $sceneIndex);
+                if ($patternQuality['quality'] === 'needs-review') {
+                    Log::warning('VideoWizard: Shot/reverse-shot pattern needs review', $patternQuality);
+                }
+
                 Log::info('VideoWizard: Speech-driven shots created', [
                     'scene_id' => $sceneId,
                     'shots_created' => count($shots),
@@ -18067,6 +18073,12 @@ PROMPT;
                     $scene,
                     $visualDescription
                 );
+
+                // Phase 12: Validate shot/reverse-shot pattern quality (fallback path)
+                $patternQuality = $this->validateShotReversePatternQuality($shots, $sceneIndex);
+                if ($patternQuality['quality'] === 'needs-review') {
+                    Log::warning('VideoWizard: Shot/reverse-shot pattern needs review (fallback)', $patternQuality);
+                }
 
                 // Log summary
                 $summary = $dialogueDecomposer->getDecompositionSummary($dialogueShots);
