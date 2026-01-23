@@ -811,7 +811,7 @@ PROMPT;
 
         // Determine detection method
         $method = $contentAnalysis['isLikelyClimax'] ? 'content' :
-                  ($allPeaks[0]['prominence'] ?? 0) > 0.2 ? 'intensity_peak' : 'position_fallback';
+                  (($allPeaks[0]['prominence'] ?? 0) > 0.2 ? 'intensity_peak' : 'position_fallback');
 
         Log::debug('NarrativeMomentService: Climax detected', [
             'index' => $climaxIndex,
