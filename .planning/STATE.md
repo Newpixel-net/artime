@@ -8,23 +8,23 @@
 ## Current Position
 
 **Phase:** 2 of ongoing (Narrative Intelligence)
-**Plan:** 01 of 3 (in phase)
-**Status:** In progress
+**Plan:** 03 of 3 (in phase)
+**Status:** Phase complete
 
-**Progress:** [###-------] 33% of Phase 2
+**Progress:** [##########] 100% of Phase 2
 
 ---
 
 ## Current Focus
 
-**Phase 2: Narrative Intelligence**
+**Phase 2: Narrative Intelligence** - COMPLETE
 
 Wire NarrativeMomentService into the shot generation pipeline for Hollywood-standard narrative decomposition.
 
 Plans:
 1. ~~Wire NarrativeMomentService into ShotIntelligenceService~~ COMPLETE
-2. Enhance buildAnalysisPrompt with narrative moments
-3. Map narrative moments to shot recommendations
+2. ~~Enhance buildAnalysisPrompt with narrative moments~~ COMPLETE
+3. ~~Map narrative moments to shot recommendations~~ COMPLETE
 
 ---
 
@@ -38,12 +38,26 @@ The system should be sophisticated and automatically updated based on previous s
 
 ## Completed This Session
 
-### Plan 02-01: Wire NarrativeMomentService (COMPLETE)
-**Summary:** NarrativeMomentService injected into ShotIntelligenceService with analyzeScene() integration
+### Plan 02-03: Action Uniqueness Validation (COMPLETE)
+**Summary:** Automatic action deduplication with progression markers plus uniqueness validation scoring
 
 **Tasks:**
-1. [x] Add NarrativeMomentService dependency to ShotIntelligenceService
-2. [x] Call decomposeNarrationIntoMoments in analyzeScene
+1. [x] Add action deduplication to NarrativeMomentService
+2. [x] Add action uniqueness validation to ShotIntelligenceService
+
+**Commits:**
+- `0c43f1f` - feat(02-03): add action deduplication to NarrativeMomentService
+- `1d5e047` - feat(02-03): add action uniqueness validation to ShotIntelligenceService
+
+**SUMMARY:** `.planning/phases/02-narrative-intelligence/02-03-SUMMARY.md`
+
+### Plan 02-02: Enhance buildAnalysisPrompt (COMPLETE)
+**Summary:** AI prompt enhanced with narrative moments, emotional arc, and shot type suggestions
+
+**SUMMARY:** `.planning/phases/02-narrative-intelligence/02-02-SUMMARY.md`
+
+### Plan 02-01: Wire NarrativeMomentService (COMPLETE)
+**Summary:** NarrativeMomentService injected into ShotIntelligenceService with analyzeScene() integration
 
 **Commits:**
 - `2cf8dc9` - feat(02-01): wire NarrativeMomentService into ShotIntelligenceService
@@ -70,6 +84,9 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 | Date | Area | Decision | Context |
 |------|------|----------|---------|
+| 2026-01-23 | Deduplication Timing | After interpolation | Interpolation may duplicate moments when expanding |
+| 2026-01-23 | Verb Window Size | 2-verb sliding window | Allows same verb after 2+ gap |
+| 2026-01-23 | Similarity Detection | Verb + synonym groups | More comprehensive than exact match |
 | 2026-01-23 | NarrativeMomentService DI | Optional constructor param + setter | Matches existing service injection pattern |
 | 2026-01-23 | Decomposition Timing | After scene type detection, before prompt building | Moments available for AI prompt |
 | 2026-01-23 | Error Handling | try/catch with Log::warning | Graceful degradation if decomposition fails |
@@ -86,11 +103,21 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 ---
 
-## Remaining Tasks (Phase 2)
+## Phase 2 Complete - What Was Built
 
-1. ~~**Plan 01:** Wire NarrativeMomentService into ShotIntelligenceService~~ COMPLETE
-2. **Plan 02:** Enhance buildAnalysisPrompt with narrative moments
-3. **Plan 03:** Map narrative moments to shot recommendations
+### Narrative Intelligence Pipeline
+1. **Moment Decomposition:** Narration automatically decomposed into distinct micro-moments
+2. **Emotional Arc:** Intensity values (0-1) extracted for cinematography mapping
+3. **Prompt Enhancement:** AI prompts include moment-by-moment guidance
+4. **Action Deduplication:** Progression markers prevent duplicate verbs
+5. **Uniqueness Validation:** Scores (0-100%) and issues for quality assurance
+
+### Key Methods Added
+- `NarrativeMomentService::deduplicateActions()`
+- `NarrativeMomentService::areActionsSimilar()`
+- `ShotIntelligenceService::validateActionUniqueness()`
+- `ShotIntelligenceService::formatNarrativeMomentsForPrompt()`
+- `ShotIntelligenceService::getShotTypeFromIntensity()`
 
 ---
 
@@ -104,19 +131,22 @@ None currently
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `.planning/phases/02-narrative-intelligence/02-01-SUMMARY.md` | Plan 01 summary | **Created** |
-| `Services/ShotIntelligenceService.php` | NarrativeMomentService integration | **Updated** |
-| `Services/NarrativeMomentService.php` | Narrative decomposition (711 lines) | Exists |
+| `.planning/phases/02-narrative-intelligence/02-03-SUMMARY.md` | Plan 03 summary | **Created** |
+| `.planning/phases/02-narrative-intelligence/02-02-SUMMARY.md` | Plan 02 summary | Created |
+| `.planning/phases/02-narrative-intelligence/02-01-SUMMARY.md` | Plan 01 summary | Created |
+| `Services/ShotIntelligenceService.php` | Narrative integration | **Updated** |
+| `Services/NarrativeMomentService.php` | Narrative decomposition | **Updated** |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 02-01-PLAN.md (Wire NarrativeMomentService)
+**Stopped at:** Completed 02-03-PLAN.md (Action Uniqueness Validation)
 **Resume file:** None
+**Phase 2 Status:** COMPLETE
 
 ---
 
 *Session: Phase 2 - Narrative Intelligence*
-*Plan: 02-01 COMPLETE*
+*Phase 2 COMPLETE - All 3 plans executed*
