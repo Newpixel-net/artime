@@ -1354,6 +1354,9 @@ class VideoWizard extends Component
             // Load TTS provider and available voices
             $this->loadTtsSettings();
 
+            // PHASE 3: Ensure Hollywood features are enabled by default
+            $this->ensureHollywoodSettingsExist();
+
             // Log that settings were loaded (helpful for debugging)
             Log::debug('VideoWizard: Dynamic settings loaded', [
                 'defaultShotCount' => $this->multiShotMode['defaultShotCount'],
@@ -1398,6 +1401,38 @@ class VideoWizard extends Component
                 'shimmer' => ['name' => 'Shimmer', 'gender' => 'female', 'style' => 'bright'],
             ];
             Log::warning('VideoWizard: Could not load TTS settings', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Ensure Hollywood production settings exist with enabled defaults.
+     * Called on mount to enable features even before seeder runs.
+     *
+     * PHASE 3: These settings control the Hollywood Production System features:
+     * - shot_progression_enabled: Prevents repetitive shot sequences
+     * - cinematic_intelligence_enabled: Character state tracking and continuity
+     * - hollywood_shot_sequences_enabled: Professional shot patterns
+     * - emotional_arc_shot_mapping_enabled: Emotion-to-shot-type mapping
+     * - dialogue_coverage_patterns_enabled: Shot/reverse shot for dialogue
+     */
+    protected function ensureHollywoodSettingsExist(): void
+    {
+        $hollywoodDefaults = [
+            'shot_progression_enabled' => 'true',
+            'cinematic_intelligence_enabled' => 'true',
+            'hollywood_shot_sequences_enabled' => 'true',
+            'emotional_arc_shot_mapping_enabled' => 'true',
+            'dialogue_coverage_patterns_enabled' => 'true',
+        ];
+
+        foreach ($hollywoodDefaults as $key => $default) {
+            if (VwSetting::getValue($key) === null) {
+                VwSetting::setValue($key, $default);
+                Log::info('VideoWizard: Initialized missing Hollywood setting', [
+                    'key' => $key,
+                    'value' => $default,
+                ]);
+            }
         }
     }
 
