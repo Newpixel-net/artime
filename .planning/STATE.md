@@ -18,19 +18,19 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 
 **Milestone:** 7 (Scene Text Inspector)
 **Phase:** 7 (Foundation - Modal Shell + Scene Card Fixes + Metadata)
-**Plan:** Not started
-**Status:** Roadmap created, ready for planning
+**Plan:** 01 of 04 complete
+**Status:** In progress - Scene card fixes complete
 
 ```
-Phase 7:  ░░░░░░░░░░ 0% (Pending)
+Phase 7:  ██░░░░░░░░ 25% (1/4 complete)
 Phase 8:  ░░░░░░░░░░ 0% (Pending)
 Phase 9:  ░░░░░░░░░░ 0% (Pending)
 Phase 10: ░░░░░░░░░░ 0% (Pending)
 ─────────────────────
-Overall:  ░░░░░░░░░░ 0%
+Overall:  ██░░░░░░░░ 25%
 ```
 
-**Last activity:** 2026-01-23 - Milestone 7 roadmap created
+**Last activity:** 2026-01-23 - Completed 07-01-PLAN.md (Scene card speech label fixes)
 
 ---
 
@@ -73,7 +73,7 @@ The system should be sophisticated and automatically updated based on previous s
 - Mobile usability: Thumb-friendly
 
 **Current baseline:**
-- Type label accuracy: 0% (hardcoded "Dialogue" for all)
+- Type label accuracy: 100% (dynamic based on segment composition) ✓
 - Full text visibility: 0% (truncated to 80 chars, max 2 segments)
 
 ---
@@ -89,14 +89,17 @@ The system should be sophisticated and automatically updated based on previous s
 | 2026-01-23 | Performance | Use computed properties, wire:ignore | Avoid payload bloat and re-render cascades |
 | 2026-01-23 | Clipboard | Native API + execCommand fallback | Cross-browser reliability including iOS Safari |
 | 2026-01-23 | Mobile UX | Fullscreen on mobile, thumb-zone close button | One-handed operation |
+| 2026-01-23 | Scene card labels | 80% threshold for dominant type vs Mixed | Scenes with >80% of one type show that type; below shows Mixed with breakdown |
+| 2026-01-23 | Mixed icon | Use 🎭 (theater masks) for MIXED category | Represents multiple performance types, clear visual distinction |
+| 2026-01-23 | Preview diversity | Show one segment from each type when mixed | Users need to see what types are present, not just first 2 |
 
 ### Known Issues
 
-| Issue | Impact | Plan |
-|-------|--------|------|
-| Hardcoded "Dialogue" label | HIGH - Users see incorrect type labels for all segments | Fixed in Phase 7 (CARD-01) |
-| Text truncation | HIGH - Users cannot see full speech segments or prompts | Fixed in Phase 8 (SPCH-01) and Phase 9 (PRMT-01/02) |
-| No metadata visibility | MEDIUM - Users cannot inspect scene details | Fixed in Phase 7 (META-01 to META-06) |
+| Issue | Impact | Plan | Status |
+|-------|--------|------|--------|
+| Hardcoded "Dialogue" label | HIGH - Users see incorrect type labels for all segments | Phase 7 (CARD-01) | ✓ FIXED (07-01) |
+| Text truncation | HIGH - Users cannot see full speech segments or prompts | Phase 8 (SPCH-01) and Phase 9 (PRMT-01/02) | Pending |
+| No metadata visibility | MEDIUM - Users cannot inspect scene details | Phase 7 (META-01 to META-06) | Pending |
 
 ### Research Insights
 
@@ -149,11 +152,10 @@ The system should be sophisticated and automatically updated based on previous s
 ## Todos
 
 ### Immediate (Phase 7)
-- [ ] Create Phase 7 plan with `/gsd:plan-phase 7`
-- [ ] Implement modal shell following Character Bible pattern
-- [ ] Fix scene card type labels (replace hardcoded "Dialogue")
-- [ ] Add Inspect button to scene cards
-- [ ] Display scene metadata badges in modal
+- [x] Fix scene card type labels (replace hardcoded "Dialogue") - 07-01 complete
+- [ ] Implement modal shell following Character Bible pattern - 07-02 next
+- [ ] Display scene metadata badges in modal - 07-03
+- [ ] Modal UX polish (scroll, mobile) - 07-04
 
 ### Upcoming (Phase 8)
 - [ ] Display full speech segments with type badges
@@ -183,21 +185,23 @@ None currently.
 | `.planning/REQUIREMENTS.md` | 28 requirements defined | Updated (2026-01-23) |
 | `.planning/research/SUMMARY.md` | Research findings | Complete (2026-01-23) |
 | `.planning/PROJECT.md` | Project context | Current |
+| `.planning/phases/07-foundation-modal-shell-scene-card-fixes-metadata/07-01-SUMMARY.md` | Scene card label fixes | Complete (2026-01-23) |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Roadmap creation complete
-**Resume command:** `/gsd:plan-phase 7`
-**Milestone 7 status:** 0% (4 phases planned)
+**Stopped at:** Plan 07-01 complete
+**Resume file:** None
+**Milestone 7 status:** 25% (1/4 plans complete)
 
 **Context preserved:**
-- Roadmap defines 4 sequential phases
-- All 28 requirements mapped to phases
-- Research findings documented
-- Critical pitfalls identified with mitigation strategies
+- Phase 7 Plan 01 complete: Scene card speech label fixes
+- Type label accuracy improved from 0% to 100%
+- Dominant type detection (>80% threshold) implemented
+- MIXED category with detailed breakdown added
+- Ready for Plan 07-02: Modal shell implementation
 
 ---
 
