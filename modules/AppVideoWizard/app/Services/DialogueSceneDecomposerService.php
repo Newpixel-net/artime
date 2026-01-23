@@ -578,6 +578,271 @@ class DialogueSceneDecomposerService
     }
 
     /**
+     * PHASE 12: Validate 180-degree rule compliance across dialogue sequence.
+     * Camera must stay on same side of axis; eyelines must oppose between speakers.
+     *
+     * @param array $shots Shots with spatial data
+     * @return array Array of violations (empty if compliant)
+     */
+    protected function validate180DegreeRule(array $shots): array
+    {
+        $violations = [];
+        $lastSpeaker = null;
+        $lastEyeLine = null;
+
+        foreach ($shots as $index => $shot) {
+            // Skip non-dialogue shots (no speakingCharacter)
+            if (empty($shot['speakingCharacter'])) {
+                continue;
+            }
+
+            $spatial = $shot['spatial'] ?? [];
+            $speaker = $shot['speakingCharacter'];
+            $cameraPosition = $spatial['cameraPosition'] ?? null;
+            $eyeLineDirection = $spatial['eyeLineDirection'] ?? null;
+
+            // Check 1: Camera position must be consistent (axis lock)
+            if ($cameraPosition !== null && $cameraPosition !== $this->axisLockSide) {
+                $violations[] = [
+                    'type' => 'axis_jump',
+                    'shotIndex' => $index,
+                    'speaker' => $speaker,
+                    'expected' => $this->axisLockSide,
+                    'actual' => $cameraPosition,
+                    'message' => "Camera jumped axis: expected '{$this->axisLockSide}', got '{$cameraPosition}'",
+                ];
+
+                Log::warning('DialogueSceneDecomposer: 180-degree rule violation - axis jump', [
+                    'shot_index' => $index,
+                    'speaker' => $speaker,
+                    'expected_camera' => $this->axisLockSide,
+                    'actual_camera' => $cameraPosition,
+                ]);
+            }
+
+            // Check 2: When speaker changes, eyeline should differ (opposite directions)
+            if ($lastSpeaker !== null && $lastSpeaker !== $speaker) {
+                if ($eyeLineDirection !== null && $lastEyeLine !== null) {
+                    if ($eyeLineDirection === $lastEyeLine) {
+                        $violations[] = [
+                            'type' => 'eyeline_match',
+                            'shotIndex' => $index,
+                            'speaker' => $speaker,
+                            'previousSpeaker' => $lastSpeaker,
+                            'eyeLineDirection' => $eyeLineDirection,
+                            'message' => "Both speakers look same direction ({$eyeLineDirection}) - breaks shot/reverse pattern",
+                        ];
+
+                        Log::warning('DialogueSceneDecomposer: 180-degree rule violation - eyeline match', [
+                            'shot_index' => $index,
+                            'speaker' => $speaker,
+                            'previous_speaker' => $lastSpeaker,
+                            'eyeline' => $eyeLineDirection,
+                        ]);
+                    }
+                }
+            }
+
+            // Track for next iteration
+            $lastSpeaker = $speaker;
+            $lastEyeLine = $eyeLineDirection;
+        }
+
+        if (empty($violations)) {
+            Log::debug('DialogueSceneDecomposer: 180-degree rule validation passed', [
+                'shot_count' => count($shots),
+            ]);
+        }
+
+        return $violations;
+    }
+
+    /**
+     * PHASE 12: Enforce single character per shot constraint (FLOW-02).
+     * Image generation model cannot reliably render multiple characters.
+     * Converts two-shots to wide shots; ensures OTS shows only focus character.
+     *
+     * @param array $shots Shots to enforce constraint on
+     * @return array Modified shots with single-character constraint applied
+     */
+    protected function enforceSingleCharacterConstraint(array $shots): array
+    {
+        $conversions = [];
+
+        foreach ($shots as $index => &$shot) {
+            $type = $shot['type'] ?? '';
+            $charactersInShot = $shot['charactersInShot'] ?? [];
+            $characterCount = count($charactersInShot);
+
+            // Skip shots that already have single character
+            if ($characterCount <= 1) {
+                continue;
+            }
+
+            // Case 1: Two-shot or establishing with multiple characters
+            if ($type === 'two-shot' || $type === 'establishing') {
+                // Convert to wide shot with only the primary character
+                $primaryCharacter = $charactersInShot[0] ?? null;
+
+                $shot['type'] = 'wide';
+                $shot['originalType'] = $type;
+                $shot['charactersInShot'] = $primaryCharacter ? [$primaryCharacter] : [];
+                $shot['singleCharacterEnforced'] = true;
+
+                // Update visual description
+                if (!empty($shot['visualDescription'])) {
+                    $shot['visualDescription'] = preg_replace(
+                        '/two[- ]?shot|establishing shot/i',
+                        'wide shot',
+                        $shot['visualDescription']
+                    );
+                }
+
+                $conversions[] = [
+                    'shotIndex' => $index,
+                    'from' => $type,
+                    'to' => 'wide',
+                    'reason' => 'two-shot converted to single-character wide',
+                    'keptCharacter' => $primaryCharacter,
+                ];
+
+                Log::debug('DialogueSceneDecomposer: Converted multi-character shot to wide', [
+                    'shot_index' => $index,
+                    'original_type' => $type,
+                    'kept_character' => $primaryCharacter,
+                ]);
+            }
+
+            // Case 2: Over-the-shoulder with multiple characters visible
+            if ($type === 'over-the-shoulder') {
+                // Keep only the focus character (the one speaking/being focused on)
+                $focusCharacter = $shot['speakingCharacter'] ?? $charactersInShot[0] ?? null;
+
+                // Ensure charactersInShot contains ONLY the focus character
+                $shot['charactersInShot'] = $focusCharacter ? [$focusCharacter] : [];
+                $shot['singleCharacterEnforced'] = true;
+
+                // Enhance OTS data to clarify foreground is partial/blurred
+                if (!isset($shot['otsData'])) {
+                    $shot['otsData'] = [];
+                }
+                $shot['otsData']['foregroundVisible'] = 'shoulder and partial head';
+                $shot['otsData']['foregroundBlur'] = true;
+                $shot['otsData']['focusOn'] = $focusCharacter;
+
+                $conversions[] = [
+                    'shotIndex' => $index,
+                    'from' => 'over-the-shoulder (multi)',
+                    'to' => 'over-the-shoulder (single focus)',
+                    'reason' => 'OTS enforced single focus character',
+                    'focusCharacter' => $focusCharacter,
+                ];
+
+                Log::debug('DialogueSceneDecomposer: Enforced OTS single focus', [
+                    'shot_index' => $index,
+                    'focus_character' => $focusCharacter,
+                ]);
+            }
+        }
+
+        if (!empty($conversions)) {
+            Log::info('DialogueSceneDecomposer: Enforced single-character constraint (FLOW-02)', [
+                'conversions_count' => count($conversions),
+                'details' => $conversions,
+            ]);
+        } else {
+            Log::debug('DialogueSceneDecomposer: Single-character constraint already satisfied');
+        }
+
+        return $shots;
+    }
+
+    /**
+     * PHASE 12: Validate character alternation in dialogue sequences (FLOW-04).
+     * Flags consecutive shots from same speaker as potential coverage issue.
+     *
+     * @param array $shots Shots to validate
+     * @return array Array of alternation issues
+     */
+    protected function validateCharacterAlternation(array $shots): array
+    {
+        $issues = [];
+        $consecutiveCount = 1;
+        $lastSpeaker = null;
+        $consecutiveStartIndex = 0;
+
+        foreach ($shots as $index => $shot) {
+            // Get speaker (dialogue shots only)
+            $speaker = $shot['speakingCharacter'] ?? null;
+            $purpose = $shot['purpose'] ?? '';
+
+            // Non-speaking shots (reaction, narrator overlay) reset the counter
+            if ($speaker === null || $purpose === 'reaction' || $purpose === 'narrator') {
+                // Check if previous streak was problematic before resetting
+                if ($consecutiveCount >= 3 && $lastSpeaker !== null) {
+                    $issues[] = [
+                        'type' => 'consecutive_speaker',
+                        'speaker' => $lastSpeaker,
+                        'count' => $consecutiveCount,
+                        'startIndex' => $consecutiveStartIndex,
+                        'endIndex' => $index - 1,
+                        'suggestion' => 'Consider inserting reaction shot for visual variety',
+                    ];
+                }
+                $consecutiveCount = 0;
+                $lastSpeaker = null;
+                continue;
+            }
+
+            // Same speaker as previous shot
+            if ($speaker === $lastSpeaker) {
+                $consecutiveCount++;
+            } else {
+                // Different speaker - check previous streak
+                if ($consecutiveCount >= 3 && $lastSpeaker !== null) {
+                    $issues[] = [
+                        'type' => 'consecutive_speaker',
+                        'speaker' => $lastSpeaker,
+                        'count' => $consecutiveCount,
+                        'startIndex' => $consecutiveStartIndex,
+                        'endIndex' => $index - 1,
+                        'suggestion' => 'Consider inserting reaction shot for visual variety',
+                    ];
+                }
+
+                // Reset for new speaker
+                $consecutiveCount = 1;
+                $consecutiveStartIndex = $index;
+            }
+
+            $lastSpeaker = $speaker;
+        }
+
+        // Check final streak at end of shots
+        if ($consecutiveCount >= 3 && $lastSpeaker !== null) {
+            $issues[] = [
+                'type' => 'consecutive_speaker',
+                'speaker' => $lastSpeaker,
+                'count' => $consecutiveCount,
+                'startIndex' => $consecutiveStartIndex,
+                'endIndex' => count($shots) - 1,
+                'suggestion' => 'Consider inserting reaction shot for visual variety',
+            ];
+        }
+
+        if (!empty($issues)) {
+            Log::info('DialogueSceneDecomposer: Character alternation issues found (FLOW-04)', [
+                'issue_count' => count($issues),
+                'details' => $issues,
+            ]);
+        } else {
+            Log::debug('DialogueSceneDecomposer: Character alternation validation passed');
+        }
+
+        return $issues;
+    }
+
+    /**
      * PHASE 4: Analyze coverage of generated shots.
      *
      * @param array $shots Array of generated shots
@@ -1774,6 +2039,25 @@ class DialogueSceneDecomposerService
 
         // Apply shot/reverse-shot pairing
         $shots = $this->pairReverseShots($shots);
+
+        // Phase 12: Enforce single-character constraint (FLOW-02)
+        $shots = $this->enforceSingleCharacterConstraint($shots);
+
+        // Phase 12: Validate 180-degree rule (SCNE-04)
+        $axisViolations = $this->validate180DegreeRule($shots);
+        if (!empty($axisViolations)) {
+            Log::warning('DialogueSceneDecomposer: 180-degree rule violations', [
+                'violations' => $axisViolations,
+            ]);
+        }
+
+        // Phase 12: Validate character alternation (FLOW-04)
+        $alternationIssues = $this->validateCharacterAlternation($shots);
+        if (!empty($alternationIssues)) {
+            Log::info('DialogueSceneDecomposer: Character alternation notes', [
+                'issues' => $alternationIssues,
+            ]);
+        }
 
         // Calculate durations
         $shots = $this->calculateShotDurations($shots);
