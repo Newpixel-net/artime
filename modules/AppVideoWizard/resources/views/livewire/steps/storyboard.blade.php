@@ -2393,8 +2393,8 @@ function getCameraMovementIcon($movement) {
                                     <span wire:loading wire:target="openMultiShotModal({{ $index }})">⏳</span>
                                 </button>
                             </div>
-                            {{-- Shots Grid with Frame Chain (4 columns for better visibility) --}}
-                            <div wire:key="shots-grid-{{ $index }}" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; contain: layout;">
+                            {{-- Shots Grid with Frame Chain (2 columns for larger thumbnails) --}}
+                            <div wire:key="shots-grid-{{ $index }}" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; contain: layout;">
                                 @foreach($decomposed['shots'] as $shotIdx => $shot)
                                     @php
                                         $isSelected = ($decomposed['selectedShot'] ?? 0) === $shotIdx;

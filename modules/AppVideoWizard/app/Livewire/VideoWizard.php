@@ -6310,6 +6310,13 @@ PROMPT;
             // PHASE 3: Get character consistency options for visual consistency
             $characterOptions = $this->getCharacterConsistencyOptions($sceneIndex);
 
+            // CRITICAL: Include negative prompts for realism (avoid cartoon/anime)
+            $negativePrompt = null;
+            if (($this->storyboard['technicalSpecs']['enabled'] ?? true) &&
+                !empty($this->storyboard['technicalSpecs']['negative'])) {
+                $negativePrompt = $this->storyboard['technicalSpecs']['negative'];
+            }
+
             $result = $imageService->generateSceneImage($project, $scene, array_merge([
                 'sceneIndex' => $sceneIndex,
                 'teamId' => session('current_team_id', 0),
@@ -6318,6 +6325,8 @@ PROMPT;
                 'sceneMemory' => $this->sceneMemory,
                 'storyboard' => $this->storyboard,
                 'useCascade' => true,
+                // CRITICAL: Pass negative prompts to avoid cartoon/anime style
+                'negativePrompt' => $negativePrompt,
             ], $characterOptions));
 
             if ($result['async'] ?? false) {
@@ -6435,6 +6444,13 @@ PROMPT;
                 $this->saveProject();
             }
 
+            // CRITICAL: Include negative prompts for realism (avoid cartoon/anime)
+            $negativePrompt = null;
+            if (($this->storyboard['technicalSpecs']['enabled'] ?? true) &&
+                !empty($this->storyboard['technicalSpecs']['negative'])) {
+                $negativePrompt = $this->storyboard['technicalSpecs']['negative'];
+            }
+
             // Second pass: Actually generate images
             foreach ($scenesToGenerate as $index) {
                 $scene = $this->script['scenes'][$index];
@@ -6451,6 +6467,8 @@ PROMPT;
                         'sceneMemory' => $this->sceneMemory,
                         'storyboard' => $this->storyboard,
                         'useCascade' => true,
+                        // CRITICAL: Pass negative prompts to avoid cartoon/anime style
+                        'negativePrompt' => $negativePrompt,
                     ], $characterOptions));
 
                     if ($result['async'] ?? false) {
@@ -19163,8 +19181,21 @@ PROMPT;
             $parts[] = $this->sceneMemory['styleBible']['style'];
         }
 
-        // 6. Cinematic quality (moderate DOF keeps background figures visible)
-        $parts[] = 'cinematic lighting, moderate depth of field with sharp environmental details';
+        // 6. CRITICAL: User's Technical Specs (photorealistic, realistic textures, etc.)
+        // This controls whether output is realistic or stylized
+        $techSpecsEnabled = $this->storyboard['technicalSpecs']['enabled'] ?? true;
+        if ($techSpecsEnabled) {
+            $userPositive = $this->storyboard['technicalSpecs']['positive'] ?? '';
+            if (!empty($userPositive)) {
+                $parts[] = $userPositive;
+            } else {
+                // Default to cinematic if no user specs
+                $parts[] = 'cinematic lighting, moderate depth of field with sharp environmental details';
+            }
+        } else {
+            // Fallback when technical specs disabled
+            $parts[] = 'cinematic lighting, moderate depth of field with sharp environmental details';
+        }
 
         return implode('. ', array_filter($parts));
     }
@@ -20582,30 +20613,48 @@ PROMPT;
     {
         $specs = [];
 
+        // CRITICAL: User's Technical Specs positive prompts (photorealistic, etc.)
+        // This is the PRIMARY quality control - must be included first
+        $techSpecsEnabled = $this->storyboard['technicalSpecs']['enabled'] ?? true;
+        if ($techSpecsEnabled) {
+            $userPositive = $this->storyboard['technicalSpecs']['positive'] ?? '';
+            if (!empty($userPositive)) {
+                $specs[] = $userPositive;
+            }
+        }
+
         // Lens
         $lens = $shotType['lens'] ?? $this->getDefaultLensForShot($shotType['type']);
         if ($lens) {
             $specs[] = $lens;
         }
 
-        // Lighting from genre preset
+        // Lighting from genre preset (only if not already in user specs)
         $genrePreset = $this->getGenrePreset();
-        if (!empty($genrePreset['lighting'])) {
-            $lightingElements = explode(',', $genrePreset['lighting']);
-            $specs[] = trim($lightingElements[0]) . ' lighting';
-        } else {
-            $specs[] = 'cinematic lighting';
+        $userPositiveLower = strtolower($this->storyboard['technicalSpecs']['positive'] ?? '');
+        if (!str_contains($userPositiveLower, 'lighting')) {
+            if (!empty($genrePreset['lighting'])) {
+                $lightingElements = explode(',', $genrePreset['lighting']);
+                $specs[] = trim($lightingElements[0]) . ' lighting';
+            } else {
+                $specs[] = 'cinematic lighting';
+            }
         }
 
-        // Style from Style Bible or genre
-        if ($this->sceneMemory['styleBible']['enabled'] && !empty($this->sceneMemory['styleBible']['style'])) {
-            $specs[] = $this->sceneMemory['styleBible']['style'];
-        } elseif (!empty($genrePreset['style'])) {
-            $specs[] = $genrePreset['style'];
+        // Style from Style Bible or genre (only if not already in user specs)
+        if (!str_contains($userPositiveLower, 'style') && !str_contains($userPositiveLower, 'artistic')) {
+            if ($this->sceneMemory['styleBible']['enabled'] && !empty($this->sceneMemory['styleBible']['style'])) {
+                $specs[] = $this->sceneMemory['styleBible']['style'];
+            } elseif (!empty($genrePreset['style'])) {
+                $specs[] = $genrePreset['style'];
+            }
         }
 
         // Cinematic quality markers (moderate DOF keeps background visible)
-        $specs[] = 'moderate depth of field';
+        // Only add if user hasn't specified depth of field
+        if (!str_contains($userPositiveLower, 'depth of field')) {
+            $specs[] = 'moderate depth of field';
+        }
 
         return implode(', ', $specs);
     }
@@ -23956,6 +24005,13 @@ PROMPT;
                     // PHASE 3: Get character consistency options for visual consistency
                     $characterOptions = $this->getCharacterConsistencyOptions($sceneIndex);
 
+                    // CRITICAL: Include negative prompts for realism (avoid cartoon/anime)
+                    $negativePrompt = null;
+                    if (($this->storyboard['technicalSpecs']['enabled'] ?? true) &&
+                        !empty($this->storyboard['technicalSpecs']['negative'])) {
+                        $negativePrompt = $this->storyboard['technicalSpecs']['negative'];
+                    }
+
                     $result = $imageService->generateSceneImage($project, [
                         'id' => $shot['id'],
                         'visualDescription' => $enhancedPrompt,
@@ -23973,6 +24029,8 @@ PROMPT;
                         'sceneMemory' => $this->sceneMemory,
                         'storyboard' => $this->storyboard,
                         'useCascade' => true,
+                        // CRITICAL: Pass negative prompts to avoid cartoon/anime style
+                        'negativePrompt' => $negativePrompt,
                     ], $characterOptions));
 
                     if ($result['success']) {
@@ -24417,6 +24475,12 @@ PROMPT;
                                 $shotPrompt .= "CHARACTERS: {$consistencyContext['characters']} ";
                             }
 
+                            // CRITICAL: User's Technical Specs positive prompts (photorealistic, etc.)
+                            $techSpecsEnabled = $this->storyboard['technicalSpecs']['enabled'] ?? true;
+                            if ($techSpecsEnabled && !empty($this->storyboard['technicalSpecs']['positive'])) {
+                                $shotPrompt .= "QUALITY: {$this->storyboard['technicalSpecs']['positive']} ";
+                            }
+
                             // CRITICAL: Anti-posed-photo instructions
                             $shotPrompt .= "CRITICAL REQUIREMENTS: " .
                                 "1) Characters must be CAUGHT IN ACTION - mid-gesture, mid-conversation, mid-movement. " .
@@ -24424,6 +24488,13 @@ PROMPT;
                                 "3) This is a CINEMATIC MOMENT - natural, candid, dynamic. " .
                                 "4) Characters should be DOING something, not standing still. " .
                                 "5) Capture genuine emotion and movement like a real film frame.";
+
+                            // CRITICAL: Include negative prompts for realism (avoid cartoon/anime)
+                            $negativePrompt = null;
+                            if (($this->storyboard['technicalSpecs']['enabled'] ?? true) &&
+                                !empty($this->storyboard['technicalSpecs']['negative'])) {
+                                $negativePrompt = $this->storyboard['technicalSpecs']['negative'];
+                            }
 
                             // Build options for image generation
                             $generationOptions = [
@@ -24437,6 +24508,8 @@ PROMPT;
                                 'sceneMemory' => $this->sceneMemory,
                                 'storyboard' => $this->storyboard,
                                 'useCascade' => true,
+                                // CRITICAL: Pass negative prompts to avoid cartoon/anime style
+                                'negativePrompt' => $negativePrompt,
                             ];
 
                             // FACE CONSISTENCY CHAIN: Pass previous shot as continuity reference
@@ -24741,9 +24814,21 @@ PROMPT;
                     $shotPrompt .= "LOCATION: " . $consistencyContext['location'] . " ";
                 }
 
+                // CRITICAL: User's Technical Specs positive prompts (photorealistic, etc.)
+                $techSpecsEnabled = $this->storyboard['technicalSpecs']['enabled'] ?? true;
+                if ($techSpecsEnabled && !empty($this->storyboard['technicalSpecs']['positive'])) {
+                    $shotPrompt .= "QUALITY: {$this->storyboard['technicalSpecs']['positive']} ";
+                }
+
                 // Anti-posed-photo instructions
                 $shotPrompt .= "CRITICAL: Characters caught in action - mid-gesture, mid-conversation. " .
                     "NO looking at camera. NO posed photographs. Natural, cinematic, dynamic.";
+
+                // CRITICAL: Include negative prompts for realism (avoid cartoon/anime)
+                $negativePrompt = null;
+                if ($techSpecsEnabled && !empty($this->storyboard['technicalSpecs']['negative'])) {
+                    $negativePrompt = $this->storyboard['technicalSpecs']['negative'];
+                }
 
                 // Generate the image
                 $result = $imageService->generateSceneImage($project, [
@@ -24756,6 +24841,8 @@ PROMPT;
                     'sceneMemory' => $this->sceneMemory,
                     'storyboard' => $this->storyboard,
                     'useCascade' => true,
+                    // CRITICAL: Pass negative prompts to avoid cartoon/anime style
+                    'negativePrompt' => $negativePrompt,
                 ]);
 
                 if ($result['success'] && !empty($result['imageUrl'])) {
