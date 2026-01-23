@@ -54,7 +54,11 @@ Plans:
 
 **Goal:** Users can view all speech segments with correct type labels, icons, and speaker attribution
 
+**Status:** Planned (2026-01-23)
+
 **Dependencies:** Phase 7 (requires modal shell)
+
+**Plans:** 1 plan
 
 **Requirements:**
 - SPCH-01: User can view ALL speech segments for a scene (not truncated)
@@ -73,6 +77,9 @@ Plans:
 5. Scrollable segment list handles 10+ segments smoothly without layout issues
 
 **Estimated time:** 2 hours
+
+Plans:
+- [ ] 08-01-PLAN.md — Speech segments display (type configuration, segment cards with all properties, legacy fallback)
 
 ---
 
@@ -126,7 +133,7 @@ Plans:
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 7: Foundation | ✓ Complete | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5/5 verified |
-| Phase 8: Speech Segments | Pending | SPCH-01 to SPCH-07 (7) | 5 criteria |
+| Phase 8: Speech Segments | Planned | SPCH-01 to SPCH-07 (7) | 5 criteria |
 | Phase 9: Prompts + Copy | Pending | PRMT-01 to PRMT-06 (6) | 5 criteria |
 | Phase 10: Mobile + Polish | Pending | MODL-05 (1) | 5 criteria |
 
@@ -183,4 +190,4 @@ Full transparency into generated content maintains trust and enables users to un
 ---
 
 *Milestone 7 roadmap created: 2026-01-23*
-*Ready for phase planning: Phase 7*
+*Phase 8 planned: 2026-01-23*
