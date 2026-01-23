@@ -9,10 +9,10 @@ Requirements for Milestone 8. Each maps to roadmap phases.
 
 ### Speech-to-Shot Architecture
 
-- [ ] **CSA-01**: Each dialogue segment creates its own shot (1:1 mapping)
-- [ ] **CSA-02**: Each monologue segment creates its own shot (1:1 mapping)
-- [ ] **CSA-03**: Narrator segments overlay across multiple shots (not dedicated shots)
-- [ ] **CSA-04**: Internal thought segments handled as voiceover (no dedicated shot)
+- [x] **CSA-01**: Each dialogue segment creates its own shot (1:1 mapping) ✓
+- [x] **CSA-02**: Each monologue segment creates its own shot (1:1 mapping) ✓
+- [x] **CSA-03**: Narrator segments overlay across multiple shots (not dedicated shots) ✓
+- [x] **CSA-04**: Internal thought segments handled as voiceover (no dedicated shot) ✓
 
 ### Shot Pattern & Flow
 
@@ -30,7 +30,7 @@ Requirements for Milestone 8. Each maps to roadmap phases.
 
 ### Scene Handling
 
-- [ ] **SCNE-01**: No artificial limit on shots per scene (10+ if speech demands)
+- [x] **SCNE-01**: No artificial limit on shots per scene (10+ if speech demands) ✓
 - [ ] **SCNE-02**: Non-dialogue scenes get improved action decomposition
 - [ ] **SCNE-03**: Mixed scenes (dialogue + action) handled smoothly
 - [ ] **SCNE-04**: Scene maintains 180-degree rule throughout
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CSA-01 | Phase 11 | Pending |
-| CSA-02 | Phase 11 | Pending |
-| CSA-03 | Phase 11 | Pending |
-| CSA-04 | Phase 11 | Pending |
-| SCNE-01 | Phase 11 | Pending |
+| CSA-01 | Phase 11 | ✓ Complete |
+| CSA-02 | Phase 11 | ✓ Complete |
+| CSA-03 | Phase 11 | ✓ Complete |
+| CSA-04 | Phase 11 | ✓ Complete |
+| SCNE-01 | Phase 11 | ✓ Complete |
 | FLOW-01 | Phase 12 | Pending |
 | FLOW-02 | Phase 12 | Pending |
 | FLOW-04 | Phase 12 | Pending |
@@ -97,4 +97,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after initial definition*
+*Last updated: 2026-01-23 — Phase 11 complete (5/16 requirements)*
