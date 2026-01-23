@@ -494,6 +494,9 @@
     {{-- Writer's Room Modal (Phase 2: Professional Writing Interface) --}}
     @include('appvideowizard::livewire.modals.writers-room')
 
+    {{-- Scene Text Inspector Modal --}}
+    @include('appvideowizard::livewire.modals.scene-text-inspector')
+
     {{-- Debug Console Logger --}}
     @if(config('app.debug', false) || session('login_as') === 'admin')
     <script>
