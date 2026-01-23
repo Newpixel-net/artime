@@ -722,8 +722,8 @@ window.multiShotVideoPolling = function() {
                         <button wire:click="resetDecomposition({{ $multiShotSceneIndex }})" class="msm-reset-btn">🗑️ {{ __('Reset') }}</button>
                     </div>
 
-                    {{-- Timeline --}}
-                    <div class="msm-timeline">
+                    {{-- Timeline (synced with carousel) --}}
+                    <div class="msm-timeline" x-data="{ activeSegment: 0 }" x-on:carousel-index-changed.window="activeSegment = $event.detail.index">
                         @foreach($decomposed['shots'] as $idx => $shot)
                             @php
                                 $dur = $shot['selectedDuration'] ?? $shot['duration'] ?? 6;
@@ -731,16 +731,77 @@ window.multiShotVideoPolling = function() {
                                 $hasImg = ($shot['status'] ?? '') === 'ready' && !empty($shot['imageUrl']);
                                 $hasVid = ($shot['videoStatus'] ?? '') === 'ready' && !empty($shot['videoUrl']);
                             @endphp
-                            <div class="msm-timeline-seg {{ $hasVid ? 'vid' : ($hasImg ? 'img' : '') }}" style="width: {{ $pct }}%;" wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $idx }})" title="Shot {{ $idx + 1 }}: {{ $dur }}s">{{ $idx + 1 }}</div>
+                            <div class="msm-timeline-seg {{ $hasVid ? 'vid' : ($hasImg ? 'img' : '') }}"
+                                 x-bind:class="{ 'active': activeSegment === {{ $idx }} }"
+                                 style="width: {{ $pct }}%;"
+                                 x-on:click="$dispatch('scroll-to-shot', { index: {{ $idx }} })"
+                                 wire:click="selectShot({{ $multiShotSceneIndex }}, {{ $idx }})"
+                                 title="Shot {{ $idx + 1 }}: {{ $dur }}s">{{ $idx + 1 }}</div>
                         @endforeach
                     </div>
 
-                    {{-- Shot Grid --}}
+                    {{-- Shot Carousel --}}
                     @php
                         // Create a hash of all shot imageUrls to detect changes
                         $shotsHash = md5(json_encode(array_column($decomposed['shots'], 'imageUrl')));
+                        $totalShotsCount = count($decomposed['shots']);
                     @endphp
-                    <div class="msm-shot-grid" wire:key="shots-grid-{{ $multiShotSceneIndex }}-{{ $shotsHash }}">
+                    <div class="msm-carousel-wrapper"
+                         x-data="{
+                             currentIndex: 0,
+                             totalShots: {{ $totalShotsCount }},
+                             scrollContainer: null,
+                             init() {
+                                 this.scrollContainer = this.$refs.shotGrid;
+                                 this.scrollContainer.addEventListener('scroll', () => this.updateCurrentIndex());
+                             },
+                             updateCurrentIndex() {
+                                 if (!this.scrollContainer) return;
+                                 const cards = this.scrollContainer.querySelectorAll('.msm-shot-card');
+                                 const containerRect = this.scrollContainer.getBoundingClientRect();
+                                 const containerCenter = containerRect.left + containerRect.width / 2;
+                                 let closestIdx = 0;
+                                 let closestDist = Infinity;
+                                 cards.forEach((card, idx) => {
+                                     const rect = card.getBoundingClientRect();
+                                     const cardCenter = rect.left + rect.width / 2;
+                                     const dist = Math.abs(cardCenter - containerCenter);
+                                     if (dist < closestDist) {
+                                         closestDist = dist;
+                                         closestIdx = idx;
+                                     }
+                                 });
+                                 if (this.currentIndex !== closestIdx) {
+                                     this.currentIndex = closestIdx;
+                                     this.$dispatch('carousel-index-changed', { index: closestIdx });
+                                 }
+                             },
+                             scrollToShot(idx) {
+                                 const cards = this.scrollContainer.querySelectorAll('.msm-shot-card');
+                                 if (cards[idx]) {
+                                     cards[idx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                                     this.currentIndex = idx;
+                                 }
+                             },
+                             prev() { if (this.currentIndex > 0) this.scrollToShot(this.currentIndex - 1); },
+                             next() { if (this.currentIndex < this.totalShots - 1) this.scrollToShot(this.currentIndex + 1); }
+                         }"
+                         x-on:keydown.left.window="prev()"
+                         x-on:keydown.right.window="next()"
+                         x-on:scroll-to-shot.window="scrollToShot($event.detail.index)">
+                        <div class="msm-carousel-container">
+                            {{-- Prev Button --}}
+                            <button class="msm-carousel-nav prev"
+                                    x-on:click="prev()"
+                                    x-bind:disabled="currentIndex === 0"
+                                    title="{{ __('Previous shot') }}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+
+                            {{-- Shot Grid (now horizontal carousel) --}}
+                            <div class="msm-shot-grid" x-ref="shotGrid" wire:key="shots-grid-{{ $multiShotSceneIndex }}-{{ $shotsHash }}">
                         @foreach($decomposed['shots'] as $shotIndex => $shot)
                             @php
                                 $hasImage = ($shot['status'] ?? '') === 'ready' && !empty($shot['imageUrl']);
@@ -1082,6 +1143,29 @@ window.multiShotVideoPolling = function() {
                                 </div>
                             </div>
                         @endforeach
+                    </div>
+
+                            {{-- Next Button --}}
+                            <button class="msm-carousel-nav next"
+                                    x-on:click="next()"
+                                    x-bind:disabled="currentIndex === totalShots - 1"
+                                    title="{{ __('Next shot') }}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Carousel Indicators --}}
+                        <div class="msm-carousel-indicators">
+                            @foreach($decomposed['shots'] as $dotIdx => $dotShot)
+                                <button class="msm-carousel-dot"
+                                        x-bind:class="{ 'active': currentIndex === {{ $dotIdx }} }"
+                                        x-on:click="scrollToShot({{ $dotIdx }})"
+                                        title="{{ __('Shot') }} {{ $dotIdx + 1 }}">
+                                </button>
+                            @endforeach
+                        </div>
                     </div>
 
                     {{-- Collage Region Assignment Panel --}}
@@ -1518,18 +1602,162 @@ window.multiShotVideoPolling = function() {
 .msm-reset-btn:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
 
 .msm-timeline { display: flex; height: 48px; margin: 1rem 1.5rem; background: linear-gradient(135deg, rgba(0,0,0,0.55), rgba(10,10,20,0.45)); border-radius: 12px; overflow: hidden; box-shadow: inset 0 3px 10px rgba(0,0,0,0.35), 0 3px 12px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); }
-.msm-timeline-seg { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.95rem; font-weight: 700; border-right: 1px solid rgba(255,255,255,0.12); background: linear-gradient(180deg, rgba(139,92,246,0.45), rgba(139,92,246,0.3)); cursor: pointer; transition: all 0.2s ease; }
+.msm-timeline-seg { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.95rem; font-weight: 700; border-right: 1px solid rgba(255,255,255,0.12); background: linear-gradient(180deg, rgba(139,92,246,0.45), rgba(139,92,246,0.3)); cursor: pointer; transition: all 0.25s ease; position: relative; }
 .msm-timeline-seg.img { background: linear-gradient(180deg, rgba(16,185,129,0.6), rgba(16,185,129,0.4)); }
 .msm-timeline-seg.vid { background: linear-gradient(180deg, rgba(6,182,212,0.7), rgba(59,130,246,0.5)); }
-.msm-timeline-seg:hover { filter: brightness(1.3); transform: scaleY(1.08); box-shadow: 0 0 15px rgba(139,92,246,0.3); }
+.msm-timeline-seg:hover { filter: brightness(1.3); transform: scaleY(1.1); box-shadow: 0 0 20px rgba(139,92,246,0.4); z-index: 5; }
+.msm-timeline-seg.active {
+    filter: brightness(1.4);
+    transform: scaleY(1.15);
+    box-shadow: 0 4px 20px rgba(139,92,246,0.5), inset 0 -3px 0 rgba(255,255,255,0.3);
+    z-index: 10;
+}
+.msm-timeline-seg.active::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(139,92,246,0.8);
+}
 
-.msm-shot-grid { flex: 1; padding: 1.5rem; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1.5rem; align-content: start; }
+.msm-shot-grid {
+    flex: 1;
+    padding: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    gap: 1.25rem;
+    align-items: stretch;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scroll-padding: 0 1.5rem;
+    -webkit-overflow-scrolling: touch;
+}
 
-/* Shot Card - Modern Glass Card - ENHANCED */
-.msm-shot-card { background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
-.msm-shot-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.35); border-color: rgba(255,255,255,0.2); }
-.msm-shot-card.has-video { border-color: rgba(6,182,212,0.5); box-shadow: 0 6px 24px rgba(6,182,212,0.2); }
-.msm-shot-card.has-video:hover { box-shadow: 0 12px 45px rgba(6,182,212,0.3); }
+/* Hide scrollbar but keep functionality */
+.msm-shot-grid::-webkit-scrollbar { height: 0; width: 0; }
+.msm-shot-grid { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Carousel navigation wrapper */
+.msm-carousel-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+}
+
+.msm-carousel-container {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    position: relative;
+    min-height: 0;
+    padding: 0 3.5rem;
+}
+
+/* Navigation arrows */
+.msm-carousel-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(168, 85, 247, 0.8));
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+}
+.msm-carousel-nav:hover {
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 30px rgba(139, 92, 246, 0.6);
+}
+.msm-carousel-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: translateY(-50%);
+}
+.msm-carousel-nav.prev { left: 0.5rem; }
+.msm-carousel-nav.next { right: 0.5rem; }
+
+/* Carousel indicators */
+.msm-carousel-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.2));
+}
+.msm-carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+}
+.msm-carousel-dot:hover { background: rgba(255, 255, 255, 0.5); transform: scale(1.2); }
+.msm-carousel-dot.active {
+    background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+    width: 28px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.5);
+}
+
+/* Shot Card - Modern Glass Card - CAROUSEL OPTIMIZED */
+.msm-shot-card {
+    flex: 0 0 400px;
+    min-width: 360px;
+    max-width: 450px;
+    height: auto;
+    min-height: 100%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+}
+.msm-shot-card:first-child { margin-left: 1.5rem; }
+.msm-shot-card:last-child { margin-right: 1.5rem; }
+
+.msm-shot-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 50px rgba(0,0,0,0.4);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+.msm-shot-card.has-video {
+    border-color: rgba(6,182,212,0.6);
+    box-shadow: 0 8px 32px rgba(6,182,212,0.25);
+}
+.msm-shot-card.has-video:hover {
+    box-shadow: 0 16px 50px rgba(6,182,212,0.35);
+    border-color: rgba(6,182,212,0.8);
+}
+.msm-shot-card.selected {
+    border-color: rgba(139,92,246,0.8) !important;
+    box-shadow: 0 0 0 4px rgba(139,92,246,0.3), 0 16px 50px rgba(139,92,246,0.3);
+    transform: scale(1.02);
+}
 
 .msm-shot-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; background: linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.25)); border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
 .msm-shot-num { background: linear-gradient(135deg, rgba(139,92,246,0.7), rgba(168,85,247,0.6)); color: #fff; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 1rem; font-weight: 700; box-shadow: 0 3px 10px rgba(139,92,246,0.4); min-width: 32px; text-align: center; }
@@ -1542,7 +1770,19 @@ window.multiShotVideoPolling = function() {
 .msm-dur.yellow { color: #fde047; background: rgba(234,179,8,0.2); }
 .msm-dur.blue { color: #60a5fa; background: rgba(59,130,246,0.2); }
 
-.msm-shot-preview { position: relative; height: 200px; background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(10,10,20,0.4)); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; }
+.msm-shot-preview {
+    position: relative;
+    flex: 1;
+    min-height: 180px;
+    max-height: 280px;
+    background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(10,10,20,0.4));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-direction: column;
+    overflow: hidden;
+}
 .msm-shot-preview img { width: 100%; height: 100%; object-fit: cover; }
 .msm-shot-preview img.dimmed { filter: brightness(0.35); }
 .msm-shot-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(0,0,0,0.6), rgba(20,20,40,0.5)); display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.25s ease; backdrop-filter: blur(3px); flex-direction: column; gap: 0.5rem; }
@@ -1683,15 +1923,11 @@ window.multiShotVideoPolling = function() {
 @keyframes msm-spin { to { transform: rotate(360deg); } }
 @keyframes msm-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-/* Scrollbar Styling */
-.msm-collage-content::-webkit-scrollbar,
-.msm-shot-grid::-webkit-scrollbar { width: 8px; }
-.msm-collage-content::-webkit-scrollbar-track,
-.msm-shot-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
-.msm-collage-content::-webkit-scrollbar-thumb,
-.msm-shot-grid::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 4px; }
-.msm-collage-content::-webkit-scrollbar-thumb:hover,
-.msm-shot-grid::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.5); }
+/* Scrollbar Styling (Collage content only - carousel has hidden scrollbar) */
+.msm-collage-content::-webkit-scrollbar { width: 8px; }
+.msm-collage-content::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
+.msm-collage-content::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 4px; }
+.msm-collage-content::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.5); }
 
 /* AI Analysis Badges in Header */
 .msm-ai-badge { background: linear-gradient(135deg, rgba(16,185,129,0.35), rgba(6,182,212,0.3)); color: #10b981; padding: 0.15rem 0.45rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; cursor: help; }
@@ -1754,36 +1990,50 @@ window.multiShotVideoPolling = function() {
 /* Wrong Model Warning */
 .msm-wrong-model-hint { background: rgba(245,158,11,0.18); color: #fbbf24; font-size: 0.75rem; padding: 0.4rem 0.65rem; text-align: center; border-top: 1px solid rgba(245,158,11,0.3); font-weight: 500; }
 
-/* Responsive Adjustments */
+/* Responsive Adjustments - Carousel Mode */
 @media (max-width: 1400px) {
-    .msm-shot-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+    .msm-shot-card { flex: 0 0 380px; min-width: 340px; max-width: 420px; }
 }
 
 @media (max-width: 1100px) {
-    .msm-shot-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
-    .msm-shot-preview { height: 180px; }
+    .msm-shot-card { flex: 0 0 350px; min-width: 320px; max-width: 380px; }
+    .msm-shot-preview { min-height: 160px; max-height: 240px; }
+    .msm-carousel-container { padding: 0 3rem; }
 }
 
 @media (max-width: 900px) {
     .msm-split-panel { grid-template-columns: 1fr !important; grid-template-rows: auto auto 1fr; }
-    .msm-collage-panel { max-height: 45vh; border-bottom: 1px solid rgba(139,92,246,0.25); }
+    .msm-collage-panel { max-height: 40vh; border-bottom: 1px solid rgba(139,92,246,0.25); }
     .msm-resize-handle { display: none; }
-    .msm-shot-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; padding: 1rem; }
-    .msm-shot-preview { height: 160px; }
+    .msm-shot-card { flex: 0 0 320px; min-width: 300px; max-width: 360px; }
+    .msm-shot-preview { min-height: 140px; max-height: 200px; }
+    .msm-carousel-container { padding: 0 2.5rem; }
+    .msm-carousel-nav { width: 40px; height: 40px; font-size: 1.2rem; }
+    .msm-carousel-nav.prev { left: 0.25rem; }
+    .msm-carousel-nav.next { right: 0.25rem; }
     .msm-shot-info { flex-direction: column; gap: 0.35rem; align-items: flex-start; }
     .msm-camera { max-width: 100%; }
-    .msm-action-bar { padding: 0.75rem 1rem; gap: 0.5rem; }
+    .msm-action-bar { padding: 0.75rem 1rem; gap: 0.5rem; flex-wrap: wrap; }
     .msm-action-btn { padding: 0.5rem 0.85rem; font-size: 0.8rem; }
 }
 
 @media (max-width: 600px) {
-    .msm-shot-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .msm-shot-card { flex: 0 0 calc(100vw - 5rem); min-width: 280px; max-width: 360px; }
+    .msm-shot-card:first-child { margin-left: 1rem; }
+    .msm-shot-card:last-child { margin-right: 1rem; }
+    .msm-carousel-container { padding: 0 2rem; }
+    .msm-carousel-nav { width: 36px; height: 36px; }
+    .msm-carousel-nav.prev { left: 0.15rem; }
+    .msm-carousel-nav.next { right: 0.15rem; }
     .msm-shot-header { padding: 0.65rem 0.75rem; }
     .msm-shot-num { font-size: 0.9rem; padding: 0.25rem 0.6rem; }
     .msm-shot-type { font-size: 0.85rem; }
     .msm-shot-controls { padding: 0.75rem; }
     .msm-timeline { height: 40px; margin: 0.75rem 1rem; }
     .msm-timeline-seg { font-size: 0.8rem; }
+    .msm-carousel-indicators { gap: 0.35rem; padding: 0.5rem 0; }
+    .msm-carousel-dot { width: 8px; height: 8px; }
+    .msm-carousel-dot.active { width: 22px; }
 }
 
 /* PHASE 6: Shot Type Badges - ENHANCED */
