@@ -1385,26 +1385,64 @@ class DialogueSceneDecomposerService
     }
 
     /**
-     * Select shot type based on emotional intensity.
+     * Select shot type based on emotional intensity and position.
+     *
+     * PHASE 13 Requirements:
+     * - CAM-01: Dynamic CU/MS/OTS selection based on emotional intensity
+     * - CAM-02: Camera variety based on position in conversation
+     * - CAM-04: Establishing shot at start, tight framing at climax
+     *
+     * Position-enforced rules take priority over intensity alone.
+     * Third parameter allows speaker emotion to adjust intensity thresholds.
+     *
+     * @param float $intensity Emotional intensity (0.0-1.0)
+     * @param string $position Position in dialogue (opening, building, climax, resolution)
+     * @param string|null $speakerEmotion Optional speaker emotion from analyzeSpeakerEmotion
+     * @return string Shot type (establishing, wide, medium, over-the-shoulder, medium-close, close-up, extreme-close-up)
      */
-    protected function selectShotTypeForIntensity(float $intensity, string $position): string
+    protected function selectShotTypeForIntensity(float $intensity, string $position, ?string $speakerEmotion = null): string
     {
-        // Climax moments get tighter framing
-        if ($position === 'climax' && $intensity >= 0.8) {
-            return 'extreme-close-up';
+        // PHASE 13 CAM-04: Position-enforced rules take priority
+        switch ($position) {
+            case 'opening':
+                // Opening ALWAYS uses wide framing (CAM-04)
+                // Never close-up at conversation start
+                if ($intensity >= 0.5) return 'medium';
+                if ($intensity >= 0.3) return 'wide';
+                return 'establishing';
+
+            case 'climax':
+                // Climax ALWAYS uses tight framing (CAM-04)
+                if ($intensity >= 0.8 || $speakerEmotion === 'angry' || $speakerEmotion === 'fearful') {
+                    return 'extreme-close-up';
+                }
+                return 'close-up';
+
+            case 'resolution':
+                // Resolution eases back to medium framing
+                if ($intensity >= 0.65) return 'medium-close';
+                if ($intensity >= 0.4) return 'medium';
+                return 'wide';
         }
 
-        if ($intensity >= 0.75) {
-            return 'close-up';
-        } elseif ($intensity >= 0.55) {
-            return 'medium-close';
-        } elseif ($intensity >= 0.4) {
-            return 'over-the-shoulder';
-        } elseif ($intensity >= 0.25) {
-            return 'medium';
-        } else {
-            return 'wide';
+        // 'building' phase uses full intensity range (CAM-01)
+        // Speaker emotion adjusts threshold (CAM-03)
+        $adjustedIntensity = $intensity;
+        if ($speakerEmotion === 'angry' || $speakerEmotion === 'fearful') {
+            $adjustedIntensity = min(1.0, $intensity + 0.15);
         }
+
+        if ($adjustedIntensity >= 0.75) {
+            return 'close-up';
+        } elseif ($adjustedIntensity >= 0.55) {
+            return 'medium-close';
+        } elseif ($adjustedIntensity >= 0.4) {
+            return 'over-the-shoulder';
+        } elseif ($adjustedIntensity >= 0.25) {
+            return 'medium';
+        }
+
+        return 'wide';
     }
 
     /**
