@@ -22,6 +22,8 @@ The implementation follows established modal patterns from Character Bible and L
 
 **Dependencies:** None (starts new milestone)
 
+**Plans:** 3 plans
+
 **Requirements:**
 - MODL-01: User can open inspector from scene card
 - MODL-02: Modal shows scene number and title
@@ -45,6 +47,11 @@ The implementation follows established modal patterns from Character Bible and L
 5. Modal content scrolls smoothly for long scenes without body scroll behind modal
 
 **Estimated time:** 2 hours
+
+Plans:
+- [ ] 07-01-PLAN.md — Scene card fixes (dynamic labels, type-specific icons, truncation indicators)
+- [ ] 07-02-PLAN.md — Modal shell creation (VideoWizard backend, modal blade template, layout inclusion)
+- [ ] 07-03-PLAN.md — Metadata display (duration, transition, location, characters, intensity, climax badge)
 
 ---
 
@@ -123,7 +130,7 @@ The implementation follows established modal patterns from Character Bible and L
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 7: Foundation | Pending | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5 criteria |
+| Phase 7: Foundation | Planning Complete | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5 criteria |
 | Phase 8: Speech Segments | Pending | SPCH-01 to SPCH-07 (7) | 5 criteria |
 | Phase 9: Prompts + Copy | Pending | PRMT-01 to PRMT-06 (6) | 5 criteria |
 | Phase 10: Mobile + Polish | Pending | MODL-05 (1) | 5 criteria |
