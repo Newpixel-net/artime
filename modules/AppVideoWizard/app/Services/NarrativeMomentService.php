@@ -23,6 +23,101 @@ class NarrativeMomentService
     protected ?GeminiService $geminiService = null;
 
     /**
+     * PHASE 5: Keywords that indicate climax/peak moments in narrative.
+     */
+    protected const CLIMAX_KEYWORDS = [
+        // Action peaks
+        'reveals', 'discovers', 'confronts', 'attacks', 'escapes',
+        'transforms', 'explodes', 'crashes', 'collapses', 'breaks',
+
+        // Emotional peaks
+        'screams', 'cries', 'confesses', 'declares', 'realizes',
+        'understands', 'accepts', 'rejects', 'forgives', 'betrays',
+
+        // Narrative turns
+        'finally', 'suddenly', 'at last', 'the truth', 'everything changes',
+        'no turning back', 'moment of truth', 'now or never',
+
+        // Conflict peaks
+        'showdown', 'battle', 'fight', 'duel', 'confrontation',
+        'standoff', 'face to face', 'ultimate', 'final',
+    ];
+
+    /**
+     * PHASE 5: Keywords that indicate resolution/falling action.
+     */
+    protected const RESOLUTION_KEYWORDS = [
+        'peace', 'calm', 'quiet', 'settles', 'rests', 'heals',
+        'forgiven', 'reconciled', 'together', 'home', 'safe',
+        'aftermath', 'later', 'eventually', 'in the end',
+    ];
+
+    /**
+     * PHASE 5: Arc shape templates for different narrative styles.
+     * Values represent target intensities at 0%, 25%, 50%, 75%, 100% of narrative.
+     */
+    protected const ARC_TEMPLATES = [
+        // Standard Hollywood three-act structure
+        'hollywood' => [
+            0.0 => 0.35,   // Setup
+            0.25 => 0.50,  // Rising action
+            0.50 => 0.65,  // Midpoint turn
+            0.70 => 0.85,  // Climax
+            0.85 => 0.60,  // Falling action
+            1.0 => 0.40,   // Resolution
+        ],
+
+        // Action-heavy with multiple peaks
+        'action' => [
+            0.0 => 0.40,
+            0.20 => 0.70,  // Early action
+            0.40 => 0.55,  // Brief lull
+            0.60 => 0.80,  // Major setpiece
+            0.80 => 0.90,  // Climax
+            1.0 => 0.45,
+        ],
+
+        // Drama with slow build
+        'drama' => [
+            0.0 => 0.25,
+            0.30 => 0.35,
+            0.50 => 0.50,
+            0.75 => 0.80,  // Late climax
+            0.90 => 0.70,
+            1.0 => 0.35,
+        ],
+
+        // Thriller with sustained tension
+        'thriller' => [
+            0.0 => 0.50,
+            0.25 => 0.65,
+            0.50 => 0.70,
+            0.75 => 0.85,
+            0.90 => 0.80,  // Sustained high
+            1.0 => 0.50,
+        ],
+
+        // Comedy with lighter tone
+        'comedy' => [
+            0.0 => 0.40,
+            0.25 => 0.50,
+            0.50 => 0.55,
+            0.70 => 0.65,
+            0.85 => 0.55,
+            1.0 => 0.50,
+        ],
+
+        // Flat/documentary style
+        'documentary' => [
+            0.0 => 0.45,
+            0.25 => 0.50,
+            0.50 => 0.55,
+            0.75 => 0.55,
+            1.0 => 0.50,
+        ],
+    ];
+
+    /**
      * Emotion to intensity mapping based on Hollywood cinematography analysis.
      * Higher intensity = tighter framing (close-up at climax)
      */
@@ -451,6 +546,8 @@ PROMPT;
     /**
      * Apply emotional arc to ensure intensity variation (Hollywood standard).
      * Creates a build → peak → resolution pattern.
+     *
+     * PHASE 5: Updated to use intelligent climax detection instead of fixed 70%.
      */
     protected function applyEmotionalArc(array $moments): array
     {
@@ -480,25 +577,35 @@ PROMPT;
         }
 
         if ($allSame) {
-            // Apply classic Hollywood arc: low → build → peak → resolve
-            $climaxIndex = max(1, intval($count * 0.7)); // 70% through
+            // PHASE 5: Use intelligent climax detection instead of fixed 70%
+            $climaxData = $this->detectClimaxFromContent($moments);
+            $climaxIndex = $climaxData['index'];
 
+            // Store climax metadata for downstream use
+            $climaxMetadata = [
+                'method' => $climaxData['method'],
+                'confidence' => $climaxData['confidence'],
+                'isMultiClimax' => $climaxData['isMultiClimax'],
+            ];
+
+            // Apply intensity curve based on detected climax
             foreach ($moments as $i => &$moment) {
-                if ($i === 0) {
-                    $moment['intensity'] = 0.3; // Opening: lower intensity
-                    $moment['emotion'] = 'anticipation';
-                } elseif ($i < $climaxIndex) {
-                    // Building phase: gradual increase
-                    $progress = $i / $climaxIndex;
-                    $moment['intensity'] = 0.3 + ($progress * 0.55); // 0.3 → 0.85
-                } elseif ($i === $climaxIndex) {
-                    // Climax: peak intensity
-                    $moment['intensity'] = 0.85;
+                $position = $i / max(1, $count - 1);
+
+                if ($i === $climaxIndex) {
+                    // Peak intensity at climax
+                    $moment['intensity'] = max($moment['intensity'] ?? 0.5, 0.85);
+                    $moment['isClimax'] = true;
+                    $moment['climaxMetadata'] = $climaxMetadata;
+                } elseif ($position < ($climaxIndex / max(1, $count - 1))) {
+                    // Rising action - build toward climax
+                    $targetIntensity = 0.3 + ($position * 0.5);
+                    $moment['intensity'] = max($moment['intensity'] ?? 0.5, $targetIntensity);
                 } else {
-                    // Resolution: decrease
-                    $remaining = $count - $climaxIndex;
-                    $postClimax = $i - $climaxIndex;
-                    $moment['intensity'] = 0.85 - (($postClimax / $remaining) * 0.35); // 0.85 → 0.5
+                    // Falling action - decrease from climax
+                    $distanceFromClimax = $position - ($climaxIndex / max(1, $count - 1));
+                    $targetIntensity = 0.85 - ($distanceFromClimax * 0.6);
+                    $moment['intensity'] = max(0.3, min($moment['intensity'] ?? 0.5, $targetIntensity));
                 }
             }
         }
@@ -521,19 +628,254 @@ PROMPT;
     }
 
     /**
-     * Extract emotional intensity arc from moments.
-     * Returns array of 0-1 values for each moment.
+     * PHASE 5: Analyze text for climax indicators.
+     *
+     * @param string $text Narrative text to analyze
+     * @return array Climax analysis with score and triggers
+     */
+    protected function analyzeClimaxIndicators(string $text): array
+    {
+        $textLower = strtolower($text);
+        $climaxScore = 0;
+        $triggers = [];
+
+        // Check for climax keywords
+        foreach (self::CLIMAX_KEYWORDS as $keyword) {
+            if (stripos($textLower, $keyword) !== false) {
+                $climaxScore += 0.15;
+                $triggers[] = $keyword;
+            }
+        }
+
+        // Check for resolution keywords (reduces climax likelihood)
+        foreach (self::RESOLUTION_KEYWORDS as $keyword) {
+            if (stripos($textLower, $keyword) !== false) {
+                $climaxScore -= 0.1;
+            }
+        }
+
+        // Punctuation analysis
+        $exclamationCount = substr_count($text, '!');
+        $climaxScore += min($exclamationCount * 0.1, 0.3);
+
+        // All caps words indicate emphasis
+        preg_match_all('/\b[A-Z]{2,}\b/', $text, $capsMatches);
+        $climaxScore += min(count($capsMatches[0]) * 0.1, 0.2);
+
+        // Cap the score
+        $climaxScore = max(0, min(1, $climaxScore));
+
+        return [
+            'score' => $climaxScore,
+            'triggers' => array_slice($triggers, 0, 5),
+            'isLikelyClimax' => $climaxScore >= 0.3,
+        ];
+    }
+
+    /**
+     * PHASE 5: Detect peaks in an intensity array.
+     * A peak is a local maximum higher than neighbors by threshold.
+     *
+     * @param array $intensities Array of intensity values (0-1)
+     * @param float $threshold Minimum difference to qualify as peak
+     * @return array Peak indices and their intensities
+     */
+    protected function detectIntensityPeaks(array $intensities, float $threshold = 0.15): array
+    {
+        $peaks = [];
+        $count = count($intensities);
+
+        if ($count < 3) {
+            // Not enough data for peak detection
+            return $count > 0 ? [['index' => 0, 'intensity' => $intensities[0] ?? 0.5]] : [];
+        }
+
+        for ($i = 1; $i < $count - 1; $i++) {
+            $current = $intensities[$i];
+            $prev = $intensities[$i - 1];
+            $next = $intensities[$i + 1];
+
+            // Check if local maximum
+            if ($current > $prev && $current > $next) {
+                // Check if significant enough
+                $diff = min($current - $prev, $current - $next);
+                if ($diff >= $threshold) {
+                    $peaks[] = [
+                        'index' => $i,
+                        'intensity' => $current,
+                        'prominence' => $diff,
+                    ];
+                }
+            }
+        }
+
+        // If no peaks found, use the maximum value position
+        if (empty($peaks)) {
+            $maxIndex = array_search(max($intensities), $intensities);
+            $peaks[] = [
+                'index' => $maxIndex,
+                'intensity' => $intensities[$maxIndex],
+                'prominence' => 0,
+            ];
+        }
+
+        // Sort by intensity descending
+        usort($peaks, fn($a, $b) => $b['intensity'] <=> $a['intensity']);
+
+        return $peaks;
+    }
+
+    /**
+     * PHASE 5: Identify the primary climax from peaks and content.
+     *
+     * @param array $moments Narrative moments with text and intensity
+     * @return int Index of the primary climax moment
+     */
+    protected function identifyPrimaryClimax(array $moments): int
+    {
+        $count = count($moments);
+        if ($count === 0) return 0;
+
+        // Extract intensities
+        $intensities = array_map(fn($m) => $m['intensity'] ?? 0.5, $moments);
+
+        // Detect peaks
+        $peaks = $this->detectIntensityPeaks($intensities);
+
+        // Score each peak based on content analysis
+        $scoredPeaks = [];
+        foreach ($peaks as $peak) {
+            $momentIndex = $peak['index'];
+            $moment = $moments[$momentIndex] ?? [];
+            $text = $moment['action'] ?? $moment['description'] ?? '';
+
+            $contentAnalysis = $this->analyzeClimaxIndicators($text);
+
+            // Combined score: intensity + content + position bonus
+            $positionProgress = $momentIndex / max(1, $count - 1);
+            $positionBonus = ($positionProgress >= 0.5 && $positionProgress <= 0.85) ? 0.1 : 0;
+
+            $combinedScore = ($peak['intensity'] * 0.4) +
+                             ($contentAnalysis['score'] * 0.4) +
+                             ($peak['prominence'] * 0.1) +
+                             $positionBonus;
+
+            $scoredPeaks[] = [
+                'index' => $momentIndex,
+                'combinedScore' => $combinedScore,
+                'intensity' => $peak['intensity'],
+                'contentScore' => $contentAnalysis['score'],
+            ];
+        }
+
+        // Return the highest scored peak
+        usort($scoredPeaks, fn($a, $b) => $b['combinedScore'] <=> $a['combinedScore']);
+
+        return $scoredPeaks[0]['index'] ?? intval($count * 0.7);
+    }
+
+    /**
+     * PHASE 5: Detect climax from content analysis.
+     * Replaces the fixed 70% rule with intelligent detection.
+     *
+     * @param array $moments Array of narrative moments
+     * @return array Climax data with index, confidence, and metadata
+     */
+    public function detectClimaxFromContent(array $moments): array
+    {
+        $count = count($moments);
+        if ($count === 0) {
+            return [
+                'index' => 0,
+                'confidence' => 0,
+                'method' => 'empty',
+                'peaks' => [],
+            ];
+        }
+
+        // Get primary climax index
+        $climaxIndex = $this->identifyPrimaryClimax($moments);
+
+        // Analyze content at climax point
+        $climaxMoment = $moments[$climaxIndex] ?? [];
+        $climaxText = $climaxMoment['action'] ?? $climaxMoment['description'] ?? '';
+        $contentAnalysis = $this->analyzeClimaxIndicators($climaxText);
+
+        // Detect all peaks for multi-climax narratives
+        $intensities = array_map(fn($m) => $m['intensity'] ?? 0.5, $moments);
+        $allPeaks = $this->detectIntensityPeaks($intensities, 0.1);
+
+        // Calculate confidence
+        $climaxIntensity = $moments[$climaxIndex]['intensity'] ?? 0.5;
+        $confidence = min(1, ($climaxIntensity * 0.5) + ($contentAnalysis['score'] * 0.5));
+
+        // Determine detection method
+        $method = $contentAnalysis['isLikelyClimax'] ? 'content' :
+                  ($allPeaks[0]['prominence'] ?? 0) > 0.2 ? 'intensity_peak' : 'position_fallback';
+
+        Log::debug('NarrativeMomentService: Climax detected', [
+            'index' => $climaxIndex,
+            'total_moments' => $count,
+            'position' => round($climaxIndex / max(1, $count - 1) * 100) . '%',
+            'method' => $method,
+            'confidence' => round($confidence, 2),
+            'triggers' => $contentAnalysis['triggers'],
+        ]);
+
+        return [
+            'index' => $climaxIndex,
+            'confidence' => $confidence,
+            'method' => $method,
+            'position' => $climaxIndex / max(1, $count - 1),
+            'intensity' => $climaxIntensity,
+            'triggers' => $contentAnalysis['triggers'],
+            'peaks' => array_slice($allPeaks, 0, 3), // Top 3 peaks
+            'isMultiClimax' => count($allPeaks) > 1,
+        ];
+    }
+
+    /**
+     * PHASE 5: Extract and process emotional arc from moments.
+     * Enhanced with smoothing and template blending.
      *
      * Hollywood Pattern: Build toward climax, then resolve
      * [0.3, 0.5, 0.8, 0.7] = arrival → recognition → chase (peak) → loss
+     *
+     * @param array $moments Array of narrative moments
+     * @param string $template Arc template to apply (default: hollywood)
+     * @param bool $smooth Whether to smooth the curve
+     * @return array Processed emotional arc with raw and smoothed values
      */
-    public function extractEmotionalArc(array $moments): array
-    {
-        $arc = [];
-        foreach ($moments as $moment) {
-            $arc[] = $moment['intensity'] ?? 0.5;
+    public function extractEmotionalArc(
+        array $moments,
+        string $template = 'hollywood',
+        bool $smooth = true
+    ): array {
+        if (empty($moments)) {
+            return [
+                'values' => [],
+                'smoothed' => [],
+                'template' => $template,
+            ];
         }
-        return $arc;
+
+        // Get processed curve
+        $curveData = $this->getProcessedIntensityCurve($moments, $template, $smooth);
+
+        // Log arc extraction
+        Log::debug('NarrativeMomentService: Extracted emotional arc', [
+            'moment_count' => count($moments),
+            'template' => $template,
+            'smoothed' => $smooth,
+            'stats' => $curveData['stats'],
+        ]);
+
+        return [
+            'values' => $curveData['raw'],
+            'smoothed' => $curveData['processed'],
+            'template' => $template,
+            'stats' => $curveData['stats'],
+        ];
     }
 
     /**
@@ -1111,5 +1453,190 @@ PROMPT;
         ];
 
         return $phaseIntensity[$phase] ?? 0.5;
+    }
+
+    /**
+     * PHASE 5: Smooth an intensity curve using weighted moving average.
+     * Prevents jarring transitions between consecutive moments.
+     *
+     * @param array $intensities Raw intensity values
+     * @param int $windowSize Number of neighbors to consider (odd number)
+     * @return array Smoothed intensity values
+     */
+    protected function smoothIntensityCurve(array $intensities, int $windowSize = 3): array
+    {
+        $count = count($intensities);
+        if ($count <= 2) {
+            return $intensities;
+        }
+
+        // Ensure odd window size
+        $windowSize = max(3, $windowSize | 1);
+        $halfWindow = intdiv($windowSize, 2);
+
+        $smoothed = [];
+
+        foreach ($intensities as $i => $value) {
+            $sum = 0;
+            $weightSum = 0;
+
+            for ($j = -$halfWindow; $j <= $halfWindow; $j++) {
+                $idx = $i + $j;
+                if ($idx >= 0 && $idx < $count) {
+                    // Weight decreases with distance from center
+                    $weight = 1 / (1 + abs($j));
+                    $sum += $intensities[$idx] * $weight;
+                    $weightSum += $weight;
+                }
+            }
+
+            $smoothed[$i] = $weightSum > 0 ? $sum / $weightSum : $value;
+        }
+
+        // Preserve climax peaks - don't smooth them down
+        foreach ($intensities as $i => $original) {
+            if ($original >= 0.8 && $smoothed[$i] < $original - 0.1) {
+                // Restore peak that was smoothed too much
+                $smoothed[$i] = max($smoothed[$i], $original - 0.05);
+            }
+        }
+
+        return $smoothed;
+    }
+
+    /**
+     * PHASE 5: Apply exponential smoothing for more gradual transitions.
+     *
+     * @param array $intensities Raw intensity values
+     * @param float $alpha Smoothing factor (0-1, lower = smoother)
+     * @return array Exponentially smoothed values
+     */
+    protected function exponentialSmooth(array $intensities, float $alpha = 0.3): array
+    {
+        $count = count($intensities);
+        if ($count <= 1) {
+            return $intensities;
+        }
+
+        $smoothed = [$intensities[0]];
+
+        for ($i = 1; $i < $count; $i++) {
+            $smoothed[$i] = $alpha * $intensities[$i] + (1 - $alpha) * $smoothed[$i - 1];
+        }
+
+        return $smoothed;
+    }
+
+    /**
+     * PHASE 5: Get target intensity at a given position from arc template.
+     *
+     * @param string $template Arc template name
+     * @param float $position Position in narrative (0-1)
+     * @return float Target intensity at position
+     */
+    protected function getArcTargetIntensity(string $template, float $position): float
+    {
+        $arcPoints = self::ARC_TEMPLATES[$template] ?? self::ARC_TEMPLATES['hollywood'];
+
+        $positions = array_keys($arcPoints);
+        $intensities = array_values($arcPoints);
+
+        // Find surrounding points for interpolation
+        $prevPos = 0.0;
+        $prevInt = $intensities[0];
+        $nextPos = 1.0;
+        $nextInt = end($intensities);
+
+        foreach ($positions as $i => $pos) {
+            if ($pos <= $position) {
+                $prevPos = $pos;
+                $prevInt = $intensities[$i];
+            }
+            if ($pos >= $position) {
+                $nextPos = $pos;
+                $nextInt = $intensities[$i];
+                break;
+            }
+        }
+
+        // Linear interpolation between points
+        if ($nextPos === $prevPos) {
+            return $prevInt;
+        }
+
+        $t = ($position - $prevPos) / ($nextPos - $prevPos);
+        return $prevInt + $t * ($nextInt - $prevInt);
+    }
+
+    /**
+     * PHASE 5: Blend actual intensities with arc template.
+     * Combines content-derived intensity with template shape.
+     *
+     * @param array $intensities Actual intensity values
+     * @param string $template Arc template name
+     * @param float $blendWeight How much template influences (0=none, 1=full)
+     * @return array Blended intensity values
+     */
+    public function blendWithArcTemplate(
+        array $intensities,
+        string $template = 'hollywood',
+        float $blendWeight = 0.5
+    ): array {
+        $count = count($intensities);
+        if ($count === 0) {
+            return [];
+        }
+
+        $blended = [];
+
+        foreach ($intensities as $i => $actual) {
+            $position = $i / max(1, $count - 1);
+            $target = $this->getArcTargetIntensity($template, $position);
+
+            // Blend actual with template
+            $blended[$i] = ($actual * (1 - $blendWeight)) + ($target * $blendWeight);
+        }
+
+        return $blended;
+    }
+
+    /**
+     * PHASE 5: Get smoothed and shaped intensity curve.
+     * Main entry point for intensity curve processing.
+     *
+     * @param array $moments Narrative moments with intensity
+     * @param string $template Arc template to apply
+     * @param bool $smooth Whether to apply smoothing
+     * @return array Processed intensity values with metadata
+     */
+    public function getProcessedIntensityCurve(
+        array $moments,
+        string $template = 'hollywood',
+        bool $smooth = true
+    ): array {
+        // Extract raw intensities
+        $raw = array_map(fn($m) => $m['intensity'] ?? 0.5, $moments);
+
+        // Blend with template
+        $blended = $this->blendWithArcTemplate($raw, $template, 0.4);
+
+        // Apply smoothing
+        $processed = $smooth ? $this->smoothIntensityCurve($blended) : $blended;
+
+        // Calculate curve statistics
+        $stats = [
+            'min' => min($processed) ?: 0,
+            'max' => max($processed) ?: 1,
+            'average' => count($processed) > 0 ? array_sum($processed) / count($processed) : 0.5,
+            'range' => (max($processed) ?: 1) - (min($processed) ?: 0),
+            'template' => $template,
+            'smoothed' => $smooth,
+        ];
+
+        return [
+            'raw' => $raw,
+            'processed' => $processed,
+            'stats' => $stats,
+        ];
     }
 }
