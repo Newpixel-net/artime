@@ -1,23 +1,23 @@
 # Video Wizard - Current State
 
 > Last Updated: 2026-01-23
-> Session: Phase 3 - Hollywood Production System COMPLETE
+> Session: Phase 3 - Hollywood Production System (Continued)
 
 ---
 
 ## Current Position
 
 **Phase:** 3 of ongoing (Hollywood Production System)
-**Plan:** 03 of 3 (in phase)
-**Status:** Phase COMPLETE
+**Plan:** 05 of 7 (in phase)
+**Status:** In Progress
 
-**Progress:** [##########] 100% of Phase 3 (All 3 plans complete)
+**Progress:** [######----] 71% of Phase 3 (5/7 plans complete)
 
 ---
 
 ## Current Focus
 
-**Phase 3: Hollywood Production System** - COMPLETE
+**Phase 3: Hollywood Production System** - IN PROGRESS
 
 Enhance the production pipeline with Hollywood-standard moment extraction and shot generation.
 
@@ -25,6 +25,10 @@ Plans:
 1. ~~Activate Hollywood Shot Sequence~~ COMPLETE
 2. ~~Eliminate Placeholder Moments~~ COMPLETE
 3. ~~Enable Hollywood Features by Default~~ COMPLETE
+4. (skipped) Scene Type Detection
+5. ~~Smart Retry Logic for Batch Generation~~ COMPLETE
+6. (pending) Batch Generation Progress UI
+7. (pending) Final Integration
 
 ---
 
@@ -38,13 +42,26 @@ The system should be sophisticated and automatically updated based on previous s
 
 ## Completed This Session
 
-### Plan 03-01: Activate Hollywood Shot Sequence (COMPLETE)
-**Summary:** VideoWizard now calls generateHollywoodShotSequence instead of analyzeScene, activating emotion-driven shot types and dialogue coverage patterns
+### Plan 03-05: Smart Retry Logic for Batch Generation (COMPLETE)
+**Summary:** Automatic retry with exponential backoff for batch image and video generation, with progress tracking
 
 **Tasks:**
-1. [x] Fix decomposeSceneWithDynamicEngine to use Hollywood patterns
-2. [x] Fix generateCollagePreview to use Hollywood patterns
-3. [x] Ensure NarrativeMomentService is available (inline creation pattern)
+1. [x] Add retry tracking properties (generationRetryCount, maxRetryAttempts, generationStatus)
+2. [x] Add smart retry method for image generation with exponential backoff
+3. [x] Add smart retry method for video generation with exponential backoff
+4. [x] Add batch generation status summary method
+
+**Commits:**
+- `38983d7` - feat(03-05): add smart retry logic for batch generation
+
+**SUMMARY:** `.planning/phases/03-hollywood-production-system/03-05-SUMMARY.md`
+
+---
+
+## Previous Plans in Phase 3
+
+### Plan 03-01: Activate Hollywood Shot Sequence (COMPLETE)
+**Summary:** VideoWizard now calls generateHollywoodShotSequence instead of analyzeScene, activating emotion-driven shot types and dialogue coverage patterns
 
 **Commits:**
 - `0bb6542` - feat(03-01): activate Hollywood shot sequence in VideoWizard
@@ -54,11 +71,6 @@ The system should be sophisticated and automatically updated based on previous s
 ### Plan 03-02: Eliminate Placeholder Moments (COMPLETE)
 **Summary:** Two-tier fallback system (narration analysis + narrative arc) that NEVER returns useless "continues the scene" placeholders
 
-**Tasks:**
-1. [x] Replace placeholder generation with meaningful moment extraction
-2. [x] Add generateMeaningfulMomentsFromNarration method
-3. [x] Add generateNarrativeArcMoments fallback
-
 **Commits:**
 - `2d9508b` - feat(03-02): eliminate placeholder moments with meaningful extraction
 
@@ -66,11 +78,6 @@ The system should be sophisticated and automatically updated based on previous s
 
 ### Plan 03-03: Enable Hollywood Features by Default (COMPLETE)
 **Summary:** Five Hollywood production settings added to VwSettingSeeder with runtime initialization fallback
-
-**Tasks:**
-1. [x] Ensure Hollywood settings exist and are enabled in seeder
-2. [x] Add runtime setting initialization
-3. [x] Verify ShotProgressionService is connected
 
 **Commits:**
 - `325efa1` - feat(03-03): add Hollywood production feature settings to seeder
@@ -107,6 +114,9 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 | Date | Area | Decision | Context |
 |------|------|----------|---------|
+| 2026-01-23 | Retry Pattern | Exponential backoff (2s, 4s, 8s) | Standard retry pattern for API reliability |
+| 2026-01-23 | Max Retries | 3 attempts per item | Balance between recovery and failure detection |
+| 2026-01-23 | Status Tracking | Item keys: scene_{i}, scene_{i}_shot_{j}, video_scene_{i} | Unique identification for mixed batch operations |
 | 2026-01-23 | Settings Category | Use 'hollywood' group for new feature settings | Separate from existing 'shot_progression' and 'cinematic_intelligence' categories |
 | 2026-01-23 | Runtime Initialization | Create settings on mount if missing | Ensures Hollywood features work in development environments |
 | 2026-01-23 | Shot Variety | DynamicShotEngine handles variety through Hollywood patterns | Not ShotProgressionService - different approach |
@@ -135,6 +145,13 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 
 ## Phase 3 Progress - What Was Built
 
+### Plan 03-05: Smart Retry Logic (NEW)
+1. **Retry Properties:** generationRetryCount, maxRetryAttempts=3, generationStatus
+2. **Image Retry:** generateImageWithRetry() with exponential backoff
+3. **Video Retry:** generateVideoWithRetry() with exponential backoff
+4. **Status Summary:** getBatchGenerationStatus() for progress tracking
+5. **Retry All:** retryAllFailed() for manual retry of failed items
+
 ### Plan 03-01: Hollywood Shot Sequence Activation
 1. **VideoWizard Integration:** generateHollywoodShotSequence called instead of analyzeScene
 2. **Emotional Arc Flow:** NarrativeMomentService extracts intensity values for shot type selection
@@ -154,6 +171,14 @@ See: `.planning/phases/1.5-automatic-speech-flow/1.5-CONTEXT.md` for implementat
 3. **Verification:** ShotProgressionService connection confirmed in ShotIntelligenceService
 
 ### Key Methods Added
+**03-05 (VideoWizard.php):**
+- `generateImageWithRetry()` - Smart image retry with backoff
+- `scheduleImageRetry()` - Schedule image retry event
+- `generateVideoWithRetry()` - Smart video retry with backoff
+- `scheduleVideoRetry()` - Schedule video retry event
+- `getBatchGenerationStatus()` - Progress summary
+- `retryAllFailed()` - Retry all failed items
+
 **03-01 (VideoWizard.php):**
 - Updated `decomposeSceneWithDynamicEngine()` for Hollywood patterns
 - Updated `generateCollagePreview()` for Hollywood patterns
@@ -198,21 +223,22 @@ None currently
 |------|---------|--------|
 | `.planning/phases/03-hollywood-production-system/03-01-SUMMARY.md` | Plan 01 summary | Created |
 | `.planning/phases/03-hollywood-production-system/03-02-SUMMARY.md` | Plan 02 summary | Created |
-| `.planning/phases/03-hollywood-production-system/03-03-SUMMARY.md` | Plan 03 summary | **Created** |
-| `Livewire/VideoWizard.php` | Hollywood patterns + settings | **Updated** |
+| `.planning/phases/03-hollywood-production-system/03-03-SUMMARY.md` | Plan 03 summary | Created |
+| `.planning/phases/03-hollywood-production-system/03-05-SUMMARY.md` | Plan 05 summary | **Created** |
+| `Livewire/VideoWizard.php` | Hollywood patterns + retry logic | **Updated** |
 | `Services/NarrativeMomentService.php` | Narrative decomposition | Updated |
-| `database/seeders/VwSettingSeeder.php` | Hollywood settings | **Updated** |
+| `database/seeders/VwSettingSeeder.php` | Hollywood settings | Updated |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 03-03-PLAN.md (Enable Hollywood Features by Default)
+**Stopped at:** Completed 03-05-PLAN.md (Smart Retry Logic for Batch Generation)
 **Resume file:** None
-**Phase 3 Status:** COMPLETE (3/3 plans complete)
+**Phase 3 Status:** IN PROGRESS (5/7 plans complete)
 
 ---
 
 *Session: Phase 3 - Hollywood Production System*
-*ALL PLANS COMPLETE - Hollywood production features enabled by default*
+*Plan 03-05 COMPLETE - Smart retry logic with exponential backoff*
