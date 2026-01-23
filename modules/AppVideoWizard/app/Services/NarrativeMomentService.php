@@ -187,7 +187,8 @@ class NarrativeMomentService
         $moments = $this->ruleBasedDecomposition($narration, $context);
 
         // Interpolate to match target shot count
-        return $this->interpolateMoments($moments, $targetShotCount);
+        $interpolated = $this->interpolateMoments($moments, $targetShotCount);
+        return $this->deduplicateActions($interpolated);
     }
 
     /**
@@ -665,6 +666,117 @@ PROMPT;
         }
 
         return implode(', ', $names);
+    }
+
+    /**
+     * Deduplicate actions across consecutive moments.
+     * Hollywood standard: Each shot must have a UNIQUE action.
+     *
+     * @param array $moments Array of moment objects
+     * @return array Moments with deduplicated actions
+     */
+    public function deduplicateActions(array $moments): array
+    {
+        if (count($moments) <= 1) {
+            return $moments;
+        }
+
+        $usedVerbs = [];
+        $progressionMarkers = [
+            'begins to', 'starts to', 'continues to', 'proceeds to',
+            'then', 'now', 'suddenly', 'finally', 'eventually'
+        ];
+
+        foreach ($moments as $index => &$moment) {
+            $action = $moment['action'] ?? '';
+            $verb = $this->extractPrimaryVerb($action);
+
+            // Check if verb was used in previous moments
+            if (in_array(strtolower($verb), $usedVerbs)) {
+                // Add progression marker to make unique
+                $marker = $progressionMarkers[$index % count($progressionMarkers)];
+                $moment['action'] = $marker . ' ' . $action;
+                $moment['deduplicated'] = true;
+
+                Log::debug('NarrativeMomentService: Deduplicated action', [
+                    'original' => $action,
+                    'modified' => $moment['action'],
+                    'index' => $index,
+                ]);
+            }
+
+            // Track this verb (allow same verb with 2+ gap)
+            $usedVerbs[] = strtolower($verb);
+            if (count($usedVerbs) > 2) {
+                array_shift($usedVerbs); // Keep only last 2 verbs
+            }
+        }
+
+        return $moments;
+    }
+
+    /**
+     * Extract the primary action verb from an action string.
+     *
+     * @param string $action Action description
+     * @return string Primary verb or full action if no verb found
+     */
+    protected function extractPrimaryVerb(string $action): string
+    {
+        // Common action verbs to detect
+        $verbPattern = '/\b(arrives?|enters?|walks?|runs?|spots?|sees?|looks?|watches?|notices?|chases?|finds?|loses?|meets?|speaks?|confronts?|faces?|flees?|escapes?|approaches?|attacks?|defends?|realizes?|discovers?|stands?|sits?|moves?|steps?|turns?|reaches?|grabs?|holds?|drops?|throws?|pushes?|pulls?|opens?|closes?|starts?|stops?|begins?|ends?|continues?)\b/i';
+
+        if (preg_match($verbPattern, $action, $matches)) {
+            return $matches[1];
+        }
+
+        // Fallback: first word
+        $words = explode(' ', trim($action));
+        return $words[0] ?? $action;
+    }
+
+    /**
+     * Check if two actions are similar enough to be considered duplicates.
+     *
+     * @param string $action1 First action
+     * @param string $action2 Second action
+     * @return bool True if actions are too similar
+     */
+    public function areActionsSimilar(string $action1, string $action2): bool
+    {
+        $verb1 = strtolower($this->extractPrimaryVerb($action1));
+        $verb2 = strtolower($this->extractPrimaryVerb($action2));
+
+        // Same verb = similar
+        if ($verb1 === $verb2) {
+            return true;
+        }
+
+        // Check for verb variations (look/looks/looking)
+        $stem1 = rtrim($verb1, 'seding');
+        $stem2 = rtrim($verb2, 'seding');
+        if ($stem1 === $stem2 && strlen($stem1) > 3) {
+            return true;
+        }
+
+        // Synonym groups that should be considered similar
+        $synonymGroups = [
+            ['look', 'watch', 'observe', 'gaze', 'stare', 'glance'],
+            ['run', 'sprint', 'dash', 'race', 'rush'],
+            ['walk', 'step', 'pace', 'stride'],
+            ['speak', 'say', 'tell', 'talk'],
+            ['stand', 'rise', 'get up'],
+        ];
+
+        foreach ($synonymGroups as $group) {
+            $in1 = in_array($stem1, $group) || in_array($verb1, $group);
+            $in2 = in_array($stem2, $group) || in_array($verb2, $group);
+            if ($in1 && $in2) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
