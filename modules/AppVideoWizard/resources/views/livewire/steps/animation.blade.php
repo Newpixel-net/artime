@@ -1758,6 +1758,53 @@
                             <div class="vw-scene-info">
                                 <div class="vw-scene-name">{{ __('Scene') }} {{ $index + 1 }}</div>
                                 <div class="vw-scene-progress-text" style="color: {{ $progress === 100 ? '#10b981' : ($progress > 0 ? '#fbbf24' : 'rgba(255,255,255,0.4)') }};">{{ $progress }}% {{ __('complete') }}</div>
+
+                                {{-- PHASE 6: Speaker Info in Animation --}}
+                                @php
+                                    $scriptScene = $script['scenes'][$index] ?? null;
+                                    $speechSegments = $scriptScene['speechSegments'] ?? [];
+                                @endphp
+
+                                @if(!empty($speechSegments))
+                                    <div style="
+                                        display: flex;
+                                        flex-wrap: wrap;
+                                        gap: 0.25rem;
+                                        margin-top: 0.35rem;
+                                        padding-top: 0.35rem;
+                                        border-top: 1px solid rgba(255,255,255,0.1);
+                                    ">
+                                        @php
+                                            $speakers = collect($speechSegments)->pluck('speaker')->filter()->unique()->values();
+                                        @endphp
+
+                                        @foreach($speakers as $speaker)
+                                            @php
+                                                $character = collect($characterBible['characters'] ?? [])->firstWhere('name', $speaker);
+                                                $hasVoice = !empty($character['voiceId']);
+                                            @endphp
+                                            <div style="
+                                                display: inline-flex;
+                                                align-items: center;
+                                                gap: 0.2rem;
+                                                background: {{ $hasVoice ? 'rgba(139, 92, 246, 0.2)' : 'rgba(168, 162, 158, 0.2)' }};
+                                                padding: 0.15rem 0.4rem;
+                                                border-radius: 0.25rem;
+                                                font-size: 0.6rem;
+                                                color: {{ $hasVoice ? 'rgba(139, 92, 246, 0.95)' : 'rgba(168, 162, 158, 0.9)' }};
+                                            ">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                                </svg>
+                                                <span>{{ $speaker }}</span>
+                                                @if(!$hasVoice)
+                                                    <span style="opacity: 0.7;">({{ __('no voice') }})</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endforeach
