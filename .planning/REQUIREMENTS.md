@@ -23,10 +23,10 @@ Requirements for Milestone 8. Each maps to roadmap phases.
 
 ### Camera Selection
 
-- [ ] **CAM-01**: Dynamic CU/MS/OTS selection based on emotional intensity
-- [ ] **CAM-02**: Camera variety based on position in conversation (opening vs climax)
-- [ ] **CAM-03**: Shot type matches speaker's emotional state
-- [ ] **CAM-04**: Establishing shot at conversation start, tight framing at climax
+- [x] **CAM-01**: Dynamic CU/MS/OTS selection based on emotional intensity ✓
+- [x] **CAM-02**: Camera variety based on position in conversation (opening vs climax) ✓
+- [x] **CAM-03**: Shot type matches speaker's emotional state ✓
+- [x] **CAM-04**: Establishing shot at conversation start, tight framing at climax ✓
 
 ### Scene Handling
 
@@ -76,10 +76,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLOW-02 | Phase 12 | ✓ Complete |
 | FLOW-04 | Phase 12 | ✓ Complete |
 | SCNE-04 | Phase 12 | ✓ Complete |
-| CAM-01 | Phase 13 | Pending |
-| CAM-02 | Phase 13 | Pending |
-| CAM-03 | Phase 13 | Pending |
-| CAM-04 | Phase 13 | Pending |
+| CAM-01 | Phase 13 | ✓ Complete |
+| CAM-02 | Phase 13 | ✓ Complete |
+| CAM-03 | Phase 13 | ✓ Complete |
+| CAM-04 | Phase 13 | ✓ Complete |
 | FLOW-03 | Phase 14 | Pending |
 | SCNE-02 | Phase 14 | Pending |
 | SCNE-03 | Phase 14 | Pending |
@@ -97,4 +97,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 — Phase 12 complete (9/16 requirements)*
+*Last updated: 2026-01-23 — Phase 13 complete (13/16 requirements)*
