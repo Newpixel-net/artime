@@ -244,16 +244,35 @@ class DialogueSceneDecomposerService
 
             $shots[] = $shot;
 
-            // Add reaction shot before climax (optional breathing room)
-            if ($this->shouldAddReactionShot($position, $emotionalIntensity, $options)) {
-                $nextSpeaker = $this->getNextSpeaker($exchanges, $index);
-                if ($nextSpeaker && $nextSpeaker !== $exchange['speaker']) {
-                    $shots[] = $this->createReactionShot(
-                        $nextSpeaker,
-                        $characterLookup,
-                        $scene,
-                        $emotionalIntensity
+            // PHASE 4: Analyze listener emotion and determine if reaction needed
+            $listener = $this->getOtherCharacter($exchange['speaker'], $characterLookup);
+            $listenerData = $characterLookup[$listener] ?? [];
+
+            $listenerEmotion = $this->analyzeListenerEmotion(
+                $exchange['text'],
+                $shot['expression'] ?? 'neutral',
+                ['mood' => $scene['mood'] ?? 'neutral']
+            );
+
+            // Determine if this exchange warrants a reaction shot
+            if ($this->shouldInsertReaction($exchange, $index, $totalExchanges, $listenerEmotion)) {
+                if ($listener) {
+                    $reactionShot = $this->buildReactionShot(
+                        $listener,
+                        $listenerData,
+                        $listenerEmotion,
+                        $shot, // Previous shot (what they're reacting to)
+                        $shot['spatial'] ?? []
                     );
+
+                    $shots[] = $reactionShot;
+
+                    Log::debug('DialogueSceneDecomposer: Added strategic reaction shot', [
+                        'listener' => $listener,
+                        'emotion' => $listenerEmotion['emotion'],
+                        'intensity' => $listenerEmotion['intensity'],
+                        'exchange_index' => $index,
+                    ]);
                 }
             }
         }
@@ -1359,6 +1378,278 @@ class DialogueSceneDecomposerService
         }
 
         return implode(', ', array_filter($prompt)) . '.';
+    }
+
+    /**
+     * PHASE 4: Analyze dialogue to determine listener's emotional response.
+     *
+     * @param string $dialogue What was said TO the listener
+     * @param string $speakerEmotion The speaker's emotional state
+     * @param array $context Additional context (relationship, scene mood)
+     * @return array Listener emotion data
+     */
+    protected function analyzeListenerEmotion(string $dialogue, string $speakerEmotion, array $context = []): array
+    {
+        $text = strtolower($dialogue);
+        $emotion = 'attentive'; // Default neutral listening
+        $intensity = 0.5;
+        $visualCues = [];
+
+        // Questions directed at listener - they need to think
+        if (str_ends_with(trim($dialogue), '?')) {
+            $emotion = 'contemplative';
+            $visualCues[] = 'thoughtful expression';
+            $visualCues[] = 'slight head tilt';
+            $intensity = 0.5;
+        }
+
+        // Accusations or blame
+        if (preg_match('/\b(you|your)\b.*\b(fault|blame|wrong|lied|betrayed)\b/', $text)) {
+            $emotion = 'defensive';
+            $visualCues[] = 'tense posture';
+            $visualCues[] = 'guarded expression';
+            $intensity = 0.7;
+        }
+
+        // Declarations of love or care
+        if (preg_match('/\b(love|care about|need|miss)\s+(you|him|her)\b/', $text)) {
+            $emotion = 'moved';
+            $visualCues[] = 'softening expression';
+            $visualCues[] = 'emotional eyes';
+            $intensity = 0.75;
+        }
+
+        // Bad news or revelations
+        if (preg_match('/\b(dead|died|cancer|leaving|divorce|fired|over)\b/', $text)) {
+            $emotion = 'shocked';
+            $visualCues[] = 'widening eyes';
+            $visualCues[] = 'stunned silence';
+            $intensity = 0.85;
+        }
+
+        // Good news or positive revelations
+        if (preg_match('/\b(pregnant|engaged|won|accepted|promoted|alive)\b/', $text)) {
+            $emotion = 'overjoyed';
+            $visualCues[] = 'breaking into smile';
+            $visualCues[] = 'relief flooding face';
+            $intensity = 0.8;
+        }
+
+        // Threats or intimidation
+        if (preg_match('/\b(kill|hurt|destroy|regret|warn)\b/', $text)) {
+            $emotion = 'fearful';
+            $visualCues[] = 'nervous swallow';
+            $visualCues[] = 'fear in eyes';
+            $intensity = 0.8;
+        }
+
+        // Apologies
+        if (preg_match('/\b(sorry|apologize|forgive|my fault)\b/', $text)) {
+            $emotion = 'considering';
+            $visualCues[] = 'weighing response';
+            $visualCues[] = 'guarded but listening';
+            $intensity = 0.6;
+        }
+
+        // Mirror high-intensity speaker emotions
+        if ($speakerEmotion === 'angry' && $emotion === 'attentive') {
+            $emotion = 'wary';
+            $visualCues[] = 'cautious expression';
+            $intensity = 0.6;
+        }
+
+        return [
+            'emotion' => $emotion,
+            'intensity' => $intensity,
+            'visualCues' => $visualCues,
+            'silentBeat' => $intensity >= 0.7, // High intensity = hold on reaction
+        ];
+    }
+
+    /**
+     * PHASE 4: Determine if a reaction shot should be inserted after this exchange.
+     *
+     * @param array $exchange Current dialogue exchange
+     * @param int $exchangeIndex Position in dialogue
+     * @param int $totalExchanges Total number of exchanges
+     * @param array $listenerEmotion Analyzed listener emotion
+     * @return bool True if reaction shot should be added
+     */
+    protected function shouldInsertReaction(
+        array $exchange,
+        int $exchangeIndex,
+        int $totalExchanges,
+        array $listenerEmotion
+    ): bool {
+        // Always add reaction for high-intensity moments
+        if ($listenerEmotion['silentBeat']) {
+            return true;
+        }
+
+        // Add reaction at narrative turning points
+        $progress = $exchangeIndex / max(1, $totalExchanges - 1);
+
+        // Before the midpoint climax (around 40-50% through)
+        if ($progress >= 0.35 && $progress <= 0.5 && $listenerEmotion['intensity'] >= 0.6) {
+            return true;
+        }
+
+        // After major revelations (high intensity exchanges)
+        if ($listenerEmotion['intensity'] >= 0.75) {
+            return true;
+        }
+
+        // At the end of significant exchanges (every 3-4 exchanges for rhythm)
+        if ($exchangeIndex > 0 && $exchangeIndex % 3 === 2) {
+            return true;
+        }
+
+        // After questions that deserve visual consideration
+        if (str_ends_with(trim($exchange['text'] ?? ''), '?') && $listenerEmotion['intensity'] >= 0.5) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * PHASE 4: Build a detailed reaction shot.
+     *
+     * @param string $listener The character reacting
+     * @param array $listenerData Character data
+     * @param array $listenerEmotion Analyzed emotion
+     * @param array $previousShot The shot being reacted to
+     * @param array $spatial Spatial continuity data
+     * @return array Complete reaction shot data
+     */
+    protected function buildReactionShot(
+        string $listener,
+        array $listenerData,
+        array $listenerEmotion,
+        array $previousShot,
+        array $spatial
+    ): array {
+        // Calculate duration based on intensity (longer for bigger reactions)
+        $baseDuration = 2;
+        $duration = $listenerEmotion['intensity'] >= 0.7
+            ? $baseDuration + 1.5  // Hold on big reactions
+            : $baseDuration;
+
+        // Build visual description
+        $appearance = $listenerData['appearance'] ?? '';
+        $visualCues = implode(', ', $listenerEmotion['visualCues']);
+        $emotion = $listenerEmotion['emotion'];
+
+        // Determine shot type based on intensity
+        $shotType = $listenerEmotion['intensity'] >= 0.75
+            ? 'close-up'  // Tight for big emotions
+            : 'medium-close';  // Standard for reactions
+
+        // Build the prompt
+        $promptParts = [
+            ucfirst($shotType) . " shot of {$listener}",
+        ];
+
+        if (!empty($appearance)) {
+            $promptParts[] = "({$appearance})";
+        }
+
+        $promptParts[] = "listening intently";
+        $promptParts[] = "{$emotion} expression";
+
+        if (!empty($visualCues)) {
+            $promptParts[] = $visualCues;
+        }
+
+        // Add spatial positioning (reverse of speaker)
+        $promptParts[] = "positioned " . ($spatial['subjectPosition'] === 'right' ? 'left' : 'right') . " of frame";
+        $promptParts[] = "looking " . ($spatial['eyeLineDirection'] === 'screen-left' ? 'screen-right' : 'screen-left');
+
+        // Add context from what was said
+        if (!empty($previousShot['dialogue'])) {
+            $context = $this->getReactionContext($previousShot['dialogue']);
+            if ($context) {
+                $promptParts[] = $context;
+            }
+        }
+
+        $promptParts[] = 'silent moment';
+        $promptParts[] = 'cinematic lighting';
+
+        return [
+            'type' => $shotType,
+            'purpose' => 'reaction',
+            'speakingCharacter' => null,
+            'reactionCharacter' => $listener,
+            'dialogue' => null,
+            'useMultitalk' => false,
+            'needsLipSync' => false,
+            'duration' => $duration,
+            'emotionalIntensity' => $listenerEmotion['intensity'],
+            'expression' => $emotion,
+            'visualDescription' => implode(', ', $promptParts) . '.',
+            'spatial' => [
+                'cameraPosition' => $spatial['cameraPosition'] ?? 'left',
+                'cameraAngle' => $shotType === 'close-up' ? 'three-quarter' : 'frontal',
+                'subjectPosition' => $spatial['subjectPosition'] === 'right' ? 'left' : 'right',
+                'eyeLineDirection' => $spatial['eyeLineDirection'] === 'screen-left' ? 'screen-right' : 'screen-left',
+                'reverseOf' => null,
+                'pairId' => null,
+            ],
+            'reactionData' => [
+                'reactingTo' => $previousShot['dialogue'] ?? '',
+                'reactingToSpeaker' => $previousShot['speakingCharacter'] ?? '',
+                'emotion' => $emotion,
+                'visualCues' => $listenerEmotion['visualCues'],
+                'silentBeat' => $listenerEmotion['silentBeat'],
+            ],
+        ];
+    }
+
+    /**
+     * PHASE 4: Get contextual description based on dialogue content.
+     *
+     * @param string $dialogue The dialogue text
+     * @return string Contextual description for reaction
+     */
+    protected function getReactionContext(string $dialogue): string
+    {
+        $text = strtolower($dialogue);
+
+        if (preg_match('/\b(dead|died|gone|over)\b/', $text)) {
+            return 'processing devastating news';
+        }
+        if (preg_match('/\b(love|marry|together)\b/', $text)) {
+            return 'absorbing heartfelt words';
+        }
+        if (preg_match('/\b(sorry|apologize)\b/', $text)) {
+            return 'considering the apology';
+        }
+        if (str_ends_with(trim($dialogue), '?')) {
+            return 'formulating response';
+        }
+        if (str_ends_with(trim($dialogue), '!')) {
+            return 'reacting to emphatic statement';
+        }
+
+        return 'taking in the words';
+    }
+
+    /**
+     * PHASE 4: Get the other character in a two-person dialogue.
+     *
+     * @param string $currentSpeaker Current speaker name
+     * @param array $characterLookup Character lookup array
+     * @return string|null Other character name or null
+     */
+    protected function getOtherCharacter(string $currentSpeaker, array $characterLookup): ?string
+    {
+        foreach (array_keys($characterLookup) as $character) {
+            if (strcasecmp($character, $currentSpeaker) !== 0) {
+                return $character;
+            }
+        }
+        return null;
     }
 
     /**
