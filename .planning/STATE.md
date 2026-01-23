@@ -17,20 +17,20 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 ## Current Position
 
 **Milestone:** 8 (Cinematic Shot Architecture)
-**Phase:** 13 (Dynamic Camera Intelligence) - COMPLETE
-**Plan:** 01 of 01 complete
-**Status:** Phase 13 complete, ready for Phase 14
+**Phase:** 14 (Cinematic Flow & Action Scenes) - IN PROGRESS
+**Plan:** 01 of 02 complete
+**Status:** Plan 14-01 complete, ready for Plan 14-02
 
 ```
 Phase 11: ██████████ 100% (2/2 plans complete)
 Phase 12: ██████████ 100% (2/2 plans complete)
 Phase 13: ██████████ 100% (1/1 plans complete)
-Phase 14: ░░░░░░░░░░ 0%
+Phase 14: █████░░░░░ 50% (1/2 plans complete)
 ─────────────────────
-Overall:  ███████░░░ 63% (5/8 plans)
+Overall:  ████████░░ 75% (6/8 plans)
 ```
 
-**Last activity:** 2026-01-23 - Completed 13-01-PLAN.md (Dynamic Camera Intelligence)
+**Last activity:** 2026-01-23 - Completed 14-01-PLAN.md (Transition Validation)
 
 ---
 
@@ -51,7 +51,9 @@ Transform scene decomposition so every shot is purposeful, speech-driven, and ci
 **Phase 13 Complete:** Dynamic Camera Intelligence
 - Plan 13-01: Position-enforced shot selection with per-speaker emotion analysis
 
-Phase 13 complete. Ready for Phase 14.
+**Phase 14 In Progress:** Cinematic Flow & Action Scenes
+- Plan 14-01: Transition validation for jump cut detection (FLOW-03) - COMPLETE
+- Plan 14-02: Action scene pacing - PENDING
 
 ---
 
@@ -85,6 +87,8 @@ The system should be sophisticated and automatically updated based on previous s
 | 2026-01-23 | Position-first shots | Position rules take priority over intensity | Opening never close-up, climax always tight |
 | 2026-01-23 | Emotion adjustment | +0.15 intensity for angry/fearful emotions | High-intensity emotions drive tighter framing |
 | 2026-01-23 | Backward compat | Optional third parameter for emotion | Existing callers continue to work |
+| 2026-01-23 | Scale adjustment | Prefer stepping OUT (wider) over IN | Wider shots feel less jarring than tighter |
+| 2026-01-23 | Local scale mapping | Use local getShotSizeForType in DialogueSceneDecomposerService | Avoid cross-service dependency in shot flow |
 
 ### Research Insights
 
@@ -113,6 +117,13 @@ The system should be sophisticated and automatically updated based on previous s
 - Climax scenes use tight framing (always close-up or tighter)
 - Speaker emotion stored on shot for downstream use
 
+**Transition validation added (Phase 14):**
+- `getShotSizeForType()` maps shot types to numeric scale (1-5)
+- `validateAndFixTransitions()` detects jump cuts and same-scale transitions
+- `getWiderShotType()` and `getTighterShotType()` for scale adjustment
+- Non-blocking validation: logs warnings but doesn't halt video generation
+- `scaleAdjusted=true` flag on modified shots for debugging
+
 ### Known Issues
 
 | Issue | Impact | Plan | Status |
@@ -123,6 +134,31 @@ The system should be sophisticated and automatically updated based on previous s
 | Multi-character in single shot | HIGH - Model can't render | M8 (CSA-03) | FIXED (Plan 12-01) |
 | No quality assessment | MEDIUM - Can't track pattern health | M8 | FIXED (Plan 12-02) |
 | No emotion-driven shots | MEDIUM - Camera doesn't respond to dialogue | M8 (CAM-03) | FIXED (Plan 13-01) |
+| Jump cuts between shots | MEDIUM - Jarring visual transitions | M8 (FLOW-03) | FIXED (Plan 14-01) |
+
+---
+
+## Phase 14 Summary - IN PROGRESS
+
+**Cinematic Flow & Action Scenes** - In Progress
+
+### Plan 14-01: Transition Validation (FLOW-03) - COMPLETE
+**Key accomplishments:**
+- getShotSizeForType() for numeric scale mapping (1-5)
+- validateAndFixTransitions() detects same-type and same-scale transitions
+- Automatic adjustment prefers stepping OUT (wider) over IN (tighter)
+- Non-blocking: logs warnings but doesn't halt video generation
+- scaleAdjusted=true flag on modified shots for debugging
+
+**Commits:**
+- `8b4817c` feat(14-01): add getShotSizeForType method for jump cut detection
+- `0e6eaf4` feat(14-01): add validateAndFixTransitions for jump cut detection (FLOW-03)
+- `3b1d1b9` feat(14-01): integrate transition validation into enhanceShotsWithDialoguePatterns
+
+**Files modified:**
+- DialogueSceneDecomposerService.php (+162 lines)
+
+### Plan 14-02: Action Scene Pacing - PENDING
 
 ---
 
@@ -262,17 +298,17 @@ None currently.
 | `.planning/PROJECT.md` | Project context | Updated (2026-01-23) |
 | `.planning/STATE.md` | Current state tracking | Updated (2026-01-23) |
 | `modules/AppVideoWizard/app/Livewire/VideoWizard.php` | Main component | Modified (Phase 12) |
-| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Modified (Plan 13-01) |
-| `modules/AppVideoWizard/app/Services/DynamicShotEngine.php` | Shot count/type | Target for Phase 14 |
+| `modules/AppVideoWizard/app/Services/DialogueSceneDecomposerService.php` | Dialogue decomposition | Modified (Plan 14-01) |
+| `modules/AppVideoWizard/app/Services/DynamicShotEngine.php` | Shot count/type | Target for Plan 14-02 |
 
 ---
 
 ## Session Continuity
 
 **Last session:** 2026-01-23
-**Stopped at:** Completed 13-01-PLAN.md (Dynamic Camera Intelligence)
-**Resume file:** .planning/phases/13-dynamic-camera-intelligence/13-01-SUMMARY.md
-**Next step:** Execute Phase 14 (if exists)
+**Stopped at:** Completed 14-01-PLAN.md (Transition Validation)
+**Resume file:** .planning/phases/14-cinematic-flow-action-scenes/14-01-SUMMARY.md
+**Next step:** Execute Plan 14-02 (Action Scene Pacing)
 
 ---
 
