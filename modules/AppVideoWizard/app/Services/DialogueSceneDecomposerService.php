@@ -1690,6 +1690,230 @@ class DialogueSceneDecomposerService
         return '';
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // PHASE 11: SPEECH-DRIVEN SHOT CREATION
+    // Methods for creating/enhancing shots from speech segments (1:1 mapping)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Enhance pre-created shots with dialogue patterns.
+     * Called when shots are created from speech segments (1:1 mapping).
+     * Applies shot/reverse-shot patterns, camera positions, and emotional intensity.
+     *
+     * @param array $shots Array of shots created from speech segments
+     * @param array $scene Scene data for context
+     * @param array $characterBible Character Bible for character lookup
+     * @return array Enhanced shots with dialogue patterns applied
+     */
+    public function enhanceShotsWithDialoguePatterns(array $shots, array $scene, array $characterBible = []): array
+    {
+        if (empty($shots)) {
+            return [];
+        }
+
+        $totalShots = count($shots);
+        $speakers = $this->extractSpeakersFromShots($shots);
+        $characterLookup = $this->buildCharacterLookup($characterBible, $speakers);
+
+        Log::info('DialogueSceneDecomposer: Enhancing speech-driven shots', [
+            'shot_count' => $totalShots,
+            'speakers' => $speakers,
+            'ratio' => '1:1',
+        ]);
+
+        // Enhance each shot with dialogue patterns
+        foreach ($shots as $index => &$shot) {
+            $position = $this->calculateDialoguePosition($index, $totalShots);
+            $emotionalIntensity = $this->calculateEmotionalIntensityFromShot($shot, $position, $scene);
+
+            // Get speaker from shot
+            $speaker = $shot['speakingCharacter'] ?? $shot['speaker'] ?? null;
+            $charData = $characterLookup[$speaker] ?? [];
+
+            // Select shot type based on emotional intensity
+            $shotType = $this->selectShotTypeForIntensity($emotionalIntensity, $position);
+
+            // Calculate spatial data for 180-degree rule
+            $characters = array_slice($speakers, 0, 2);
+            $spatial = $this->calculateSpatialData($speaker ?? '', $characters, $shotType);
+
+            // Enhance shot with dialogue pattern data
+            $shot['type'] = $shotType;
+            $shot['purpose'] = 'dialogue';
+            $shot['emotionalIntensity'] = $emotionalIntensity;
+            $shot['position'] = $position;
+            $shot['dialogueIndex'] = $index;
+            $shot['shotIndex'] = $index;
+            $shot['totalShots'] = $totalShots;
+            $shot['spatial'] = $spatial;
+
+            // Add visual prompt based on shot type
+            $shot['visualPromptAddition'] = $this->buildSpeakingVisualPrompt(
+                ['speaker' => $speaker, 'text' => $shot['dialogue'] ?? ''],
+                $shotType,
+                $charData,
+                $position
+            );
+
+            // Mark for lip-sync
+            $shot['useMultitalk'] = true;
+            $shot['needsLipSync'] = true;
+
+            // Add character data
+            if (!empty($charData)) {
+                $shot['characterIndex'] = $charData['characterIndex'] ?? null;
+                $shot['characterData'] = $charData['characterData'] ?? null;
+                if (empty($shot['voiceId']) && !empty($charData['voiceId'])) {
+                    $shot['voiceId'] = $charData['voiceId'];
+                }
+            }
+
+            // Build spatial-aware prompt
+            $shot['spatialAwarePrompt'] = $this->buildSpatialAwarePrompt($shot, $charData['characterData'] ?? []);
+        }
+
+        // Apply shot/reverse-shot pairing
+        $shots = $this->pairReverseShots($shots);
+
+        // Calculate durations
+        $shots = $this->calculateShotDurations($shots);
+
+        Log::info('DialogueSceneDecomposer: Enhanced shots with dialogue patterns', [
+            'total_shots' => count($shots),
+            'speakers' => $speakers,
+            'unique_types' => count(array_unique(array_column($shots, 'type'))),
+        ]);
+
+        return $shots;
+    }
+
+    /**
+     * Extract unique speakers from shots array.
+     *
+     * @param array $shots Array of shots
+     * @return array Array of speaker names
+     */
+    protected function extractSpeakersFromShots(array $shots): array
+    {
+        $speakers = [];
+        foreach ($shots as $shot) {
+            $speaker = $shot['speakingCharacter'] ?? $shot['speaker'] ?? null;
+            if ($speaker && !in_array($speaker, $speakers)) {
+                $speakers[] = $speaker;
+            }
+        }
+        return $speakers;
+    }
+
+    /**
+     * Calculate emotional intensity from shot data.
+     *
+     * @param array $shot Shot data with dialogue
+     * @param string $position Position in dialogue sequence
+     * @param array $scene Scene context
+     * @return float Intensity value 0.0-1.0
+     */
+    protected function calculateEmotionalIntensityFromShot(array $shot, string $position, array $scene): float
+    {
+        $exchange = [
+            'speaker' => $shot['speakingCharacter'] ?? $shot['speaker'] ?? 'Unknown',
+            'text' => $shot['dialogue'] ?? $shot['monologue'] ?? '',
+        ];
+
+        return $this->calculateEmotionalIntensity($exchange, $position, $scene);
+    }
+
+    /**
+     * Create a single shot from a speech segment.
+     * Used for 1:1 mapping where each segment becomes one shot.
+     *
+     * @param array $segment Speech segment data
+     * @param array $scene Scene data for context
+     * @param array $characterBible Character Bible for character lookup
+     * @param int $index Segment index in sequence
+     * @param int $total Total number of segments
+     * @return array Shot data
+     */
+    public function createShotFromSegment(
+        array $segment,
+        array $scene,
+        array $characterBible,
+        int $index = 0,
+        int $total = 1
+    ): array {
+        $speaker = $segment['speaker'] ?? 'Unknown';
+        $text = $segment['text'] ?? '';
+
+        // Build character lookup
+        $characterLookup = $this->buildCharacterLookup($characterBible, [$speaker]);
+        $charData = $characterLookup[$speaker] ?? [];
+
+        // Calculate position and intensity
+        $position = $this->calculateDialoguePosition($index, $total);
+        $emotionalIntensity = $this->calculateEmotionalIntensity(
+            ['speaker' => $speaker, 'text' => $text],
+            $position,
+            $scene
+        );
+
+        // Select shot type
+        $shotType = $this->selectShotTypeForIntensity($emotionalIntensity, $position);
+
+        // Base shot structure
+        $shot = [
+            'id' => uniqid('shot_'),
+            'type' => $shotType,
+            'purpose' => 'dialogue',
+            'duration' => $this->calculateDurationFromTextLength($text),
+            'dialogue' => $text,
+            'monologue' => $text,
+            'speaker' => $speaker,
+            'speakingCharacter' => $speaker,
+            'speakingCharacters' => [$speaker],
+            'needsLipSync' => true,
+            'useMultitalk' => true,
+            'speechSegments' => [$segment],
+            'emotionalIntensity' => $emotionalIntensity,
+            'position' => $position,
+            'dialogueIndex' => $index,
+            'shotIndex' => $index,
+            'totalShots' => $total,
+        ];
+
+        // Add character context from Character Bible
+        if (!empty($charData)) {
+            $shot['characterIndex'] = $charData['characterIndex'] ?? null;
+            $shot['characterName'] = $charData['name'] ?? $speaker;
+            $shot['voiceId'] = $charData['voiceId'] ?? null;
+            $shot['characterData'] = $charData['characterData'] ?? null;
+        }
+
+        // Build visual prompt
+        $shot['visualPromptAddition'] = $this->buildSpeakingVisualPrompt(
+            ['speaker' => $speaker, 'text' => $text],
+            $shotType,
+            $charData,
+            $position
+        );
+
+        return $shot;
+    }
+
+    /**
+     * Calculate shot duration based on text length.
+     * Speaking rate: ~150 words per minute = ~2.5 words per second.
+     *
+     * @param string $text Dialogue text
+     * @return int Duration in seconds (minimum 3s)
+     */
+    protected function calculateDurationFromTextLength(string $text): int
+    {
+        $wordCount = str_word_count($text);
+        // 2.5 words per second + 1 second buffer for natural pacing
+        $duration = ceil($wordCount / 2.5) + 1;
+        return max(3, (int) $duration); // Minimum 3 seconds
+    }
+
     /**
      * Validate dialogue scene decomposition.
      */
