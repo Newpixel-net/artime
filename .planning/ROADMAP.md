@@ -50,36 +50,29 @@ Plans:
 
 ---
 
-## Phase 8: Speech Segments Display
+## Phase 8: Speech Segments Display ✓
 
 **Goal:** Users can view all speech segments with correct type labels, icons, and speaker attribution
 
-**Status:** Planned (2026-01-23)
+**Status:** Complete (2026-01-23)
 
 **Dependencies:** Phase 7 (requires modal shell)
 
-**Plans:** 1 plan
+**Plans:** 1 plan (all complete)
 
 **Requirements:**
-- SPCH-01: User can view ALL speech segments for a scene (not truncated)
-- SPCH-02: Each segment shows correct type label (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE)
-- SPCH-03: Each segment shows type-specific icon (microphone/speech bubble/thought bubble/speaking)
-- SPCH-04: Each segment shows speaker name (if applicable)
-- SPCH-05: Each segment shows lip-sync indicator (YES for dialogue/monologue, NO for narrator/internal)
-- SPCH-06: Each segment shows estimated duration
-- SPCH-07: Speaker matched to Character Bible shows character indicator
+- SPCH-01: User can view ALL speech segments for a scene (not truncated) ✓
+- SPCH-02: Each segment shows correct type label (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE) ✓
+- SPCH-03: Each segment shows type-specific icon (microphone/speech bubble/thought bubble/speaking) ✓
+- SPCH-04: Each segment shows speaker name (if applicable) ✓
+- SPCH-05: Each segment shows lip-sync indicator (YES for dialogue/monologue, NO for narrator/internal) ✓
+- SPCH-06: Each segment shows estimated duration ✓
+- SPCH-07: Speaker matched to Character Bible shows character indicator ✓
 
-**Success Criteria:**
-1. Modal displays complete speech segment list with no truncation, showing full text content with proper line wrapping
-2. Each segment displays correct type badge (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE) with matching icon (microphone, speech bubble, thought bubble, speaking)
-3. Dialogue and monologue segments show speaker name in purple with lip-sync badge showing YES/NO
-4. Each segment displays estimated duration and character indicator when speaker exists in Character Bible
-5. Scrollable segment list handles 10+ segments smoothly without layout issues
-
-**Estimated time:** 2 hours
+**Success Criteria:** All 5 criteria verified ✓
 
 Plans:
-- [ ] 08-01-PLAN.md — Speech segments display (type configuration, segment cards with all properties, legacy fallback)
+- [x] 08-01-PLAN.md — Speech segments display (type configuration, segment cards with all properties, legacy fallback)
 
 ---
 
@@ -133,7 +126,7 @@ Plans:
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 7: Foundation | ✓ Complete | MODL-01 to MODL-04, CARD-01 to CARD-03, META-01 to META-06 (14) | 5/5 verified |
-| Phase 8: Speech Segments | Planned | SPCH-01 to SPCH-07 (7) | 5 criteria |
+| Phase 8: Speech Segments | ✓ Complete | SPCH-01 to SPCH-07 (7) | 5/5 verified |
 | Phase 9: Prompts + Copy | Pending | PRMT-01 to PRMT-06 (6) | 5 criteria |
 | Phase 10: Mobile + Polish | Pending | MODL-05 (1) | 5 criteria |
 
@@ -141,11 +134,11 @@ Plans:
 
 ```
 Phase 7:  ██████████ 100% ✓
-Phase 8:  ░░░░░░░░░░ 0%
+Phase 8:  ██████████ 100% ✓
 Phase 9:  ░░░░░░░░░░ 0%
 Phase 10: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ██░░░░░░░░ 25%
+Overall:  █████░░░░░ 50%
 ```
 
 **Coverage:** 28/28 requirements mapped (100%)

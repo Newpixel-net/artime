@@ -9,13 +9,13 @@ Requirements for Milestone 7. Each maps to roadmap phases.
 
 ### Speech Segment Display
 
-- [ ] **SPCH-01**: User can view ALL speech segments for a scene (not truncated)
-- [ ] **SPCH-02**: Each segment shows correct type label (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE)
-- [ ] **SPCH-03**: Each segment shows type-specific icon (🎙️/💬/💭/🗣️)
-- [ ] **SPCH-04**: Each segment shows speaker name (if applicable)
-- [ ] **SPCH-05**: Each segment shows lip-sync indicator (YES for dialogue/monologue, NO for narrator/internal)
-- [ ] **SPCH-06**: Each segment shows estimated duration
-- [ ] **SPCH-07**: Speaker matched to Character Bible shows character indicator
+- [x] **SPCH-01**: User can view ALL speech segments for a scene (not truncated) ✓
+- [x] **SPCH-02**: Each segment shows correct type label (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE) ✓
+- [x] **SPCH-03**: Each segment shows type-specific icon (🎙️/💬/💭/🗣️) ✓
+- [x] **SPCH-04**: Each segment shows speaker name (if applicable) ✓
+- [x] **SPCH-05**: Each segment shows lip-sync indicator (YES for dialogue/monologue, NO for narrator/internal) ✓
+- [x] **SPCH-06**: Each segment shows estimated duration ✓
+- [x] **SPCH-07**: Speaker matched to Character Bible shows character indicator ✓
 
 ### Prompts Display
 
@@ -76,13 +76,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SPCH-01 | Phase 8 | Pending |
-| SPCH-02 | Phase 8 | Pending |
-| SPCH-03 | Phase 8 | Pending |
-| SPCH-04 | Phase 8 | Pending |
-| SPCH-05 | Phase 8 | Pending |
-| SPCH-06 | Phase 8 | Pending |
-| SPCH-07 | Phase 8 | Pending |
+| SPCH-01 | Phase 8 | Complete |
+| SPCH-02 | Phase 8 | Complete |
+| SPCH-03 | Phase 8 | Complete |
+| SPCH-04 | Phase 8 | Complete |
+| SPCH-05 | Phase 8 | Complete |
+| SPCH-06 | Phase 8 | Complete |
+| SPCH-07 | Phase 8 | Complete |
 | PRMT-01 | Phase 9 | Pending |
 | PRMT-02 | Phase 9 | Pending |
 | PRMT-03 | Phase 9 | Pending |
@@ -117,4 +117,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after Phase 7 completion (14 requirements complete)*
+*Last updated: 2026-01-23 after Phase 8 completion (21 requirements complete)*
