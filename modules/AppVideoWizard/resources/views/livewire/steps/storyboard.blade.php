@@ -1024,6 +1024,100 @@
         stroke-linecap: round;
         transition: stroke-dashoffset 0.3s ease;
     }
+
+    /* ========================================
+       PHASE 6: Visual Consistency Improvements
+       ======================================== */
+
+    /* Consistent card shadows */
+    .vw-scene-card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .vw-scene-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        transform: translateY(-2px);
+    }
+
+    /* Badge hover effects */
+    .vw-shot-badge:hover,
+    .vw-status-badge:hover {
+        filter: brightness(1.1);
+        cursor: default;
+    }
+
+    /* Smooth transitions for status changes */
+    .vw-status-badge,
+    .vw-intensity-fill {
+        transition: all 0.3s ease;
+    }
+
+    /* Focus states for accessibility */
+    .vw-storyboard-fullscreen select:focus,
+    .vw-storyboard-fullscreen button:focus {
+        outline: 2px solid rgba(139, 92, 246, 0.5);
+        outline-offset: 2px;
+    }
+
+    /* Consistent section spacing */
+    .vw-card-section {
+        padding: 0.5rem 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 0.5rem;
+    }
+
+    /* Scrollbar consistency */
+    .vw-scene-dialogue::-webkit-scrollbar,
+    .vw-modal-content::-webkit-scrollbar,
+    .vw-storyboard-content::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .vw-scene-dialogue::-webkit-scrollbar-thumb,
+    .vw-modal-content::-webkit-scrollbar-thumb,
+    .vw-storyboard-content::-webkit-scrollbar-thumb {
+        background: rgba(139, 92, 246, 0.3);
+        border-radius: 2px;
+    }
+
+    .vw-scene-dialogue::-webkit-scrollbar-thumb:hover,
+    .vw-modal-content::-webkit-scrollbar-thumb:hover,
+    .vw-storyboard-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(139, 92, 246, 0.5);
+    }
+
+    /* Empty state styling */
+    .vw-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+    }
+
+    .vw-empty-state svg {
+        margin-bottom: 0.75rem;
+        opacity: 0.5;
+    }
+
+    /* Pulse animation for generating states */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+
+    /* Arc template selector styling */
+    .vw-arc-selector select {
+        transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .vw-arc-selector select:hover {
+        border-color: rgba(139, 92, 246, 0.5);
+        background: rgba(0, 0, 0, 0.4);
+    }
 </style>
 
 @php
