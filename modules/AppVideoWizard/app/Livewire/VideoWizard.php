@@ -19025,6 +19025,150 @@ PROMPT;
         };
     }
 
+    /**
+     * PHASE 12: Validate shot/reverse-shot pattern quality for a scene.
+     * Checks pairing ratio, 180-degree axis consistency, and single-character compliance.
+     *
+     * @param array $shots Shots to validate
+     * @param int $sceneIndex Scene index for logging
+     * @return array Quality assessment summary
+     */
+    protected function validateShotReversePatternQuality(array $shots, int $sceneIndex): array
+    {
+        // Filter to dialogue shots (those with speakingCharacter)
+        $dialogueShots = array_filter($shots, function ($shot) {
+            return !empty($shot['speakingCharacter']);
+        });
+
+        // If < 2 dialogue shots, not a meaningful dialogue scene for validation
+        if (count($dialogueShots) < 2) {
+            return [
+                'sceneIndex' => $sceneIndex,
+                'totalShots' => count($shots),
+                'dialogueShots' => count($dialogueShots),
+                'quality' => 'not-applicable',
+                'reason' => 'Less than 2 dialogue shots - not a dialogue scene',
+            ];
+        }
+
+        // Check unique speakers
+        $uniqueSpeakers = [];
+        foreach ($dialogueShots as $shot) {
+            $speaker = $shot['speakingCharacter'] ?? null;
+            if ($speaker && !in_array($speaker, $uniqueSpeakers)) {
+                $uniqueSpeakers[] = $speaker;
+            }
+        }
+
+        // Count paired shots (those with spatial.pairId)
+        $pairedCount = 0;
+        foreach ($dialogueShots as $shot) {
+            $pairId = $shot['dialogueShotData']['spatial']['pairId'] ?? null;
+            if ($pairId !== null) {
+                $pairedCount++;
+            }
+        }
+
+        // Calculate pairing ratio
+        $pairingRatio = round($pairedCount / max(1, count($dialogueShots)), 2);
+
+        // Check 180-degree axis consistency
+        // Verify all dialogue shots have same cameraPosition value
+        $cameraPositions = [];
+        foreach ($dialogueShots as $shot) {
+            $cameraPosition = $shot['dialogueShotData']['spatial']['cameraPosition'] ?? null;
+            if ($cameraPosition !== null && !in_array($cameraPosition, $cameraPositions)) {
+                $cameraPositions[] = $cameraPosition;
+            }
+        }
+        $axisConsistent = count($cameraPositions) <= 1;
+
+        // Check single-character compliance
+        // Verify no shot has more than 1 character in charactersInShot
+        $singleCharCompliant = true;
+        foreach ($dialogueShots as $shot) {
+            $charactersInShot = $shot['charactersInShot'] ?? [];
+            if (count($charactersInShot) > 1) {
+                $singleCharCompliant = false;
+                break;
+            }
+        }
+
+        // Determine overall quality
+        $quality = ($pairingRatio > 0.5 && $axisConsistent && $singleCharCompliant) ? 'good' : 'needs-review';
+
+        $qualitySummary = [
+            'sceneIndex' => $sceneIndex,
+            'totalShots' => count($shots),
+            'dialogueShots' => count($dialogueShots),
+            'uniqueSpeakers' => count($uniqueSpeakers),
+            'pairedShots' => $pairedCount,
+            'pairingRatio' => $pairingRatio,
+            'axisConsistent' => $axisConsistent,
+            'singleCharacterCompliant' => $singleCharCompliant,
+            'quality' => $quality,
+        ];
+
+        Log::info('VideoWizard: Shot/reverse-shot pattern quality assessment', $qualitySummary);
+
+        // Log sequence for debugging
+        if (config('app.debug')) {
+            $this->logShotReverseSequence($shots, $sceneIndex);
+        }
+
+        return $qualitySummary;
+    }
+
+    /**
+     * PHASE 12: Log shot/reverse-shot sequence for debugging.
+     * Shows speaker alternation, shot types, and pair IDs.
+     *
+     * @param array $shots Shots to log
+     * @param int $sceneIndex Scene index
+     * @return void
+     */
+    protected function logShotReverseSequence(array $shots, int $sceneIndex): void
+    {
+        // Filter to dialogue shots only
+        $dialogueShots = array_filter($shots, function ($shot) {
+            return !empty($shot['speakingCharacter']);
+        });
+
+        if (count($dialogueShots) < 2) {
+            return;
+        }
+
+        // Build speaker sequence: "Marcus -> Sarah -> Marcus"
+        $speakers = [];
+        foreach ($dialogueShots as $shot) {
+            $speakers[] = $shot['speakingCharacter'] ?? 'unknown';
+        }
+        $speakerSequence = implode(' -> ', $speakers);
+
+        // Build shot type sequence: "medium -> ots -> close-up"
+        $shotTypes = [];
+        foreach ($dialogueShots as $shot) {
+            $shotTypes[] = $shot['type'] ?? $shot['shotType'] ?? 'unknown';
+        }
+        $typeSequence = implode(' -> ', $shotTypes);
+
+        // Build pair ID sequence: "pair_0, pair_0, pair_1, pair_1"
+        $pairIds = [];
+        foreach ($dialogueShots as $shot) {
+            $pairId = $shot['dialogueShotData']['spatial']['pairId'] ?? null;
+            $pairIds[] = $pairId !== null ? "pair_{$pairId}" : 'no-pair';
+        }
+        $pairSequence = implode(', ', $pairIds);
+
+        Log::debug('VideoWizard: Shot/reverse-shot sequence', [
+            'scene_index' => $sceneIndex,
+            'speaker_alternation' => $speakerSequence,
+            'shot_types' => $typeSequence,
+            'pair_ids' => $pairSequence,
+            'total_dialogue_shots' => count($dialogueShots),
+        ]);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // END DIALOGUE SCENE DECOMPOSITION HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
