@@ -45,7 +45,61 @@
                         Scene Metadata
                     </h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">
-                        {{-- Metadata badges will be added in tasks 2 and 3 --}}
+                        {{-- META-01: Duration --}}
+                        @php
+                            $duration = $scene['metadata']['duration'] ?? null;
+                            $durationFormatted = 'N/A';
+                            if ($duration && is_numeric($duration)) {
+                                $minutes = floor($duration / 60);
+                                $seconds = $duration % 60;
+                                $durationFormatted = sprintf('%02d:%02d', $minutes, $seconds);
+                            }
+                        @endphp
+                        <div style="padding: 0.5rem 0.75rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 0.375rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.875rem;">⏱️</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Duration</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.95); font-weight: 500;">{{ $durationFormatted }}</div>
+                            </div>
+                        </div>
+
+                        {{-- META-02: Transition --}}
+                        @php
+                            $transition = $scene['metadata']['transition'] ?? 'CUT';
+                            $transitionIcons = [
+                                'CUT' => '✂️',
+                                'FADE' => '🌫️',
+                                'DISSOLVE' => '💫',
+                                'WIPE' => '↔️',
+                                'IRIS' => '⭕',
+                            ];
+                            $transitionIcon = $transitionIcons[strtoupper($transition)] ?? '🎬';
+                        @endphp
+                        <div style="padding: 0.5rem 0.75rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); border-radius: 0.375rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.875rem;">{{ $transitionIcon }}</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Transition</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.95); font-weight: 500;">{{ strtoupper($transition) }}</div>
+                            </div>
+                        </div>
+
+                        {{-- META-03: Location --}}
+                        @php
+                            $location = $scene['metadata']['location'] ?? $scene['location'] ?? 'Unknown';
+                            if (is_array($location)) {
+                                $location = $location['name'] ?? $location['description'] ?? 'Unknown';
+                            }
+                            $locationDisplay = strlen($location) > 30 ? substr($location, 0, 27) . '...' : $location;
+                        @endphp
+                        <div style="padding: 0.5rem 0.75rem; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); border-radius: 0.375rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.875rem;">📍</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em;">Location</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.95); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $location }}">{{ $locationDisplay }}</div>
+                            </div>
+                        </div>
+
+                        {{-- Characters, Intensity, and Climax badges will be added in task 3 --}}
                     </div>
                 </div>
 
