@@ -9,8 +9,8 @@ Requirements for Milestone 9. Each maps to roadmap phases.
 
 ### Critical Fixes (P0)
 
-- [ ] **VOC-01**: Narrator voice assigned to shots (narratorVoiceId flows through overlayNarratorSegments)
-- [ ] **VOC-02**: Empty text validation before TTS (empty/invalid segments caught early)
+- [x] **VOC-01**: Narrator voice assigned to shots (narratorVoiceId flows through overlayNarratorSegments)
+- [x] **VOC-02**: Empty text validation before TTS (empty/invalid segments caught early)
 
 ### Consistency Layer (P1)
 
@@ -49,8 +49,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOC-01 | Phase 15 | Pending |
-| VOC-02 | Phase 15 | Pending |
+| VOC-01 | Phase 15 | Complete |
+| VOC-02 | Phase 15 | Complete |
 | VOC-03 | Phase 16 | Pending |
 | VOC-04 | Phase 16 | Pending |
 | VOC-05 | Phase 17 | Pending |

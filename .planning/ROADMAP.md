@@ -41,12 +41,12 @@ Modern industry standards (Dia 1.6B, VibeVoice, Gemini 2.5 TTS, MultiTalk) demon
 
 **Goal:** Fix immediate voice assignment and validation gaps that cause TTS failures
 
-**Status:** Planned (2026-01-24)
+**Status:** Complete (2026-01-24)
 
 **Plans:** 1 plan
 
 Plans:
-- [ ] 15-01-PLAN.md — Narrator voice assignment + empty text validation
+- [x] 15-01-PLAN.md — Narrator voice assignment + empty text validation
 
 **Dependencies:** None (starts new milestone)
 
@@ -191,7 +191,7 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 15: Critical Fixes | Planned | VOC-01, VOC-02 (2) | 0/4 |
+| Phase 15: Critical Fixes | Complete | VOC-01, VOC-02 (2) | 4/4 |
 | Phase 16: Consistency Layer | Planned | VOC-03, VOC-04 (2) | 0/5 |
 | Phase 17: Voice Registry | Planned | VOC-05 (1) | 0/5 |
 | Phase 18: Multi-Speaker | Planned | VOC-06 (1) | 0/5 |
@@ -199,12 +199,12 @@ Sequential execution required.
 **Overall Progress:**
 
 ```
-Phase 15: ░░░░░░░░░░ 0%
+Phase 15: ██████████ 100%
 Phase 16: ░░░░░░░░░░ 0%
 Phase 17: ░░░░░░░░░░ 0%
 Phase 18: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ░░░░░░░░░░ 0%
+Overall:  ███░░░░░░░ 33% (2/6 requirements)
 ```
 
 **Coverage:** 6/6 requirements mapped (100%)
