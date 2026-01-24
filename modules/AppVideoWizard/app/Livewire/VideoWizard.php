@@ -5991,51 +5991,45 @@ PROMPT;
         $speechType = $voiceover['speechType'] ?? $scene['speechType'] ?? 'narrator';
         $voiceoverText = $voiceover['text'] ?? '';
 
+        // Determine best text source for parsing
+        $textToParse = !empty($narration) ? $narration : $voiceoverText;
+
         Log::info('VideoWizard: Parsing scene narration for decomposition', [
             'sceneIndex' => $sceneIndex,
             'speechType' => $speechType,
             'hasNarration' => !empty($narration),
             'hasVoiceoverText' => !empty($voiceoverText),
+            'textLength' => strlen($textToParse),
         ]);
 
-        // If scene has voiceover text and speechType is narrator, create narrator segment(s)
-        if ($speechType === 'narrator' && !empty($voiceoverText)) {
-            // Create narrator segment from voiceover text
-            $scene['speechSegments'] = [[
-                'id' => 'seg-narrator-' . uniqid(),
-                'type' => 'narrator',
-                'text' => $voiceoverText,
-                'speaker' => null,
-                'needsLipSync' => false,
-                'order' => 0,
-            ]];
-            $scene['speechType'] = 'narrator';
-
-            Log::info('VideoWizard: Created narrator segment from voiceover text', [
-                'sceneIndex' => $sceneIndex,
-                'textLength' => strlen($voiceoverText),
-            ]);
-            return;
-        }
-
-        // If scene has narration but no speechSegments, parse it
-        if (!empty(trim($narration))) {
+        // CRITICAL: ALWAYS try parsing first to detect dialogue/monologue patterns
+        // Even if speechType is 'narrator', the text might contain character dialogue
+        // like "HERO: I will save the princess!" which should be lip-synced
+        if (!empty(trim($textToParse))) {
             try {
                 $parser = new \Modules\AppVideoWizard\Services\SpeechSegmentParser();
                 $characterBible = $this->sceneMemory['characterBible'] ?? [];
 
-                // Parse narration into segments
-                $segments = $parser->parse($narration, $characterBible);
+                // Parse text into segments - this detects SPEAKER: dialogue patterns
+                $segments = $parser->parse($textToParse, $characterBible);
 
                 if (!empty($segments)) {
                     $segmentArrays = $parser->toArray($segments);
+
+                    // Check what types were detected
+                    $types = array_unique(array_column($segmentArrays, 'type'));
+                    $hasDialogue = in_array('dialogue', $types) || in_array('monologue', $types);
+
                     $scene['speechSegments'] = $segmentArrays;
-                    $scene['speechType'] = count($segmentArrays) > 1 ? 'mixed' : ($segmentArrays[0]['type'] ?? 'narrator');
+                    $scene['speechType'] = count($types) > 1 ? 'mixed' : ($segmentArrays[0]['type'] ?? 'narrator');
 
                     Log::info('VideoWizard: Parsed narration into segments for decomposition', [
                         'sceneIndex' => $sceneIndex,
                         'segmentCount' => count($segmentArrays),
-                        'types' => array_unique(array_column($segmentArrays, 'type')),
+                        'types' => $types,
+                        'hasDialogue' => $hasDialogue,
+                        'originalSpeechType' => $speechType,
+                        'detectedSpeechType' => $scene['speechType'],
                     ]);
                     return;
                 }
@@ -6047,21 +6041,27 @@ PROMPT;
             }
         }
 
-        // Fallback: If speechType is narrator but no text parsed, create narrator segment from narration
-        if ($speechType === 'narrator' && !empty(trim($narration))) {
+        // Fallback: Parser found nothing - create segment based on speechType
+        if (!empty(trim($textToParse))) {
+            // Determine segment type based on user's selection
+            $segmentType = in_array($speechType, ['dialogue', 'monologue']) ? $speechType : 'narrator';
+            $needsLipSync = in_array($segmentType, ['dialogue', 'monologue']);
+
             $scene['speechSegments'] = [[
-                'id' => 'seg-narrator-' . uniqid(),
-                'type' => 'narrator',
-                'text' => trim($narration),
-                'speaker' => null,
-                'needsLipSync' => false,
+                'id' => 'seg-' . $segmentType . '-' . uniqid(),
+                'type' => $segmentType,
+                'text' => trim($textToParse),
+                'speaker' => $needsLipSync ? 'Character' : null,
+                'needsLipSync' => $needsLipSync,
                 'order' => 0,
             ]];
-            $scene['speechType'] = 'narrator';
+            $scene['speechType'] = $segmentType;
 
-            Log::info('VideoWizard: Created narrator segment from scene narration (fallback)', [
+            Log::info('VideoWizard: Created fallback segment from scene text', [
                 'sceneIndex' => $sceneIndex,
-                'textLength' => strlen($narration),
+                'segmentType' => $segmentType,
+                'needsLipSync' => $needsLipSync,
+                'textLength' => strlen($textToParse),
             ]);
             return;
         }
@@ -23618,19 +23618,26 @@ PROMPT;
 
                 if ($needsLipSync) {
                     // Dialogue/monologue - requires Multitalk for lip-sync animation
+                    // CRITICAL: Set BOTH dialogue AND monologue for Multitalk panel
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['dialogue'] = $shotDialogue;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['monologue'] = $shotDialogue;
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakingCharacters'] = array_keys($speakers);
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['selectedVideoModel'] = self::VIDEO_MODEL_MULTITALK;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['needsLipSync'] = true;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['useMultitalk'] = true;
 
                     // Assign voice from first speaking character
                     $firstSpeaker = array_keys($speakers)[0] ?? null;
                     if ($firstSpeaker) {
                         $voice = $this->getVoiceForCharacterName($firstSpeaker);
                         $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['voiceId'] = $voice;
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakingCharacter'] = $firstSpeaker;
                     }
                 } else {
                     // No lip-sync needed - use Minimax with TTS voiceover
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['selectedVideoModel'] = self::VIDEO_MODEL_MINIMAX;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['needsLipSync'] = false;
+                    $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['useMultitalk'] = false;
                 }
 
                 // Set narrator text if present (for TTS voiceover generation)
