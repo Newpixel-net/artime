@@ -23831,24 +23831,65 @@ PROMPT;
             return $shots;
         }
 
-        // Distribute narrator segments across shots
+        // Distribute narrator segments across ALL shots
+        // CRITICAL: Every shot should have narrator voiceover, not just the first one
         $shotCount = count($shots);
         $narratorCount = count($narratorSegments);
 
-        // Strategy: Distribute evenly, allowing multiple narrator segments per shot
-        $narratorIndex = 0;
-        $narratorsPerShot = max(1, ceil($narratorCount / $shotCount));
+        // Combine all narrator text for distribution
+        $allNarratorText = implode(' ', array_column($narratorSegments, 'text'));
+        $words = preg_split('/\s+/', trim($allNarratorText));
+        $totalWords = count($words);
+        $wordsPerShot = max(1, ceil($totalWords / $shotCount));
 
+        Log::info('Distributing narrator text across all shots', [
+            'sceneIndex' => $sceneIndex,
+            'totalWords' => $totalWords,
+            'shotCount' => $shotCount,
+            'wordsPerShot' => $wordsPerShot,
+        ]);
+
+        $wordIndex = 0;
         foreach ($shots as $shotIdx => $shot) {
-            $shotNarrators = [];
+            // Calculate this shot's portion of narrator text
+            $shotWords = array_slice($words, $wordIndex, $wordsPerShot);
+            $wordIndex += $wordsPerShot;
 
-            // Collect narrator segments for this shot
-            for ($i = 0; $i < $narratorsPerShot && $narratorIndex < $narratorCount; $i++, $narratorIndex++) {
-                $shotNarrators[] = $narratorSegments[$narratorIndex];
+            // If we're at the last shot, include any remaining words
+            if ($shotIdx === $shotCount - 1 && $wordIndex < $totalWords) {
+                $shotWords = array_merge($shotWords, array_slice($words, $wordIndex));
+            }
+
+            $shotNarratorText = implode(' ', $shotWords);
+
+            // Create a narrator segment for this shot
+            $shotNarrators = [];
+            if (!empty($shotNarratorText)) {
+                $shotNarrators[] = [
+                    'id' => 'seg-narrator-shot-' . $shotIdx . '-' . uniqid(),
+                    'type' => SpeechSegment::TYPE_NARRATOR,
+                    'text' => $shotNarratorText,
+                    'speaker' => null,
+                    'needsLipSync' => false,
+                    'order' => $shotIdx,
+                ];
             }
 
             // Add as overlay metadata AND to speechSegments for UI detection
-            if (!empty($shotNarrators)) {
+            // IMPORTANT: Add to ALL shots, even if text portion is small
+            if (!empty($shotNarrators) || !empty($allNarratorText)) {
+                // If this shot got no words (edge case), give it a placeholder
+                if (empty($shotNarrators) && $shotIdx < $shotCount) {
+                    // Distribute remaining narrator context
+                    $shotNarrators[] = [
+                        'id' => 'seg-narrator-shot-' . $shotIdx . '-' . uniqid(),
+                        'type' => SpeechSegment::TYPE_NARRATOR,
+                        'text' => '[Narrator continues]',
+                        'speaker' => null,
+                        'needsLipSync' => false,
+                        'order' => $shotIdx,
+                    ];
+                }
                 $shots[$shotIdx]['narratorOverlay'] = $shotNarrators;
                 $shots[$shotIdx]['hasNarratorVoiceover'] = true;
 
@@ -23893,11 +23934,13 @@ PROMPT;
             }
         }
 
-        Log::info('Distributed narrator segments as overlays', [
+        Log::info('Distributed narrator text across ALL shots', [
             'sceneIndex' => $sceneIndex,
-            'narratorSegments' => $narratorCount,
+            'originalSegments' => $narratorCount,
+            'totalWords' => $totalWords,
+            'shotCount' => $shotCount,
             'shotsWithNarrator' => count(array_filter($shots, fn($s) => !empty($s['narratorOverlay']))),
-            'strategy' => 'overlay (not dedicated shots)',
+            'strategy' => 'word-split-to-all-shots',
         ]);
 
         return $shots;
