@@ -5833,65 +5833,37 @@ function getCameraMovementIcon($movement) {
                     @endphp
 
                     @if(!empty($speechSegments) || !empty($narration))
-                        <div style="padding: 0.4rem 0.75rem;">
-                            <div class="vw-scene-dialogue" style="padding: 0.4rem 0;">
-                                <div class="vw-dialogue-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.25rem;">
-                                        <span style="font-size: 0.75rem;">{{ $speechIcon }}</span>
-                                        <span style="font-weight: 600; font-size: 0.7rem;">{{ $speechLabel }}</span>
-                                        @if(!empty($speechDetailLabel))
-                                            <span style="opacity: 0.5; font-size: 0.6rem;">{{ $speechDetailLabel }}</span>
-                                        @endif
-                                    </div>
-                                    <button
-                                        wire:click="openSceneTextInspector({{ $index }})"
-                                        class="vw-inspect-btn"
-                                        title="{{ __('Click to view all scene text and prompts') }}"
-                                        style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #a78bfa; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.55rem; cursor: pointer; transition: all 0.2s;"
-                                    >
-                                        🔍 {{ __('Inspect') }}
-                                    </button>
-                                </div>
-
-                                @if(!empty($speechSegments))
-                                    @php
-                                        // Show only 1 segment for compact view
-                                        $previewSegments = [];
-                                        if ($hasMultipleTypes && count($speechSegments) > 1) {
-                                            // Pick first segment
-                                            $grouped = collect($speechSegments)->groupBy('type');
-                                            foreach ($grouped as $segments) {
-                                                $previewSegments[] = $segments->first();
-                                                break; // Only 1 segment
-                                            }
-                                        } else {
-                                            // Just take first 1 for compact view
-                                            $previewSegments = array_slice($speechSegments, 0, 1);
-                                        }
-                                    @endphp
-                                    @foreach($previewSegments as $segment)
-                                        @php
-                                            $segType = $segment['type'] ?? 'narrator';
-                                            $typeData = $typeIcons[$segType] ?? ['icon' => '🎙️', 'color' => 'rgba(14, 165, 233, 0.4)', 'label' => 'NARRATION'];
-                                        @endphp
-                                        <div style="padding-left: 0.4rem; border-left: 2px solid {{ $typeData['color'] }};">
-                                            <span class="vw-dialogue-text" style="font-size: 0.75rem; color: rgba(255,255,255,0.7); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                                {{ Str::limit($segment['text'] ?? '', 80) }}
-                                            </span>
-                                        </div>
-                                    @endforeach
-                                    @if(count($speechSegments) > 1)
-                                        <div class="vw-dialogue-more" wire:click="openSceneTextInspector({{ $index }})" style="cursor: pointer; font-size: 0.6rem; margin-top: 0.2rem; opacity: 0.5;">
-                                            +{{ count($speechSegments) - 1 }} {{ __('more') }}
-                                        </div>
+                        @php
+                            // Build tooltip text from first segment or narration
+                            $tooltipText = '';
+                            if (!empty($speechSegments)) {
+                                $firstSeg = $speechSegments[0] ?? null;
+                                $tooltipText = $firstSeg['text'] ?? '';
+                                if (count($speechSegments) > 1) {
+                                    $tooltipText .= ' (+' . (count($speechSegments) - 1) . ' more)';
+                                }
+                            } elseif (!empty($narration)) {
+                                $tooltipText = $narration;
+                            }
+                        @endphp
+                        <div style="padding: 0.3rem 0.75rem;">
+                            <div class="vw-scene-dialogue" style="display: flex; justify-content: space-between; align-items: center;">
+                                {{-- Badge with tooltip showing full text --}}
+                                <div style="display: flex; align-items: center; gap: 0.25rem; cursor: help;" title="{{ $tooltipText }}">
+                                    <span style="font-size: 0.75rem;">{{ $speechIcon }}</span>
+                                    <span style="font-weight: 600; font-size: 0.7rem;">{{ $speechLabel }}</span>
+                                    @if(!empty($speechDetailLabel))
+                                        <span style="opacity: 0.5; font-size: 0.6rem;">{{ $speechDetailLabel }}</span>
                                     @endif
-                                @elseif(!empty($narration))
-                                    <div style="padding-left: 0.4rem; border-left: 2px solid rgba(14, 165, 233, 0.4);">
-                                        <span class="vw-dialogue-text" style="font-size: 0.75rem; color: rgba(255,255,255,0.7); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                            {{ Str::limit($narration, 100) }}
-                                        </span>
-                                    </div>
-                                @endif
+                                </div>
+                                <button
+                                    wire:click="openSceneTextInspector({{ $index }})"
+                                    class="vw-inspect-btn"
+                                    title="{{ __('Click to view all scene text and prompts') }}"
+                                    style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #a78bfa; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.55rem; cursor: pointer; transition: all 0.2s;"
+                                >
+                                    🔍 {{ __('Inspect') }}
+                                </button>
                             </div>
                         </div>
                     @endif
