@@ -43,6 +43,11 @@ Modern industry standards (Dia 1.6B, VibeVoice, Gemini 2.5 TTS, MultiTalk) demon
 
 **Status:** Planned (2026-01-24)
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 15-01-PLAN.md — Narrator voice assignment + empty text validation
+
 **Dependencies:** None (starts new milestone)
 
 **Requirements:**
@@ -50,21 +55,15 @@ Modern industry standards (Dia 1.6B, VibeVoice, Gemini 2.5 TTS, MultiTalk) demon
 - VOC-02: Empty text validation before TTS (empty/invalid segments caught early)
 
 **Success Criteria:**
-1. overlayNarratorSegments() sets narratorVoiceId on each shot (from animation.narrator.voice)
+1. overlayNarratorSegments() sets narratorVoiceId on each shot (from getNarratorVoice())
 2. Empty segment text caught before reaching TTS generation
 3. Missing segment type logged as error (not silently coerced to 'narrator')
-4. validateBeforeParse() method catches common issues early
-5. TTS generation receives valid, non-empty text for all segments
+4. TTS generation receives valid, non-empty text for all segments
 
 **Key changes:**
-- Add narratorVoiceId assignment in overlayNarratorSegments() (~line 23906)
-- Add validateBeforeParse() method for early validation
+- Add narratorVoiceId assignment in overlayNarratorSegments() (~line 23701)
 - Add empty text check before TTS calls
 - Log errors for missing segment types instead of silent coercion
-
-**Location hints (from audit):**
-- `overlayNarratorSegments()` - Add `$shots[$shotIdx]['narratorVoiceId'] = $this->animation['narrator']['voice'] ?? 'fable';`
-- Segment parsing - Add type validation with error logging
 
 ---
 
@@ -192,7 +191,7 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 15: Critical Fixes | Planned | VOC-01, VOC-02 (2) | 0/5 |
+| Phase 15: Critical Fixes | Planned | VOC-01, VOC-02 (2) | 0/4 |
 | Phase 16: Consistency Layer | Planned | VOC-03, VOC-04 (2) | 0/5 |
 | Phase 17: Voice Registry | Planned | VOC-05 (1) | 0/5 |
 | Phase 18: Multi-Speaker | Planned | VOC-06 (1) | 0/5 |
