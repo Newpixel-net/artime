@@ -1,6 +1,6 @@
 {{-- Multi-Shot Decomposition Modal - Full Screen Split Panel Layout --}}
 
-{{-- Video polling Alpine component --}}
+{{-- Video polling Alpine component with performance optimizations --}}
 <script>
 window.multiShotVideoPolling = function() {
     return {
@@ -10,9 +10,12 @@ window.multiShotVideoPolling = function() {
         maxPolls: 120,
         POLL_INTERVAL: 5000,
         componentDestroyed: false,
+        // Performance fix: instant close state
+        isClosing: false,
 
         initPolling() {
             this.componentDestroyed = false;
+            this.isClosing = false;
             this.$nextTick(() => {
                 if (this.checkForProcessingVideos()) this.startPolling();
             });
@@ -43,6 +46,15 @@ window.multiShotVideoPolling = function() {
         stopPolling() {
             if (this.pollingInterval) { clearInterval(this.pollingInterval); this.pollingInterval = null; }
             this.isPolling = false;
+        },
+        // Performance fix: instant visual close, then Livewire cleanup
+        quickClose() {
+            this.isClosing = true;
+            this.cleanup();
+            // Defer Livewire call to allow instant visual feedback
+            setTimeout(() => {
+                if (this.$wire) this.$wire.closeMultiShotModal();
+            }, 50);
         },
         cleanup() {
             this.componentDestroyed = true; this.stopPolling();
@@ -151,7 +163,12 @@ window.multiShotVideoPolling = function() {
      wire:key="multi-shot-modal-{{ $multiShotSceneIndex }}"
      x-data="multiShotVideoPolling()"
      x-init="initPolling()"
-     @destroy="cleanup()">
+     x-show="!isClosing"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @destroy="cleanup()"
+     style="will-change: opacity;">
 
     {{-- Header --}}
     <header class="msm-header">
@@ -202,7 +219,7 @@ window.multiShotVideoPolling = function() {
                 @endif
             @endif
         </div>
-        <button type="button" wire:click="closeMultiShotModal" class="msm-close-btn">&times;</button>
+        <button type="button" @click="quickClose()" class="msm-close-btn">&times;</button>
     </header>
 
     @if($scene)
