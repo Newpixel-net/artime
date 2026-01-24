@@ -1182,7 +1182,11 @@
         display: block;
     }
 
-    /* Empty State - Larger for full-screen layout */
+    /* ========================================
+       HYBRID A+B: Modern Cinematic Empty State
+       ======================================== */
+
+    /* Empty State Container - Cinematic glassmorphism */
     .vw-scene-empty {
         height: 100%;
         min-height: 280px;
@@ -1190,11 +1194,30 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 2rem;
-        background: rgba(255, 255, 255, 0.03);
-        border: 2px dashed rgba(255, 255, 255, 0.15);
+        padding: 1.5rem;
+        background: linear-gradient(135deg, rgba(15, 15, 30, 0.95), rgba(25, 25, 45, 0.9));
+        border: 1px solid rgba(139, 92, 246, 0.15);
         border-radius: 0;
         margin: 0;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Animated gradient background */
+    .vw-scene-empty::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg,
+            rgba(139, 92, 246, 0.08) 0%,
+            rgba(6, 182, 212, 0.05) 50%,
+            rgba(236, 72, 153, 0.08) 100%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+    }
+
+    .vw-scene-empty:hover::before {
+        opacity: 1;
     }
 
     /* Empty State with background image from shots */
@@ -1204,87 +1227,359 @@
         background-position: center;
     }
 
-    .vw-scene-empty.has-bg-image .vw-scene-empty-text {
-        color: rgba(255, 255, 255, 0.9);
-        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    .vw-scene-empty.has-bg-image::before {
+        background: linear-gradient(135deg,
+            rgba(0, 0, 0, 0.6),
+            rgba(15, 15, 30, 0.7));
+        opacity: 1;
     }
 
-    .vw-scene-empty.has-bg-image .vw-scene-empty-btn {
-        backdrop-filter: blur(4px);
-        background: rgba(0, 0, 0, 0.4) !important;
-    }
-
-    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.ai {
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(6, 182, 212, 0.5)) !important;
-    }
-
-    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.stock {
-        background: rgba(16, 185, 129, 0.4) !important;
-    }
-
-    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.collage {
-        background: linear-gradient(135deg, rgba(236, 72, 153, 0.4), rgba(139, 92, 246, 0.4)) !important;
-    }
-
-    .vw-scene-empty-text {
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 1rem;
-        margin-bottom: 1.25rem;
-    }
-
-    .vw-scene-empty-buttons {
-        display: flex;
-        gap: 1rem;
-        width: 100%;
-        max-width: 380px;
-    }
-
-    .vw-scene-empty-btn {
-        flex: 1;
-        padding: 1rem 0.85rem;
-        border-radius: 0.6rem;
-        border: 1px solid;
-        color: white;
-        cursor: pointer;
-        font-size: 0.9rem;
+    /* Center Content Area */
+    .vw-empty-center {
+        position: relative;
+        z-index: 2;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.4rem;
-        transition: all 0.2s;
+        text-align: center;
     }
 
+    /* Floating icon with glow */
+    .vw-empty-icon-float {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.2));
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        margin-bottom: 1rem;
+        animation: vw-float 3s ease-in-out infinite;
+        box-shadow: 0 8px 32px rgba(139, 92, 246, 0.2);
+    }
+
+    @keyframes vw-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+    }
+
+    .vw-scene-empty-text {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        margin-bottom: 1.25rem;
+        letter-spacing: 0.02em;
+    }
+
+    .vw-scene-empty.has-bg-image .vw-scene-empty-text {
+        color: rgba(255, 255, 255, 0.95);
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    /* Action Cards Grid - Horizontal timeline-inspired */
+    .vw-scene-empty-buttons {
+        display: flex;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 420px;
+    }
+
+    /* Individual Action Card */
+    .vw-scene-empty-btn {
+        flex: 1;
+        padding: 1rem 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(8px);
+        color: white;
+        cursor: pointer;
+        font-size: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Card shimmer effect on hover */
+    .vw-scene-empty-btn::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.05) 50%,
+            transparent 100%);
+        transform: translateX(-100%);
+        transition: transform 0.6s ease;
+    }
+
+    .vw-scene-empty-btn:hover::before {
+        transform: translateX(100%);
+    }
+
+    /* AI Generate - Primary gradient card */
     .vw-scene-empty-btn.ai {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(6, 182, 212, 0.15));
+        border-color: rgba(139, 92, 246, 0.3);
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
+    }
+
+    .vw-scene-empty-btn.ai:hover {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(6, 182, 212, 0.25));
+        border-color: rgba(139, 92, 246, 0.5);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 32px rgba(139, 92, 246, 0.25);
+    }
+
+    /* Stock Media - Green accent card */
+    .vw-scene-empty-btn.stock {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    .vw-scene-empty-btn.stock:hover {
+        background: rgba(16, 185, 129, 0.2);
+        border-color: rgba(16, 185, 129, 0.5);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 32px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Collage First - Pink gradient card */
+    .vw-scene-empty-btn.collage {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(139, 92, 246, 0.1));
+        border-color: rgba(236, 72, 153, 0.25);
+    }
+
+    .vw-scene-empty-btn.collage:hover {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(139, 92, 246, 0.2));
+        border-color: rgba(236, 72, 153, 0.5);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 32px rgba(236, 72, 153, 0.15);
+    }
+
+    /* With background image - stronger glassmorphism */
+    .vw-scene-empty.has-bg-image .vw-scene-empty-btn {
+        backdrop-filter: blur(12px);
+        background: rgba(0, 0, 0, 0.4) !important;
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.ai {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.4)) !important;
+    }
+
+    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.stock {
+        background: rgba(16, 185, 129, 0.35) !important;
+    }
+
+    .vw-scene-empty.has-bg-image .vw-scene-empty-btn.collage {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.35), rgba(139, 92, 246, 0.35)) !important;
+    }
+
+    /* Icon with glow effect */
+    .vw-scene-empty-btn-icon {
+        font-size: 1.6rem;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+        transition: transform 0.3s ease;
+    }
+
+    .vw-scene-empty-btn:hover .vw-scene-empty-btn-icon {
+        transform: scale(1.1);
+    }
+
+    /* Label text */
+    .vw-scene-empty-btn-label {
+        font-weight: 500;
+        font-size: 0.8rem;
+        letter-spacing: 0.01em;
+    }
+
+    /* Cost badge - pill style */
+    .vw-scene-empty-btn-cost {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.5);
+        background: rgba(0, 0, 0, 0.2);
+        padding: 0.15rem 0.5rem;
+        border-radius: 1rem;
+        margin-top: 0.25rem;
+    }
+
+    .vw-scene-empty-btn.stock .vw-scene-empty-btn-cost {
+        color: rgba(16, 185, 129, 0.9);
+        background: rgba(16, 185, 129, 0.15);
+    }
+
+    .vw-scene-empty-btn.ai .vw-scene-empty-btn-cost {
+        color: rgba(167, 139, 250, 0.9);
+        background: rgba(139, 92, 246, 0.15);
+    }
+
+    .vw-scene-empty-btn.collage .vw-scene-empty-btn-cost {
+        color: rgba(236, 72, 153, 0.9);
+        background: rgba(236, 72, 153, 0.15);
+    }
+
+    /* ========================================
+       HYBRID B: Shot Timeline Scrubber
+       ======================================== */
+
+    .vw-shot-timeline {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        max-width: 460px;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.75rem;
+    }
+
+    .vw-shot-timeline-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .vw-shot-timeline-label {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+
+    .vw-shot-timeline-count {
+        font-size: 0.6rem;
+        color: rgba(139, 92, 246, 0.9);
+        background: rgba(139, 92, 246, 0.15);
+        padding: 0.15rem 0.4rem;
+        border-radius: 0.25rem;
+    }
+
+    /* Shot thumbnails strip */
+    .vw-shot-timeline-strip {
+        display: flex;
+        gap: 0.35rem;
+        overflow-x: auto;
+        padding: 0.25rem 0;
+        scroll-behavior: smooth;
+        scrollbar-width: none;
+    }
+
+    .vw-shot-timeline-strip::-webkit-scrollbar {
+        display: none;
+    }
+
+    .vw-shot-timeline-thumb {
+        flex-shrink: 0;
+        width: 48px;
+        height: 32px;
+        border-radius: 0.25rem;
+        overflow: hidden;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .vw-shot-timeline-thumb:hover {
+        border-color: rgba(139, 92, 246, 0.5);
+        transform: scale(1.08);
+    }
+
+    .vw-shot-timeline-thumb.active {
+        border-color: #8b5cf6;
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .vw-shot-timeline-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .vw-shot-timeline-thumb-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.2));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .vw-shot-timeline-thumb-number {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+        font-size: 0.5rem;
+        color: white;
+        padding: 0.1rem 0.2rem;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    /* Progress bar under timeline */
+    .vw-shot-timeline-progress {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        margin-top: 0.5rem;
+        overflow: hidden;
+    }
+
+    .vw-shot-timeline-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+        border-radius: 2px;
+        transition: width 0.3s ease;
+    }
+
+    /* Quick action bar */
+    .vw-quick-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        justify-content: center;
+    }
+
+    .vw-quick-action-btn {
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .vw-quick-action-btn:hover {
+        background: rgba(139, 92, 246, 0.2);
+        border-color: rgba(139, 92, 246, 0.4);
+    }
+
+    .vw-quick-action-btn.primary {
         background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(6, 182, 212, 0.3));
         border-color: rgba(139, 92, 246, 0.4);
     }
 
-    .vw-scene-empty-btn.ai:hover {
+    .vw-quick-action-btn.primary:hover {
         background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.4));
-        transform: translateY(-1px);
-    }
-
-    .vw-scene-empty-btn.stock {
-        background: rgba(16, 185, 129, 0.2);
-        border-color: rgba(16, 185, 129, 0.4);
-    }
-
-    .vw-scene-empty-btn.stock:hover {
-        background: rgba(16, 185, 129, 0.3);
-        transform: translateY(-1px);
-    }
-
-    .vw-scene-empty-btn-icon {
-        font-size: 1.5rem;
-    }
-
-    .vw-scene-empty-btn-cost {
-        font-size: 0.7rem;
-        color: rgba(255, 255, 255, 0.5);
-    }
-
-    .vw-scene-empty-btn.stock .vw-scene-empty-btn-cost {
-        color: rgba(16, 185, 129, 0.8);
     }
 
     /* Generating State */
@@ -5031,48 +5326,132 @@ function getCameraMovementIcon($movement) {
                                      wire:loading.remove
                                      wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')"
                                      @if($emptyStateBgImage) style="background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.8)), url('{{ $emptyStateBgImage }}'); background-size: cover; background-position: center; border: none;" @endif>
-                                    <div class="vw-scene-empty-text">{{ __('Choose image source:') }}</div>
-                                    <div class="vw-scene-empty-buttons">
-                                        <button type="button"
-                                                class="vw-scene-empty-btn ai"
-                                                wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
-                                                wire:loading.attr="disabled"
-                                                wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
-                                            <span class="vw-scene-empty-btn-icon" wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">🎨</span>
-                                            <span wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">{{ __('AI Generate') }}</span>
-                                            <span wire:loading wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
-                                                <svg style="width: 16px; height: 16px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
-                                                    <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-                                                </svg>
-                                            </span>
-                                            <span class="vw-scene-empty-btn-cost" wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
-                                        </button>
-                                        <button type="button"
-                                                class="vw-scene-empty-btn stock"
-                                                wire:click="openStockBrowser({{ $index }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
-                                            <span class="vw-scene-empty-btn-icon">📷</span>
-                                            <span>{{ __('Stock Media') }}</span>
-                                            <span class="vw-scene-empty-btn-cost">{{ __('FREE') }}</span>
-                                        </button>
-                                        <button type="button"
-                                                class="vw-scene-empty-btn collage"
-                                                wire:click="generateCollagePreview({{ $index }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="generateCollagePreview({{ $index }})"
-                                                style="background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(139, 92, 246, 0.15)); border-color: rgba(236, 72, 153, 0.4);">
-                                            <span class="vw-scene-empty-btn-icon" wire:loading.remove wire:target="generateCollagePreview({{ $index }})">🖼️</span>
-                                            <span wire:loading.remove wire:target="generateCollagePreview({{ $index }})">{{ __('Collage First') }}</span>
-                                            <span wire:loading wire:target="generateCollagePreview({{ $index }})">
-                                                <svg style="width: 16px; height: 16px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
-                                                    <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-                                                </svg>
-                                            </span>
-                                            <span class="vw-scene-empty-btn-cost" wire:loading.remove wire:target="generateCollagePreview({{ $index }})">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
-                                        </button>
+
+                                    {{-- HYBRID A+B: Cinematic Center Content --}}
+                                    <div class="vw-empty-center">
+                                        {{-- Floating Icon with Glow --}}
+                                        <div class="vw-empty-icon-float">
+                                            🎬
+                                        </div>
+
+                                        <div class="vw-scene-empty-text">{{ __('Choose image source') }}</div>
+
+                                        {{-- Action Cards Grid --}}
+                                        <div class="vw-scene-empty-buttons">
+                                            {{-- AI Generate - Primary Action --}}
+                                            <button type="button"
+                                                    class="vw-scene-empty-btn ai"
+                                                    wire:click="generateImage({{ $index }}, '{{ $scene['id'] }}')"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
+                                                <span class="vw-scene-empty-btn-icon" wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">🎨</span>
+                                                <span wire:loading wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
+                                                    <svg style="width: 20px; height: 20px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                                                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                                                    </svg>
+                                                </span>
+                                                <span class="vw-scene-empty-btn-label" wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">{{ __('AI Generate') }}</span>
+                                                <span class="vw-scene-empty-btn-cost" wire:loading.remove wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
+                                            </button>
+
+                                            {{-- Stock Media - Secondary Action --}}
+                                            <button type="button"
+                                                    class="vw-scene-empty-btn stock"
+                                                    wire:click="openStockBrowser({{ $index }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="generateImage({{ $index }}, '{{ $scene['id'] }}')">
+                                                <span class="vw-scene-empty-btn-icon">📷</span>
+                                                <span class="vw-scene-empty-btn-label">{{ __('Stock Media') }}</span>
+                                                <span class="vw-scene-empty-btn-cost">{{ __('FREE') }}</span>
+                                            </button>
+
+                                            {{-- Collage First - Third Action --}}
+                                            <button type="button"
+                                                    class="vw-scene-empty-btn collage"
+                                                    wire:click="generateCollagePreview({{ $index }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="generateCollagePreview({{ $index }})">
+                                                <span class="vw-scene-empty-btn-icon" wire:loading.remove wire:target="generateCollagePreview({{ $index }})">🖼️</span>
+                                                <span wire:loading wire:target="generateCollagePreview({{ $index }})">
+                                                    <svg style="width: 20px; height: 20px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                                                        <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                                                    </svg>
+                                                </span>
+                                                <span class="vw-scene-empty-btn-label" wire:loading.remove wire:target="generateCollagePreview({{ $index }})">{{ __('Collage First') }}</span>
+                                                <span class="vw-scene-empty-btn-cost" wire:loading.remove wire:target="generateCollagePreview({{ $index }})">{{ $imageModels[$selectedModel]['cost'] ?? 2 }} {{ __('tokens') }}</span>
+                                            </button>
+                                        </div>
+
+                                        {{-- HYBRID B: Shot Timeline (when multi-shot exists) --}}
+                                        @if($hasMultiShot && !empty($decomposed['shots']))
+                                            @php
+                                                $timelineShots = $decomposed['shots'];
+                                                $totalShots = count($timelineShots);
+                                                $readyShots = collect($timelineShots)->filter(fn($s) => ($s['imageStatus'] ?? $s['status'] ?? '') === 'ready')->count();
+                                                $progressPercent = $totalShots > 0 ? round(($readyShots / $totalShots) * 100) : 0;
+                                            @endphp
+                                            <div class="vw-shot-timeline">
+                                                <div class="vw-shot-timeline-header">
+                                                    <span class="vw-shot-timeline-label">{{ __('Shot Timeline') }}</span>
+                                                    <span class="vw-shot-timeline-count">{{ $readyShots }}/{{ $totalShots }} {{ __('ready') }}</span>
+                                                </div>
+
+                                                {{-- Shot Thumbnails Strip --}}
+                                                <div class="vw-shot-timeline-strip">
+                                                    @foreach($timelineShots as $shotIdx => $timelineShot)
+                                                        @php
+                                                            $shotImageUrl = $timelineShot['imageUrl'] ?? null;
+                                                            $shotStatus = $timelineShot['imageStatus'] ?? $timelineShot['status'] ?? 'pending';
+                                                            $shotType = getShotTypeLabel($timelineShot['type'] ?? 'medium');
+                                                        @endphp
+                                                        <div class="vw-shot-timeline-thumb {{ $shotIdx === 0 ? 'active' : '' }}"
+                                                             wire:click="openMultiShotModal({{ $index }})"
+                                                             title="{{ __('Shot') }} {{ $shotIdx + 1 }}: {{ $shotType }}">
+                                                            @if($shotImageUrl && $shotStatus === 'ready')
+                                                                <img src="{{ $shotImageUrl }}" alt="Shot {{ $shotIdx + 1 }}" loading="lazy">
+                                                            @else
+                                                                <div class="vw-shot-timeline-thumb-placeholder">
+                                                                    @if($shotStatus === 'generating')
+                                                                        <svg style="width: 12px; height: 12px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                            <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                                                                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                                                                        </svg>
+                                                                    @else
+                                                                        {{ $shotType }}
+                                                                    @endif
+                                                                </div>
+                                                            @endif
+                                                            <div class="vw-shot-timeline-thumb-number">{{ $shotIdx + 1 }}</div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+
+                                                {{-- Progress Bar --}}
+                                                <div class="vw-shot-timeline-progress">
+                                                    <div class="vw-shot-timeline-progress-fill" style="width: {{ $progressPercent }}%;"></div>
+                                                </div>
+
+                                                {{-- Quick Actions --}}
+                                                <div class="vw-quick-actions">
+                                                    <button type="button"
+                                                            class="vw-quick-action-btn primary"
+                                                            wire:click="openMultiShotModal({{ $index }})"
+                                                            title="{{ __('Open Multi-Shot Editor') }}">
+                                                        ✂️ {{ __('Edit Shots') }}
+                                                    </button>
+                                                    @if($readyShots > 0)
+                                                        <button type="button"
+                                                                class="vw-quick-action-btn"
+                                                                wire:click="useFirstReadyShot({{ $index }})"
+                                                                title="{{ __('Use first ready shot as scene image') }}">
+                                                            🎯 {{ __('Use Best Shot') }}
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
 
                                     {{-- Collage Preview (when generated) - Multi-Page Support --}}
