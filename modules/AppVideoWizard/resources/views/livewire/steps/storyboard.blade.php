@@ -1378,6 +1378,42 @@
         box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
     }
 
+    /* ========================================
+       EDIT SHOTS BUTTON - Prominent CTA
+       ======================================== */
+
+    .vw-edit-shots-btn {
+        padding: 0.4rem 0.75rem;
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        border: none;
+        border-radius: 0.4rem;
+        color: white;
+        font-size: 0.7rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        white-space: nowrap;
+    }
+
+    .vw-edit-shots-btn:hover {
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .vw-edit-shots-btn:active {
+        transform: translateY(0);
+    }
+
+    .vw-edit-shots-btn.vw-btn-loading {
+        opacity: 0.8;
+        cursor: wait;
+    }
+
     /* Action Cards Grid - Compact horizontal layout */
     .vw-scene-empty-buttons {
         display: flex;
@@ -5599,8 +5635,17 @@ function getCameraMovementIcon($movement) {
                                 <button type="button"
                                         wire:click="openMultiShotModal({{ $index }})"
                                         wire:loading.attr="disabled"
-                                        style="font-size: 0.5rem; padding: 0.12rem 0.35rem; background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.2rem; color: #a78bfa; cursor: pointer;">
-                                    ✂️ {{ __('Edit') }}
+                                        wire:loading.class="vw-btn-loading"
+                                        wire:target="openMultiShotModal({{ $index }})"
+                                        class="vw-edit-shots-btn">
+                                    <span wire:loading.remove wire:target="openMultiShotModal({{ $index }})">✂️ {{ __('Edit Shots') }}</span>
+                                    <span wire:loading wire:target="openMultiShotModal({{ $index }})" style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <svg style="width: 12px; height: 12px; animation: vw-spin 0.8s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10" stroke-opacity="0.3"></circle>
+                                            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                                        </svg>
+                                        {{ __('Opening...') }}
+                                    </span>
                                 </button>
                             </div>
                             {{-- Horizontal Scrollable Shot Strip - Wrapped for proper collapse --}}
