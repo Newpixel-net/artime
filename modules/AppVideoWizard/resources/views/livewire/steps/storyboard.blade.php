@@ -5496,11 +5496,11 @@ function getCameraMovementIcon($movement) {
                                         $borderColor = $hasVideo ? 'rgba(6,182,212,0.6)' : ($hasImage ? 'rgba(16,185,129,0.5)' : ($isSelected ? '#8b5cf6' : 'rgba(255,255,255,0.1)'));
                                     @endphp
                                     <div wire:key="shot-thumb-{{ $index }}-{{ $shotIdx }}"
-                                         style="cursor: pointer; position: relative; border-radius: 0.25rem; overflow: hidden; border: 2px solid {{ $borderColor }}; background: {{ $isSelected ? 'rgba(139,92,246,0.15)' : 'rgba(0,0,0,0.2)' }}; flex-shrink: 0; width: 56px;"
+                                         style="cursor: pointer; position: relative; border-radius: 0.35rem; overflow: hidden; border: 2px solid {{ $borderColor }}; background: {{ $isSelected ? 'rgba(139,92,246,0.15)' : 'rgba(0,0,0,0.2)' }}; flex-shrink: 0; width: 90px;"
                                          wire:click="openMultiShotModal({{ $index }})"
                                          title="{{ $shot['description'] ?? 'Shot ' . ($shotIdx + 1) }} ({{ $shotDuration }}s)">
-                                        {{-- Compact Thumbnail --}}
-                                        <div style="aspect-ratio: 1; position: relative; contain: strict;">
+                                        {{-- Larger Thumbnail --}}
+                                        <div style="aspect-ratio: 16/10; position: relative; contain: strict;">
                                             @if($hasImage)
                                                 <img src="{{ $shot['imageUrl'] }}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
                                                 {{-- Video play indicator --}}
