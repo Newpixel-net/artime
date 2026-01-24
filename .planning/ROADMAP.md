@@ -1,21 +1,26 @@
 # Video Wizard Development Roadmap
 
-## Milestone 8: Cinematic Shot Architecture
+## Milestone 9: Voice Production Excellence
 
-**Target:** Transform scene decomposition so every shot is purposeful, speech-driven, and cinematically connected
-**Status:** Complete (2026-01-23)
-**Total requirements:** 16 (4 categories)
-**Phases:** 11-14 (continues from M7)
+**Target:** Professional-grade voice continuity and TTS production pipeline aligned with modern industry standards
+**Status:** In Progress (2026-01-24)
+**Total requirements:** 6 (3 categories)
+**Phases:** 15-18 (continues from M8)
 
 ---
 
 ## Overview
 
-Cinematic Shot Architecture fixes the fundamental issue where speech segments are distributed proportionally across shots instead of driving shot creation. This produces non-cinematic results where dialogue doesn't flow naturally with alternating characters.
+Voice Production Excellence addresses critical gaps in the TTS/lip-sync pipeline identified through comprehensive audit. The current implementation has solid foundations (SpeechSegment class, flexible parsing, good voice assignment) but lacks voice continuity, proper narrator voice assignment, and multi-speaker support.
 
-The refactored system creates shots FROM speech segments: each dialogue/monologue segment becomes its own shot with proper shot/reverse-shot patterns, dynamic camera selection based on emotion and position, and continuous cinematic flow. Narrator segments overlay across multiple shots rather than receiving dedicated shots.
+Modern industry standards (Dia 1.6B, VibeVoice, Gemini 2.5 TTS, MultiTalk) demonstrate that multi-speaker dialogue with consistent character voices and smooth turn-taking is now standard. This milestone brings the Video Wizard's voice pipeline to professional grade.
 
-This builds on the M4 DialogueSceneDecomposerService foundation while inverting the segment-to-shot relationship.
+**Key gaps from audit:**
+- Narrator voice not assigned to shots (overlayNarratorSegments sets narratorText but NOT narratorVoiceId)
+- Single speaker per shot limitation (only first speaker's voice used)
+- No voice continuity validation (same character could get different voices)
+- Silent type coercion (missing segment type defaults to 'narrator' without error)
+- Empty text validation missing (empty segments can reach TTS)
 
 ---
 
@@ -23,163 +28,160 @@ This builds on the M4 DialogueSceneDecomposerService foundation while inverting 
 
 | Phase | Name | Goal | Requirements | Success Criteria |
 |-------|------|------|--------------|------------------|
-| 11 | Speech-Driven Shot Creation | Shots created FROM speech segments, not distributed TO them | CSA-01, CSA-02, CSA-03, CSA-04, SCNE-01 | 5 |
-| 12 | Shot/Reverse-Shot Patterns | Proper alternating character coverage for conversations | FLOW-01, FLOW-02, FLOW-04, SCNE-04 | 4 |
-| 13 | Dynamic Camera Intelligence | Smart camera selection based on emotion and position | CAM-01, CAM-02, CAM-03, CAM-04 | 4 |
-| 14 | Cinematic Flow & Action Scenes | Seamless transitions and improved non-dialogue handling | FLOW-03, SCNE-02, SCNE-03 | 3 |
+| 15 | Critical Fixes | Fix immediate voice assignment and validation gaps | VOC-01, VOC-02 | 2 |
+| 16 | Consistency Layer | Unify distribution strategies and validate continuity | VOC-03, VOC-04 | 2 |
+| 17 | Voice Registry | Centralize voice assignment as single source of truth | VOC-05 | 1 |
+| 18 | Multi-Speaker Support | Track multiple speakers per shot for dialogue | VOC-06 | 1 |
 
-**Total:** 4 phases | 16 requirements | 16 success criteria
+**Total:** 4 phases | 6 requirements | 6 success criteria
 
 ---
 
-## Phase 11: Speech-Driven Shot Creation - COMPLETE
+## Phase 15: Critical Fixes
 
-**Goal:** Refactor decomposition so speech segments CREATE shots instead of being distributed to them
+**Goal:** Fix immediate voice assignment and validation gaps that cause TTS failures
 
-**Status:** Complete (2026-01-23)
+**Status:** Planned (2026-01-24)
 
 **Dependencies:** None (starts new milestone)
 
-**Plans:** 2 plans (2/2 complete)
-
-Plans:
-- [x] 11-01-PLAN.md - Speech-to-shot inversion (1:1 mapping for dialogue/monologue)
-- [x] 11-02-PLAN.md - Narrator overlay and internal thought voiceover handling
-
 **Requirements:**
-- CSA-01: Each dialogue segment creates its own shot (1:1 mapping)
-- CSA-02: Each monologue segment creates its own shot (1:1 mapping)
-- CSA-03: Narrator segments overlay across multiple shots (not dedicated shots)
-- CSA-04: Internal thought segments handled as voiceover (no dedicated shot)
-- SCNE-01: No artificial limit on shots per scene (10+ if speech demands)
+- VOC-01: Narrator voice assigned to shots (narratorVoiceId flows through overlayNarratorSegments)
+- VOC-02: Empty text validation before TTS (empty/invalid segments caught early)
 
 **Success Criteria:**
-1. Scene with 5 dialogue exchanges produces 5+ shots (one per speaker turn)
-2. Monologue scene creates shots matching monologue segments
-3. Narrator text appears as metadata on shots, not as separate shots
-4. Internal thought segments flagged as voiceover-only, no visual shot
-5. Scene with 12 speech segments produces 12+ shots without error
+1. overlayNarratorSegments() sets narratorVoiceId on each shot (from animation.narrator.voice)
+2. Empty segment text caught before reaching TTS generation
+3. Missing segment type logged as error (not silently coerced to 'narrator')
+4. validateBeforeParse() method catches common issues early
+5. TTS generation receives valid, non-empty text for all segments
 
 **Key changes:**
-- Invert `distributeSpeechSegmentsToShots()` -> `createShotsFromSpeechSegments()`
-- Separate narrator handling from dialogue/monologue
-- Remove shot count caps that limit cinematic expression
+- Add narratorVoiceId assignment in overlayNarratorSegments() (~line 23906)
+- Add validateBeforeParse() method for early validation
+- Add empty text check before TTS calls
+- Log errors for missing segment types instead of silent coercion
+
+**Location hints (from audit):**
+- `overlayNarratorSegments()` - Add `$shots[$shotIdx]['narratorVoiceId'] = $this->animation['narrator']['voice'] ?? 'fable';`
+- Segment parsing - Add type validation with error logging
 
 ---
 
-## Phase 12: Shot/Reverse-Shot Patterns - COMPLETE
+## Phase 16: Consistency Layer
 
-**Goal:** Validate and enforce proper Hollywood conversation coverage with alternating characters
+**Goal:** Unify distribution strategies and validate voice continuity across scenes
 
-**Status:** Complete (2026-01-23)
+**Status:** Planned (2026-01-24)
 
-**Dependencies:** Phase 11 (requires shots to exist from speech)
-
-**Plans:** 2 plans (2/2 complete)
-
-Plans:
-- [x] 12-01-PLAN.md - Add validation methods to DialogueSceneDecomposerService (180-degree rule, single-character constraint, character alternation)
-- [x] 12-02-PLAN.md - Integrate validation into VideoWizard flow with quality reporting
+**Dependencies:** Phase 15 (requires validation working)
 
 **Requirements:**
-- FLOW-01: Shot/reverse-shot pattern for 2-character conversations
-- FLOW-02: Single character visible per shot (model constraint enforced)
-- FLOW-04: Alternating character shots in dialogue sequences
-- SCNE-04: Scene maintains 180-degree rule throughout
+- VOC-03: Unified distribution strategy (narrator and internal thoughts use same word-split approach)
+- VOC-04: Voice continuity validation (same character maintains same voice across all scenes)
 
 **Success Criteria:**
-1. Two-character dialogue alternates Character A -> Character B -> A -> B
-2. Each shot shows exactly one speaking character (validated before generation)
-3. Camera stays on same side of action axis (180-degree rule)
-4. OTS shots show foreground character blurred, background in focus
-
-**Key insight from research:** Phase 12 is NOT about building new shot/reverse-shot logic. The infrastructure exists in DialogueSceneDecomposerService (pairReverseShots at line 534, calculateSpatialData at line 488). Phase 12 ACTIVATES and VALIDATES these existing patterns.
+1. Narrator and internal thought segments use identical word-split distribution algorithm
+2. validateVoiceContinuity() method checks character-to-voice consistency
+3. Voice mismatches logged as warnings (non-blocking, same as M8 validation pattern)
+4. Same character never receives different voices across scenes
+5. Internal thought overlay behavior matches narrator overlay behavior
 
 **Key changes:**
-- Add validate180DegreeRule() to DialogueSceneDecomposerService
-- Add enforceSingleCharacterConstraint() to enforce FLOW-02
-- Add validateCharacterAlternation() to check FLOW-04
-- Integrate validation into VideoWizard scene decomposition flow
+- Refactor internal thought distribution to use same word-split as narrator
+- Add validateVoiceContinuity() to check voice assignments
+- Log voice continuity warnings without blocking generation
+
+**Industry alignment:**
+- Microsoft VibeVoice: 90 minutes of speech with 4 distinct speakers maintaining consistency
+- Google Gemini 2.5 TTS: Seamless dialogue with consistent character voices
 
 ---
 
-## Phase 13: Dynamic Camera Intelligence - COMPLETE
+## Phase 17: Voice Registry
 
-**Goal:** Smart camera selection that responds to emotion and conversation position
+**Goal:** Centralize voice assignment as single source of truth
 
-**Status:** Complete (2026-01-23)
+**Status:** Planned (2026-01-24)
 
-**Dependencies:** Phase 12 (requires pattern working)
-
-**Plans:** 1 plan (1/1 complete)
-
-Plans:
-- [x] 13-01-PLAN.md - Position-enforced shot selection and speaker emotion analysis
+**Dependencies:** Phase 16 (requires continuity validation)
 
 **Requirements:**
-- CAM-01: Dynamic CU/MS/OTS selection based on emotional intensity
-- CAM-02: Camera variety based on position in conversation (opening vs climax)
-- CAM-03: Shot type matches speaker's emotional state
-- CAM-04: Establishing shot at conversation start, tight framing at climax
+- VOC-05: Voice Registry centralization (single source of truth for narrator, internal, character voices)
 
 **Success Criteria:**
-1. High-intensity dialogue (anger, fear) uses close-up framing
-2. Conversation opening uses establishing or medium shots
-3. Conversation climax uses tight close-ups
-4. Neutral dialogue uses medium shots with OTS variety
-5. Each speaker's shot type reflects their emotional state from script
+1. VoiceRegistry class created with narrator, internal, and character voice properties
+2. All voice lookups go through VoiceRegistry instead of multiple resolution paths
+3. Character Bible voice assignments flow into VoiceRegistry
+4. validateContinuity() method on VoiceRegistry returns issues array
+5. Voice assignment debugging simplified (single place to check)
 
 **Key changes:**
-- Enhance `selectShotTypeForIntensity()` with conversation position awareness
-- Add per-speaker emotion analysis via `analyzeSpeakerEmotion()`
-- Implement shot progression arc (wide -> medium -> tight as tension builds)
+- Create VoiceRegistry class (as proposed in audit)
+- Refactor voice lookup calls to use registry
+- Wire Character Bible voices into registry
+- Add registry-level continuity validation
+
+**Proposed interface (from audit):**
+```php
+class VoiceRegistry {
+    public ?string $narratorVoiceId;
+    public ?string $internalVoiceId;
+    public array $characterVoices = [];
+    public function validateContinuity(): array;
+}
+```
 
 ---
 
-## Phase 14: Cinematic Flow & Action Scenes - COMPLETE
+## Phase 18: Multi-Speaker Support
 
-**Goal:** Smooth shot transitions and improved non-dialogue scene handling
+**Goal:** Track multiple speakers per shot for complex dialogue scenes
 
-**Status:** Complete (2026-01-23)
+**Status:** Planned (2026-01-24)
 
-**Dependencies:** Phase 13 (requires camera working)
-
-**Plans:** 2 plans (2/2 complete)
-
-Plans:
-- [x] 14-01-PLAN.md - Transition validation (jump cut prevention, scale change enforcement)
-- [x] 14-02-PLAN.md - Action scene decomposition and scene type routing
+**Dependencies:** Phase 17 (requires registry working)
 
 **Requirements:**
-- FLOW-03: Shots build cinematically on each other (no jarring cuts)
-- SCNE-02: Non-dialogue scenes get improved action decomposition
-- SCNE-03: Mixed scenes (dialogue + action) handled smoothly
+- VOC-06: Multi-speaker shot support (multiple speakers tracked per shot for dialogue)
 
 **Success Criteria:**
-1. No jump cuts (same character, same framing back-to-back)
-2. Shot scale changes by at least one step (CU -> MS, not CU -> CU)
-3. Action scenes produce varied shot types (establishing, action, reaction, detail)
-4. Mixed dialogue/action scenes transition smoothly between modes
-5. Visual prompt continuity verified across shot sequence
+1. Shot structure supports multiple speakers array (not just first speaker)
+2. Each speaker entry includes name, voiceId, and text
+3. DialogueSceneDecomposerService creates multi-speaker shot data
+4. Downstream TTS processing can handle multiple voices per shot
+5. Shot/reverse-shot patterns still work (single visible character, multiple voice tracks)
 
 **Key changes:**
-- Add transition validator to prevent jarring cuts (Plan 14-01)
-- Add decomposeActionScene() using action coverage pattern (Plan 14-02)
-- Add scene type routing via SceneTypeDetectorService (Plan 14-02)
-- Add visual continuity helper for prompt consistency (Plan 14-02)
+- Expand shot structure from single speaker to speakers array
+- Refactor `$firstSpeaker = array_keys($speakers)[0]` pattern (~line 23630)
+- Create multi-speaker shot data in decomposition
+- Update TTS processing to handle multiple voices
+
+**Current limitation (from audit):**
+```php
+// Current (line 23630):
+$firstSpeaker = array_keys($speakers)[0] ?? null;
+
+// Proposed:
+$shot['speakers'] = [
+    ['name' => 'HERO', 'voiceId' => 'xxx', 'text' => '...'],
+    ['name' => 'VILLAIN', 'voiceId' => 'yyy', 'text' => '...'],
+];
+```
 
 ---
 
 ## Dependencies
 
 ```
-Phase 11 (Speech-Driven)
+Phase 15 (Critical Fixes)
     |
-Phase 12 (Shot/Reverse-Shot) <- depends on shots existing
+Phase 16 (Consistency Layer) <- depends on validation working
     |
-Phase 13 (Camera Intelligence) <- depends on pattern working
+Phase 17 (Voice Registry) <- depends on continuity validation
     |
-Phase 14 (Flow & Polish) <- depends on camera working
+Phase 18 (Multi-Speaker) <- depends on registry working
 ```
 
 Sequential execution required.
@@ -190,23 +192,23 @@ Sequential execution required.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 11: Speech-Driven | Complete | CSA-01 to CSA-04, SCNE-01 (5) | 5/5 |
-| Phase 12: Shot/Reverse-Shot | Complete | FLOW-01, FLOW-02, FLOW-04, SCNE-04 (4) | 4/4 |
-| Phase 13: Camera Intelligence | Complete | CAM-01 to CAM-04 (4) | 4/4 |
-| Phase 14: Flow & Action | Complete | FLOW-03, SCNE-02, SCNE-03 (3) | 3/3 |
+| Phase 15: Critical Fixes | Planned | VOC-01, VOC-02 (2) | 0/5 |
+| Phase 16: Consistency Layer | Planned | VOC-03, VOC-04 (2) | 0/5 |
+| Phase 17: Voice Registry | Planned | VOC-05 (1) | 0/5 |
+| Phase 18: Multi-Speaker | Planned | VOC-06 (1) | 0/5 |
 
 **Overall Progress:**
 
 ```
-Phase 11: ██████████ 100%
-Phase 12: ██████████ 100%
-Phase 13: ██████████ 100%
-Phase 14: ██████████ 100%
+Phase 15: ░░░░░░░░░░ 0%
+Phase 16: ░░░░░░░░░░ 0%
+Phase 17: ░░░░░░░░░░ 0%
+Phase 18: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ██████████ 100%
+Overall:  ░░░░░░░░░░ 0%
 ```
 
-**Coverage:** 16/16 requirements mapped (100%)
+**Coverage:** 6/6 requirements mapped (100%)
 
 ---
 
@@ -214,37 +216,45 @@ Overall:  ██████████ 100%
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Many shots overwhelm UI | HIGH | Update storyboard grid to handle 10+ shots per scene |
-| Breaking existing scenes | HIGH | Preserve fallback to current decomposition for non-dialogue |
-| Performance with 10+ shots | MEDIUM | Lazy load shots, paginate if needed |
-| Complex prompt chains | MEDIUM | Validate prompts maintain character continuity |
+| Breaking existing TTS flow | HIGH | Add validation without changing happy path first |
+| Voice Registry refactor scope | MEDIUM | Keep registry as wrapper, don't rewrite voice lookup |
+| Multi-speaker complexity | MEDIUM | Start with data structure, TTS processing later |
+| Performance with validation | LOW | Validation is lightweight string checks |
 
 ---
 
 ## Verification Strategy
 
 After each phase:
-1. Test with sample dialogue scene (2 characters, 6+ exchanges)
-2. Test with monologue scene (single character, 4+ segments)
-3. Test with action scene (no dialogue)
-4. Test with mixed scene (dialogue + action)
-5. Verify generated images show correct character in correct framing
+1. Test with scene containing narrator segments (voice assignment)
+2. Test with empty/malformed segments (validation)
+3. Test with same character across multiple scenes (continuity)
+4. Test with multi-character dialogue (multi-speaker)
+5. Verify TTS generation produces correct audio for all segment types
 
 ---
 
 ## Previous Milestone (Complete)
 
-### Milestone 7: Scene Text Inspector - COMPLETE
+### Milestone 8: Cinematic Shot Architecture - COMPLETE
 
-**Status:** 100% complete (28/28 requirements)
-**Phases:** 7-10
+**Status:** 100% complete (16/16 requirements)
+**Phases:** 11-14
 
 | Phase | Status |
 |-------|--------|
-| Phase 7: Foundation | Complete |
-| Phase 8: Speech Segments | Complete |
-| Phase 9: Prompts + Copy | Complete |
-| Phase 10: Mobile + Polish | Complete |
+| Phase 11: Speech-Driven | Complete |
+| Phase 12: Shot/Reverse-Shot | Complete |
+| Phase 13: Camera Intelligence | Complete |
+| Phase 14: Flow & Action | Complete |
+
+**Key achievements:**
+- Speech-driven shot creation (1:1 mapping)
+- Shot/reverse-shot patterns with 180-degree rule
+- Dynamic camera selection based on emotion and position
+- Jump cut prevention with transition validation
+- Action scene decomposition with coverage patterns
+- Visual continuity metadata for prompts
 
 ---
 
@@ -252,10 +262,10 @@ After each phase:
 
 **"Automatic, effortless, Hollywood-quality output from button clicks."**
 
-Cinematic shot architecture ensures users get professional-quality shot sequences automatically. Each button click produces shots that flow like a Hollywood film, with proper coverage, dynamic cameras, and continuous visual storytelling.
+Voice Production Excellence ensures users get professional-quality audio automatically. Each character maintains their voice throughout the video, narrator segments have proper voice assignment, and multi-speaker dialogue flows naturally with smooth turn-taking.
 
 ---
 
-*Milestone 8 roadmap created: 2026-01-23*
-*Phases 11-14 defined*
-*Phase 14 planned: 2026-01-23*
+*Milestone 9 roadmap created: 2026-01-24*
+*Phases 15-18 defined*
+*Source: Comprehensive TTS/Lip-Sync audit*

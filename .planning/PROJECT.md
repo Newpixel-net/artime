@@ -10,19 +10,17 @@ AI-powered video creation platform built with Laravel and Livewire. Users input 
 
 The system should be sophisticated and automatically updated based on previous steps in the wizard. Users click buttons and perform complete actions without effort.
 
-## Current Milestone: v8 Cinematic Shot Architecture
+## Current Milestone: v9 Voice Production Excellence
 
-**Goal:** Transform scene decomposition so every shot is purposeful, speech-driven, and cinematically connected.
+**Goal:** Professional-grade voice continuity and TTS production pipeline aligned with modern industry standards (Dia, VibeVoice, Gemini 2.5 TTS).
 
 **Target features:**
-- Speech-to-Shot Mapping — Each dialogue/monologue segment creates its own shot(s)
-- Shot/Reverse-Shot Pattern — Proper conversation coverage with alternating characters
-- Dynamic Camera Selection — Vary CU/MS/OTS based on emotional intensity and position
-- Continuous Flow — Shots build cinematically on each other
-- Single-Character Focus — One character per shot (model constraint → feature)
-- Narrator Overlay — Narrator spans multiple shots, not dedicated shots
-- Unlimited Shots — 10+ shots per scene if speech demands it
-- Action Scene Improvement — Better decomposition for non-dialogue scenes
+- Narrator Voice Assignment — Narrator voiceId flows to shots for TTS generation
+- Segment Validation — Empty/invalid segments caught before reaching TTS
+- Unified Distribution — Narrator and internal thoughts use consistent word-split distribution
+- Voice Continuity — Same character maintains same voice across all scenes
+- Voice Registry — Centralized source of truth for character voice assignments
+- Multi-Speaker Support — Track multiple speakers per shot for complex dialogue
 
 ## Requirements
 
@@ -38,19 +36,18 @@ The system should be sophisticated and automatically updated based on previous s
 - ✓ **M5**: Emotional Arc System — climax detection, intensity smoothing, arc templates
 - ✓ **M6**: UI/UX Polish — dialogue display, shot badges, progress indicators, visual consistency
 - ✓ **M7**: Scene Text Inspector — full transparency modal, speech segments, prompts, copy-to-clipboard
+- ✓ **M8**: Cinematic Shot Architecture — speech-driven shots, shot/reverse-shot, dynamic camera, action scenes
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] **CSA-01**: Speech-driven shot count — each dialogue/monologue segment creates at least one shot
-- [ ] **CSA-02**: Narrator overlay — narrator segments span multiple shots, not dedicated
-- [ ] **CSA-03**: Single character per shot — enforce one speaking character per shot
-- [ ] **CSA-04**: Dynamic camera variety — vary CU/MS/OTS based on intensity AND position
-- [ ] **CSA-05**: Shot flow continuity — shots connect cinematically (no jarring transitions)
-- [ ] **CSA-06**: Improved action decomposition — non-dialogue scenes get better shot variety
-- [ ] **CSA-07**: Unlimited shots per scene — remove artificial limits, speech drives count
-- [ ] **CSA-08**: Character emotion matching — shot type matches speaker's emotional state
+- [ ] **VOC-01**: Narrator voice assigned — overlayNarratorSegments() sets narratorVoiceId on shots
+- [ ] **VOC-02**: Empty text validation — empty/invalid segments caught before TTS generation
+- [ ] **VOC-03**: Unified distribution — narrator and internal thoughts use same word-split approach
+- [ ] **VOC-04**: Voice continuity validation — same character keeps same voice across scenes
+- [ ] **VOC-05**: Voice Registry centralization — single source of truth for character voices
+- [ ] **VOC-06**: Multi-speaker shot support — multiple speakers tracked per shot for dialogue
 
 ### Out of Scope
 
@@ -70,15 +67,25 @@ The system should be sophisticated and automatically updated based on previous s
 - Image generation: HiDream, NanoBanana Pro, NanoBanana
 - Video generation: Runway, Multitalk (single character lip-sync)
 
-**Existing architecture (from M4):**
-- DialogueSceneDecomposerService — shot/reverse-shot, 180-degree rule, reactions
-- DynamicShotEngine — content-driven shot count, intensity mapping
-- Speech segment distribution — currently proportional (needs to become 1:1)
+**M8 Foundation (complete):**
+- DialogueSceneDecomposerService — speech-driven shots, shot/reverse-shot, emotion analysis
+- SceneTypeDetectorService — routes dialogue/action/mixed scenes
+- ShotContinuityService — jump cut prevention, coverage patterns
+- Transition validation — scale changes enforced between consecutive shots
 
-**Current issue:**
-- Speech segments distributed proportionally across shots instead of driving shot creation
-- Scenes don't produce continuous, cinematic shot sequences
-- Dialogue doesn't naturally flow shot-to-shot with alternating characters
+**Current issues (from audit):**
+- Narrator voice not assigned — overlayNarratorSegments() sets narratorText but NOT narratorVoiceId
+- Single speaker per shot — only first speaker's voice used: array_keys($speakers)[0]
+- No voice continuity — same character could get different voices across scenes
+- Internal thought asymmetry — narrator uses word-split, internal uses segment-split
+- Silent type coercion — missing segment type defaults to 'narrator' without error
+- Empty text validation — empty segments can reach TTS generation
+
+**Industry standards (2025):**
+- Dia 1.6B TTS — speaker tags [S1], [S2] for consistent multi-voice dialogue
+- Microsoft VibeVoice — 90 min speech with 4 distinct speakers
+- Google Gemini 2.5 TTS — seamless dialogue with consistent character voices
+- MultiTalk (MeiGen-AI) — audio-driven multi-person conversational video
 
 ## Constraints
 
@@ -96,8 +103,12 @@ The system should be sophisticated and automatically updated based on previous s
 | Purple for speaker names | Consistent with app color scheme | ✓ Good |
 | Type icons: 🎙️💬💭🗣️ | Immediate visual recognition | ✓ Good |
 | M4 DialogueSceneDecomposerService | Foundation for shot/reverse-shot | ✓ Good - will extend |
-| Speech-to-shot 1:1 mapping | Each speech segment drives its own shot | — Pending (M8) |
-| Narrator overlay pattern | Narrator spans shots, not dedicated | — Pending (M8) |
+| Speech-to-shot 1:1 mapping | Each speech segment drives its own shot | ✓ Good (M8) |
+| Narrator overlay pattern | Narrator spans shots, not dedicated | ✓ Good (M8) |
+| Jump cut prevention | Validate transitions, enforce scale changes | ✓ Good (M8) |
+| Action coverage pattern | Use ShotContinuityService for action scenes | ✓ Good (M8) |
+| Voice Registry pattern | Centralized voice assignment (from audit) | — Pending (M9) |
+| Multi-speaker tracking | Multiple speakers per shot for dialogue | — Pending (M9) |
 
 ---
-*Last updated: 2026-01-23 after Milestone 8 start*
+*Last updated: 2026-01-24 after Milestone 9 start*

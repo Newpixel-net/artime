@@ -1,65 +1,47 @@
-# Requirements: Video Wizard - Cinematic Shot Architecture
+# Requirements: Video Wizard - Voice Production Excellence
 
-**Defined:** 2026-01-23
+**Defined:** 2026-01-24
 **Core Value:** Automatic, effortless, Hollywood-quality output from button clicks
 
 ## v1 Requirements
 
-Requirements for Milestone 8. Each maps to roadmap phases.
+Requirements for Milestone 9. Each maps to roadmap phases.
 
-### Speech-to-Shot Architecture
+### Critical Fixes (P0)
 
-- [x] **CSA-01**: Each dialogue segment creates its own shot (1:1 mapping) ✓
-- [x] **CSA-02**: Each monologue segment creates its own shot (1:1 mapping) ✓
-- [x] **CSA-03**: Narrator segments overlay across multiple shots (not dedicated shots) ✓
-- [x] **CSA-04**: Internal thought segments handled as voiceover (no dedicated shot) ✓
+- [ ] **VOC-01**: Narrator voice assigned to shots (narratorVoiceId flows through overlayNarratorSegments)
+- [ ] **VOC-02**: Empty text validation before TTS (empty/invalid segments caught early)
 
-### Shot Pattern & Flow
+### Consistency Layer (P1)
 
-- [x] **FLOW-01**: Shot/reverse-shot pattern for 2-character conversations ✓
-- [x] **FLOW-02**: Single character visible per shot (model constraint enforced) ✓
-- [x] **FLOW-03**: Shots build cinematically on each other (no jarring cuts) ✓
-- [x] **FLOW-04**: Alternating character shots in dialogue sequences ✓
+- [ ] **VOC-03**: Unified distribution strategy (narrator and internal thoughts use same word-split approach)
+- [ ] **VOC-04**: Voice continuity validation (same character maintains same voice across all scenes)
 
-### Camera Selection
+### Voice Architecture (P2)
 
-- [x] **CAM-01**: Dynamic CU/MS/OTS selection based on emotional intensity ✓
-- [x] **CAM-02**: Camera variety based on position in conversation (opening vs climax) ✓
-- [x] **CAM-03**: Shot type matches speaker's emotional state ✓
-- [x] **CAM-04**: Establishing shot at conversation start, tight framing at climax ✓
-
-### Scene Handling
-
-- [x] **SCNE-01**: No artificial limit on shots per scene (10+ if speech demands) ✓
-- [x] **SCNE-02**: Non-dialogue scenes get improved action decomposition ✓
-- [x] **SCNE-03**: Mixed scenes (dialogue + action) handled smoothly ✓
-- [x] **SCNE-04**: Scene maintains 180-degree rule throughout ✓
+- [ ] **VOC-05**: Voice Registry centralization (single source of truth for narrator, internal, character voices)
+- [ ] **VOC-06**: Multi-speaker shot support (multiple speakers tracked per shot for dialogue scenes)
 
 ## Future Requirements
 
 Deferred to later milestones.
 
-### Advanced Dialogue
+### SSML Integration (P3)
 
-- **ADV-01**: 3+ character conversation handling (group scenes)
-- **ADV-02**: Cross-cutting between parallel conversations
-- **ADV-03**: Flashback/memory shot integration
-
-### Performance
-
-- **PERF-01**: Shot generation preview before committing
-- **PERF-02**: Batch regeneration of specific shots
+- **SSML-01**: SSML-style speech markup for better TTS control
+- **SSML-02**: Voice switching with speaker tags
+- **SSML-03**: Style control with express-as elements for emotional consistency
 
 ## Out of Scope
 
-Explicitly excluded.
+Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Multi-character in single shot | Multitalk model limitation, embrace as creative constraint |
-| Manual shot reordering | Keep automatic flow, users can regenerate |
-| Custom camera angles | Automatic selection is core value |
-| Split-screen effects | Not standard Hollywood cinematography |
+| Real-time voice preview | High complexity, not critical for production |
+| Custom voice training | Requires external service integration |
+| Multi-language TTS | English-first, expand later |
+| Audio editing timeline | Use external tools for post-production |
 
 ## Traceability
 
@@ -67,34 +49,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CSA-01 | Phase 11 | ✓ Complete |
-| CSA-02 | Phase 11 | ✓ Complete |
-| CSA-03 | Phase 11 | ✓ Complete |
-| CSA-04 | Phase 11 | ✓ Complete |
-| SCNE-01 | Phase 11 | ✓ Complete |
-| FLOW-01 | Phase 12 | ✓ Complete |
-| FLOW-02 | Phase 12 | ✓ Complete |
-| FLOW-04 | Phase 12 | ✓ Complete |
-| SCNE-04 | Phase 12 | ✓ Complete |
-| CAM-01 | Phase 13 | ✓ Complete |
-| CAM-02 | Phase 13 | ✓ Complete |
-| CAM-03 | Phase 13 | ✓ Complete |
-| CAM-04 | Phase 13 | ✓ Complete |
-| FLOW-03 | Phase 14 | ✓ Complete |
-| SCNE-02 | Phase 14 | ✓ Complete |
-| SCNE-03 | Phase 14 | ✓ Complete |
+| VOC-01 | Phase 15 | Pending |
+| VOC-02 | Phase 15 | Pending |
+| VOC-03 | Phase 16 | Pending |
+| VOC-04 | Phase 16 | Pending |
+| VOC-05 | Phase 17 | Pending |
+| VOC-06 | Phase 18 | Pending |
 
 **Coverage:**
-- v1 requirements: 16 total
-- Mapped to phases: 16 (100%)
+- v1 requirements: 6 total
+- Mapped to phases: 6 (100%)
 - Unmapped: 0 ✓
 
 **Phase distribution:**
-- Phase 11 (Speech-Driven): 5 requirements (CSA-01 to CSA-04, SCNE-01)
-- Phase 12 (Shot/Reverse-Shot): 4 requirements (FLOW-01, FLOW-02, FLOW-04, SCNE-04)
-- Phase 13 (Camera Intelligence): 4 requirements (CAM-01 to CAM-04)
-- Phase 14 (Flow & Action): 3 requirements (FLOW-03, SCNE-02, SCNE-03)
+- Phase 15 (Critical Fixes): 2 requirements (VOC-01, VOC-02)
+- Phase 16 (Consistency Layer): 2 requirements (VOC-03, VOC-04)
+- Phase 17 (Voice Registry): 1 requirement (VOC-05)
+- Phase 18 (Multi-Speaker): 1 requirement (VOC-06)
 
 ---
-*Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 — Milestone 8 complete (16/16 requirements)*
+*Requirements defined: 2026-01-24*
+*Source: Comprehensive TTS/Lip-Sync audit*
