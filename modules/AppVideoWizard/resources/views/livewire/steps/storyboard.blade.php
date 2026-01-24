@@ -6205,7 +6205,7 @@ function getCameraMovementIcon($movement) {
                                 {{-- Voice Types clickable badge --}}
                                 <button
                                     type="button"
-                                    @click="voiceModalOpen = true"
+                                    @click.stop.prevent="voiceModalOpen = true"
                                     class="vw-voice-types-btn"
                                     style="display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.5rem; background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,182,212,0.15)); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.3rem; cursor: pointer; transition: all 0.2s;"
                                 >
@@ -6216,7 +6216,8 @@ function getCameraMovementIcon($movement) {
 
                                 {{-- Inspect button --}}
                                 <button
-                                    wire:click="openSceneTextInspector({{ $index }})"
+                                    type="button"
+                                    wire:click.stop="openSceneTextInspector({{ $index }})"
                                     class="vw-inspect-btn"
                                     title="{{ __('Full scene details') }}"
                                     style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #a78bfa; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-size: 0.55rem; cursor: pointer; transition: all 0.2s;"
