@@ -520,25 +520,92 @@
 
     /* Scene Memory in Sidebar */
     .vw-sidebar-bible-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
         gap: 0.5rem;
         margin-bottom: 0.5rem;
     }
 
     .vw-sidebar-bible-card {
-        flex: 1;
-        padding: 0.5rem;
+        position: relative;
+        aspect-ratio: 1;
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 0.4rem;
+        border-radius: 0.5rem;
         cursor: pointer;
-        text-align: center;
-        transition: all 0.15s ease;
+        overflow: hidden;
+        transition: all 0.2s ease;
     }
 
     .vw-sidebar-bible-card:hover {
-        background: rgba(139, 92, 246, 0.1);
+        border-color: rgba(139, 92, 246, 0.5);
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+    }
+
+    .vw-sidebar-bible-card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .vw-sidebar-bible-card-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1));
+        font-size: 2rem;
+    }
+
+    .vw-sidebar-bible-card-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 0.4rem 0.5rem;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+    }
+
+    .vw-sidebar-bible-card-name {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: white;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vw-sidebar-bible-card-tag {
+        font-size: 0.55rem;
+        color: rgba(167, 139, 250, 0.9);
+    }
+
+    .vw-sidebar-bible-card-add {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-style: dashed;
         border-color: rgba(139, 92, 246, 0.3);
+        background: rgba(139, 92, 246, 0.05);
+    }
+
+    .vw-sidebar-bible-card-add:hover {
+        background: rgba(139, 92, 246, 0.15);
+        border-color: rgba(139, 92, 246, 0.5);
+    }
+
+    .vw-sidebar-bible-card-add-icon {
+        font-size: 1.5rem;
+        color: rgba(139, 92, 246, 0.6);
+        margin-bottom: 0.25rem;
+    }
+
+    .vw-sidebar-bible-card-add-text {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.5);
     }
 
     .vw-sidebar-bible-icon {
@@ -4109,27 +4176,34 @@ function getCameraMovementIcon($movement) {
                                     <span class="icon">👤</span>
                                     <span>{{ __('Characters') }} ({{ count($characters) }})</span>
                                 </div>
-                                <button type="button" wire:click="openCharacterBibleModal" style="font-size: 0.6rem; color: #a78bfa; background: none; border: none; cursor: pointer;">+ {{ __('Add') }}</button>
+                                <button type="button" wire:click="openCharacterBibleModal" style="font-size: 0.65rem; color: #a78bfa; background: none; border: none; cursor: pointer; font-weight: 500;">+ {{ __('Add') }}</button>
                             </div>
                             <div class="vw-sidebar-section-body">
                                 <div class="vw-sidebar-bible-row">
-                                    @forelse(array_slice($characters, 0, 4) as $char)
-                                        <div class="vw-sidebar-bible-card" wire:click="openCharacterBibleModal">
-                                            <div class="vw-sidebar-bible-icon">
-                                                @if(!empty($char['referenceImage']))
-                                                    <img src="{{ $char['referenceImage'] }}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
-                                                @else
-                                                    👤
-                                                @endif
+                                    @forelse($characters as $charIndex => $char)
+                                        <div class="vw-sidebar-bible-card" wire:click="openCharacterBibleModal" title="{{ $char['name'] ?? __('Character') }}">
+                                            @if(!empty($char['referenceImage']))
+                                                <img src="{{ $char['referenceImage'] }}" alt="{{ $char['name'] ?? '' }}" class="vw-sidebar-bible-card-image" loading="lazy">
+                                            @else
+                                                <div class="vw-sidebar-bible-card-placeholder">👤</div>
+                                            @endif
+                                            <div class="vw-sidebar-bible-card-overlay">
+                                                <div class="vw-sidebar-bible-card-name">{{ $char['name'] ?? __('Character') }}</div>
+                                                <div class="vw-sidebar-bible-card-tag">&#64;{{ Str::slug($char['name'] ?? 'char') }}</div>
                                             </div>
-                                            <div class="vw-sidebar-bible-label">{{ Str::limit($char['name'] ?? 'Char', 8) }}</div>
                                         </div>
                                     @empty
-                                        <div class="vw-sidebar-bible-card" wire:click="openCharacterBibleModal" style="border-style: dashed;">
-                                            <div class="vw-sidebar-bible-icon">+</div>
-                                            <div class="vw-sidebar-bible-label">{{ __('Add') }}</div>
+                                        <div class="vw-sidebar-bible-card vw-sidebar-bible-card-add" wire:click="openCharacterBibleModal">
+                                            <div class="vw-sidebar-bible-card-add-icon">+</div>
+                                            <div class="vw-sidebar-bible-card-add-text">{{ __('Add Character') }}</div>
                                         </div>
                                     @endforelse
+                                    @if(count($characters) > 0)
+                                        <div class="vw-sidebar-bible-card vw-sidebar-bible-card-add" wire:click="openCharacterBibleModal">
+                                            <div class="vw-sidebar-bible-card-add-icon">+</div>
+                                            <div class="vw-sidebar-bible-card-add-text">{{ __('Add More') }}</div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -4141,42 +4215,49 @@ function getCameraMovementIcon($movement) {
                                     <span class="icon">📍</span>
                                     <span>{{ __('Locations') }} ({{ count($locations) }})</span>
                                 </div>
-                                <button type="button" wire:click="openLocationBibleModal" style="font-size: 0.6rem; color: #a78bfa; background: none; border: none; cursor: pointer;">+ {{ __('Add') }}</button>
+                                <button type="button" wire:click="openLocationBibleModal" style="font-size: 0.65rem; color: #a78bfa; background: none; border: none; cursor: pointer; font-weight: 500;">+ {{ __('Add') }}</button>
                             </div>
                             <div class="vw-sidebar-section-body">
                                 <div class="vw-sidebar-bible-row">
-                                    @forelse(array_slice($locations, 0, 4) as $loc)
-                                        <div class="vw-sidebar-bible-card" wire:click="openLocationBibleModal">
-                                            <div class="vw-sidebar-bible-icon">
-                                                @if(!empty($loc['referenceImage']))
-                                                    <img src="{{ $loc['referenceImage'] }}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
-                                                @else
-                                                    📍
-                                                @endif
+                                    @forelse($locations as $locIndex => $loc)
+                                        <div class="vw-sidebar-bible-card" wire:click="openLocationBibleModal" title="{{ $loc['name'] ?? __('Location') }}">
+                                            @if(!empty($loc['referenceImage']))
+                                                <img src="{{ $loc['referenceImage'] }}" alt="{{ $loc['name'] ?? '' }}" class="vw-sidebar-bible-card-image" loading="lazy">
+                                            @else
+                                                <div class="vw-sidebar-bible-card-placeholder">📍</div>
+                                            @endif
+                                            <div class="vw-sidebar-bible-card-overlay">
+                                                <div class="vw-sidebar-bible-card-name">{{ $loc['name'] ?? __('Location') }}</div>
+                                                <div class="vw-sidebar-bible-card-tag">&#64;{{ Str::slug($loc['name'] ?? 'location') }}</div>
                                             </div>
-                                            <div class="vw-sidebar-bible-label">{{ Str::limit($loc['name'] ?? 'Location', 8) }}</div>
                                         </div>
                                     @empty
-                                        <div class="vw-sidebar-bible-card" wire:click="openLocationBibleModal" style="border-style: dashed;">
-                                            <div class="vw-sidebar-bible-icon">+</div>
-                                            <div class="vw-sidebar-bible-label">{{ __('Add') }}</div>
+                                        <div class="vw-sidebar-bible-card vw-sidebar-bible-card-add" wire:click="openLocationBibleModal">
+                                            <div class="vw-sidebar-bible-card-add-icon">+</div>
+                                            <div class="vw-sidebar-bible-card-add-text">{{ __('Add Location') }}</div>
                                         </div>
                                     @endforelse
+                                    @if(count($locations) > 0)
+                                        <div class="vw-sidebar-bible-card vw-sidebar-bible-card-add" wire:click="openLocationBibleModal">
+                                            <div class="vw-sidebar-bible-card-add-icon">+</div>
+                                            <div class="vw-sidebar-bible-card-add-text">{{ __('Add More') }}</div>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
 
                         {{-- Scene DNA --}}
-                        <div style="padding: 0.6rem; background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.08)); border: 1px solid rgba(6,182,212,0.2); border-radius: 0.4rem; margin-top: 0.5rem;">
+                        <div style="padding: 0.75rem; background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.08)); border: 1px solid rgba(6,182,212,0.2); border-radius: 0.5rem; margin-top: 0.5rem;">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="font-size: 1rem;">🧬</span>
+                                <span style="font-size: 1.25rem;">🧬</span>
                                 <div style="flex: 1;">
-                                    <div style="font-size: 0.7rem; font-weight: 600; color: white;">{{ __('Scene DNA') }}</div>
-                                    <div style="font-size: 0.6rem; color: rgba(255,255,255,0.5);">{{ count($characters) + count($locations) }} {{ __('items synced') }}</div>
+                                    <div style="font-size: 0.75rem; font-weight: 600; color: white;">{{ __('Scene DNA') }}</div>
+                                    <div style="font-size: 0.65rem; color: rgba(255,255,255,0.5);">{{ count($characters) + count($locations) }} {{ __('items synced') }}</div>
                                 </div>
                                 <button type="button"
                                         wire:click="openSceneDNAModal"
-                                        style="padding: 0.25rem 0.5rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.25rem; color: white; cursor: pointer; font-size: 0.6rem;">
+                                        style="padding: 0.35rem 0.75rem; background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); border-radius: 0.35rem; color: white; cursor: pointer; font-size: 0.65rem; font-weight: 500;">
                                     {{ __('View') }}
                                 </button>
                             </div>
