@@ -23699,6 +23699,7 @@ PROMPT;
                 // Combine narrator text for voiceover generation (separate from dialogue)
                 $narratorText = implode(' ', array_column($shotNarrators, 'text'));
                 $shots[$shotIdx]['narratorText'] = $narratorText;
+                $shots[$shotIdx]['narratorVoiceId'] = $this->getNarratorVoice();
 
                 Log::debug('Added narrator overlay to shot', [
                     'sceneIndex' => $sceneIndex,
