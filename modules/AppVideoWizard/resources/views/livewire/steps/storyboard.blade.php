@@ -2397,9 +2397,11 @@
         border: 1px solid rgba(139, 92, 246, 0.2);
     }
 
-    /* Micro-animations: Button hover effects */
+    /* Micro-animations: Button hover effects (Performance optimized) */
     .vw-btn-hover {
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
     }
 
     .vw-btn-hover:hover {
@@ -2412,9 +2414,11 @@
         box-shadow: 0 2px 4px rgba(139, 92, 246, 0.15);
     }
 
-    /* Micro-animations: Card hover effects */
+    /* Micro-animations: Card hover effects (Performance optimized) */
     .vw-card-hover {
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
     }
 
     .vw-card-hover:hover {
@@ -2770,6 +2774,52 @@
             transform: translateY(20px);
         }
     }
+
+    /* ========================================
+       PERFORMANCE OPTIMIZATIONS
+       ======================================== */
+
+    /* Modal performance - use GPU acceleration and containment */
+    .vw-modal-overlay,
+    .msm-fullscreen {
+        will-change: opacity;
+        contain: layout style;
+    }
+
+    /* Scene cards - isolate rendering for better scroll performance */
+    .vw-scene-card {
+        contain: layout style paint;
+    }
+
+    /* Side panel - GPU accelerated transforms */
+    .vw-side-panel {
+        will-change: transform;
+        contain: layout style;
+    }
+
+    /* Reduce paint on backdrop-filter elements when not visible */
+    [x-cloak] {
+        display: none !important;
+    }
+
+    /* Prevent layout thrashing on hover states */
+    .vw-floating-toolbar,
+    .vw-brainstorm-panel {
+        contain: layout;
+    }
+
+    /* Optimize scrolling containers */
+    .vw-storyboard-main,
+    .vw-scenes-grid {
+        contain: strict;
+        content-visibility: auto;
+    }
+
+    /* Reduce repaints for frequently updated elements */
+    .vw-spinner,
+    .vw-generation-preview-bar {
+        will-change: transform;
+    }
 </style>
 
 @php
@@ -2850,7 +2900,7 @@ function getCameraMovementIcon($movement) {
         this.sidePanel.type = null;
         this.sidePanel.sceneIndex = null;
     },
-    // Phase 3: @ Mention System
+    // Phase 3: @ Mention System (Performance optimized - cached items)
     mention: {
         active: false,
         query: '',
@@ -2858,7 +2908,12 @@ function getCameraMovementIcon($movement) {
         inputEl: null,
         cursorPos: 0
     },
-    get mentionItems() {
+    // Cached bible items - initialized once, not on every access
+    _mentionItemsCache: null,
+    getMentionItemsBase() {
+        // Return cached if available
+        if (this._mentionItemsCache) return this._mentionItemsCache;
+        // Build and cache on first access
         const characters = @js($sceneMemory['characterBible']['characters'] ?? []).map(c => ({
             type: 'character',
             icon: '👤',
@@ -2873,7 +2928,12 @@ function getCameraMovementIcon($movement) {
             tag: '@' + (l.name || 'location').toLowerCase().replace(/\s+/g, '-'),
             image: l.referenceImage || null
         }));
-        const allItems = [...characters, ...locations];
+        this._mentionItemsCache = [...characters, ...locations];
+        return this._mentionItemsCache;
+    },
+    // Filtered items based on query - uses cached base
+    getFilteredMentionItems() {
+        const allItems = this.getMentionItemsBase();
         if (!this.mention.query) return allItems;
         const q = this.mention.query.toLowerCase();
         return allItems.filter(item =>
@@ -2911,7 +2971,7 @@ function getCameraMovementIcon($movement) {
     handleMentionKeydown(e) {
         if (!this.mention.active) return;
 
-        const items = this.mentionItems;
+        const items = this.getFilteredMentionItems();
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             this.mention.selectedIndex = Math.min(this.mention.selectedIndex + 1, items.length - 1);
@@ -3031,12 +3091,18 @@ function getCameraMovementIcon($movement) {
         document.documentElement.classList.remove('vw-light-theme', 'vw-dark-theme');
         document.documentElement.classList.add('vw-' + newTheme + '-theme');
     },
-    // Phase 4: Keyboard Shortcuts
+    // Phase 4: Keyboard Shortcuts (Performance optimized - proper cleanup)
     shortcuts: {
         showHelp: false
     },
+    _keyboardHandler: null,
     initKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
+        // Remove any existing handler first (prevents duplicates on Livewire updates)
+        if (this._keyboardHandler) {
+            document.removeEventListener('keydown', this._keyboardHandler);
+        }
+        // Create bound handler for proper cleanup
+        this._keyboardHandler = (e) => {
             // Ignore if typing in input/textarea
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -3082,7 +3148,18 @@ function getCameraMovementIcon($movement) {
                     setTimeout(() => sceneCards[sceneIndex].classList.remove('selected'), 1000);
                 }
             }
-        });
+        };
+        document.addEventListener('keydown', this._keyboardHandler);
+    },
+    // Cleanup method for proper resource management
+    destroy() {
+        if (this._keyboardHandler) {
+            document.removeEventListener('keydown', this._keyboardHandler);
+            this._keyboardHandler = null;
+        }
+        if (this.toast.timeout) {
+            clearTimeout(this.toast.timeout);
+        }
     },
     // Phase 4: Toast Notifications
     toast: {
@@ -3103,12 +3180,15 @@ function getCameraMovementIcon($movement) {
     // Initialize on mount
     init() {
         this.initKeyboardShortcuts();
+        // Pre-cache mention items for better performance
+        this.getMentionItemsBase();
         // Apply saved theme
         if (this.theme === 'light') {
             document.documentElement.classList.add('vw-light-theme');
         }
     }
-}">
+}"
+@destroy="destroy()">
     {{-- Top Header Bar --}}
     <div class="vw-storyboard-topbar">
         {{-- Brand --}}
