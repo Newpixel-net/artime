@@ -1,7 +1,7 @@
 # Video Wizard - Current State
 
 > Last Updated: 2026-01-25
-> Session: Milestone 10 - Livewire Performance Architecture
+> Session: Milestone 11 - Hollywood-Quality Prompt Pipeline
 
 ---
 
@@ -10,61 +10,43 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Automatic, effortless, Hollywood-quality output from button clicks
-**Current focus:** Milestone 10 - Livewire Performance Architecture
+**Current focus:** Milestone 11 - Hollywood-Quality Prompt Pipeline
 
 ---
 
 ## Current Position
 
-**Milestone:** 10 (Livewire Performance Architecture)
-**Phase:** 19 (Quick Wins)
-**Plan:** 04 of 4
-**Status:** Phase complete
+**Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
+**Phase:** Not started (defining requirements)
+**Plan:** —
+**Status:** Researching domain
 
 ```
-Phase 19: ██████████ 100% (4/4 plans)
-Phase 20: ░░░░░░░░░░ 0%
-Phase 21: ░░░░░░░░░░ 0%
+Phase 22: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ####░░░░░░ 50% (4/8 requirements)
+Overall:  ░░░░░░░░░░ 0%
 ```
 
-**Last activity:** 2026-01-25 - Completed 19-04-PLAN.md (Optimize updated() Hook)
+**Last activity:** 2026-01-25 — Milestone v11 started
 
 ---
 
 ## Current Focus
 
-**Phase 19: Quick Wins - COMPLETE**
+**Milestone 11: Hollywood-Quality Prompt Pipeline**
 
-Goal: Reduce payload size and interaction latency with minimal architectural changes
+Goal: Transform prompt generation to produce 600-1000 word Hollywood screenplay-level prompts
 
-Requirements:
-- PERF-01: Livewire 3 attributes (#[Locked], #[Computed]) - COMPLETE
-- PERF-02: Debounced bindings (wire:model.blur/.change) - COMPLETE
-- PERF-03: Base64 storage migration (files, not state) - COMPLETE (19-03)
-- PERF-08: Updated hook optimization - COMPLETE (19-04)
+Target prompt depth:
+- Image prompts: 600-1000 words (from 50-80)
+- Video prompts: 600-1000 words (from ~100)
+- Voice prompts: Full emotional direction (from type only)
 
-Success Criteria:
-1. #[Locked] properties do not serialize on every request - DONE
-2. #[Computed] derived values cache until dependencies change - DONE
-3. Text inputs use debounced bindings, not .live - DONE (24 bindings converted)
-4. Base64 images stored in files, loaded lazily for API calls - DONE
-5. Updated hook uses targeted methods, not generic catch-all - DONE
-
----
-
-## Performance Metrics
-
-**Target (M10):**
-- Payload size: <50KB (from 500KB-2MB)
-- Interaction latency: <500ms (from 2-5 seconds)
-- Component lines: <2,000 per component (from 31,489)
-- wire:model.live bindings: <20 (from 154+)
-
-**Velocity:**
-- Total plans completed: 4 (M10)
-- Milestone started: 2026-01-25
+Key gaps to close:
+- Micro-expressions, detailed body language
+- Temporal progression in video prompts
+- Emotional direction and pacing markers in voice
+- Physical continuity across shots
 
 ---
 
@@ -74,32 +56,29 @@ Success Criteria:
 
 | Date | Area | Decision | Rationale |
 |------|------|----------|-----------|
-| 2026-01-25 | Architecture | Full architectural overhaul | Debug analysis showed fundamental issues |
-| 2026-01-25 | Approach | 3-phase optimization | Quick wins first, then splitting, then normalization |
-| 2026-01-25 | Model profile | Set to "quality" | Complex architectural work benefits from Opus reasoning |
-| 2026-01-25 | Livewire | #[Locked] on read-only props | 7 properties excluded from serialization |
-| 2026-01-25 | Livewire | #[Computed] for derivations | 5 computed properties for cached counts/status |
-| 2026-01-25 | Livewire | wire:model.change for sliders | Range sliders sync only on release, not during drag |
-| 2026-01-25 | Livewire | wire:model.blur for textareas | Text inputs sync only on blur, not every keystroke |
-| 2026-01-25 | Livewire | Targeted update methods | Replace generic updated() with property-specific hooks |
-| 2026-01-25 | Storage | File-based reference images | Base64 stored on disk, lazy-loaded only for API calls |
+| 2026-01-25 | Milestone | Pivot from M10 to M11 | Prompt quality is more critical than performance |
+| 2026-01-25 | Scope | All three together | Image, video, voice prompts enhanced in parallel |
+| 2026-01-25 | Approach | Research first | Study Hollywood screenplay/cinematography patterns |
 
 ### Research Insights
 
-From debug analysis (.planning/debug/livewire-performance.md):
-- 31,489 line monolithic component
-- 500KB-5MB estimated payload per request
-- Base64 images potentially 4MB+ in component state
-- 154+ wire:model.live bindings
-- No Livewire 3 attributes used (NOW FIXED: 7 #[Locked], 5 #[Computed])
-- 73 → 49 wire:model.live bindings (NOW FIXED: 24 converted to .change/.blur)
-- Generic updated() ran on ALL changes (NOW FIXED: targeted methods)
+From codebase exploration (2026-01-25):
+- Current image prompts: 50-80 words (capped in buildShotPrompt)
+- Current video prompts: ~100 words
+- Existing infrastructure: StructuredPromptBuilderService, VideoPromptBuilderService
+- Gap: 10-15x expansion needed in prompt detail
+- Key methods: buildStoryVisualContent, buildActionComponent, buildSubjectFromSceneDNA
 
 ---
 
-## Previous Milestones (Complete)
+## Previous Milestones
 
-### Milestone 9: Voice Production Excellence - COMPLETE (2026-01-25)
+### Milestone 10: Livewire Performance (PAUSED)
+- Phase 19: Quick Wins — COMPLETE
+- Phase 20: Component Splitting — DEFERRED
+- Phase 21: Data Normalization — DEFERRED
+
+### Milestone 9: Voice Production Excellence - COMPLETE
 ### Milestone 8: Cinematic Shot Architecture - COMPLETE
 ### Milestone 7: Scene Text Inspector - COMPLETE
 ### Milestone 6: UI/UX Polish - COMPLETE
@@ -121,10 +100,10 @@ None currently.
 ## Session Continuity
 
 **Last session:** 2026-01-25
-**Stopped at:** Completed 19-04-PLAN.md (Phase 19 complete)
-**Next step:** Execute Phase 20 (Component Splitting)
+**Stopped at:** Starting Milestone 11 - researching domain
+**Next step:** Complete research, define requirements, create roadmap
 
 ---
 
-*Session: Milestone 10 - Livewire Performance Architecture*
-*Roadmap created: 2026-01-25*
+*Session: Milestone 11 - Hollywood-Quality Prompt Pipeline*
+*Milestone started: 2026-01-25*

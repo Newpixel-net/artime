@@ -10,16 +10,19 @@ AI-powered video creation platform built with Laravel and Livewire. Users input 
 
 The system should be sophisticated and automatically updated based on previous steps in the wizard. Users click buttons and perform complete actions without effort.
 
-## Current Milestone: v10 Livewire Performance Architecture
+## Current Milestone: v11 Hollywood-Quality Prompt Pipeline
 
-**Goal:** Transform the Video Wizard from a monolithic 31k-line component into a performant, maintainable architecture with sub-second interactions.
+**Goal:** Transform prompt generation to produce 600-1000 word Hollywood screenplay-level prompts for image, video, and voice generation.
 
 **Target features:**
-- Quick Wins — Livewire 3 attributes (#[Locked], #[Computed]), debounced bindings
-- Storage Optimization — Move base64 images from component state to file storage
-- Component Splitting — Separate child components per wizard step and modal
-- Data Normalization — Database models for scenes, shots, characters instead of nested arrays
-- Payload Reduction — From 500KB-2MB per request to <50KB
+- Image Prompts (600-1000 words) — Micro-expressions, body language, camera specs with reasoning, lighting values, emotional state in physicality
+- Video Prompts (600-1000 words) — Temporal progression, character movement paths, camera timing, inter-character dynamics
+- Voice Prompts — Emotional direction, pacing markers, vocal quality descriptions, ambient cues
+- Continuity System — Physical details, wardrobe/props, emotional arc consistency across shots
+
+**Previous Milestone (Paused):** v10 Livewire Performance Architecture
+- Phase 19 complete (Quick Wins)
+- Phases 20-21 deferred (Component Splitting, Data Normalization)
 
 ## Requirements
 
@@ -113,4 +116,4 @@ The system should be sophisticated and automatically updated based on previous s
 | Multi-speaker tracking | Multiple speakers per shot for dialogue | — Pending (M9) |
 
 ---
-*Last updated: 2026-01-24 after Milestone 9 start*
+*Last updated: 2026-01-25 after Milestone 11 start*
