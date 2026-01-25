@@ -24147,7 +24147,9 @@ PROMPT;
                 // Combine narrator text for voiceover generation (separate from dialogue)
                 $narratorText = implode(' ', array_column($shotNarrators, 'text'));
                 $shots[$shotIdx]['narratorText'] = $narratorText;
-                $shots[$shotIdx]['narratorVoiceId'] = $this->getNarratorVoice(); // VOC-01: narrator voice assignment
+                $shots[$shotIdx]['narratorVoiceId'] = $this->voiceRegistry
+                    ? $this->voiceRegistry->getNarratorVoice()
+                    : $this->getNarratorVoice(); // VOC-01/VOC-05: narrator voice via registry
                 $shots[$shotIdx]['narration'] = $narratorText;
 
                 // CRITICAL: Add narrator segments to speechSegments for UI badge detection
@@ -24311,7 +24313,13 @@ PROMPT;
 
         // Extract speaker from first segment (internal thoughts typically have one speaker)
         $speaker = $internalSegments[0]['speaker'] ?? null;
-        $voiceId = $speaker ? $this->getVoiceForCharacterName($speaker) : $this->getNarratorVoice();
+        $voiceId = $speaker
+            ? ($this->voiceRegistry
+                ? $this->voiceRegistry->getVoiceForCharacter($speaker, fn($name) => $this->getVoiceForCharacterName($name))
+                : $this->getVoiceForCharacterName($speaker))
+            : ($this->voiceRegistry
+                ? $this->voiceRegistry->getNarratorVoice()
+                : $this->getNarratorVoice()); // VOC-05: voice via registry
 
         Log::info('Distributing internal thought text across all shots (VOC-03)', [
             'sceneIndex' => $sceneIndex,
@@ -24701,7 +24709,11 @@ PROMPT;
         foreach ($characters as $idx => $char) {
             $config['characters'][$char['name'] ?? "Character {$idx}"] = [
                 'index' => $idx,
-                'voiceId' => $char['voice']['id'] ?? $this->getVoiceForCharacterName($char['name'] ?? ''),
+                'voiceId' => $char['voice']['id'] ?? (
+                    $this->voiceRegistry
+                        ? $this->voiceRegistry->getVoiceForCharacter($char['name'] ?? '', fn($name) => $this->getVoiceForCharacterName($name))
+                        : $this->getVoiceForCharacterName($char['name'] ?? '')
+                ), // VOC-05: voice via registry
                 'voiceConfig' => $char['voice'] ?? null,
                 'isNarrator' => $char['isNarrator'] ?? false,
                 'speakingRole' => $char['speakingRole'] ?? 'dialogue',
