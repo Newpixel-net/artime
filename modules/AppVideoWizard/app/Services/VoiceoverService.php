@@ -104,6 +104,113 @@ class VoiceoverService
     }
 
     /**
+     * Process a multi-speaker shot, generating TTS for each speaker (VOC-06).
+     *
+     * Generates audio for each speaker sequentially with their assigned voice,
+     * tracking timing for audio concatenation.
+     *
+     * @param WizardProject $project The project
+     * @param array $shot Shot data with speakers array
+     * @param array $options Additional options (sceneIndex, etc.)
+     * @return array Result with speakers array (each with audioUrl, duration, startTime) and totalDuration
+     */
+    public function processMultiSpeakerShot(WizardProject $project, array $shot, array $options = []): array
+    {
+        $speakers = $this->getSpeakersFromShot($shot);
+
+        if (empty($speakers)) {
+            Log::warning('processMultiSpeakerShot called with no speakers (VOC-06)', [
+                'shotId' => $shot['id'] ?? 'unknown',
+            ]);
+            return [
+                'success' => false,
+                'error' => 'No speakers in shot',
+                'speakers' => [],
+                'totalDuration' => 0,
+            ];
+        }
+
+        $audioSegments = [];
+        $currentTime = 0;
+        $successCount = 0;
+
+        foreach ($speakers as $index => $speaker) {
+            $speakerText = trim($speaker['text'] ?? '');
+
+            // Skip empty text (VOC-02 validation)
+            if (empty($speakerText)) {
+                Log::debug('Skipping speaker with empty text in processMultiSpeakerShot', [
+                    'speaker' => $speaker['name'] ?? 'unknown',
+                    'order' => $index,
+                ]);
+                continue;
+            }
+
+            try {
+                // Generate TTS for this speaker using their voice
+                $result = $this->generateSceneVoiceover($project, [
+                    'id' => ($shot['id'] ?? 'shot') . '-speaker-' . $index,
+                    'narration' => $speakerText,
+                ], [
+                    'voice' => $speaker['voiceId'] ?? 'echo',
+                    'sceneIndex' => $options['sceneIndex'] ?? null,
+                ]);
+
+                if (isset($result['url']) || isset($result['audioUrl'])) {
+                    $audioUrl = $result['url'] ?? $result['audioUrl'];
+                    $duration = $result['duration'] ?? $this->estimateDuration($speakerText);
+
+                    $audioSegments[] = [
+                        'name' => $speaker['name'],
+                        'voiceId' => $speaker['voiceId'],
+                        'text' => $speakerText,
+                        'order' => $index,
+                        'startTime' => $currentTime,
+                        'duration' => $duration,
+                        'audioUrl' => $audioUrl,
+                    ];
+
+                    $currentTime += $duration;
+                    $successCount++;
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to generate TTS for speaker in multi-speaker shot (VOC-06)', [
+                    'speaker' => $speaker['name'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('Multi-speaker shot TTS complete (VOC-06)', [
+            'shotId' => $shot['id'] ?? 'unknown',
+            'speakersProcessed' => $successCount,
+            'totalSpeakers' => count($speakers),
+            'totalDuration' => $currentTime,
+        ]);
+
+        return [
+            'success' => $successCount > 0,
+            'speakers' => $audioSegments,
+            'totalDuration' => $currentTime,
+            'isMultiSpeaker' => count($audioSegments) > 1,
+            'speakerCount' => $successCount,
+        ];
+    }
+
+    /**
+     * Estimate duration for text based on word count.
+     *
+     * @param string $text Text to estimate
+     * @return float Estimated duration in seconds
+     */
+    protected function estimateDuration(string $text): float
+    {
+        $wordCount = str_word_count($text);
+        // Average speaking rate: 150 words per minute = 2.5 words per second
+        return max(1.0, $wordCount / 2.5);
+    }
+
+    /**
      * Generate voiceover using Kokoro TTS.
      */
     protected function generateWithKokoro(WizardProject $project, array $scene, string $narration, string $voice, float $speed, array $options = []): array
