@@ -71,7 +71,13 @@ Plans:
 
 **Goal:** Unify distribution strategies and validate voice continuity across scenes
 
-**Status:** Planned (2026-01-24)
+**Status:** Ready for execution (2026-01-25)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Unified distribution strategy (word-split for internal thoughts)
+- [ ] 16-02-PLAN.md — Voice continuity validation (validateVoiceContinuity method)
 
 **Dependencies:** Phase 15 (requires validation working)
 
@@ -192,7 +198,7 @@ Sequential execution required.
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 15: Critical Fixes | Complete | VOC-01, VOC-02 (2) | 4/4 |
-| Phase 16: Consistency Layer | Planned | VOC-03, VOC-04 (2) | 0/5 |
+| Phase 16: Consistency Layer | Ready | VOC-03, VOC-04 (2) | 0/5 |
 | Phase 17: Voice Registry | Planned | VOC-05 (1) | 0/5 |
 | Phase 18: Multi-Speaker | Planned | VOC-06 (1) | 0/5 |
 
@@ -267,4 +273,5 @@ Voice Production Excellence ensures users get professional-quality audio automat
 
 *Milestone 9 roadmap created: 2026-01-24*
 *Phases 15-18 defined*
+*Phase 16 planned: 2026-01-25*
 *Source: Comprehensive TTS/Lip-Sync audit*
