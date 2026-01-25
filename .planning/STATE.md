@@ -82,6 +82,7 @@ Success Criteria:
 | 2026-01-25 | Livewire | wire:model.change for sliders | Range sliders sync only on release, not during drag |
 | 2026-01-25 | Livewire | wire:model.blur for textareas | Text inputs sync only on blur, not every keystroke |
 | 2026-01-25 | Livewire | Targeted update methods | Replace generic updated() with property-specific hooks |
+| 2026-01-25 | Storage | File-based reference images | Base64 stored on disk, lazy-loaded only for API calls |
 
 ### Research Insights
 
