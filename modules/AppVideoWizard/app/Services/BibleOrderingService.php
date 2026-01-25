@@ -15,6 +15,39 @@ use Illuminate\Support\Facades\Log;
 class BibleOrderingService
 {
     /**
+     * Check if a bible item (character, location, style) has a reference image.
+     *
+     * Supports both:
+     * - New storage key format (Phase 19): referenceImageStorageKey
+     * - Legacy format: referenceImageBase64
+     *
+     * @param array $item The item to check
+     * @param bool $requireReady Whether to require 'ready' status
+     * @return bool True if has a reference image
+     */
+    protected function hasReferenceImage(array $item, bool $requireReady = false): bool
+    {
+        if ($requireReady) {
+            $isReady = ($item['referenceImageStatus'] ?? '') === 'ready';
+            if (!$isReady) {
+                return false;
+            }
+        }
+
+        // Check new storage key format (Phase 19)
+        if (!empty($item['referenceImageStorageKey'])) {
+            return true;
+        }
+
+        // Check legacy base64 format
+        if (!empty($item['referenceImageBase64'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Role priority mapping (lower = more important)
      */
     const ROLE_PRIORITY = [
@@ -92,9 +125,9 @@ class BibleOrderingService
         $scenes = $character['scenes'] ?? $character['appliedScenes'] ?? $character['appearsInScenes'] ?? [];
         $sceneCount = count($scenes);
 
-        // Get reference status
+        // Get reference status (supports both storage key and legacy base64)
         $refStatus = $character['referenceImageStatus'] ?? 'none';
-        $hasReference = !empty($character['referenceImageBase64']);
+        $hasReference = $this->hasReferenceImage($character);
 
         // Determine status badge
         $statusBadge = $this->getCharacterStatusBadge($refStatus, $hasReference, $character);
@@ -334,9 +367,9 @@ class BibleOrderingService
         // Calculate first appearance
         $firstAppearance = !empty($assignedScenes) ? min($assignedScenes) : PHP_INT_MAX;
 
-        // Get reference status
+        // Get reference status (supports both storage key and legacy base64)
         $refStatus = $location['referenceImageStatus'] ?? 'none';
-        $hasReference = !empty($location['referenceImageBase64']);
+        $hasReference = $this->hasReferenceImage($location);
 
         // Determine status badge
         $statusBadge = $this->getLocationStatusBadge($refStatus, $hasReference, $location);
@@ -543,7 +576,7 @@ class BibleOrderingService
         $details = [];
 
         foreach ($characters as $idx => $char) {
-            $hasRef = !empty($char['referenceImageBase64']) && ($char['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($char, requireReady: true);
             $hasDesc = !empty($char['description']);
             $dnaCompleteness = $this->calculateDNACompleteness($char);
 
@@ -605,7 +638,7 @@ class BibleOrderingService
         $details = [];
 
         foreach ($locations as $idx => $loc) {
-            $hasRef = !empty($loc['referenceImageBase64']) && ($loc['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($loc, requireReady: true);
             $hasDesc = !empty($loc['description']);
 
             if ($hasRef) $withReferences++;
@@ -655,7 +688,7 @@ class BibleOrderingService
             ];
         }
 
-        $hasReference = !empty($styleBible['referenceImageBase64']) && ($styleBible['referenceImageStatus'] ?? '') === 'ready';
+        $hasReference = $this->hasReferenceImage($styleBible, requireReady: true);
         $hasStyle = !empty($styleBible['style']);
         $hasColorGrade = !empty($styleBible['colorGrade']);
         $hasAtmosphere = !empty($styleBible['atmosphere']);
@@ -689,7 +722,7 @@ class BibleOrderingService
         foreach ($characters as $idx => $char) {
             // Character without reference but appears in many scenes
             $sceneCount = count($char['scenes'] ?? $char['appliedScenes'] ?? $char['appearsInScenes'] ?? []);
-            $hasRef = !empty($char['referenceImageBase64']) && ($char['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($char, requireReady: true);
 
             if (!$hasRef && $sceneCount >= 3) {
                 $issues[] = [
@@ -721,7 +754,7 @@ class BibleOrderingService
         $locations = $locationBible['locations'] ?? [];
         foreach ($locations as $idx => $loc) {
             $sceneCount = count($loc['scenes'] ?? []);
-            $hasRef = !empty($loc['referenceImageBase64']) && ($loc['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($loc, requireReady: true);
 
             if (!$hasRef && $sceneCount >= 2) {
                 $issues[] = [
@@ -737,7 +770,7 @@ class BibleOrderingService
         // Check style issues
         $styleEnabled = $styleBible['enabled'] ?? false;
         if ($styleEnabled) {
-            $hasStyleRef = !empty($styleBible['referenceImageBase64']);
+            $hasStyleRef = $this->hasReferenceImage($styleBible);
             $hasStyleDef = !empty($styleBible['style']);
 
             if (!$hasStyleRef && !$hasStyleDef) {
@@ -907,7 +940,7 @@ class BibleOrderingService
         $needsReferences = [];
 
         foreach ($characters as $idx => $char) {
-            $hasRef = !empty($char['referenceImageBase64']) && ($char['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($char, requireReady: true);
             $hasDesc = !empty($char['description']);
 
             if (!$hasRef && $hasDesc) {
@@ -932,7 +965,7 @@ class BibleOrderingService
         $needsReferences = [];
 
         foreach ($locations as $idx => $loc) {
-            $hasRef = !empty($loc['referenceImageBase64']) && ($loc['referenceImageStatus'] ?? '') === 'ready';
+            $hasRef = $this->hasReferenceImage($loc, requireReady: true);
             $hasDesc = !empty($loc['description']);
 
             if (!$hasRef && $hasDesc) {
