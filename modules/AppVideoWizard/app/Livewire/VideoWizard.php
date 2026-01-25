@@ -23914,12 +23914,18 @@ PROMPT;
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['needsLipSync'] = true;
                     $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['useMultitalk'] = true;
 
-                    // Assign voice from first speaking character
-                    $firstSpeaker = array_keys($speakers)[0] ?? null;
-                    if ($firstSpeaker) {
-                        $voice = $this->getVoiceForCharacterName($firstSpeaker);
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['voiceId'] = $voice;
-                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakingCharacter'] = $firstSpeaker;
+                    // Build multi-speaker array (VOC-06)
+                    $speakersArray = $this->buildSpeakersArray($speakers);
+
+                    if (!empty($speakersArray)) {
+                        // Set multi-speaker data
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakers'] = $speakersArray;
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakerCount'] = count($speakersArray);
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['isMultiSpeaker'] = count($speakersArray) > 1;
+
+                        // Backward compatibility: populate single-speaker fields from first speaker
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['speakingCharacter'] = $speakersArray[0]['name'];
+                        $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'][$shotIdx]['voiceId'] = $speakersArray[0]['voiceId'];
                     }
                 } else {
                     // No lip-sync needed - use Minimax with TTS voiceover
