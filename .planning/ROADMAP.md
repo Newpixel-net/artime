@@ -34,12 +34,14 @@ Hollywood-Quality Prompt Pipeline transforms the Video Wizard's AI prompts from 
 
 **Goal:** Users get model-appropriate prompts with proper token limits and professional camera/lighting vocabulary
 
-**Status:** Not started
+**Status:** Planned
 
-**Plans:** TBD
+**Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] 22-01: TBD
+- [ ] 22-01-PLAN.md — CinematographyVocabulary and PromptTemplateLibrary (Wave 1)
+- [ ] 22-02-PLAN.md — ModelPromptAdapterService with CLIP tokenization (Wave 2)
+- [ ] 22-03-PLAN.md — Integration into ImageGenerationService (Wave 3)
 
 **Dependencies:** None (starts new milestone)
 
@@ -222,7 +224,7 @@ Phase 27 is final polish after all prompt systems work.
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
-| Phase 22: Foundation & Model Adapters | Not started | INF-01, INF-03, IMG-01, IMG-02, IMG-03 (5) | 0/5 |
+| Phase 22: Foundation & Model Adapters | Planned (3 plans) | INF-01, INF-03, IMG-01, IMG-02, IMG-03 (5) | 0/5 |
 | Phase 23: Character Psychology & Bible | Not started | INF-02, IMG-04, IMG-05, IMG-06, IMG-07, IMG-08, IMG-09 (7) | 0/4 |
 | Phase 24: Video Temporal Expansion | Not started | VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07 (7) | 0/4 |
 | Phase 25: Voice Prompt Enhancement | Not started | VOC-01, VOC-02, VOC-03, VOC-04, VOC-05, VOC-06 (6) | 0/3 |
@@ -306,5 +308,6 @@ Hollywood-Quality Prompt Pipeline delivers on the "Hollywood-quality" promise. U
 ---
 
 *Milestone 11 roadmap created: 2026-01-25*
+*Phase 22 planned: 2026-01-26*
 *Phases 22-27 defined*
 *Source: Research .planning/research/SUMMARY.md*
