@@ -3,6 +3,8 @@
 namespace Modules\AppVideoWizard\Services;
 
 use Illuminate\Support\Facades\Log;
+use Modules\AppVideoWizard\Services\CinematographyVocabulary;
+use Modules\AppVideoWizard\Services\PromptTemplateLibrary;
 
 /**
  * StructuredPromptBuilderService
@@ -286,6 +288,29 @@ class StructuredPromptBuilderService
         ],
     ];
 
+    // =========================================================================
+    // PHASE 22: Hollywood-Quality Cinematography Integration
+    // =========================================================================
+
+    /**
+     * CinematographyVocabulary for lens psychology, lighting ratios, and framing.
+     */
+    protected CinematographyVocabulary $vocabulary;
+
+    /**
+     * PromptTemplateLibrary for shot-type aware prompt building.
+     */
+    protected PromptTemplateLibrary $templateLibrary;
+
+    /**
+     * Constructor - initialize cinematography vocabulary and template library.
+     */
+    public function __construct()
+    {
+        $this->vocabulary = new CinematographyVocabulary();
+        $this->templateLibrary = new PromptTemplateLibrary();
+    }
+
     /**
      * Build a complete structured prompt from scene data.
      *
@@ -373,6 +398,46 @@ class StructuredPromptBuilderService
         // Build shot composition/framing instructions for multi-shot sequences
         $composition = $this->buildShotComposition($shotType, $shotIndex, $totalShots, $isMultiShot);
 
+        // Phase 22: Build Hollywood-quality vocabulary enhancements
+        $effectiveShotType = $shotType ?? 'medium';
+        $effectiveMood = $styleBible['atmosphere'] ?? $lighting['mood'] ?? 'natural';
+
+        // Determine time of day from location
+        $timeOfDay = 'daylight';
+        if ($locationBible && ($locationBible['enabled'] ?? false)) {
+            $locations = $locationBible['locations'] ?? [];
+            foreach ($locations as $location) {
+                $appliedScenes = $location['scenes'] ?? $location['appliedScenes'] ?? [];
+                if ($sceneIndex === null || empty($appliedScenes) || in_array($sceneIndex, $appliedScenes)) {
+                    $timeOfDay = $location['timeOfDay'] ?? 'daylight';
+                    break;
+                }
+            }
+        }
+
+        // Build vocabulary-enhanced descriptions
+        $cameraLanguage = $this->buildCameraLanguageWithPsychology($effectiveShotType);
+        $lightingTechnical = $this->buildLightingWithKelvinAndRatios([
+            'mood' => $effectiveMood,
+            'time_of_day' => $timeOfDay,
+        ]);
+
+        // Calculate frame percentage based on shot type
+        $framePercentages = [
+            'extreme-close-up' => 90,
+            'close-up' => 80,
+            'medium-close' => 65,
+            'medium' => 50,
+            'medium-wide' => 35,
+            'wide' => 25,
+            'establishing' => 15,
+        ];
+        $framePercentage = $framePercentages[$effectiveShotType] ?? 50;
+        $framingTechnical = $this->buildFramingWithPercentages([
+            'subject_percentage' => $framePercentage,
+            'subject_position' => 'center frame',
+        ]);
+
         return [
             'scene_summary' => $sceneSummary,
             'subject' => $subject,
@@ -384,6 +449,10 @@ class StructuredPromptBuilderService
             'style_dna' => $styleDNA,         // Style DNA block for visual consistency
             'location_dna' => $locationDNA,   // Location DNA block for environmental consistency
             'composition' => $composition,    // Shot-specific framing instructions
+            // Phase 22: Hollywood vocabulary additions
+            'camera_language' => $cameraLanguage,       // Lens psychology (e.g., "85mm creates intimacy")
+            'lighting_technical' => $lightingTechnical, // Kelvin and ratios (e.g., "5600K, -2 stops fill")
+            'framing_technical' => $framingTechnical,   // Frame percentages (e.g., "40% of frame")
         ];
     }
 
@@ -425,6 +494,34 @@ class StructuredPromptBuilderService
         // Build shot composition/framing instructions
         $composition = $this->buildShotComposition($shotType, $shotIndex, $totalShots, $isMultiShot);
 
+        // Phase 22: Build Hollywood-quality vocabulary enhancements
+        $effectiveShotType = $shotType ?? 'medium';
+        $effectiveMood = $sceneDNAEntry['mood'] ?? $lighting['mood'] ?? 'natural';
+        $timeOfDay = $sceneDNAEntry['location']['timeOfDay'] ?? 'daylight';
+
+        // Build vocabulary-enhanced descriptions
+        $cameraLanguage = $this->buildCameraLanguageWithPsychology($effectiveShotType);
+        $lightingTechnical = $this->buildLightingWithKelvinAndRatios([
+            'mood' => $effectiveMood,
+            'time_of_day' => $timeOfDay,
+        ]);
+
+        // Calculate frame percentage based on shot type
+        $framePercentages = [
+            'extreme-close-up' => 90,
+            'close-up' => 80,
+            'medium-close' => 65,
+            'medium' => 50,
+            'medium-wide' => 35,
+            'wide' => 25,
+            'establishing' => 15,
+        ];
+        $framePercentage = $framePercentages[$effectiveShotType] ?? 50;
+        $framingTechnical = $this->buildFramingWithPercentages([
+            'subject_percentage' => $framePercentage,
+            'subject_position' => 'center frame',
+        ]);
+
         Log::debug('StructuredPromptBuilder: Built prompt from Scene DNA', [
             'sceneIndex' => $sceneDNAEntry['sceneIndex'] ?? 'unknown',
             'characterCount' => $sceneDNAEntry['characterCount'] ?? 0,
@@ -434,6 +531,8 @@ class StructuredPromptBuilderService
             'styleDNAVisuaMode' => $sceneDNAEntry['style']['visualMode'] ?? 'not-set',
             'hasStyleDNA' => !empty($styleDNA),
             'hasCharacterDNA' => !empty($characterDNA),
+            'hasCameraLanguage' => !empty($cameraLanguage),
+            'hasLightingTechnical' => !empty($lightingTechnical),
         ]);
 
         return [
@@ -447,6 +546,10 @@ class StructuredPromptBuilderService
             'style_dna' => $styleDNA,
             'location_dna' => $locationDNA,
             'composition' => $composition,
+            // Phase 22: Hollywood vocabulary additions
+            'camera_language' => $cameraLanguage,       // Lens psychology (e.g., "85mm creates intimacy")
+            'lighting_technical' => $lightingTechnical, // Kelvin and ratios (e.g., "5600K, -2 stops fill")
+            'framing_technical' => $framingTechnical,   // Frame percentages (e.g., "40% of frame")
         ];
     }
 
@@ -1075,6 +1178,130 @@ class StructuredPromptBuilderService
         return $mappings[$timeOfDay] ?? self::LIGHTING_PRESETS['overcast_natural'];
     }
 
+    // =========================================================================
+    // PHASE 22: Hollywood-Quality Camera & Lighting Language
+    // =========================================================================
+
+    /**
+     * Build camera language with lens psychology.
+     *
+     * Uses CinematographyVocabulary to generate professional cinematography
+     * descriptions including lens focal length, visual effect, and emotional psychology.
+     *
+     * Example output: "85mm lens creates intimate compression, isolating subject from background,
+     * evokes emotional connection"
+     *
+     * @param string $shotType The shot type (close-up, medium, wide, etc.)
+     * @param array $options Additional options
+     * @return string Professional camera language description
+     */
+    protected function buildCameraLanguageWithPsychology(string $shotType, array $options = []): string
+    {
+        $lens = $this->vocabulary->getLensForShotType($shotType);
+
+        // Build camera description with psychology
+        return sprintf(
+            '%s lens %s, %s',
+            $lens['focal_length'],
+            $lens['effect'],
+            $lens['psychology']
+        );
+    }
+
+    /**
+     * Build lighting description with Kelvin values and ratios.
+     *
+     * Uses CinematographyVocabulary to generate professional lighting descriptions
+     * including color temperature in Kelvin, lighting ratios, and stop differences.
+     *
+     * Example output: "key light at 5600K neutral daylight balance, subtle modeling
+     * gentle shadows, fill at -1 stops"
+     *
+     * @param array $options Options including mood and time_of_day
+     * @return string Professional lighting description
+     */
+    protected function buildLightingWithKelvinAndRatios(array $options = []): string
+    {
+        $mood = $options['mood'] ?? 'natural';
+        $timeOfDay = $options['time_of_day'] ?? 'daylight';
+
+        $ratio = $this->vocabulary->getRatioForMood($mood);
+        $temp = $this->vocabulary->getTemperatureDescription($timeOfDay);
+
+        // Build comprehensive lighting description
+        return sprintf(
+            'key light at %s, %s, fill at -%d stops',
+            $temp,
+            $ratio['description'],
+            $ratio['stops_difference']
+        );
+    }
+
+    /**
+     * Build framing description with percentages and positions.
+     *
+     * Uses CinematographyVocabulary to generate precise framing descriptions
+     * with frame percentage and rule-of-thirds positioning.
+     *
+     * Example output: "subject occupies 40% of frame, positioned at left third intersection"
+     *
+     * @param array $options Options including subject_percentage and subject_position
+     * @return string Professional framing description
+     */
+    protected function buildFramingWithPercentages(array $options = []): string
+    {
+        $percentage = $options['subject_percentage'] ?? 40;
+        $position = $options['subject_position'] ?? 'center frame';
+
+        return $this->vocabulary->buildFramingDescription($percentage, $position);
+    }
+
+    /**
+     * Build enhanced creative prompt section with Hollywood vocabulary.
+     *
+     * This method enhances the base creative prompt with:
+     * - Lens psychology (e.g., "85mm creates intimacy")
+     * - Kelvin color temperatures (e.g., "5600K daylight")
+     * - Frame percentages (e.g., "40% of frame")
+     *
+     * @param array $creative The base creative prompt section
+     * @param array $options Build options including shot_type, mood, time_of_day
+     * @return array Enhanced creative prompt section
+     */
+    protected function enhanceCreativePromptWithVocabulary(array $creative, array $options): array
+    {
+        $shotType = $options['shot_type'] ?? 'medium';
+        $mood = $options['mood'] ?? 'natural';
+        $timeOfDay = $options['time_of_day'] ?? 'daylight';
+
+        // Add camera language with psychology
+        $creative['camera_language'] = $this->buildCameraLanguageWithPsychology($shotType);
+
+        // Add lighting with Kelvin and ratios
+        $creative['lighting_technical'] = $this->buildLightingWithKelvinAndRatios([
+            'mood' => $mood,
+            'time_of_day' => $timeOfDay,
+        ]);
+
+        // Add framing with percentages based on shot type
+        $framePercentages = [
+            'extreme-close-up' => 90,
+            'close-up' => 80,
+            'medium-close' => 65,
+            'medium' => 50,
+            'medium-wide' => 35,
+            'wide' => 25,
+            'establishing' => 15,
+        ];
+        $percentage = $framePercentages[$shotType] ?? 50;
+        $creative['framing_technical'] = $this->buildFramingWithPercentages([
+            'subject_percentage' => $percentage,
+            'subject_position' => 'center frame',
+        ]);
+
+        return $creative;
+    }
+
     /**
      * Build the scene summary.
      */
@@ -1321,6 +1548,24 @@ class StructuredPromptBuilderService
         }
         if (!empty($lighting['mood'])) {
             $parts[] = $lighting['mood'] . ' mood';
+        }
+
+        // =================================================================
+        // PHASE 22: Hollywood-quality vocabulary integration
+        // =================================================================
+        // Add lens psychology with emotional reasoning
+        if (!empty($creative['camera_language'])) {
+            $parts[] = '[LENS: ' . $creative['camera_language'] . ']';
+        }
+
+        // Add technical lighting with Kelvin values and stop ratios
+        if (!empty($creative['lighting_technical'])) {
+            $parts[] = '[LIGHTING: ' . $creative['lighting_technical'] . ']';
+        }
+
+        // Add precise framing with percentages
+        if (!empty($creative['framing_technical'])) {
+            $parts[] = '[FRAME: ' . $creative['framing_technical'] . ']';
         }
 
         // Authenticity markers
