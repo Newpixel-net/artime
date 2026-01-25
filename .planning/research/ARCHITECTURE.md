@@ -1,527 +1,407 @@
-# Architecture: Scene Text Inspector Integration
+# Architecture: Hollywood-Quality Prompt Pipeline
 
-**Project:** Scene Text Inspector Modal for Video Wizard
-**Researched:** 2026-01-23
-**Confidence:** HIGH
+**Domain:** AI Video Generation - Prompt Expansion System
+**Researched:** 2026-01-25
+**Confidence:** HIGH (based on direct codebase analysis)
 
 ## Executive Summary
 
-Scene Text Inspector integrates into VideoWizard's existing modal architecture using the established pattern: boolean toggle property, open/close methods, and direct data access via `$this->script['scenes'][$index]` and `$this->storyboard[$index]`. The modal is read-only (inspection only, no editing), so it requires minimal new PHP logic.
+The Hollywood-quality prompt pipeline integrates into an existing, well-structured service architecture. The current flow uses a clean separation between prompt building (VideoWizard, StructuredPromptBuilderService) and image generation (ImageGenerationService). The expansion system should slot in as a **preprocessing layer** that transforms 50-80 word prompts into 600-1000 word Hollywood-quality prompts before they reach the image generation service.
 
-**Integration approach:** Lightweight read-only modal following Character Bible/Location Bible pattern with scene-scoped data access.
-
-## Recommended Architecture
-
-### Modal Display Pattern
+## Current Architecture Overview
 
 ```
-User action (button click on scene card)
-    → wire:click="openSceneTextInspectorModal({{ $index }})"
-    → Sets $showSceneTextInspectorModal = true
-    → Sets $inspectorSceneIndex = $index
-    → Modal blade file renders (@if($showSceneTextInspectorModal))
-    → Accesses $script['scenes'][$inspectorSceneIndex] for data
-    → User closes modal
-    → wire:click="closeSceneTextInspectorModal()"
-    → Sets $showSceneTextInspectorModal = false
++-----------------------------------------------------------------------------+
+|                           VideoWizard.php                                    |
+|                         (Main Livewire Component)                            |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                      buildShotPrompt()                               |    |
+|  |  - Story visual content (what's happening)                           |    |
+|  |  - Dialogue integration                                              |    |
+|  |  - Camera/shot type (brief)                                          |    |
+|  |  - Technical specs (lens, lighting, style)                           |    |
+|  |  OUTPUT: 50-80 word "compact prompt"                                 |    |
+|  +---------------------------------------------------------------------+    |
++-----------------------------------------------------------------------------+
+                                     |
+                                     v
++-----------------------------------------------------------------------------+
+|                    ImageGenerationService.php                                |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |                      buildImagePrompt()                              |    |
+|  |  Calls StructuredPromptBuilderService.build()                        |    |
+|  |  - Visual mode configuration                                         |    |
+|  |  - Bible integrations (character, location, style)                   |    |
+|  |  - Scene DNA injection                                               |    |
+|  |  - Negative prompt handling                                          |    |
+|  +---------------------------------------------------------------------+    |
+|                                                                              |
+|  +---------------------------------------------------------------------+    |
+|  |               generateSceneImage() / generateWithGemini()            |    |
+|  |  - Reference cascade (characters, location, style)                   |    |
+|  |  - API call to Gemini/HiDream                                        |    |
+|  +---------------------------------------------------------------------+    |
++-----------------------------------------------------------------------------+
 ```
 
-This matches the pattern used by:
-- Character Bible Modal (`$showCharacterBibleModal`)
-- Location Bible Modal (`$showLocationBibleModal`)
-- Scene DNA Modal (`$showSceneDNAModal`)
-- Edit Prompt Modal (`$showEditPromptModal`, `$editPromptSceneIndex`)
+## Existing Service Ecosystem
 
-## Data Flow
+### Core Services (Direct Integration Points)
 
-### Source Data Locations
+| Service | File | Responsibility | Integration Priority |
+|---------|------|----------------|---------------------|
+| StructuredPromptBuilderService | `app/Services/StructuredPromptBuilderService.php` | JSON-based image prompts, visual modes | HIGH - Extend or wrap |
+| VideoPromptBuilderService | `app/Services/VideoPromptBuilderService.php` | Hollywood formula video prompts | HIGH - Extend for expansion |
+| PromptExpanderService | `app/Services/PromptExpanderService.php` | AI-powered prompt enhancement (existing) | HIGH - Replace/Enhance |
+| ImageGenerationService | `app/Services/ImageGenerationService.php` | API calls to Gemini/HiDream | MEDIUM - Call site changes |
+| EnhancedPromptService | `app/Services/EnhancedPromptService.php` | Unified facade for intelligence | LOW - Can wrap new system |
 
-| Data Type | Primary Source | Fallback | Structure |
-|-----------|---------------|----------|-----------|
-| Speech Segments | `$script['scenes'][$index]['speechSegments']` | `[]` | Array of segment objects with type, speaker, text, needsLipSync |
-| Image Prompt | `$storyboard[$index]['prompt']` | `$script['scenes'][$index]['visualDescription']` | String |
-| Video Prompt | `$storyboard[$index]['videoPrompt']` | `''` | String |
-| Scene Duration | `$storyboard[$index]['duration']` | `$script['scenes'][$index]['duration']` | Integer (seconds) |
-| Transition | `$storyboard[$index]['transition']` | `'cut'` | String |
-| Shot Type | `$storyboard[$index]['shotType']` | `null` | String |
-| Camera Movement | `$storyboard[$index]['cameraMovement']` | `null` | String |
+### Supporting Services (Context Providers)
 
-### Data Structure Reference
+| Service | Purpose |
+|---------|---------|
+| CameraMovementService | Motion intelligence, movement prompts |
+| ShotIntelligenceService | AI-driven shot decomposition |
+| ShotContinuityService | 30-degree rule, sequence validation |
+| SceneTypeDetectorService | Auto scene classification |
+| StoryBibleService | Character/location/style consistency |
 
-**Speech Segment (from `$script['scenes'][N]['speechSegments'][N]`):**
+## Recommended Architecture: HollywoodPromptExpander
+
+### Component Boundaries
+
+```
++-----------------------------------------------------------------------------+
+|                    NEW: HollywoodPromptExpanderService                       |
+|                                                                              |
+|  +----------------------+  +----------------------+  +------------------+   |
+|  |  Template Library    |  |  Expansion Engine    |  |  Context Injector|   |
+|  |  - Shot type rules   |  |  - AI expansion      |  |  - Bible data    |   |
+|  |  - Component blocks  |  |  - Rule fallback     |  |  - Scene state   |   |
+|  |  - Quality markers   |  |  - Word count mgmt   |  |  - Continuity    |   |
+|  +----------------------+  +----------------------+  +------------------+   |
+|                                                                              |
+|  INPUT: Compact prompt (50-80 words) + context                               |
+|  OUTPUT: Hollywood prompt (600-1000 words)                                   |
++-----------------------------------------------------------------------------+
+```
+
+### Data Flow: Before vs After
+
+**CURRENT Flow (50-80 words):**
+```
+Scene Data
+    |
+    v
+VideoWizard::buildShotPrompt()
+    | (50-80 words)
+    v
+ImageGenerationService::buildImagePrompt()
+    | (adds Bible context)
+    v
+StructuredPromptBuilder::build()
+    | (structured JSON prompt)
+    v
+API Call (Gemini/HiDream)
+```
+
+**PROPOSED Flow (600-1000 words):**
+```
+Scene Data
+    |
+    v
+VideoWizard::buildShotPrompt()
+    | (50-80 words "seed prompt")
+    v
++-----------------------------------------+
+| HollywoodPromptExpanderService::expand() |  <-- NEW INTEGRATION POINT
+|                                          |
+| 1. Parse seed prompt                     |
+| 2. Detect shot type, emotion, genre      |
+| 3. Load Bible context (characters, etc)  |
+| 4. Apply expansion template              |
+| 5. AI enhancement (Grok/GPT)             |
+| 6. Validate word count (600-1000)        |
+| 7. Inject quality markers                |
++-----------------------------------------+
+    | (600-1000 words)
+    v
+ImageGenerationService::generateSceneImage()
+    | (API call with expanded prompt)
+    v
+API Call (Gemini/HiDream)
+```
+
+## Component Design
+
+### 1. HollywoodPromptExpanderService (New)
+
+**Purpose:** Central orchestrator for prompt expansion.
+
 ```php
-[
-    'id' => 'seg-abc123',
-    'type' => 'narrator' | 'dialogue' | 'internal' | 'monologue',
-    'text' => 'The spoken text content',
-    'speaker' => 'CHARACTER NAME' | null,
-    'characterId' => 'char-xyz789' | null,
-    'voiceId' => 'voice-id' | null,
-    'needsLipSync' => true | false,
-    'startTime' => 0.0 | null,
-    'duration' => 5.2 | null,
-    'audioUrl' => 'https://...' | null,
-    'order' => 0,
-    'emotion' => 'whispering' | null,
-]
-```
+<?php
 
-**Scene Data (from `$script['scenes'][N]`):**
-```php
-[
-    'id' => 'scene-abc123',
-    'title' => 'Scene Title',
-    'visualDescription' => 'Long description...',
-    'speechSegments' => [/* array of segments */],
-    'speechType' => 'mixed' | 'narrator' | 'dialogue' | 'monologue',
-    'duration' => 10, // seconds
-    // ... other fields
-]
-```
+namespace Modules\AppVideoWizard\Services;
 
-**Storyboard Data (from `$storyboard[$index]`):**
-```php
-[
-    'prompt' => 'Cinematic image prompt...',
-    'videoPrompt' => 'Action description for video generation...',
-    'imageUrl' => 'https://...',
-    'duration' => 10,
-    'transition' => 'cut' | 'fade' | 'dissolve',
-    'shotType' => 'wide' | 'medium' | 'close-up' | etc.,
-    'cameraMovement' => 'static' | 'push_in' | 'tracking' | etc.,
-    // ... other fields
-]
-```
-
-## Integration Points with VideoWizard.php
-
-### New Properties Required
-
-```php
-// Modal state (add to VideoWizard.php class properties around line 1024-1030)
-public bool $showSceneTextInspectorModal = false;
-public int $inspectorSceneIndex = 0;
-```
-
-### New Methods Required
-
-```php
-/**
- * Open Scene Text Inspector modal for a specific scene.
- */
-public function openSceneTextInspectorModal(int $sceneIndex): void
+class HollywoodPromptExpanderService
 {
-    if (!isset($this->script['scenes'][$sceneIndex])) {
-        $this->dispatch('toast-error', message: __('Scene not found'));
-        return;
+    // Configuration
+    const TARGET_WORD_COUNT_MIN = 600;
+    const TARGET_WORD_COUNT_MAX = 1000;
+
+    // Dependencies
+    protected PromptTemplateLibrary $templates;
+    protected ContextInjectorService $contextInjector;
+    protected GrokService $aiService;
+
+    /**
+     * Expand a compact prompt to Hollywood quality.
+     *
+     * @param string $compactPrompt 50-80 word seed prompt
+     * @param array $context Shot/scene context
+     * @return array ['prompt' => string, 'metadata' => array]
+     */
+    public function expand(string $compactPrompt, array $context = []): array;
+
+    /**
+     * Expand with caching (for regeneration scenarios).
+     */
+    public function expandWithCache(string $compactPrompt, array $context): array;
+}
+```
+
+### 2. PromptTemplateLibrary (New)
+
+**Purpose:** Manage expansion templates by shot type and scene category.
+
+```php
+class PromptTemplateLibrary
+{
+    // Template structure for each shot type
+    const SHOT_TEMPLATES = [
+        'close-up' => [
+            'sections' => [
+                'subject_face_detail' => 150,    // words
+                'emotion_micro_expression' => 100,
+                'lighting_skin' => 80,
+                'camera_lens' => 60,
+                'environment_blur' => 80,
+                'cinematic_style' => 80,
+                'quality_markers' => 50,
+            ],
+            'priority_order' => ['subject_face_detail', 'emotion_micro_expression', ...],
+        ],
+        'wide' => [...],
+        'establishing' => [...],
+    ];
+
+    public function getTemplate(string $shotType): array;
+    public function getSectionContent(string $section, array $context): string;
+}
+```
+
+### 3. ContextInjectorService (New)
+
+**Purpose:** Pull Bible data and inject into prompt sections.
+
+```php
+class ContextInjectorService
+{
+    /**
+     * Build context block from all available sources.
+     */
+    public function buildFullContext(array $sceneMemory, int $sceneIndex): array
+    {
+        return [
+            'characters' => $this->getCharacterContext(...),
+            'location' => $this->getLocationContext(...),
+            'style' => $this->getStyleContext(...),
+            'continuity' => $this->getContinuityAnchors(...),
+            'emotional_arc' => $this->getEmotionalArcContext(...),
+        ];
+    }
+}
+```
+
+## Integration Points
+
+### Integration Point 1: VideoWizard.php (~line 21988)
+
+**Current:** `buildShotPrompt()` returns 50-80 word prompt directly.
+
+**Change:** Add optional expansion flag and call expander service.
+
+```php
+protected function buildShotPrompt(...): string
+{
+    // ... existing code ...
+
+    $prompt = implode('. ', array_filter($promptParts));
+
+    // NEW: Check if Hollywood expansion is enabled
+    $expandPrompts = $this->storyboard['hollywoodExpansion']['enabled'] ?? false;
+
+    if ($expandPrompts) {
+        $expander = app(HollywoodPromptExpanderService::class);
+        $expanded = $expander->expand($prompt, [
+            'shotType' => $shotType,
+            'sceneIndex' => $shotContext['sceneIndex'] ?? null,
+            'sceneMemory' => $this->sceneMemory,
+            'genre' => $this->storyboard['genre'] ?? 'cinematic',
+            'mood' => $shotContext['mood'] ?? 'neutral',
+        ]);
+        $prompt = $expanded['prompt'];
     }
 
-    $this->inspectorSceneIndex = $sceneIndex;
-    $this->showSceneTextInspectorModal = true;
-}
-
-/**
- * Close Scene Text Inspector modal.
- */
-public function closeSceneTextInspectorModal(): void
-{
-    $this->showSceneTextInspectorModal = false;
-    // No save needed - read-only modal
+    return trim($prompt);
 }
 ```
 
-### Blade View Location
+### Integration Point 2: ImageGenerationService.php (~line 218)
 
-```
-modules/AppVideoWizard/resources/views/livewire/modals/scene-text-inspector.blade.php
-```
+**Current:** Takes `visualDescription` and builds prompt with Bible integrations.
 
-### Render Integration
+**Change:** Accept pre-expanded prompts, skip redundant processing.
 
-Add to main VideoWizard blade view (likely in `steps/4-storyboard.blade.php` or main component view):
-
-```blade
-@include('livewire.modals.scene-text-inspector')
-```
-
-## Component Architecture
-
-### Modal Structure
-
-```
-scene-text-inspector.blade.php
-├── Modal Overlay (@if($showSceneTextInspectorModal))
-│   ├── Header
-│   │   ├── Title: "Scene Text Inspector - Scene {N}"
-│   │   └── Close Button (wire:click="closeSceneTextInspectorModal()")
-│   │
-│   ├── Scene Metadata Section
-│   │   ├── Duration badge
-│   │   ├── Transition badge
-│   │   ├── Shot type badge (if set)
-│   │   └── Camera movement badge (if set)
-│   │
-│   ├── Speech Segments Section
-│   │   └── @foreach($script['scenes'][$inspectorSceneIndex]['speechSegments'] ?? [] as $segment)
-│   │       ├── Segment card
-│   │       │   ├── Type badge (Narrator/Dialogue/Internal/Monologue)
-│   │       │   ├── Speaker name (if applicable)
-│   │       │   ├── Text content
-│   │       │   └── Lip-sync indicator
-│   │
-│   ├── Image Prompt Section
-│   │   └── Display: $storyboard[$inspectorSceneIndex]['prompt']
-│   │       or fallback to $script['scenes'][$inspectorSceneIndex]['visualDescription']
-│   │
-│   └── Video Prompt Section
-│       └── Display: $storyboard[$inspectorSceneIndex]['videoPrompt']
-```
-
-### Data Access Pattern
-
-**Preferred pattern (used throughout VideoWizard modals):**
-
-```blade
-@php
-    $scene = $script['scenes'][$inspectorSceneIndex] ?? null;
-    $storyboardScene = $storyboard[$inspectorSceneIndex] ?? null;
-@endphp
-
-@if($scene)
-    {{-- Access scene data --}}
-    {{ $scene['title'] ?? 'Untitled Scene' }}
-
-    @foreach($scene['speechSegments'] ?? [] as $segment)
-        {{-- Display segment --}}
-    @endforeach
-@endif
-```
-
-**Why this pattern:**
-1. Matches existing codebase style (see character-bible.blade.php, scene-dna.blade.php)
-2. Provides null safety with `??` operator
-3. Allows conditional rendering if scene doesn't exist
-4. Clear variable naming for template readability
-
-## Build Order Considerations
-
-### Phase 1: Core Modal Shell
-**Estimated time:** 1 hour
-**Files:**
-- `scene-text-inspector.blade.php` (create modal structure, header, close button)
-- `VideoWizard.php` (add properties, open/close methods)
-
-**Validation:**
-- Modal opens/closes correctly
-- Scene index tracks properly
-- No console errors
-
-### Phase 2: Metadata Display
-**Estimated time:** 1 hour
-**Files:**
-- `scene-text-inspector.blade.php` (add metadata badges section)
-
-**Validation:**
-- Duration, transition, shot type, camera movement display correctly
-- Handles missing data gracefully (null checks)
-
-### Phase 3: Speech Segments Display
-**Estimated time:** 2 hours
-**Files:**
-- `scene-text-inspector.blade.php` (add speech segments section)
-
-**Validation:**
-- All segment types render with correct badges
-- Narrator segments show no speaker
-- Dialogue/monologue/internal show speaker name
-- Lip-sync indicator displays correctly
-- Empty speechSegments array handled gracefully
-
-### Phase 4: Prompts Display
-**Estimated time:** 1 hour
-**Files:**
-- `scene-text-inspector.blade.php` (add image/video prompt sections)
-
-**Validation:**
-- Image prompt displays (with fallback to visualDescription)
-- Video prompt displays (gracefully handles empty)
-- Long prompts are scrollable/readable
-
-### Phase 5: Styling & Polish
-**Estimated time:** 1 hour
-**Files:**
-- `scene-text-inspector.blade.php` (apply consistent styling)
-
-**Validation:**
-- Matches existing modal visual style
-- Responsive layout
-- Dark theme consistency
-- Typography hierarchy clear
-
-## Architecture Patterns
-
-### Pattern 1: Read-Only Data Display
-**What:** Modal accesses but never modifies scene data
-**Why:** Simpler implementation, no save logic, no validation needed
-**How:**
-```blade
-{{-- Read data, never wire:model --}}
-<div>{{ $scene['title'] }}</div>
-
-{{-- NOT this (editing) --}}
-<input wire:model="scene.title">
-```
-
-### Pattern 2: Computed Properties Not Needed
-**What:** No computed properties required - direct array access in blade
-**Why:** Livewire can access public properties directly, computed overhead unnecessary for simple display
-**How:**
-```blade
-{{-- Direct access (preferred) --}}
-@foreach($script['scenes'][$inspectorSceneIndex]['speechSegments'] ?? [] as $segment)
-
-{{-- NOT this (adds complexity) --}}
-@foreach($this->getInspectorSpeechSegments() as $segment)
-```
-
-**Exception:** Only add computed property if:
-- Complex data transformation needed
-- Multiple template locations use same computation
-- Performance optimization required (memoization)
-
-### Pattern 3: Null Safety with Fallbacks
-**What:** Always provide fallback values for potentially missing data
-**Why:** VideoWizard data structures evolve, old projects may lack new fields
-**How:**
-```blade
-{{-- Good: Null-safe with fallback --}}
-{{ $storyboard[$inspectorSceneIndex]['videoPrompt'] ?? __('No video prompt set') }}
-
-{{-- Bad: Assumes field exists --}}
-{{ $storyboard[$inspectorSceneIndex]['videoPrompt'] }}
-```
-
-### Pattern 4: Inline PHP for Data Preparation
-**What:** Use `@php` blocks to prepare data before rendering complex sections
-**Why:** Keeps template logic readable, follows existing modal patterns
-**How:**
-```blade
-@php
-    $segments = $scene['speechSegments'] ?? [];
-    $hasSegments = count($segments) > 0;
-    $narratorCount = count(array_filter($segments, fn($s) => $s['type'] === 'narrator'));
-@endphp
-
-@if($hasSegments)
-    {{-- Render with prepared data --}}
-@endif
-```
-
-## Existing Modal Patterns Reference
-
-### Character Bible Modal Pattern
 ```php
-// Properties
-public bool $showCharacterBibleModal = false;
-public int $editingCharacterIndex = 0;
-
-// Methods
-public function openCharacterBibleModal(): void
+public function generateSceneImage(WizardProject $project, array $scene, array $options = []): array
 {
-    // Auto-sync from Story Bible if needed
-    $this->showCharacterBibleModal = true;
-    $this->editingCharacterIndex = 0;
-}
+    // NEW: Check if prompt is already Hollywood-expanded
+    $isHollywoodExpanded = $options['isHollywoodExpanded'] ?? false;
 
-public function closeCharacterBibleModal(): void
-{
-    $this->showCharacterBibleModal = false;
-    // Rebuild Scene DNA after changes
-    $this->buildSceneDNA();
-}
-```
-
-**Key difference for Scene Text Inspector:**
-- No rebuild needed on close (read-only)
-- No auto-sync needed (not editing data)
-- Scene index parameter (Character Bible edits all characters, Inspector views one scene)
-
-### Scene DNA Modal Pattern
-```php
-// Properties
-public bool $showSceneDNAModal = false;
-public string $sceneDNAActiveTab = 'overview';
-
-// Methods
-public function openSceneDNAModal(string $tab = 'overview'): void
-{
-    // Build Scene DNA first to ensure fresh data
-    if (!empty($this->script['scenes'])) {
-        $this->buildSceneDNA();
+    if ($isHollywoodExpanded) {
+        // Use prompt directly, skip buildImagePrompt
+        $prompt = $visualDescription;
+    } else {
+        // Existing flow
+        $prompt = $this->buildImagePrompt($visualDescription, ...);
     }
 
-    $this->sceneDNAActiveTab = $tab;
-    $this->showSceneDNAModal = true;
+    // ... rest of generation ...
 }
 ```
 
-**Key difference for Scene Text Inspector:**
-- No tab navigation needed (single view)
-- No data building needed (direct access to existing data)
-- Scene-scoped (DNA is global across all scenes)
+### Integration Point 3: Collage Generation (~line 26244)
 
-## Performance Considerations
+**Current:** Generates multiple shots rapidly with compact prompts.
 
-### No Computed Properties Needed
-- VideoWizard is ~18k lines, already heavy
-- Read-only display doesn't benefit from memoization
-- Direct array access in Blade is fast enough for <100 scenes
-- Computed properties add method calls, memory overhead
+**Change:** Option to use cached expanded prompts or expand on-demand.
 
-### Livewire Reactivity Not Needed
-- Modal displays snapshot of scene at open time
-- No real-time updates while modal open
-- If scene data changes externally, user must close/reopen to see updates
-- This matches existing modal behavior (e.g., Edit Prompt modal)
+```php
+// Per-shot in collage loop
+if ($useHollywoodExpansion) {
+    $expander = app(HollywoodPromptExpanderService::class);
+    $shot['prompt'] = $expander->expandWithCache($shot['prompt'], [
+        'shotIndex' => $i,
+        'cacheKey' => "collage_{$sceneIndex}_{$i}",
+    ]);
+}
+```
 
-### Data Volume Assessment
-- Typical scene: 3-5 speech segments
-- Max segments per scene: 50 (enforced by `SpeechSegment::MAX_SEGMENTS_PER_SCENE`)
-- Prompts: ~500-2000 characters each
-- **Total data per modal render:** <50KB
-- **Blade rendering time:** <50ms
-- **Conclusion:** Direct rendering is performant
+## File Structure
+
+```
+modules/AppVideoWizard/app/Services/
+|-- HollywoodPromptExpanderService.php    # Main orchestrator (NEW)
+|-- PromptTemplateLibrary.php             # Template management (NEW)
+|-- ContextInjectorService.php            # Bible/context injection (NEW)
+|-- PromptExpanderService.php             # EXISTING (refactor to use new system)
+|-- VideoPromptBuilderService.php         # EXISTING (minimal changes)
+|-- StructuredPromptBuilderService.php    # EXISTING (no changes)
++-- ImageGenerationService.php            # EXISTING (integration point)
+
+modules/AppVideoWizard/config/
++-- hollywood_templates.php               # Template configuration (NEW)
+```
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Over-Abstraction
-**Bad:**
-```php
-// VideoWizard.php
-public function getInspectorSceneTitle()
-{
-    return $this->script['scenes'][$this->inspectorSceneIndex]['title'] ?? 'Untitled';
-}
-```
+### Anti-Pattern 1: Prompt Bloat Without Purpose
+**What:** Adding words just to hit word count targets.
+**Why bad:** Dilutes signal, confuses AI model, wastes tokens.
+**Instead:** Each section must add specific visual information. If a section has nothing meaningful, skip it entirely.
 
-**Why bad:** Adds method for trivial one-liner, increases maintenance burden
+### Anti-Pattern 2: Breaking Bible Integration
+**What:** Overwriting or ignoring character/location/style Bible data.
+**Why bad:** Destroys visual consistency the Bible system provides.
+**Instead:** Bible data MUST flow through to final prompt. Expansion adds detail, doesn't replace anchors.
 
-**Good:**
-```blade
-{{-- scene-text-inspector.blade.php --}}
-{{ $scene['title'] ?? 'Untitled Scene' }}
-```
+### Anti-Pattern 3: Synchronous Expansion in Collage Loop
+**What:** Calling AI expansion for each of 4+ shots sequentially.
+**Why bad:** Adds 2-4 seconds per shot, making collage generation painfully slow.
+**Instead:** Pre-expand all shots in parallel before collage generation, or use cached templates.
 
-### Anti-Pattern 2: Computed Properties for Display
-**Bad:**
-```php
-// VideoWizard.php
-#[Computed]
-public function inspectorScene()
-{
-    return $this->script['scenes'][$this->inspectorSceneIndex] ?? null;
-}
-```
+### Anti-Pattern 4: Hardcoded Shot Type Logic
+**What:** Giant switch statements for each shot type embedded in expander.
+**Why bad:** Impossible to tune, extend, or A/B test different templates.
+**Instead:** Template-driven approach with configurable JSON/PHP configs.
 
-**Why bad:**
-- Livewire caches computed properties per request, but modal is single-render
-- No performance benefit for read-once data
-- Adds complexity for zero gain
+## Scalability Considerations
 
-**Good:**
-```blade
-@php
-    $scene = $script['scenes'][$inspectorSceneIndex] ?? null;
-@endphp
-```
+| Concern | Current (50-80 words) | With Expansion (600-1000 words) | Mitigation |
+|---------|----------------------|--------------------------------|------------|
+| API token cost | ~100 tokens/prompt | ~600-1200 tokens/prompt | Cache expanded prompts, batch expansion |
+| Latency (expansion) | 0ms | 500-2000ms (AI call) | Pre-expand during shot decomposition, not generation |
+| Memory | Minimal | ~1KB per expanded prompt | Store only active scene prompts |
+| Collage speed | ~8s for 4 shots | +2-8s if sync expansion | Parallel pre-expansion, template caching |
 
-### Anti-Pattern 3: Scene Data Duplication
-**Bad:**
-```php
-// VideoWizard.php
-public function openSceneTextInspectorModal(int $sceneIndex): void
-{
-    $this->inspectorSceneIndex = $sceneIndex;
-    $this->inspectorSceneData = $this->script['scenes'][$sceneIndex]; // DUPLICATION
-    $this->showSceneTextInspectorModal = true;
-}
-```
+## Suggested Build Order
 
-**Why bad:**
-- Duplicates data in component state
-- Increases memory usage
-- Data can become stale if scene edited elsewhere
-- Violates single source of truth
+Based on dependencies and integration complexity:
 
-**Good:**
-```php
-public function openSceneTextInspectorModal(int $sceneIndex): void
-{
-    $this->inspectorSceneIndex = $sceneIndex; // Just store index
-    $this->showSceneTextInspectorModal = true;
-}
-```
+### Phase 1: Core Expansion Engine (2-3 tasks)
+1. **PromptTemplateLibrary** - Template data structure, shot type configs
+2. **HollywoodPromptExpanderService** - Main expand() method with rule-based fallback
+3. **Unit tests** - Validate expansion for each shot type
 
-## Validation & Error Handling
+### Phase 2: Context Integration (2-3 tasks)
+1. **ContextInjectorService** - Pull Bible data, build context blocks
+2. **Integration with SceneMemory** - Wire up character/location/style
+3. **Continuity anchors** - Extract style from previous scenes
 
-### Scene Index Validation
+### Phase 3: AI Enhancement (2 tasks)
+1. **AI expansion via Grok/GPT** - Intelligent prompt expansion
+2. **Word count validation** - Ensure 600-1000 range
 
-```php
-public function openSceneTextInspectorModal(int $sceneIndex): void
-{
-    // Validate scene exists before opening
-    if (!isset($this->script['scenes'][$sceneIndex])) {
-        $this->dispatch('toast-error', message: __('Scene not found'));
-        return;
-    }
+### Phase 4: Integration Points (2-3 tasks)
+1. **VideoWizard integration** - Add expansion toggle, call expander
+2. **ImageGenerationService** - Accept pre-expanded prompts
+3. **Collage optimization** - Caching, parallel expansion
 
-    $this->inspectorSceneIndex = $sceneIndex;
-    $this->showSceneTextInspectorModal = true;
-}
-```
+### Phase 5: UI/UX and Polish (1-2 tasks)
+1. **Settings UI** - Enable/disable expansion, preview expanded prompts
+2. **Prompt inspector** - Show expanded vs compact side-by-side
 
-**Why:** Prevents modal opening with invalid scene index, which would cause blade errors.
+## Existing PromptExpanderService Analysis
 
-### Blade Null Safety
+The current `PromptExpanderService.php` already implements:
 
-```blade
-@php
-    $scene = $script['scenes'][$inspectorSceneIndex] ?? null;
-@endphp
+**Strengths (to preserve):**
+- Hollywood formula constants (`HOLLYWOOD_FORMULA`)
+- Shot type detection (`detectShotType()`)
+- Camera movement inference (`inferCameraMovement()`)
+- Lighting inference (`inferLighting()`)
+- AI expansion via Grok/GPT (`expandWithAI()`)
+- Rule-based fallback (`expandWithRules()`)
 
-@if($scene)
-    {{-- Render modal content --}}
-@else
-    <div style="padding: 2rem; text-align: center; color: rgba(255,255,255,0.5);">
-        {{ __('Scene data not available') }}
-    </div>
-@endif
-```
+**Gaps (to address with new system):**
+- Target word count is 50-100, not 600-1000
+- No Bible context integration
+- No template-driven expansion
+- No caching layer
+- No collage optimization
 
-**Why:** Defensive programming for edge cases (scene deleted while modal open, data corruption).
-
-## Integration Checklist
-
-- [ ] Add `$showSceneTextInspectorModal` property to VideoWizard.php
-- [ ] Add `$inspectorSceneIndex` property to VideoWizard.php
-- [ ] Add `openSceneTextInspectorModal()` method to VideoWizard.php
-- [ ] Add `closeSceneTextInspectorModal()` method to VideoWizard.php
-- [ ] Create `scene-text-inspector.blade.php` modal file
-- [ ] Add `@include('livewire.modals.scene-text-inspector')` to main view
-- [ ] Add trigger button to scene cards (`wire:click="openSceneTextInspectorModal({{ $index }})"`)
-- [ ] Test modal open/close
-- [ ] Verify all data displays correctly
-- [ ] Test with scenes that have no speechSegments
-- [ ] Test with scenes that have missing storyboard data
-- [ ] Verify styling matches existing modals
-- [ ] Test on different screen sizes (responsive)
+**Recommendation:** Extend `PromptExpanderService` rather than replace it. Add `expandToHollywood()` method that uses templates and targets 600-1000 words.
 
 ## Sources
 
-**HIGH Confidence** - Direct codebase analysis:
-- `modules/AppVideoWizard/app/Livewire/VideoWizard.php` (existing modal patterns, data structures)
-- `modules/AppVideoWizard/resources/views/livewire/modals/character-bible.blade.php` (modal UI pattern)
-- `modules/AppVideoWizard/resources/views/livewire/modals/scene-dna.blade.php` (scene data access pattern)
-- `modules/AppVideoWizard/resources/views/livewire/modals/edit-prompt.blade.php` (scene-scoped modal pattern)
-- `modules/AppVideoWizard/app/Services/SpeechSegment.php` (segment data structure)
-- `modules/AppVideoWizard/app/Services/SpeechSegmentParser.php` (segment types, constants)
+All findings based on direct codebase analysis:
+- `modules/AppVideoWizard/app/Services/StructuredPromptBuilderService.php`
+- `modules/AppVideoWizard/app/Services/VideoPromptBuilderService.php`
+- `modules/AppVideoWizard/app/Services/PromptExpanderService.php`
+- `modules/AppVideoWizard/app/Services/ImageGenerationService.php`
+- `modules/AppVideoWizard/app/Services/EnhancedPromptService.php`
+- `modules/AppVideoWizard/app/Services/ShotIntelligenceService.php`
+- `modules/AppVideoWizard/app/Livewire/VideoWizard.php`

@@ -1,477 +1,558 @@
-# Domain Pitfalls: Scene Text Inspector Modal
+# Domain Pitfalls: Hollywood-Quality AI Prompt Generation Systems
 
-**Domain:** Livewire inspection/detail modals for existing applications
-**Researched:** 2026-01-23
-**Confidence:** HIGH (Livewire-specific), MEDIUM (general UX patterns)
+**Domain:** AI prompt generation for multi-model video production (image, video, TTS)
+**Researched:** 2026-01-25
+**Confidence:** HIGH (verified against Runway, CLIP, and industry best practices)
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, major performance degradation, or user abandonment.
-
-### Pitfall 1: Massive Payload from Full Text Content
-**What goes wrong:** All public properties in Livewire components are serialized to JSON and sent with EVERY request. When displaying full speech segments, prompts, and metadata in a modal, this creates a massive payload (potentially 10-100KB+ per modal interaction) that is sent and received on every wire:model update, causing severe performance degradation and RAM consumption.
-
-**Why it happens:** Developers naturally use public properties to pass data to modals, not realizing that wire:model on large textareas or binding modal state creates continuous serialization overhead.
-
-**Consequences:**
-- 2-5 second delays on modal interactions
-- Browser memory bloat (especially on mobile)
-- Server RAM exhaustion with multiple concurrent users
-- Unresponsive UI when typing in text fields
-
-**Prevention:**
-1. **Use computed properties instead of public properties** for read-only data (scene content, prompts, metadata):
-   ```php
-   #[Computed]
-   public function inspectedSceneData()
-   {
-       return $this->scenes[$this->inspectedSceneIndex] ?? null;
-   }
-   ```
-   Computed properties are NOT included in the payload, drastically reducing request size.
-
-2. **Use wire:model.blur or wire:model.change** (NOT wire:model.live) for any text inputs:
-   ```blade
-   <textarea wire:model.blur="notes">
-   ```
-   This only sends updates when the user leaves the field, not on every keystroke.
-
-3. **Use #[Renderless] attribute** for actions that don't modify the view:
-   ```php
-   #[Renderless]
-   public function logInspection($sceneIndex)
-   {
-       // Backend-only logging, no re-render needed
-   }
-   ```
-
-4. **Store scene index, not scene data** as the modal state:
-   ```php
-   public ?int $inspectedSceneIndex = null; // Good: 4 bytes
-   // NOT: public ?array $inspectedScene = null; // Bad: 10-100KB
-   ```
-
-**Detection:**
-- Browser DevTools Network tab shows requests > 50KB
-- Noticeable lag when opening modal or typing
-- Chrome Performance profiler shows excessive JSON parsing time
-
-**Sources:**
-- [Livewire Performance Tips & Tricks](https://joelmale.com/blog/laravel-livewire-performance-tips-tricks)
-- [Speed Up Livewire V3](https://medium.com/@thenibirahmed/speed-up-livewire-v3-the-only-guide-you-need-32fe73338098)
-- [Livewire Computed Properties for Performance](https://medium.com/@developerawam/is-livewire-feeling-slow-boost-its-performance-with-computed-properties-6f1b53bf74ee)
+Mistakes that cause rewrites, model failures, or unusable output.
 
 ---
 
-### Pitfall 2: Unnecessary Re-renders Cascade
-**What goes wrong:** Opening a modal triggers a Livewire re-render of the ENTIRE parent component (VideoWizard.php at ~18k lines), not just the modal. Every property update in the modal re-renders the entire storyboard view, causing 1-3 second delays and visual flashing.
+### Pitfall 1: Exceeding Model Token Limits (Prompt Truncation)
 
-**Why it happens:** Livewire's default behavior is to re-render the entire component on any state change. Developers don't realize that setting `$showInspectorModal = true` re-renders everything.
+**What goes wrong:** Expanded prompts of 600-1000 words get silently truncated by image generation models, causing the most important visual details to be cut off. CLIP-based models (Stable Diffusion, HiDream) have a hard 77-token limit per text encoder. Prompts are truncated without warning, and words appearing later in the prompt carry less weight.
+
+**Why it happens:** Teams build sophisticated prompt expanders targeting "Hollywood-quality" detail without understanding the underlying model architecture. The system generates beautiful 800-word prompts, but only the first 75 tokens actually influence the image.
 
 **Consequences:**
-- Entire storyboard re-renders when opening/closing modal
-- Screen flashing and loss of scroll position
-- Animations restart
-- Poor mobile experience (users abandon)
+- Critical visual details (lighting, style, color grading) at the end of prompts are ignored
+- Character consistency markers at prompt end never reach the model
+- Expensive AI expansion wasted on text that gets cut
+- Output quality is no better than a 50-word prompt
 
 **Prevention:**
-1. **Use wire:ignore for static content** that shouldn't re-render:
-   ```blade
-   <div wire:ignore.self class="storyboard-scenes">
-       <!-- Existing storyboard that doesn't change when modal opens -->
-   </div>
-   ```
+1. **Know your model limits** - Research exact token limits for each target model:
+   - CLIP-based (SD, HiDream): 77 tokens per encoder (75 usable)
+   - Stable Diffusion 3 T5 encoder: 512 tokens
+   - NanoBanana/Gemini: 32,768 tokens (generous)
+   - Runway Gen-4: No strict limit, but prefers concise prompts
 
-2. **Use browser events instead of Livewire properties** for UI-only state:
+2. **Front-load critical information** - Structure prompts with most important elements first:
+   ```
+   [Subject + Action] > [Camera] > [Lighting] > [Style] > [Details]
+   ```
+   Words early in prompts carry more weight in image generation.
+
+3. **Implement model-specific formatters** - Create adapters that reformat prompts per model:
    ```php
-   // Instead of: public bool $showModal = true;
-   $this->dispatch('open-inspector-modal', sceneIndex: $index);
-   ```
-   ```blade
-   <script>
-   window.addEventListener('open-inspector-modal', (e) => {
-       // Pure JS modal control, no Livewire re-render
-   });
-   </script>
-   ```
+   interface PromptFormatter {
+       public function format(string $expandedPrompt, int $tokenLimit): string;
+   }
 
-3. **Extract modal to separate Livewire component** if it has complex state:
-   ```blade
-   @livewire('scene-inspector-modal', ['projectId' => $projectId])
-   ```
-   This isolates re-renders to just the modal component.
-
-4. **Use #[Renderless] for modal state changes** that don't affect the view:
-   ```php
-   #[Renderless]
-   public function setInspectedScene($index)
-   {
-       $this->inspectedSceneIndex = $index;
+   class CLIPPromptFormatter implements PromptFormatter {
+       public function format(string $prompt, int $tokenLimit = 75): string {
+           // Compress to essentials, prioritize subject + action
+           // Use CLIP tokenizer to count actual tokens
+       }
    }
    ```
 
+4. **Use prompt compression for CLIP models** - The 77-token limit can be worked around using chunking (breaking prompt into 75-token chunks), but this adds complexity and may reduce coherence.
+
 **Detection:**
-- Network tab shows full component HTML returned (200-500KB responses)
-- Entire page flashes when opening modal
-- Browser Performance profiler shows long "Recalculate Style" tasks
-- Users report "the whole screen refreshes"
+- Compare generated images from 50-word vs 800-word prompts - if identical, truncation occurring
+- Use CLIP tokenizer to count tokens: `openai/clip-vit-base-patch32` in Python
+- Monitor for style/lighting keywords being ignored in output
+
+**Which phase should address:** Phase 1 (Foundation) - Must establish model-specific formatters before any expansion work
 
 **Sources:**
-- [Prevent Livewire Component Re-rendering](https://benjamincrozat.com/prevent-render-livewire)
-- [Avoid Component Rerender Side Effects](https://codecourse.com/watch/livewire-performance/avoid-component-rerender-side-effects)
-- [Livewire #[Renderless] Attribute](https://livewire.laravel.com/docs/4.x/attribute-renderless)
+- [Overcoming 77 Token Limit in Diffusers](https://github.com/huggingface/diffusers/issues/2136)
+- [SDXL Token Limit Discussion](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/discussions/60)
+- [Stable Diffusion 3 Token Limits](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers/discussions/22)
 
 ---
 
-### Pitfall 3: Copy-to-Clipboard Breaks After User Interactions
-**What goes wrong:** Copy-to-clipboard functionality works initially but fails after certain user interactions (confirming actions, switching tabs, modal fade animations). Users click "Copy" and nothing happens, or get a "Failed to copy" error.
+### Pitfall 2: Prompt Bloat (Too Much Detail Confuses Models)
 
-**Why it happens:** Clipboard API requires "transient user activation" (user must have recently clicked), HTTPS context, and window focus. Chrome-specific issue: fade animations on modals/confirms maintain focus for ~500ms, breaking clipboard access. Cross-origin iframes need special permissions.
+**What goes wrong:** AI video models receive overly complex prompts with multiple scene changes, contradictory instructions, or excessive detail, causing unpredictable outputs, hallucinations, and ignored instructions. Models "do their own thing" instead of following the prompt.
+
+**Why it happens:** Teams assume "more detail = better output" and stuff prompts with every possible descriptor. The Hollywood formula gets over-applied, adding lighting AND atmosphere AND color grading AND film style AND grain texture to every single shot.
 
 **Consequences:**
-- Silent failures (users think they copied but didn't)
-- Inconsistent behavior (works sometimes, fails other times)
-- Poor mobile experience (iOS Safari has additional restrictions)
-- User frustration: "I have to try 3 times to copy"
+- Runway reports: "Many users report that Runway has a tendency to ignore prompt instructions"
+- Conflicting requests cause model confusion (e.g., "cinematic shallow DOF" + "sharp environmental detail")
+- Multiple style shifts in single prompt cause visual inconsistency
+- Wasted AI expansion tokens on detail that hurts output
 
 **Prevention:**
-1. **Use modern Clipboard API with proper error handling**:
-   ```javascript
-   async function copyToClipboard(text) {
-       try {
-           await navigator.clipboard.writeText(text);
-           showSuccess('Copied!');
-       } catch (err) {
-           // Fallback to execCommand for older browsers
-           fallbackCopy(text);
-       }
-   }
+1. **Follow the "single scene" rule** - Runway Gen-4 generates 5-10 second clips. Each prompt should describe ONE scene, ONE action, ONE style:
+   ```
+   BAD: "Jack walks into cafe, sits down, orders coffee, drinks it, pays"
+   GOOD: "Jack enters busy cafe, eyes scanning for someone, determined expression"
    ```
 
-2. **Ensure clipboard operations happen immediately in click handler**, not after animations or confirms:
-   ```javascript
-   // BAD: Clipboard access after confirm
-   if (confirm('Copy this?')) {
-       await navigator.clipboard.writeText(text); // FAILS
-   }
-
-   // GOOD: Copy first, then confirm
-   await navigator.clipboard.writeText(text);
-   confirm('Copied! Continue?');
+2. **Avoid negative phrasing** - Gen-4 explicitly doesn't support negative prompts:
+   ```
+   BAD: "no blurry faces, avoid distortion, don't include artifacts"
+   GOOD: "sharp focus on face, clean detailed features"
    ```
 
-3. **Implement execCommand() fallback** for reliability:
-   ```javascript
-   function fallbackCopy(text) {
-       const textarea = document.createElement('textarea');
-       textarea.value = text;
-       textarea.style.position = 'fixed';
-       textarea.style.opacity = '0';
-       document.body.appendChild(textarea);
-       textarea.select();
-       document.execCommand('copy');
-       document.body.removeChild(textarea);
-   }
+3. **Limit style descriptors** - Pick 3-5 key style elements, not 15:
+   ```
+   BAD: "cinematic, film grain, anamorphic, shallow DOF, teal orange, dramatic lighting,
+        volumetric fog, 8K, professional cinematography, IMAX quality..."
+
+   GOOD: "cinematic, golden hour lighting, teal-orange grade"
    ```
 
-4. **Add visual feedback immediately** (optimistic UI):
-   ```javascript
-   // Change button text immediately, don't wait for async
-   button.textContent = 'Copied!';
-   navigator.clipboard.writeText(text);
+4. **Use subject pronouns in video prompts** - Per Runway best practices:
+   ```
+   BAD: "The rugged 45-year-old Japanese-American detective with salt-and-pepper hair turns"
+   GOOD: "The subject turns slowly, expression hardening"
+   ```
+   Image-to-video inherits subject from reference image; don't re-describe.
+
+5. **Implement prompt complexity scoring**:
+   ```php
+   public function getComplexityScore(string $prompt): array {
+       return [
+           'word_count' => str_word_count($prompt),
+           'style_keywords' => $this->countStyleKeywords($prompt),
+           'action_verbs' => $this->countActionVerbs($prompt),
+           'contradictions' => $this->detectContradictions($prompt),
+           'score' => $this->calculateOverallComplexity($prompt),
+           'recommendation' => $score > 0.7 ? 'simplify' : 'acceptable'
+       ];
+   }
    ```
 
 **Detection:**
-- Clipboard works in isolation but fails in modal context
-- Works on first try, fails on subsequent tries
-- Console shows "Document is not focused" errors
-- Works on desktop, fails on iOS Safari
+- Video output ignores key prompt elements
+- Output shows "hallucinations" - elements not in prompt
+- Same prompt generates wildly different outputs each time
+- Model adds unwanted scene changes or style shifts
+
+**Which phase should address:** Phase 2 (Prompt Pipeline) - Build complexity guardrails into expansion system
 
 **Sources:**
-- [Copy to Clipboard in JavaScript](https://sentry.io/answers/how-do-i-copy-to-the-clipboard-in-javascript/)
-- [Chrome Clipboard Issues After Confirm](https://www.webmasterworld.com/javascript/5099260.htm)
-- [Web.dev Clipboard API Guide](https://web.dev/patterns/clipboard/copy-text)
-- [SitePoint Clipboard API](https://www.sitepoint.com/clipboard-api/)
+- [Runway Gen-4 Prompting Guide](https://help.runwayml.com/hc/en-us/articles/39789879462419-Gen-4-Video-Prompting-Guide)
+- [Runway Text to Video Guide](https://help.runwayml.com/hc/en-us/articles/42460036199443-Text-to-Video-Prompting-Guide)
 
 ---
 
-### Pitfall 4: Mobile Modals Become Unusable
-**What goes wrong:** Desktop-designed modals don't translate to mobile. Close buttons in upper-right corner are unreachable (thumb can't reach), CTAs get lost below the fold, body scrolling happens behind the modal, and the modal itself doesn't scroll properly. Users abandon the app entirely on mobile.
+### Pitfall 3: Shot-to-Shot Inconsistency ("Identity Drift")
 
-**Why it happens:** Developers design modals on desktop with centered-box layout and upper-right close buttons, not realizing mobile users hold phones one-handed with thumb as primary input. Standard `overflow: hidden` doesn't lock body scroll on iOS Safari.
+**What goes wrong:** Characters look different across shots - face shape changes, clothing shifts, hair color varies. The protagonist in Shot 1 doesn't look like the protagonist in Shot 5. This destroys narrative coherence and makes the video unwatchable.
+
+**Why it happens:** Each shot's prompt is generated independently without shared visual anchors. Prompt expansions add different descriptors each time ("weathered face" vs "rugged features" vs "tired expression"). No reference images or style anchors are passed between shots.
 
 **Consequences:**
-- 60-80% of mobile users can't close modal (abandon app)
-- Can't scroll to see full content on small screens
-- Accidental body scrolling while trying to scroll modal
-- Modal slides under browser chrome on iOS
+- "Identity drift" - characters morph between shots
+- Environments shift unexpectedly (sunset becomes midday)
+- Color grading varies shot-to-shot
+- Professional quality impossible without manual post-editing
 
 **Prevention:**
-1. **Use mobile-first modal layout** (fullscreen or bottom-sheet on mobile):
-   ```css
-   .modal-content {
-       /* Desktop: centered box */
-       @media (min-width: 768px) {
-           max-width: 600px;
-           margin: 10vh auto;
-       }
+1. **Use reference images** - Most 2026 models support "Ingredients to Video" (Veo 3.1) or reference images (Runway Gen-4):
+   ```php
+   // Extract and store character reference from first shot
+   $characterReference = $this->extractCharacterReference($firstShotImage);
 
-       /* Mobile: fullscreen */
-       @media (max-width: 767px) {
-           width: 100%;
-           height: 100%;
-           margin: 0;
+   // Pass reference to all subsequent shots featuring same character
+   foreach ($shots as $shot) {
+       if ($shot->hasCharacter($character->id)) {
+           $shot->addReference($characterReference);
        }
    }
    ```
 
-2. **Place close button in thumb-friendly zone** (bottom-right or bottom-left on mobile):
-   ```html
-   <!-- Desktop: top-right -->
-   <button class="close-btn close-btn-desktop">×</button>
+2. **Create and maintain Style Anchors** - Extract visual constants from first scene:
+   ```php
+   $styleAnchors = [
+       'colorGrading' => 'teal shadows with warm orange highlights',
+       'lightingStyle' => 'dramatic side lighting',
+       'filmLook' => 'cinematic film grain, anamorphic',
+       'atmosphere' => 'moody noir aesthetic',
+   ];
 
-   <!-- Mobile: bottom-right -->
-   <button class="close-btn close-btn-mobile">Close</button>
-   ```
-   ```css
-   @media (max-width: 767px) {
-       .close-btn-desktop { display: none; }
-       .close-btn-mobile {
-           position: fixed;
-           bottom: 20px;
-           right: 20px;
-       }
-   }
+   // Inject into EVERY prompt in the scene
+   $prompt = $this->injectStyleAnchors($basePrompt, $styleAnchors);
    ```
 
-3. **Implement iOS-safe body scroll lock**:
-   ```javascript
-   // Position fixed approach (works on iOS)
-   function lockBodyScroll() {
-       const scrollY = window.scrollY;
-       document.body.style.position = 'fixed';
-       document.body.style.top = `-${scrollY}px`;
-       document.body.style.width = '100%';
-   }
+3. **Use canonical character descriptions** - Store in Story Bible, reference by ID:
+   ```php
+   // Story Bible entry
+   'character_jack' => [
+       'visual' => 'Japanese-American man, early 40s, salt-and-pepper hair,
+                    weathered face, prominent jaw, dark eyes',
+       'costume' => 'worn leather jacket, dark jeans, boots',
+       'reference_image' => 'storage/characters/jack_reference.png'
+   ]
 
-   function unlockBodyScroll() {
-       const scrollY = document.body.style.top;
-       document.body.style.position = '';
-       document.body.style.top = '';
-       window.scrollTo(0, parseInt(scrollY || '0') * -1);
+   // In prompt: reference the canonical description, don't paraphrase
+   ```
+
+4. **Implement visual continuity pipeline**:
+   - Scene 1: Generate, extract style anchors, store character reference
+   - Scene 2+: Load anchors, inject into prompt, use reference image
+   - Validate: Compare output to reference for drift detection
+
+**Detection:**
+- Side-by-side comparison of character across shots
+- Color histogram comparison between adjacent shots
+- User reports of "character looks different"
+- Manual review in storyboard showing visible inconsistency
+
+**Which phase should address:** Phase 2 (Prompt Pipeline) - Build continuity system into core architecture
+
+**Sources:**
+- [Google Veo 3.1 Character Consistency](https://www.financialcontent.com/article/tokenring-2026-1-21-google-launches-veo-31-a-paradigm-shift-in-cinematic-ai-video-and-character-consistency)
+- [Multi-Shot Character Consistency Research](https://arxiv.org/html/2412.07750v1)
+- [Runway Gen-4 Consistent Characters](https://runwayml.com/research/introducing-runway-gen-4)
+
+---
+
+### Pitfall 4: TTS Emotion Mismatch
+
+**What goes wrong:** Text-to-speech output sounds robotic, emotionless, or has the wrong emotional tone for the scene. Angry dialogue sounds cheerful. Sad moments sound neutral. Emotional direction cues are either ignored or spoken aloud by the TTS model.
+
+**Why it happens:** TTS models interpret emotional context from the text itself. If the text says "she said angrily" but the actual dialogue is "I understand," the model gets confused. Some models speak the emotional tags instead of interpreting them.
+
+**Consequences:**
+- Dialogue sounds mechanical and detached
+- Emotional beats don't land
+- Spoken stage directions: "The character says nervously, Hello"
+- Mismatched emotion destroys scene impact
+
+**Prevention:**
+1. **Separate clean text from emotional direction**:
+   ```php
+   // Parse TTS input to separate dialogue from direction
+   public function prepareTTSInput(string $dialogueWithDirection): array {
+       // "[angrily] I understand what you mean"
+       preg_match('/\[([^\]]+)\]\s*(.+)/', $dialogueWithDirection, $matches);
+
+       return [
+           'emotion' => $matches[1] ?? 'neutral',     // For TTS emotional direction
+           'text' => $matches[2] ?? $dialogueWithDirection,  // Clean text to speak
+       ];
    }
    ```
-   Or use library: [body-scroll-lock](https://github.com/willmcpo/body-scroll-lock)
 
-4. **Ensure modal content is scrollable** on mobile:
-   ```css
-   .modal-body {
-       max-height: calc(100vh - 120px); /* Account for header/footer */
-       overflow-y: auto;
-       -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+2. **Use model-appropriate emotional cues**:
+   - **ElevenLabs**: Explicit tags like `<excited>` or voice prompt descriptions
+   - **Hume Octave**: Natural language Voice Prompt ("The speaker is ecstatic")
+   - **Generic TTS**: Embed emotion in dialogue text naturally
+
+3. **Match text sentiment to desired emotion**:
+   ```php
+   // Emotional guidance should align with actual text sentiment
+   // BAD: Happy delivery of "I hate you"
+   // GOOD: Ensure text supports the emotional direction
+
+   if ($this->analyzeTextSentiment($text) !== $desiredEmotion) {
+       Log::warning('TTS emotion mismatch', [
+           'text_sentiment' => $textSentiment,
+           'desired_emotion' => $desiredEmotion
+       ]);
    }
+   ```
+
+4. **Plan for post-production removal** - Some models speak direction tags:
+   ```
+   Input: "She said excitedly, Hello there!"
+   Output audio: "She said excitedly, Hello there!" (speaks the tag)
+
+   Solution: Remove tags before TTS, use model's native emotion API
    ```
 
 **Detection:**
-- Test on actual iPhone (Safari behavior differs from Chrome DevTools)
-- Try reaching close button with thumb (iPhone 13+)
-- Try scrolling long content while holding phone one-handed
-- Check if body scrolls when modal is open
+- Listen to TTS output - does emotion match scene?
+- Check for spoken stage directions in audio
+- Compare emotional tone across dialogue in same scene
+- User feedback: "voices sound robotic"
+
+**Which phase should address:** Phase 3 (TTS Integration) - Build emotion extraction pipeline
 
 **Sources:**
-- [Modal UX Best Practices 2026](https://www.eleken.co/blog-posts/modal-ux)
-- [Mobile App Modals Guide 2026](https://www.plotline.so/blog/mobile-app-modals)
-- [Userpilot Modal UX Design](https://userpilot.com/blog/modal-ux-design/)
-- [Locking Body Scroll iOS](https://www.jayfreestone.com/writing/locking-body-scroll-ios/)
-- [CSS-Tricks Prevent Page Scrolling](https://css-tricks.com/prevent-page-scrolling-when-a-modal-is-open/)
+- [ElevenLabs TTS Best Practices](https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices)
+- [Hume Octave TTS Prompting Guide](https://www.hume.ai/blog/octave-tts-prompting-guide)
+- [Controlling Emotion in TTS Research](https://www.isca-archive.org/interspeech_2024/bott24_interspeech.pdf)
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays, technical debt, or poor UX but are recoverable.
-
-### Pitfall 5: Modal State Management Conflicts in Loops
-**What goes wrong:** When modals are triggered from a loop (e.g., "Inspect" button on each storyboard scene), developers use a single modal name/ID. Clicking any "Inspect" button triggers ALL modals with that name, or the wrong scene data is displayed because state wasn't updated before modal opened.
-
-**Why it happens:** Developers create a single modal component and bind it to a boolean `$showModal`, not realizing that multiple triggers need unique modal instances or careful state management.
-
-**Prevention:**
-1. **Store which item is being inspected**, not just a boolean:
-   ```php
-   // BAD:
-   public bool $showModal = false;
-
-   // GOOD:
-   public ?int $inspectedSceneIndex = null;
-
-   public function inspectScene($index)
-   {
-       $this->inspectedSceneIndex = $index;
-       // Modal visibility controlled by: wire:model="inspectedSceneIndex !== null"
-   }
-   ```
-
-2. **Use unique modal IDs in loops**:
-   ```blade
-   @foreach($scenes as $index => $scene)
-       <button wire:click="inspectScene({{ $index }})">Inspect</button>
-   @endforeach
-
-   @if($inspectedSceneIndex !== null)
-       <div class="modal" wire:key="inspector-{{ $inspectedSceneIndex }}">
-           <!-- Modal content -->
-       </div>
-   @endif
-   ```
-
-3. **Close modal by resetting state**, not just hiding:
-   ```php
-   public function closeInspector()
-   {
-       $this->inspectedSceneIndex = null;
-       $this->reset(['inspectorNotes']); // Clear modal-specific state
-   }
-   ```
-
-**Detection:**
-- Clicking "Inspect" on Scene 1 shows data from Scene 5
-- Multiple modals appear at once
-- Modal shows stale data from previous inspection
-
-**Sources:**
-- [Livewire Modal Best Practices Discussion](https://github.com/livewire/livewire/discussions/4345)
-- [Tips Working with Modals](https://forum.laravel-livewire.com/t/looking-for-tips-working-with-modals/1264)
+Mistakes that cause delays, technical debt, or poor quality but are recoverable.
 
 ---
 
-### Pitfall 6: Accessibility Completely Ignored
-**What goes wrong:** Modal lacks proper ARIA attributes, focus management, and keyboard navigation. Screen reader users can't use the modal, keyboard users get trapped, and focus jumps to random places when modal opens/closes. App fails accessibility audits and excludes disabled users.
+### Pitfall 5: Over-Engineering the Prompt Pipeline
 
-**Why it happens:** Developers focus on visual presentation and Livewire functionality, not realizing modals have strict accessibility requirements for ARIA roles, focus trapping, and keyboard handling.
+**What goes wrong:** Teams build complex prompt orchestration systems with dynamic template engines, multi-stage expansion pipelines, LLM-generated prompts that generate other prompts, feedback loops, and version-controlled prompt libraries - when a simple template system would suffice.
+
+**Why it happens:** 2026 industry trends push toward "PromptOps" and "AI orchestration" with sophisticated tooling. Teams treat prompts as "first-class production artifacts" requiring governance protocols, approval workflows, and automated testing suites before the core feature even works.
+
+**Consequences:**
+- Development paralysis - building infrastructure instead of features
+- Maintenance burden of complex system
+- Debugging nightmare when prompts fail
+- Performance overhead from multi-stage processing
+- Technical debt from abstraction layers
 
 **Prevention:**
-1. **Use semantic HTML and ARIA attributes**:
-   ```html
-   <div
-       role="dialog"
-       aria-modal="true"
-       aria-labelledby="modal-title"
-       aria-describedby="modal-description"
-       tabindex="-1"
-   >
-       <h2 id="modal-title">Scene Text Inspector</h2>
-       <p id="modal-description">View full text, prompts, and metadata</p>
-       <!-- Content -->
-   </div>
+1. **Start simple, add complexity when proven necessary**:
+   ```php
+   // Phase 1: String templates
+   $prompt = "Close-up of {$character}, {$action}, {$lighting}";
+
+   // Phase 2: Only add AI expansion IF templates insufficient
+   // Phase 3: Only add orchestration IF multiple AI steps needed
    ```
 
-2. **Manage focus properly**:
-   ```javascript
-   let previousActiveElement;
+2. **Follow the "one LLM call" principle** initially:
+   ```php
+   // BAD: Prompt generates prompt generates prompt
+   $outline = $llm->expand($basic);
+   $detailed = $llm->enhance($outline);
+   $final = $llm->polish($detailed);  // 3 API calls, 3x latency, 3x cost
 
-   function openModal(modalEl) {
-       previousActiveElement = document.activeElement;
-       modalEl.focus(); // Focus modal container
-       trapFocus(modalEl); // Trap tab navigation
-   }
-
-   function closeModal() {
-       previousActiveElement?.focus(); // Return focus
-   }
+   // GOOD: Single well-crafted prompt
+   $final = $llm->expand($basic, ['style' => 'hollywood']);
    ```
 
-3. **Implement keyboard navigation**:
-   ```javascript
-   modalEl.addEventListener('keydown', (e) => {
-       if (e.key === 'Escape') closeModal();
-       if (e.key === 'Tab') handleTabKey(e); // Trap focus
-   });
+3. **Defer prompt versioning until you need rollback**:
+   ```php
+   // Start: Prompts in code
+   const TEMPLATE = "...";
+
+   // Later (IF needed): Move to database only when A/B testing required
+   // Even later (IF needed): Add version control when rollback needed
    ```
 
-4. **Consider native `<dialog>` element** (modern browsers 2026):
-   ```html
-   <dialog id="inspector-modal">
-       <!-- Built-in focus management and Escape key -->
-   </dialog>
-   ```
-   ```javascript
-   dialog.showModal(); // Opens with automatic focus management
+4. **Measure before optimizing** - Track actual prompt performance:
+   ```php
+   $metrics = [
+       'prompt_generation_time' => $timer->elapsed(),
+       'output_quality_score' => $this->scoreOutput($result),
+       'model_compliance' => $this->checkPromptFollowed($prompt, $result),
+   ];
+   // Only add complexity if metrics show problems
    ```
 
 **Detection:**
-- Tab key escapes modal (focus goes to background)
-- Screen reader doesn't announce modal title
-- Can't close modal with Escape key
-- Lighthouse accessibility score < 90
+- More code for prompt generation than actual feature logic
+- Prompts pass through 3+ transformation stages
+- Debug sessions require understanding multiple abstraction layers
+- Adding a new prompt type requires changes in 5+ files
+
+**Which phase should address:** All phases - Continuously resist complexity creep
 
 **Sources:**
-- [W3C Dialog Modal Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
-- [Mastering Accessible Modals](https://www.a11y-collective.com/blog/modal-accessibility/)
-- [MDN aria-modal attribute](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-modal)
-- [ARIA Accessibility Best Practices](https://www.accessibilitychecker.org/blog/aria-accessibility/)
+- [PromptOps Why Prompts Break Production](https://www.v2solutions.com/blogs/promptops-for-engineering-leaders/)
+- [AI in 2026: The Model Is Not Your Problem](https://medium.com/@kaycee.lai/ai-in-2026-the-model-is-not-your-problem-and-it-never-really-was-597d0018310b)
 
 ---
 
-### Pitfall 7: Livewire Events Create Infinite Loops
-**What goes wrong:** Modal dispatches an event that parent component listens to, which updates state, which re-dispatches the event, creating an infinite loop of requests that crashes the browser or exhausts server resources.
+### Pitfall 6: Ignoring Prompt Caching and Performance
 
-**Why it happens:** Developers use broad event listeners without checking conditions, or use wire:model.live on properties that dispatch events when changed.
+**What goes wrong:** Every shot generates a fresh expanded prompt via LLM call, causing 500ms-2s latency per shot. A 20-shot scene takes 10-40 seconds just for prompt generation. Users experience painful delays, and API costs balloon.
+
+**Why it happens:** Teams focus on prompt quality without considering performance. Each shot calls the AI expander even when similar shots exist in the same scene.
+
+**Consequences:**
+- 500ms-2s latency per prompt expansion (per shot)
+- 20-shot scene = 10-40 seconds just for prompts
+- API costs multiply with every regeneration
+- Poor user experience during "Generate All" operations
 
 **Prevention:**
-1. **Be specific with event listeners**:
+1. **Cache expanded prompts by semantic similarity**:
    ```php
-   // BAD: Listens to ALL modal-updated events on page
-   #[On('modal-updated')]
-   public function handleUpdate() { }
+   public function expandWithCache(string $basicPrompt, array $context): array {
+       $cacheKey = $this->generateSemanticKey($basicPrompt, $context);
 
-   // GOOD: Listens only to specific event with guard
-   #[On('inspector-modal-updated')]
-   public function handleInspectorUpdate()
-   {
-       if ($this->inspectedSceneIndex === null) return; // Guard
-       // Handle update
+       if ($cached = Cache::get($cacheKey)) {
+           return ['prompt' => $cached, 'source' => 'cache'];
+       }
+
+       $expanded = $this->expandPrompt($basicPrompt, $context);
+       Cache::put($cacheKey, $expanded, now()->addHours(24));
+
+       return ['prompt' => $expanded, 'source' => 'generated'];
    }
    ```
 
-2. **Use browser events for UI-only updates**:
+2. **Batch similar prompts** - Process multiple shots together:
    ```php
-   // Instead of Livewire event that triggers re-render:
-   $this->dispatch('update-scene'); // Causes parent re-render
+   // Instead of 20 individual API calls:
+   public function expandBatch(array $shots, array $sharedContext): array {
+       $systemPrompt = $this->buildSystemPrompt($sharedContext);
+       $batchPrompt = $this->formatBatchRequest($shots);
 
-   // Use browser event:
-   $this->dispatch('update-scene')->self(); // Only this component
+       // Single API call returns all expansions
+       $response = $this->llm->chat([
+           'messages' => [
+               ['role' => 'system', 'content' => $systemPrompt],
+               ['role' => 'user', 'content' => $batchPrompt],
+           ]
+       ]);
+
+       return $this->parseBatchResponse($response);
+   }
    ```
 
-3. **Avoid wire:model.live on properties that dispatch events**:
-   ```blade
-   <!-- BAD: Every keystroke dispatches event -->
-   <input wire:model.live="searchQuery">
-
-   <!-- GOOD: Only dispatches on blur -->
-   <input wire:model.blur="searchQuery">
+3. **Use rule-based expansion for simple shots**:
+   ```php
+   // AI expansion only for complex/emotional shots
+   if ($this->isSimpleShot($shot)) {
+       return $this->expandWithRules($prompt);  // ~5ms
+   }
+   return $this->expandWithAI($prompt);  // ~800ms
    ```
 
-4. **Add condition checks before dispatching**:
+4. **Leverage LLM prompt caching** - Structure prompts for cache hits:
+   ```
+   Static prefix (system prompt, style guide): Cacheable
+   Dynamic suffix (shot-specific): Variable
+
+   Result: 40% token reduction on repeated patterns
+   ```
+
+**Detection:**
+- Profile prompt generation time per shot
+- Monitor API costs trending upward
+- User complaints about "Generate All" being slow
+- Network tab shows sequential AI calls
+
+**Which phase should address:** Phase 2 (Prompt Pipeline) - Build caching into expansion service
+
+**Sources:**
+- [OpenAI Prompt Caching Guide](https://platform.openai.com/docs/guides/prompt-caching)
+- [LLM Latency Optimization](https://incident.io/building-with-ai/optimizing-llm-prompts)
+- [Prompt Caching and KV Cache](https://ubos.tech/news/prompt-caching-and-kv-cache-boosting-llm-optimization-and-reducing-ai-costs/)
+
+---
+
+### Pitfall 7: Mismatched Prompt Style for Target Model
+
+**What goes wrong:** A prompt optimized for one model performs terribly on another. ChatGPT-style conversational prompts fail on Midjourney. SDXL keyword-weighted prompts confuse Runway. Paragraph prompts meant for GPT-5 overwhelm Stable Diffusion.
+
+**Why it happens:** Teams build one prompt expansion system and use it for all models without adaptation. Different AI models have fundamentally different prompt interpretation architectures.
+
+**Consequences:**
+- Same input generates great images on Model A, garbage on Model B
+- Style keywords work on one platform, ignored on another
+- Time wasted debugging "bad prompts" when it's model mismatch
+- Inconsistent quality across the pipeline
+
+**Prevention:**
+1. **Know each model's prompt preferences**:
+   | Model | Prompt Style | Ideal Length |
+   |-------|--------------|--------------|
+   | ChatGPT/GPT-5 | Paragraphs, multi-turn edits | 200-500 words |
+   | Midjourney V7 | Short, high-signal phrases + refs | 20-60 words |
+   | Stable Diffusion 3.5 | Structured, weighted keywords | 50-150 words |
+   | Runway Gen-4 | Visual detail, no conversation | 50-100 words |
+   | HiDream | Similar to SD, CLIP-based | 50-100 words |
+   | NanoBanana (Gemini) | Structured with spatial anchors | Flexible |
+
+2. **Implement model-specific prompt adapters**:
    ```php
-   public function updated($property)
-   {
-       if ($property === 'inspectedSceneIndex' && $this->inspectedSceneIndex !== null) {
-           // Only dispatch if actually opening modal, not closing
-           $this->dispatch('modal-opened');
+   interface ModelPromptAdapter {
+       public function adapt(string $canonicalPrompt): string;
+       public function getMaxTokens(): int;
+       public function supportsNegativePrompt(): bool;
+   }
+
+   class RunwayAdapter implements ModelPromptAdapter {
+       public function adapt(string $prompt): string {
+           // Remove negative phrasing
+           // Add "the subject" references
+           // Keep under 100 words
+           // Focus on visual detail
+       }
+   }
+
+   class StableDiffusionAdapter implements ModelPromptAdapter {
+       public function adapt(string $prompt): string {
+           // Add keyword weights: (important detail:1.3)
+           // Chunk for 77-token limit
+           // Structure as comma-separated tags
        }
    }
    ```
 
+3. **Generate canonical prompt first, then adapt**:
+   ```php
+   // Canonical Hollywood prompt (model-agnostic)
+   $canonical = $this->expandToCanonical($basic, $context);
+
+   // Model-specific adaptation
+   $imagePrompt = $this->adapters['hidream']->adapt($canonical);
+   $videoPrompt = $this->adapters['runway']->adapt($canonical);
+   $ttsPrompt = $this->adapters['elevenlabs']->adapt($canonical);
+   ```
+
+4. **Test prompts on actual target models** before deployment - don't assume cross-model compatibility
+
 **Detection:**
-- Browser tab becomes unresponsive
-- Network tab shows hundreds of identical requests
-- Console shows recursive event errors
-- Server CPU spikes to 100%
+- Same prompt works great on test model, fails on production model
+- Style keywords present in prompt but absent in output
+- Model-specific features (weights, refs) not being used
+- Quality varies significantly between models in pipeline
+
+**Which phase should address:** Phase 1 (Foundation) - Build adapter architecture from start
 
 **Sources:**
-- [Avoid Component Rerender Side Effects](https://codecourse.com/watch/livewire-performance/avoid-component-rerender-side-effects)
-- [Livewire Event Listeners Best Practices](https://laravel-news.com/laravel-livewire-tips-and-tricks)
+- [Image Prompting Mistakes and Fixes](https://roblaughter.medium.com/10-image-prompting-mistakes-and-how-to-avoid-them-244f972d0c2a)
+- [Model-Specific Prompting](https://levelup.gitconnected.com/image-generation-with-ai-aka-prompt-engineering-8b6cc54aa7a8)
+
+---
+
+### Pitfall 8: Subject Placement Wrong in Prompt
+
+**What goes wrong:** The main subject or action is buried in the middle or end of the prompt. AI models give it less weight, focusing instead on early-prompt elements like camera or lighting. The beautiful lighting description gets rendered perfectly, but the character action is weak or missing.
+
+**Why it happens:** Teams follow prompt formulas rigidly: "[Camera] + [Lighting] + [Subject] + [Action]" puts camera first. But CLIP and similar encoders weight early tokens more heavily.
+
+**Consequences:**
+- Camera/lighting perfect, subject action weak
+- Character doing wrong action or no action
+- Model focuses on environment, ignores protagonist
+- Prompt looks correct but output is wrong
+
+**Prevention:**
+1. **Front-load subject and action** for image models:
+   ```
+   BAD: "Cinematic close-up with dramatic side lighting of a detective
+         investigating a crime scene"
+
+   GOOD: "Detective crouches over evidence, examining it intently,
+          dramatic side lighting, cinematic close-up"
+   ```
+
+2. **Follow different order for different models**:
+   - **Image models (CLIP-based)**: Subject + Action FIRST
+   - **Video models (Runway)**: Can use "[Camera] + [Subject] + [Action]" structure
+   - **LLMs (GPT)**: Order matters less, context matters more
+
+3. **For Video Wizard existing code**, adjust the `combineComponents` method:
+   ```php
+   // Current order in VideoPromptBuilderService
+   // 1. Style, 2. Subject, 3. Action, 4. Camera, 5. Lighting, 6. Atmosphere
+
+   // Better for CLIP-based image generation:
+   // 1. Subject + Action (combined), 2. Camera, 3. Lighting, 4. Style
+   ```
+
+4. **Test with subject at different positions** - empirically verify what works for each model
+
+**Detection:**
+- Subject action weak/missing in output but lighting/style perfect
+- Comparing outputs with subject at prompt start vs end
+- Model seems to "forget" the main action
+
+**Which phase should address:** Phase 2 (Prompt Pipeline) - Implement model-aware ordering
+
+**Sources:**
+- [AI Image Prompts Best Practices](https://leonardo.ai/news/ai-image-prompts/)
+- [Writing AI Image Prompts Mistakes](https://chatsmith.io/blogs/ai-guide/writing-ai-image-prompts-mistakes-00052)
 
 ---
 
@@ -479,92 +560,117 @@ Mistakes that cause delays, technical debt, or poor UX but are recoverable.
 
 Mistakes that cause annoyance but are easily fixable.
 
-### Pitfall 8: Modal Animation Conflicts with Livewire Updates
-**What goes wrong:** Modal fade-in/fade-out animations get interrupted by Livewire updates, causing visual glitches (modal half-faded), or animations don't play at all because Livewire immediately removes the element.
+---
+
+### Pitfall 9: Contradictory Style Terms
+
+**What goes wrong:** Prompts include conflicting style descriptors that confuse the model. "Hyperrealistic cartoon style." "Shallow DOF with sharp environmental detail." "Low-key high-key lighting." The model picks one or creates visual confusion.
 
 **Prevention:**
-1. **Use Alpine.js for animations** (built into Livewire 3):
-   ```blade
-   <div
-       x-data="{ show: @entangle('showModal') }"
-       x-show="show"
-       x-transition:enter="transition ease-out duration-300"
-       x-transition:leave="transition ease-in duration-200"
-   >
-       <!-- Modal content -->
-   </div>
-   ```
+```php
+public function detectContradictions(string $prompt): array {
+    $contradictions = [
+        ['realistic', 'cartoon'],
+        ['shallow depth of field', 'sharp background'],
+        ['low-key', 'high-key'],
+        ['desaturated', 'vibrant saturated'],
+        ['harsh lighting', 'soft diffused'],
+        ['static camera', 'dynamic movement'],
+    ];
 
-2. **Delay Livewire state update until animation completes**:
-   ```javascript
-   function closeModal() {
-       modalEl.classList.add('fade-out');
-       setTimeout(() => {
-           @this.showModal = false; // Update Livewire after animation
-       }, 300);
-   }
-   ```
+    $found = [];
+    foreach ($contradictions as [$term1, $term2]) {
+        if (str_contains($prompt, $term1) && str_contains($prompt, $term2)) {
+            $found[] = [$term1, $term2];
+        }
+    }
+    return $found;
+}
+```
 
-3. **Use wire:ignore on animated elements**:
-   ```blade
-   <div wire:ignore.self class="modal-backdrop" x-show="show">
-   ```
+**Detection:** Output has visual confusion or model picks unexpected style
 
-**Sources:**
-- [Livewire with Alpine.js](https://livewire.laravel.com/docs/3.x/alpine)
+**Which phase should address:** Phase 2 - Add validation to prompt builder
 
 ---
 
-### Pitfall 9: Modal Doesn't Reset Between Opens
-**What goes wrong:** User opens inspector for Scene 1, closes it, opens inspector for Scene 2, but still sees Scene 1's data briefly before Scene 2 loads. Or modal shows previous user's notes/edits.
+### Pitfall 10: Using Conversational Language in Image Prompts
+
+**What goes wrong:** Prompts include conversational filler that wastes token budget and confuses pattern-matching models. "Please create an image of..." "I would like to see..." "Can you generate..."
 
 **Prevention:**
-1. **Reset modal state when opening**:
-   ```php
-   public function inspectScene($index)
-   {
-       $this->reset(['inspectorNotes', 'selectedTab']); // Clear old state
-       $this->inspectedSceneIndex = $index;
-   }
-   ```
+```php
+public function stripConversationalFiller(string $prompt): string {
+    $fillers = [
+        '/^please (create|generate|make)/i',
+        '/^(I would like|I want) (to see|you to)/i',
+        '/^can you (create|generate|make)/i',
+        '/\bplease\b/i',
+        '/\bthank you\b/i',
+    ];
 
-2. **Use wire:key to force re-render**:
-   ```blade
-   <div wire:key="inspector-{{ $inspectedSceneIndex }}-{{ now()->timestamp }}">
-   ```
+    foreach ($fillers as $pattern) {
+        $prompt = preg_replace($pattern, '', $prompt);
+    }
+    return trim($prompt);
+}
+```
 
-**Detection:**
-- Flashing of old content when opening modal
-- Previous user's edits appear briefly
+**Detection:** First words of prompt are instructions to the model rather than visual description
+
+**Which phase should address:** Phase 1 - Add to prompt preprocessor
 
 ---
 
-### Pitfall 10: Missing Loading States During Data Fetch
-**What goes wrong:** Modal opens instantly but shows empty content for 1-2 seconds while Livewire fetches scene data from server, making users think it's broken.
+### Pitfall 11: No Fallback When AI Expansion Fails
+
+**What goes wrong:** AI expansion API times out or returns error, and the system has no fallback. Users see error messages or broken prompts instead of graceful degradation to rule-based expansion.
 
 **Prevention:**
-1. **Show skeleton loader immediately**:
+```php
+public function expandPrompt(string $basic, array $options): array {
+    try {
+        return $this->expandWithAI($basic, $options);
+    } catch (\Exception $e) {
+        Log::warning('AI expansion failed, using rules', ['error' => $e->getMessage()]);
+
+        // Rule-based fallback always works
+        return $this->expandWithRules($basic, $options);
+    }
+}
+```
+
+**Detection:** Monitor error rates on expansion endpoint, check for "expansion failed" in logs
+
+**Which phase should address:** Phase 1 - Already implemented in existing PromptExpanderService, verify coverage
+
+---
+
+### Pitfall 12: Prompt Testing Only at Generation Time
+
+**What goes wrong:** Teams only discover prompt problems when viewing generated images/videos, after expensive API calls and long generation waits. No preview or validation of prompts before generation.
+
+**Prevention:**
+1. **Add prompt preview** before generation:
    ```blade
-   @if($inspectedSceneIndex !== null)
-       <div class="modal">
-           @if($this->inspectedScene) <!-- Computed property -->
-               <!-- Actual content -->
-           @else
-               <div class="skeleton-loader">Loading...</div>
-           @endif
+   <div class="prompt-preview">
+       <h4>Generated Prompt</h4>
+       <p>{{ $expandedPrompt }}</p>
+       <div class="metrics">
+           Word count: {{ str_word_count($expandedPrompt) }}
+           Token estimate: {{ $this->estimateTokens($expandedPrompt) }}
+           Complexity: {{ $complexityScore }}
        </div>
-   @endif
-   ```
-
-2. **Use wire:loading for specific actions**:
-   ```blade
-   <div wire:loading wire:target="inspectScene">
-       <div class="spinner"></div>
+       <button wire:click="regeneratePrompt">Regenerate</button>
+       <button wire:click="proceedToGeneration">Generate Image</button>
    </div>
    ```
 
-**Sources:**
-- [Livewire Loading States](https://livewire.laravel.com/docs/3.x/loading)
+2. **Implement prompt linting** that catches issues before generation
+
+**Detection:** Users report "I generated 5 times to get a good prompt" - indicates no preview
+
+**Which phase should address:** Phase 3 (UI/UX) - Add prompt preview and editing
 
 ---
 
@@ -572,59 +678,38 @@ Mistakes that cause annoyance but are easily fixable.
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Modal Structure Setup | Pitfall #2 (Unnecessary re-renders) | Extract to separate component OR use wire:ignore + browser events |
-| Copy-to-Clipboard Implementation | Pitfall #3 (Clipboard breaks) | Implement both Clipboard API + execCommand fallback, test on iOS |
-| Mobile Responsiveness | Pitfall #4 (Unusable on mobile) | Design mobile-first, place close button bottom-right, test on real device |
-| State Management | Pitfall #1 (Payload bloat) | Use computed properties, store index not data, wire:model.blur |
-| Loop Integration | Pitfall #5 (State conflicts) | Store inspectedSceneIndex, use wire:key, proper state reset |
-| Accessibility | Pitfall #6 (Ignored accessibility) | Add ARIA attributes, focus management, keyboard nav from start |
-| Event Handling | Pitfall #7 (Infinite loops) | Specific listeners, condition checks, prefer .self() events |
+| Foundation | Token limits (#1) | Build model formatters FIRST |
+| Foundation | Model mismatch (#7) | Implement adapter pattern from start |
+| Prompt Pipeline | Bloat (#2) | Add complexity scoring and limits |
+| Prompt Pipeline | Consistency (#3) | Build style anchor system |
+| Prompt Pipeline | Performance (#6) | Implement caching from start |
+| Prompt Pipeline | Subject placement (#8) | Test ordering per model |
+| TTS Integration | Emotion mismatch (#4) | Separate clean text from direction |
+| UI/UX | Testing only at gen (#12) | Add prompt preview before generation |
+| All phases | Over-engineering (#5) | Start simple, add complexity only when proven necessary |
 
 ---
 
-## Technology-Specific Warnings
+## Model-Specific Quick Reference
 
-### Livewire 3 Specifics
-- ✓ `wire:model.lazy` renamed to `wire:model.change` (but .lazy still works as alias)
-- ✓ `#[Renderless]` attribute is new in v3, use for performance
-- ✓ `#[Computed]` properties cached per-request, reduces payload
-- ✓ Alpine.js is built-in, use for client-side animations
-- ⚠️ Public properties serialized to JSON - keep minimal
+### HiDream (CLIP-based)
+- Token limit: 77 per encoder (75 usable)
+- Best practice: Subject + action first, comma-separated keywords
+- Avoid: Long paragraphs, conversational language
 
-### Laravel 10 + Livewire 3 Stack
-- ✓ Route caching compatible
-- ✓ Livewire scripts must be in main layout (@livewireScripts)
-- ⚠️ wire:model only works on input/select/textarea, not divs
+### NanoBanana Pro (Gemini-based)
+- Token limit: 32,768 (generous)
+- Best practice: Structured prompts with spatial anchors
+- Avoid: Overly vague prompts
 
-### VideoWizard Component Size (~18k lines)
-- ⚠️ **CRITICAL**: Component this large means every state change re-renders massive template
-- ✓ Strongly consider extracting modal to separate component
-- ✓ Use wire:ignore extensively on non-modal content
-- ✓ Consider using browser events instead of Livewire properties
+### Runway Gen-4
+- Token limit: No strict limit, prefers concise
+- Best practice: Visual detail, "the subject" for motion, single scene
+- Avoid: Negative prompts, multiple scene changes
 
----
-
-## Quick Decision Tree
-
-**Q: Should I use a separate Livewire component for the modal?**
-- If modal has complex state/logic: **YES** (isolates re-renders)
-- If modal is simple read-only viewer: **NO** (use browser events + Alpine.js)
-- If parent component is > 5k lines: **YES** (prevents massive re-renders)
-
-**Q: Should I use public properties or computed properties for scene data?**
-- Read-only display data: **Computed properties** (not in payload)
-- User-editable fields: **Public properties with wire:model.blur**
-- Large text content: **NEVER as public property** (use computed)
-
-**Q: How should I handle copy-to-clipboard?**
-- Modern browsers only: **Clipboard API + fallback**
-- Need IE support: **execCommand only**
-- Mobile-heavy: **Test on iOS Safari specifically**
-
-**Q: How should I handle mobile responsiveness?**
-- Content fits in viewport: **Centered modal with mobile adjustments**
-- Long scrollable content: **Fullscreen on mobile, modal on desktop**
-- Always: **Bottom-positioned close button on mobile**
+### ElevenLabs / TTS
+- Best practice: Clean text separate from emotional direction
+- Avoid: Stage directions in spoken text
 
 ---
 
@@ -632,56 +717,44 @@ Mistakes that cause annoyance but are easily fixable.
 
 | Area | Confidence | Source Quality |
 |------|------------|----------------|
-| Livewire payload issues | **HIGH** | Multiple official sources, common documented issue |
-| Livewire re-render prevention | **HIGH** | Official Livewire docs + community best practices |
-| Clipboard reliability | **MEDIUM** | Web standards docs but browser quirks vary |
-| Mobile modal UX | **HIGH** | Recent 2026 UX research + established patterns |
-| Accessibility requirements | **HIGH** | W3C standards + authoritative guides |
-| iOS scroll lock issues | **MEDIUM** | Well-documented issue but solutions are workarounds |
+| Token limits (CLIP) | **HIGH** | Official HuggingFace discussions, documented architecture |
+| Runway best practices | **HIGH** | Official Runway prompting guides |
+| TTS emotion handling | **MEDIUM** | Official docs + research papers, varies by model |
+| Consistency solutions | **MEDIUM** | Industry research + emerging tools (Veo 3.1, Gen-4) |
+| Performance optimization | **HIGH** | OpenAI docs + production experience |
+| Over-engineering | **MEDIUM** | Industry trend analysis, may not apply to all projects |
 
 ---
 
 ## Sources
 
-### Livewire Performance & State Management
-- [Livewire Performance Tips & Tricks](https://joelmale.com/blog/laravel-livewire-performance-tips-tricks)
-- [Speed Up Livewire V3](https://medium.com/@thenibirahmed/speed-up-livewire-v3-the-only-guide-you-need-32fe73338098)
-- [Livewire Computed Properties for Performance](https://medium.com/@developerawam/is-livewire-feeling-slow-boost-its-performance-with-computed-properties-6f1b53bf74ee)
-- [Prevent Livewire Component Re-rendering](https://benjamincrozat.com/prevent-render-livewire)
-- [Avoid Component Rerender Side Effects](https://codecourse.com/watch/livewire-performance/avoid-component-rerender-side-effects)
-- [Livewire #[Renderless] Attribute](https://livewire.laravel.com/docs/4.x/attribute-renderless)
+### Model Token Limits
+- [Overcoming 77 Token Limit](https://github.com/huggingface/diffusers/issues/2136)
+- [SDXL Token Discussions](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/discussions/60)
+- [SD3 Token Limits](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers/discussions/22)
 
-### Livewire Modal Best Practices
-- [Livewire Modal Component Discussion](https://github.com/livewire/livewire/discussions/4345)
-- [Tips Working with Modals - Livewire Forum](https://forum.laravel-livewire.com/t/looking-for-tips-working-with-modals/1264)
-- [Wire Elements Modal Package](https://github.com/wire-elements/modal)
-- [Livewire wire:model Documentation](https://livewire.laravel.com/docs/3.x/wire-model)
+### Runway/Video Generation
+- [Gen-4 Prompting Guide](https://help.runwayml.com/hc/en-us/articles/39789879462419-Gen-4-Video-Prompting-Guide)
+- [Text to Video Guide](https://help.runwayml.com/hc/en-us/articles/42460036199443-Text-to-Video-Prompting-Guide)
 
-### Clipboard API
-- [How to Copy to Clipboard in JavaScript](https://sentry.io/answers/how-do-i-copy-to-the-clipboard-in-javascript/)
-- [Chrome Clipboard Issues After Confirm](https://www.webmasterworld.com/javascript/5099260.htm)
-- [Web.dev Clipboard Copy Text Pattern](https://web.dev/patterns/clipboard/copy-text)
-- [SitePoint Clipboard API Guide](https://www.sitepoint.com/clipboard-api/)
+### Character Consistency
+- [Google Veo 3.1 Announcement](https://www.financialcontent.com/article/tokenring-2026-1-21-google-launches-veo-31-a-paradigm-shift-in-cinematic-ai-video-and-character-consistency)
+- [Multi-Shot Character Consistency Research](https://arxiv.org/html/2412.07750v1)
 
-### Modal UX & Mobile Responsiveness
-- [Mastering Modal UX Best Practices](https://www.eleken.co/blog-posts/modal-ux)
-- [Mobile App Modals Complete 2026 Guide](https://www.plotline.so/blog/mobile-app-modals)
-- [Modal UX Design for SaaS 2025](https://userpilot.com/blog/modal-ux-design/)
-- [Modal Web Design UX Rules](https://prateeksha.com/blog/modal-web-design-ux-rules-examples-when-not-to-use)
+### TTS and Emotion
+- [ElevenLabs Best Practices](https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices)
+- [Hume Octave Prompting](https://www.hume.ai/blog/octave-tts-prompting-guide)
 
-### Body Scroll Lock (iOS)
-- [Locking Body Scroll iOS](https://www.jayfreestone.com/writing/locking-body-scroll-ios/)
-- [CSS-Tricks Prevent Page Scrolling](https://css-tricks.com/prevent-page-scrolling-when-a-modal-is-open/)
-- [body-scroll-lock GitHub](https://github.com/willmcpo/body-scroll-lock)
-- [Scroll-Locked Dialogs - Frontend Masters](https://frontendmasters.com/blog/scroll-locked-dialogs/)
+### Performance and Caching
+- [OpenAI Prompt Caching](https://platform.openai.com/docs/guides/prompt-caching)
+- [LLM Latency Optimization](https://incident.io/building-with-ai/optimizing-llm-prompts)
+- [Prompt Caching Techniques](https://ubos.tech/news/prompt-caching-and-kv-cache-boosting-llm-optimization-and-reducing-ai-costs/)
 
-### Accessibility
-- [W3C Dialog Modal Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)
-- [Mastering Accessible Modals with ARIA](https://www.a11y-collective.com/blog/modal-accessibility/)
-- [MDN aria-modal attribute](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-modal)
-- [ARIA Accessibility Best Practices](https://www.accessibilitychecker.org/blog/aria-accessibility/)
-- [Carnegie Museums Accessibility Guidelines - Modals](http://web-accessibility.carnegiemuseums.org/code/dialogs/)
+### General Prompt Engineering
+- [10 Image Prompting Mistakes](https://roblaughter.medium.com/10-image-prompting-mistakes-and-how-to-avoid-them-244f972d0c2a)
+- [AI Image Prompts Guide](https://leonardo.ai/news/ai-image-prompts/)
+- [Prompt Versioning Best Practices](https://latitude-blog.ghost.io/blog/prompt-versioning-best-practices/)
 
 ---
 
-*Research completed 2026-01-23. All pitfalls verified against Livewire 3 + Laravel 10 stack.*
+*Research completed 2026-01-25. Pitfalls verified against current model documentation and industry best practices.*

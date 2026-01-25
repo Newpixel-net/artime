@@ -1,251 +1,358 @@
 # Project Research Summary
 
-**Project:** Video Wizard - Scene Text Inspector Modal (Milestone 7)
-**Domain:** Livewire inspection modals for video production applications
-**Researched:** 2026-01-23
+**Project:** Video Wizard M11 - Hollywood-Quality Prompt Pipeline
+**Domain:** AI-generated cinematography (multi-model video production)
+**Researched:** 2026-01-25
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The Scene Text Inspector modal is a read-only inspection interface that provides full transparency into scene text content (speech segments, image/video prompts, metadata) currently truncated in the Video Wizard storyboard view. Research shows this feature type sits at the intersection of transcript viewers (Descript, Adobe Premiere), metadata panels (Frame.io), and AI prompt displays (RunwayML). Industry consensus strongly favors **non-blocking containers** (drawers/side-panels) over modals for high-volume text content, as modals interrupt workflow when users need to reference the storyboard while inspecting text.
+Hollywood-quality prompts require expanding user inputs from 50-80 words to 600-1000 words with professional cinematography vocabulary, but this expansion must be strategically designed to avoid fatal pitfalls. The research reveals that **no new libraries are needed** — the existing Laravel/Livewire architecture with enhanced LLM prompting is fully capable. The core challenge is building a template-driven expansion system that integrates Story Bible context while respecting model token limits and avoiding prompt bloat.
 
-The implementation is architecturally straightforward: the existing Laravel 10 + Livewire 3 + Alpine.js stack contains all required technologies, and the app already has established modal patterns across Character Bible, Location Bible, and Scene DNA modals. The inspector follows a lightweight read-only pattern with boolean toggle, scene index tracking, and direct data access via `$script['scenes'][$index]`. No new dependencies, computed properties, or complex state management are required - this is a 6-8 hour implementation with well-validated patterns.
+The recommended approach is a **preprocessing layer architecture** that slots between existing prompt building (VideoWizard, StructuredPromptBuilderService) and image generation (ImageGenerationService). This expansion uses LLM-powered intelligence (Grok 4/GPT-4o) combined with rule-based templates organized by shot type, delivering detailed prompts with specific camera specs, lighting ratios, micro-expressions, and temporal choreography. The expansion must be **model-aware** — CLIP-based models like HiDream have a strict 77-token limit requiring compression, while Gemini-based models handle longer prompts gracefully.
 
-However, **Livewire performance pitfalls are severe** for this use case. The parent VideoWizard component is ~18k lines, meaning every state change re-renders the entire massive template. Research identified three critical risks: (1) payload bloat from serializing full text content in public properties can create 10-100KB requests causing 2-5 second delays, (2) modal state changes trigger full component re-renders causing screen flashing and scroll position loss, and (3) copy-to-clipboard breaks after animations/confirmations due to browser security. Mitigation requires computed properties for scene data (not public properties), `wire:ignore` on storyboard content, native Clipboard API with fallback, and mobile-first responsive design with thumb-friendly close buttons.
+Critical risks center on three pitfalls: (1) **Token truncation** — expanded prompts silently cut at 77 tokens on CLIP models, wasting expansion effort; (2) **Prompt bloat** — excessive detail confuses models and reduces output quality; (3) **Shot-to-shot inconsistency** — characters morph between shots without reference images and style anchors. Mitigation requires model-specific formatters from Phase 1, complexity scoring in Phase 2, and a continuity anchor system integrated throughout.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The Scene Text Inspector requires **zero new stack additions** - all technologies are validated in the existing application. Laravel 10 provides the backend framework, Livewire 3 handles reactive modal state management, and Alpine.js (bundled with Livewire 3) enables client-side animations and copy-to-clipboard interactions. The app's established modal pattern uses flexbox-based three-section layout (fixed header, scrollable content, fixed footer) with inline styling following `vw-*` class naming conventions.
+The existing stack is fully sufficient — this is an architecture and prompt engineering problem, not a technology acquisition problem. No new external libraries, databases, or microservices are required.
 
 **Core technologies:**
-- **Laravel 10 + Livewire 3**: Modal state management via `$showSceneTextInspectorModal` boolean and scene index tracking - matches existing Character Bible/Location Bible patterns
-- **Alpine.js 3**: Copy-to-clipboard via native `navigator.clipboard.writeText()` (already validated in timeline component), modal animations with x-transition
-- **Native Browser APIs**: Clipboard API (96%+ browser support in 2026) with optional chaining `?.` for graceful degradation, no plugins needed
+- **PromptExpanderService (enhanced)** — Already exists, needs word count targeting for 600-1000 words instead of current 50-100 target
+- **PHP associative arrays for templates** — Composable prompt sections (emotion, lighting, camera) without external templating overhead
+- **Grok 4 / GPT-4o (existing AI facade)** — Intelligent expansion via existing integration, no new API connections needed
+- **Custom PromptValidationService (new)** — Word count and structure validation to ensure targets met, simple PHP class
 
-**Critical validation:** The existing timeline component (line 2142-2144) already uses `navigator.clipboard?.writeText()` successfully, confirming this approach works in the app's environment.
+**Critical additions identified:**
+- Template library system using PHP constants/arrays (no framework needed)
+- Context injection from existing StoryBibleService
+- Model-specific prompt formatters (adapter pattern for CLIP vs Gemini vs Runway)
+- Caching layer for expanded prompts to avoid repeated AI calls
+
+**Explicitly avoid:**
+- External templating libraries (Twig, Blade components) — overkill for string composition
+- NLP libraries (spaCy, NLTK) — word counting is trivial, emotion detection via LLM
+- Separate microservice — adds latency without benefit
+- Fine-tuned LLM — expensive and unnecessary, prompt engineering achieves same result
 
 ### Expected Features
 
-Professional tools (Descript, Frame.io, Premiere) have converged on specific patterns for text inspection interfaces. The MVP must solve the immediate problem (truncated text visibility, incorrect type labels) while deferring power features to post-launch.
+Hollywood-quality prompts differ from amateur prompts through **specificity, technical precision, and emotional depth**. Professional cinematographers specify exact lens choices, lighting ratios, actor micro-expressions, and temporal progression — not just "what is seen" but "why it looks that way."
 
 **Must have (table stakes):**
-- **Full text display** — Core purpose, users cannot see truncated speech segments currently; requires scrollable container with `white-space: pre-wrap` for line breaks
-- **Speech type indicators** — Visual badges distinguishing NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE types (currently showing incorrect labels)
-- **Character attribution** — Show speaker name for dialogue/monologue segments, none for narrator
-- **Copy-to-clipboard per segment** — One-click copy with toast confirmation (not just "copy all")
-- **Image/video prompt display** — Separate collapsible sections showing generation prompts
-- **Scene metadata badges** — Duration, transition, shot type, camera movement
-- **Non-blocking container** — Users need to reference storyboard while reading text (drawer pattern preferred, but existing modal acceptable for MVP given 6-8 hour timeline)
-- **Proper close behavior** — X button, ESC key, click-outside-to-close
+1. **Specific camera specs** — "85mm f/1.4" not "close-up"; professionals specify lens psychology
+2. **Quantified framing** — "Face fills 80% of frame" not "extreme close-up"
+3. **Lighting setup descriptions** — "2:1 key-to-fill ratio, 3200K warmth" not "dramatic lighting"
+4. **Camera angle psychology** — Low angle = power, high angle = vulnerability (film language)
+5. **Micro-expression details** — FACS-informed facial descriptions ("AU1+AU2, hope/uncertainty")
+6. **Body language specifics** — Posture, weight distribution, tension points
+7. **Emotional state in physicality** — "Tears pooling but not falling" not "sad"
+8. **Temporal structure (video)** — Beat-by-beat timing: [0.0-1.0s: X, 1.0-2.0s: Y, 2.0-3.0s: Z]
+9. **Voice delivery tags** — Emotional markers separate from spoken text
 
-**Should have (competitive):**
-- **Segment-level copy buttons** — Copy individual speech segments vs entire scene text
-- **Collapsible metadata sections** — Accordion pattern for Speech/Prompts/Metadata sections to reduce cognitive load
-- **Inline type correction** — Quick-edit dropdown to fix NARRATOR vs DIALOGUE labeling errors without leaving inspector
-- **Toast notification system** — Visual feedback for copy actions (green toast, 3-4 second duration, "Text copied to clipboard")
+**Should have (competitive differentiators):**
+1. **Subtext layer** — What the visual implies vs what it shows (emotional context for AI)
+2. **Mise-en-scene integration** — Environment reflects character psychology
+3. **Temporal choreography (video)** — "0.0s-1.0s: braced fear → 1.0s-2.0s: confused hope → 2.0s-3.0s: disbelief"
+4. **Camera movement psychology** — Why camera moves, not just how ("dolly in creating intimacy")
+5. **Catchlight specification** — Eye reflections for "alive" look
+6. **Breath and micro-movements** — Chest rise, finger twitch, swallow
+7. **Continuity anchors** — Wardrobe details, prop positions, injury progression across shots
+8. **Color grading intent** — Specific LUT references or teal-and-orange ratios
+9. **Anamorphic/lens character** — Oval bokeh, lens flare quality
+10. **Spatial relationship power dynamics** — Character positioning reveals relationships
 
 **Defer (v2+):**
-- **Click-to-jump timeline** — Click segment → jump to that moment in video preview (requires video player integration)
-- **Prompt history/versions** — Show prompt iterations if scene regenerated (requires versioning architecture)
-- **Export scene text** — Export formatted text in Markdown, plain text, or Fountain screenplay format
-- **Search/filter segments** — Global search across all scenes (requires search infrastructure)
+- Multi-character spatial choreography (complex blocking)
+- Advanced physics descriptions for video
+- Complex camera rig simulations (Steadicam, gimbal specifics)
+- Film stock emulation references
+- Professional colorist terminology
+
+**Anti-features (avoid completely):**
+- Vague adjectives ("beautiful," "dramatic," "nice") — AI can't act on these
+- Emotional labels without physical manifestation ("she looks sad")
+- Conflicting instructions ("harsh sunlight" + "soft dreamy look")
+- Static video descriptions (describing video like still images)
+- Overloading single prompt with 10+ elements
+- Conversational filler ("Please create an image of...")
 
 ### Architecture Approach
 
-Scene Text Inspector integrates as a lightweight read-only modal following the established pattern: trigger button on scene card → `wire:click="openSceneTextInspectorModal({{ $index }})"` → sets `$showSceneTextInspectorModal = true` and `$inspectorSceneIndex = $index` → modal blade renders with `@if($showSceneTextInspectorModal)` → accesses `$script['scenes'][$inspectorSceneIndex]` and `$storyboard[$inspectorSceneIndex]` directly → close resets boolean to false. No data duplication, no computed properties needed for simple display, no save logic (read-only).
+The Hollywood-quality prompt pipeline integrates as a **preprocessing layer** that transforms 50-80 word prompts into 600-1000 word Hollywood-quality prompts before reaching the image generation service. This slots cleanly into the existing well-structured service architecture without disrupting current flows.
+
+**Current flow (50-80 words):**
+```
+VideoWizard::buildShotPrompt() → ImageGenerationService::buildImagePrompt() →
+StructuredPromptBuilder::build() → API Call (Gemini/HiDream)
+```
+
+**Proposed flow (600-1000 words):**
+```
+VideoWizard::buildShotPrompt() →
+HollywoodPromptExpanderService::expand() [NEW] →
+ImageGenerationService::generateSceneImage() → API Call
+```
 
 **Major components:**
-1. **VideoWizard.php properties** — Add `$showSceneTextInspectorModal` (bool) and `$inspectorSceneIndex` (int) matching existing modal patterns
-2. **VideoWizard.php methods** — Add `openSceneTextInspectorModal($index)` with scene validation, `closeSceneTextInspectorModal()` with no rebuild needed (read-only)
-3. **scene-text-inspector.blade.php** — Three-section modal structure (header with title/close, scrollable content with speech/prompts/metadata, footer with actions) using inline styles consistent with existing modals
-4. **Data access pattern** — Direct array access in blade with null safety: `@php $scene = $script['scenes'][$inspectorSceneIndex] ?? null; @endphp` then conditional rendering `@if($scene)`
+1. **HollywoodPromptExpanderService (new)** — Central orchestrator; expand() method targets 600-1000 words with caching support
+2. **PromptTemplateLibrary (new)** — Template management by shot type (close-up, wide, establishing) with word budget allocation per section
+3. **ContextInjectorService (new)** — Pulls Bible data (characters, location, style) and injects into prompt sections
+4. **PromptValidationService (new)** — Word count validation, section presence checking, contradiction detection
+5. **Model-specific adapters** — Format prompts for target model (CLIP compression for HiDream, paragraph style for Gemini, concise for Runway)
 
-**Key architectural decision:** Direct blade array access instead of computed properties or component extraction because (1) read-only display doesn't benefit from memoization, (2) scene data volume is small (<50KB), (3) no real-time updates needed, (4) matches existing modal patterns for consistency. Exception: If performance testing reveals >300ms render time, extract to separate component or add computed properties.
+**Key integration points:**
+- VideoWizard.php line ~21988: Add optional expansion flag, call expander service
+- ImageGenerationService.php line ~218: Accept pre-expanded prompts, skip redundant processing
+- Collage generation line ~26244: Use cached expanded prompts for rapid multi-shot generation
+
+**Anti-patterns avoided:**
+- Prompt bloat without purpose (adding words just to hit count)
+- Breaking Bible integration (expansion must preserve character/location/style anchors)
+- Synchronous expansion in collage loop (pre-expand in parallel before generation)
+- Hardcoded shot type logic (use template-driven configuration)
 
 ### Critical Pitfalls
 
-Research identified three critical and four moderate pitfalls specific to Livewire inspection modals. The critical pitfalls can cause rewrites or user abandonment if not addressed upfront.
+**1. Token Truncation (CRITICAL — Phase 1)**
+CLIP-based models (HiDream, Stable Diffusion) have a hard 77-token limit. Expanded 800-word prompts get silently truncated; only first 75 tokens influence image. Critical visual details at prompt end are ignored.
 
-1. **Massive Payload from Full Text Content (CRITICAL)** — All public properties serialize to JSON on EVERY Livewire request; full speech segments/prompts create 10-100KB payloads causing 2-5 second delays and RAM exhaustion. **Prevention:** Use computed properties for read-only scene data (NOT public properties), store scene index only (`public int $inspectorSceneIndex` not `public array $inspectedScene`), use `wire:model.blur` not `wire:model.live` for any text inputs. Detection: Browser DevTools Network tab shows requests >50KB.
+**Prevention:** Build model-specific formatters from Phase 1. Front-load critical information (subject + action first). Use CLIP tokenizer to count actual tokens. For CLIP models, compress to essentials; for Gemini, use full expansion.
 
-2. **Unnecessary Re-renders Cascade (CRITICAL)** — Opening modal triggers re-render of entire 18k-line VideoWizard component causing 1-3 second delays, screen flashing, scroll position loss. **Prevention:** Use `wire:ignore.self` on storyboard content that doesn't change when modal opens, consider browser events instead of Livewire properties for UI-only state, or extract modal to separate component if complex. Detection: Network tab shows full component HTML returned (200-500KB), entire page flashes when opening modal.
+**2. Prompt Bloat (CRITICAL — Phase 2)**
+Overly complex prompts with contradictory instructions confuse models. Runway reports users complain models "ignore prompt instructions" when prompts have multiple scene changes or conflicting style descriptors.
 
-3. **Copy-to-Clipboard Breaks After Interactions (CRITICAL)** — Clipboard API requires "transient user activation"; fails after fade animations, confirmations, or tab switches due to Chrome focus issues. **Prevention:** Use `navigator.clipboard.writeText()` with `execCommand()` fallback, ensure clipboard operations happen immediately in click handler (not after animations), add visual feedback immediately (optimistic UI). Detection: Works in isolation but fails in modal context, console shows "Document is not focused" errors.
+**Prevention:** Follow "single scene" rule (one action, one style per prompt). Limit style descriptors to 3-5 key elements. Avoid negative phrasing (Runway Gen-4 doesn't support it). Implement complexity scoring with "simplify" recommendations when score > 0.7.
 
-4. **Mobile Modals Become Unusable (CRITICAL)** — Desktop-designed modals fail on mobile: close buttons in upper-right unreachable by thumb, body scrolling behind modal on iOS Safari, content doesn't scroll properly. **Prevention:** Mobile-first design with fullscreen layout on mobile (centered box on desktop), close button in bottom-right thumb zone on mobile, implement iOS-safe body scroll lock using `position: fixed` approach, test on actual iPhone. Detection: 60-80% mobile abandonment, can't reach close button with thumb.
+**3. Shot-to-Shot Inconsistency (CRITICAL — Phase 2)**
+Characters look different across shots ("identity drift") when each prompt is generated independently without shared visual anchors. Destroys narrative coherence.
 
-5. **Modal State Management Conflicts in Loops (MODERATE)** — Single `$showModal` boolean used for multiple scenes causes wrong scene data display or multiple modals opening. **Prevention:** Store `$inspectedSceneIndex` not boolean, use unique `wire:key="inspector-{{ $inspectedSceneIndex }}"`, close by resetting state `$this->inspectedSceneIndex = null`. Detection: Clicking "Inspect" on Scene 1 shows Scene 5 data.
+**Prevention:** Use reference images from first shot for subsequent shots. Create and maintain style anchors (color grading, lighting style, film look). Store canonical character descriptions in Story Bible, reference by ID. Build visual continuity pipeline: Scene 1 extracts anchors → Scene 2+ injects anchors + uses reference image.
+
+**4. TTS Emotion Mismatch (MODERATE — Phase 3)**
+TTS models speak stage directions aloud ("She said angrily, Hello") or ignore emotional context, sounding robotic.
+
+**Prevention:** Separate clean text from emotional direction. Use model-appropriate tags (ElevenLabs `<excited>`, Hume natural language). Match text sentiment to desired emotion. Plan for post-production removal if model speaks tags.
+
+**5. Ignoring Performance/Caching (MODERATE — Phase 2)**
+Every shot generates fresh expanded prompt via LLM (500ms-2s latency per shot). 20-shot scene takes 10-40 seconds just for prompts.
+
+**Prevention:** Cache expanded prompts by semantic similarity. Batch similar prompts in single API call. Use rule-based expansion for simple shots (5ms vs 800ms). Leverage LLM prompt caching for static prefixes.
 
 ## Implications for Roadmap
 
-Based on research, implementation follows a clear sequential build order. The entire feature is a 6-8 hour implementation following established patterns with zero new dependencies.
+Based on combined research, the recommended phase structure addresses dependencies, avoids critical pitfalls, and delivers incremental value:
 
-### Phase 1: Core Modal Shell & Metadata Display
-**Rationale:** Establish modal structure and basic rendering first to validate integration with existing VideoWizard component before adding complex features. Tests the critical performance pitfalls early (payload size, re-render behavior) when they're easiest to fix.
+### Phase 1: Foundation & Model Adapters
+**Rationale:** Must establish model-aware formatters BEFORE any expansion work to avoid token truncation pitfall. This phase sets architectural patterns that all subsequent phases depend on.
 
-**Delivers:** Working modal that opens/closes correctly, displays scene metadata badges (duration, transition, shot type, camera movement)
+**Delivers:**
+- Model-specific prompt formatters (CLIP compression, Gemini paragraph, Runway concise)
+- Token counting and validation infrastructure
+- Basic prompt template structure
+- Rule-based expansion fallback
 
-**Addresses:**
-- Modal structure using established three-section pattern (header/content/footer)
-- State management via `$showSceneTextInspectorModal` and `$inspectorSceneIndex`
-- Scene metadata display (table stakes)
-- Proper close behavior (X button, ESC key) (table stakes)
+**Addresses features:**
+- Camera specs vocabulary (table stakes)
+- Lighting terminology (table stakes)
+- Quantified framing (table stakes)
 
-**Avoids:**
-- **Pitfall #2** (re-render cascade) by using `wire:ignore` on storyboard content and validating re-render behavior immediately
-- **Pitfall #5** (state conflicts) by implementing scene index pattern correctly from start
+**Avoids pitfall:**
+- #1 Token Truncation — formatters prevent silent truncation
+- #7 Model Mismatch — adapter pattern handles cross-model differences
 
-**Estimated time:** 2 hours
-
----
-
-### Phase 2: Speech Segments Display
-**Rationale:** Core problem to solve is truncated speech text visibility - this is the primary user need. Must implement type indicators correctly to fix the "Dialogue shown for narrator" bug mentioned in context.
-
-**Delivers:** Full speech segment display with type badges (NARRATOR/DIALOGUE/INTERNAL/MONOLOGUE), speaker attribution, scrollable container for long text
-
-**Addresses:**
-- Full text display with `white-space: pre-wrap` and `line-height: 1.6` (table stakes)
-- Speech type indicators with visual badges and color coding (table stakes)
-- Character attribution showing speaker name for dialogue/monologue (table stakes)
-- Scrollable content area using `flex: 1; overflow-y: auto` pattern
-
-**Uses:**
-- Data structure from `$script['scenes'][$index]['speechSegments']` with type, speaker, text, needsLipSync fields
-- Null-safe access pattern: `@foreach($scene['speechSegments'] ?? [] as $segment)`
-
-**Avoids:**
-- **Pitfall #1** (payload bloat) by accessing data directly in blade, not duplicating in public properties
-- Correct type labeling bug by displaying `$segment['type']` directly
-
-**Estimated time:** 2 hours
+**Research flag:** Standard patterns from research. Skip `/gsd:research-phase`.
 
 ---
 
-### Phase 3: Prompts Display & Copy-to-Clipboard
-**Rationale:** Prompt visibility is critical for AI video generation workflows (reproducibility). Copy functionality is table stakes but has critical implementation pitfalls requiring careful handling.
+### Phase 2: Template-Driven Expansion + Bible Integration
+**Rationale:** With formatters in place, build the core expansion engine. Must include Bible integration and continuity anchors to avoid consistency pitfall. Caching prevents performance issues.
 
-**Delivers:** Image/video prompt sections (collapsible), per-segment copy buttons, toast notifications for copy feedback
+**Delivers:**
+- HollywoodPromptExpanderService with expand() method
+- PromptTemplateLibrary organized by shot type
+- ContextInjectorService pulling Bible data
+- Style anchor extraction and injection system
+- Prompt caching layer
+- Complexity scoring and validation
 
-**Addresses:**
-- Image/video prompt display with fallback (`$storyboard[$index]['prompt']` or `$script['scenes'][$index]['visualDescription']`) (table stakes)
-- Copy-to-clipboard per segment using native API (table stakes, competitive)
-- Toast notification system for copy feedback (competitive)
-- Collapsible metadata sections using Alpine.js `x-data` (competitive)
+**Addresses features:**
+- Micro-expression details (table stakes)
+- Body language specifics (table stakes)
+- Continuity anchors (differentiator)
+- Subtext layer (differentiator)
+- Mise-en-scene integration (differentiator)
 
-**Implements:**
-- Native Clipboard API pattern: `navigator.clipboard?.writeText(text).then(() => showToast()).catch(() => fallbackCopy())`
-- `execCommand()` fallback for reliability across browsers/contexts
-- Optimistic UI (change button text immediately, don't wait for async)
+**Avoids pitfalls:**
+- #2 Prompt Bloat — complexity scoring limits over-detail
+- #3 Shot Consistency — style anchors + Bible integration prevent drift
+- #6 Performance — caching reduces repeated AI calls
+- #8 Subject Placement — model-aware ordering ensures subject priority
 
-**Avoids:**
-- **Pitfall #3** (clipboard breaks) by implementing both modern API + fallback, ensuring operations happen immediately in click handler, testing after animations
-- **Pitfall #1** (payload) by using Alpine.js for toast state (not Livewire properties)
-
-**Estimated time:** 2-3 hours
+**Research flag:** Needs research for emotion vocabulary expansion (FACS library). Consider `/gsd:research-phase` for "Micro-expression template library."
 
 ---
 
-### Phase 4: Styling & Mobile Responsiveness
-**Rationale:** Polish pass ensures consistency with existing modals and validates mobile UX. Mobile responsiveness is critical (Pitfall #4) and requires real device testing, not just DevTools responsive mode.
+### Phase 3: Video Temporal Expansion
+**Rationale:** With image prompt expansion working, extend to video-specific features (temporal progression). Depends on Phase 2 architecture.
 
-**Delivers:** Visual consistency with existing modals, mobile-optimized layout, thumb-friendly close button positioning
+**Delivers:**
+- Temporal beat structure templates
+- Video-specific prompt expansion (motion descriptions)
+- Camera movement psychology integration
+- Temporal choreography system ([0.0-1.0s: X] format)
 
-**Addresses:**
-- Consistent styling with Character Bible/Location Bible/Scene DNA modals
-- Responsive layout (fullscreen on mobile, centered box on desktop)
-- Mobile close button in bottom-right thumb zone
-- iOS body scroll lock implementation
+**Addresses features:**
+- Temporal structure (table stakes)
+- Temporal choreography (differentiator)
+- Camera movement psychology (differentiator)
+- Breath and micro-movements (differentiator)
 
-**Avoids:**
-- **Pitfall #4** (unusable mobile) by designing mobile-first, testing on actual iPhone, placing close button in reachable thumb zone, implementing position-fixed scroll lock for iOS Safari
+**Avoids pitfall:**
+- #2 Prompt Bloat — single scene rule enforcement for video
 
-**Estimated time:** 1-2 hours
+**Research flag:** Standard patterns (Runway Gen-4 docs comprehensive). Skip `/gsd:research-phase`.
+
+---
+
+### Phase 4: Voice/TTS Prompt Enhancement
+**Rationale:** Separate from image/video pipeline. Can be developed in parallel with Phase 3 or after.
+
+**Delivers:**
+- Voice-specific prompt structure (150-300 words, not 600-1000)
+- Emotional delivery tag system
+- Clean text separation from direction cues
+- Model-specific TTS adapters (ElevenLabs, Hume)
+
+**Addresses features:**
+- Voice delivery tags (table stakes)
+
+**Avoids pitfall:**
+- #4 TTS Emotion Mismatch — separate clean text from direction
+
+**Research flag:** Needs research for emotion tag mappings per TTS model. Consider `/gsd:research-phase` for "TTS model emotion API research."
+
+---
+
+### Phase 5: AI-Powered Expansion (Intelligence Layer)
+**Rationale:** With template system proven, add LLM enhancement for complex/emotional shots. Optional — templates may be sufficient.
+
+**Delivers:**
+- Grok/GPT-4o expansion via existing AI facade
+- Hollywood expansion system prompts
+- Few-shot examples for expansion quality
+- AI fallback to rule-based when API fails
+
+**Addresses features:**
+- All differentiators benefit from AI intelligence
+- Subtext layer especially (requires inference)
+
+**Research flag:** Standard patterns (IBM/Palantir prompt engineering guides). Skip `/gsd:research-phase`.
+
+---
+
+### Phase 6: UI/UX & Polish
+**Rationale:** After core functionality proven, add user-facing features.
+
+**Delivers:**
+- Prompt preview before generation
+- Expanded vs compact prompt comparison
+- Settings UI for expansion toggle
+- Prompt inspector with metrics
+- Manual prompt editing capability
+
+**Avoids pitfall:**
+- #12 Testing Only at Generation — preview catches issues early
+
+**Research flag:** Standard UI patterns. Skip `/gsd:research-phase`.
 
 ---
 
 ### Phase Ordering Rationale
 
-- **Sequential dependencies:** Modal shell must exist before adding content sections; speech display must work before adding copy buttons; copy functionality must be reliable before styling polish
-- **Early risk validation:** Performance pitfalls (payload size, re-render behavior) tested in Phase 1 when easiest to fix; clipboard reliability tested in Phase 3 before polish
-- **Progressive complexity:** Start with simple read-only display (metadata), add core feature (speech segments), then interactive features (copy), finally polish (styling/mobile)
-- **Incremental value:** Each phase delivers independently testable functionality; users get value after Phase 2 (can see full text) even if later phases delayed
+1. **Foundation first (Phase 1)** — Model adapters are foundational; token truncation pitfall is fatal and affects all subsequent work. Without formatters, expansion effort is wasted.
+
+2. **Template + Bible integration together (Phase 2)** — Consistency pitfall requires Bible integration from the start. Caching prevents performance issues that would require later refactoring.
+
+3. **Video after image (Phase 3)** — Video expansion builds on image prompt architecture. Temporal beats are additive to existing structure.
+
+4. **Voice parallel or after video (Phase 4)** — Independent pipeline, can be developed separately. Different word count targets (150-300 vs 600-1000).
+
+5. **AI enhancement later (Phase 5)** — Templates must work first to establish baseline. AI adds intelligence but isn't required for MVP. Allows A/B testing AI vs templates.
+
+6. **UI last (Phase 6)** — Core functionality must work before polishing UX. Preview requires working expansion system.
 
 ### Research Flags
 
-**Phases with standard patterns (skip additional research):**
-- **Phase 1-4:** All phases use well-documented Livewire modal patterns validated in existing codebase. STACK.md, ARCHITECTURE.md, and PITFALLS.md provide complete implementation guidance. No additional research needed during planning.
+**Phases needing deeper research during planning:**
+- **Phase 2 (Micro-expression library)** — FACS vocabulary database needs detailed emotion-to-AU mappings. Research: Paul Ekman FACS resources.
+- **Phase 4 (TTS emotion APIs)** — Each TTS model (ElevenLabs, Hume, generic) has different emotion APIs. Research: Model-specific documentation for tag formats.
 
-**Validation testing required:**
-- **Phase 1:** Validate re-render behavior with Network tab (should not see 200-500KB responses when opening modal)
-- **Phase 3:** Test copy-to-clipboard on iOS Safari specifically (known to have additional restrictions)
-- **Phase 4:** Test on actual mobile device (iPhone 13+) for thumb reach, scroll behavior, not just Chrome DevTools
+**Phases with standard patterns (skip research-phase):**
+- **Phase 1 (Model adapters)** — Adapter pattern well-documented, token limits known from research.
+- **Phase 3 (Video temporal)** — Runway Gen-4 documentation comprehensive, beat structure pattern clear.
+- **Phase 5 (AI expansion)** — Prompt engineering guides (IBM, Palantir) provide clear patterns.
+- **Phase 6 (UI/UX)** — Standard Livewire UI patterns, no domain research needed.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | **HIGH** | All technologies (Laravel 10, Livewire 3, Alpine.js) already validated in existing app; native Clipboard API confirmed working in timeline component (line 2142-2144); zero new dependencies required |
-| Features | **HIGH** | Professional tool patterns (Descript, Frame.io, Premiere) converged on consistent approach; table stakes features clearly defined; MVP scope well-bounded |
-| Architecture | **HIGH** | Direct codebase analysis of existing modal patterns (Character Bible, Location Bible, Scene DNA) provides exact implementation template; data structures documented in SpeechSegment.php and VideoWizard.php |
-| Pitfalls | **HIGH** (Livewire), **MEDIUM** (general UX) | Livewire performance issues extensively documented in official sources and community; mobile UX patterns based on 2026 research but require real device validation |
+| Stack | **HIGH** | Based on direct codebase analysis; all required services exist or are simple PHP classes |
+| Features | **HIGH** | Verified with professional cinematography sources (StudioBinder, MasterClass), FACS official docs, AI platform guides |
+| Architecture | **HIGH** | Existing codebase provides clear integration points; preprocessing layer pattern is clean |
+| Pitfalls | **HIGH** | Token limits verified with HuggingFace discussions; Runway best practices from official docs; performance patterns from OpenAI docs |
 
-**Overall confidence:** **HIGH**
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Drawer vs Modal decision:** FEATURES.md research strongly recommends drawer/side-panel (non-blocking) over modal for high-volume text content, but STACK.md shows existing app uses modal pattern exclusively. **Resolution:** Start with modal pattern for consistency and 6-8 hour timeline; revisit drawer pattern in v2 if users report workflow interruption. Phase 4 can optionally test drawer variation if time permits.
+**Emotion vocabulary depth:** Research identified FACS as the standard for micro-expressions but didn't build complete AU-to-emotion mapping database. **Handle during Phase 2 planning** — allocate task for FACS library creation with Paul Ekman resources.
 
-- **Component extraction decision:** PITFALLS.md warns that 18k-line VideoWizard component creates severe re-render risk and "strongly consider extracting modal to separate component." However, ARCHITECTURE.md shows existing modals (Character Bible, Location Bible) embedded in main component without extraction. **Resolution:** Start with embedded modal using `wire:ignore` on storyboard content (matches existing pattern); extract to separate component only if performance testing shows >300ms modal open time or >50KB payload in Phase 1.
+**Model-specific performance characteristics:** Research provides general optimization strategies but doesn't include actual latency measurements per model (HiDream vs NanoBanana vs Runway). **Handle during Phase 1 implementation** — benchmark each model to tune caching strategy.
 
-- **iOS Safari scroll lock:** PITFALLS.md notes scroll lock solutions are "workarounds" with MEDIUM confidence due to browser quirks. **Resolution:** Implement position-fixed approach in Phase 4, test on actual iPhone; fallback to body-scroll-lock library if native approach fails. This is a polish issue, not blocking for core functionality.
+**TTS model emotion tag formats:** Research confirmed tag separation is critical but didn't document exact API formats for each TTS provider. **Handle during Phase 4 planning** — deep-dive research on ElevenLabs vs Hume vs generic TTS emotion APIs.
 
-- **Copy-to-clipboard reliability:** While Clipboard API has 96%+ browser support, PITFALLS.md documents Chrome-specific focus issues after animations/confirmations. **Resolution:** Implement both modern API + execCommand fallback in Phase 3; extensive testing required after modal fade animations, particularly on iOS Safari where restrictions are strictest.
+**Continuity anchor storage format:** Research recommends style anchors but doesn't specify storage schema (database, cache, session). **Handle during Phase 2 planning** — design storage pattern based on scene duration and collage requirements.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **Existing codebase analysis:**
-  - `modules/AppVideoWizard/app/Livewire/VideoWizard.php` — Modal patterns, data structures, state management (~18k lines)
-  - `modules/AppVideoWizard/resources/views/livewire/modals/character-bible.blade.php` — Three-section modal UI pattern, inline styling conventions
-  - `modules/AppVideoWizard/resources/views/livewire/modals/scene-dna.blade.php` — Scene data access pattern, null safety with `??` operator
-  - `modules/AppVideoWizard/resources/views/livewire/modals/edit-prompt.blade.php` — Scene-scoped modal pattern with scene index tracking
-  - `modules/AppVideoWizard/app/Services/SpeechSegment.php` — Segment data structure (type, speaker, text, needsLipSync fields)
-  - Timeline component (line 2142-2144) — Validates `navigator.clipboard?.writeText()` works in app environment
+- **Existing codebase** (direct analysis):
+  - `modules/AppVideoWizard/app/Services/StructuredPromptBuilderService.php`
+  - `modules/AppVideoWizard/app/Services/VideoPromptBuilderService.php`
+  - `modules/AppVideoWizard/app/Services/PromptExpanderService.php`
+  - `modules/AppVideoWizard/app/Services/ImageGenerationService.php`
+  - `modules/AppVideoWizard/app/Livewire/VideoWizard.php`
 
-- **Official documentation:**
-  - [Livewire 3 Alpine Integration](https://livewire.laravel.com/docs/3.x/alpine) — Alpine.js bundled with Livewire 3
-  - [Livewire #[Renderless] Attribute](https://livewire.laravel.com/docs/4.x/attribute-renderless) — Performance optimization for non-rendering actions
-  - [Livewire #[Computed] Properties](https://livewire.laravel.com/docs/3.x/computed-properties) — Reduce payload by excluding computed data from serialization
-  - [W3C Dialog Modal Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) — Accessibility requirements (ARIA roles, focus management)
-  - [Web.dev Clipboard API Guide](https://web.dev/patterns/clipboard/copy-text) — Modern clipboard patterns with fallbacks
+- **Model documentation** (official sources):
+  - [Runway Gen-4 Prompting Guide](https://help.runwayml.com/hc/en-us/articles/39789879462419-Gen-4-Video-Prompting-Guide)
+  - [CLIP Token Limits](https://github.com/huggingface/diffusers/issues/2136)
+  - [OpenAI Prompt Caching](https://platform.openai.com/docs/guides/prompt-caching)
+  - [ElevenLabs TTS Best Practices](https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices)
 
 ### Secondary (MEDIUM confidence)
-- **Livewire performance patterns:**
-  - [Livewire Performance Tips & Tricks](https://joelmale.com/blog/laravel-livewire-performance-tips-tricks) — Payload optimization, computed properties
-  - [Speed Up Livewire V3](https://medium.com/@thenibirahmed/speed-up-livewire-v3-the-only-guide-you-need-32fe73338098) — Performance best practices
-  - [Prevent Livewire Component Re-rendering](https://benjamincrozat.com/prevent-render-livewire) — wire:ignore patterns
-  - [Avoid Component Rerender Side Effects](https://codecourse.com/watch/livewire-performance/avoid-component-rerender-side-effects) — Browser events vs properties
+- **Cinematography education** (professional standards):
+  - [StudioBinder Camera Shots Guide](https://www.studiobinder.com/blog/ultimate-guide-to-camera-shots/)
+  - [Paul Ekman FACS](https://www.paulekman.com/facial-action-coding-system/)
+  - [No Film School Lighting Techniques](https://nofilmschool.com/lighting-techniques-in-film)
+  - [MasterClass Camera Moves](https://www.masterclass.com/articles/guide-to-camera-moves)
 
-- **Modal UX patterns (2026 research):**
-  - [Modal vs Drawer — When to use the right component](https://medium.com/@ninad.kotasthane/modal-vs-drawer-when-to-use-the-right-component-af0a76b952da) — Drawers better for high-volume content
-  - [Modal UX Best Practices](https://www.eleken.co/blog-posts/modal-ux) — Close button positioning, mobile considerations
-  - [Mobile App Modals Guide](https://www.plotline.so/blog/mobile-app-modals) — Thumb-friendly zones, fullscreen on mobile
-  - [Mastering Accessible Modals](https://www.a11y-collective.com/blog/modal-accessibility/) — ARIA attributes, keyboard navigation
+- **AI prompt engineering** (2026 industry standards):
+  - [OpenAI Sora 2 Prompting Guide](https://cookbook.openai.com/examples/sora/sora2_prompting_guide)
+  - [fal.ai Kling 2.6 Pro Guide](https://fal.ai/learn/devs/kling-2-6-pro-prompt-guide)
+  - [IBM Prompt Engineering Guide](https://www.ibm.com/think/prompt-engineering)
+  - [Palantir Best Practices](https://www.palantir.com/docs/foundry/aip/best-practices-prompt-engineering)
 
-- **Professional tool analysis:**
-  - [Descript Speaker Labels](https://help.descript.com/hc/en-us/articles/10249423506061-Automatic-Speaker-Detection) — Speech type indicators pattern
-  - [Reduct.video Platform](https://reduct.video/) — Click-to-jump timeline feature (deferred to v2)
-  - [Frame.io Panel Overview](https://help.frame.io/en/articles/12833113-adobe-premiere-frame-io-v4-panel-overview-25-6-and-later) — Metadata display patterns
-  - [Managing metadata in Premiere Pro](https://helpx.adobe.com/premiere-pro/using/metadata.html) — Collapsible metadata sections
-
-### Tertiary (LOW confidence - needs validation)
-- **iOS Safari scroll lock:** [Locking Body Scroll iOS](https://www.jayfreestone.com/writing/locking-body-scroll-ios/) — Position-fixed approach, but requires device testing
-- **Chrome clipboard focus issues:** [Clipboard Issues After Confirm](https://www.webmasterworld.com/javascript/5099260.htm) — Documented but solution effectiveness varies
-- **Copy-to-clipboard fallbacks:** [Sentry Clipboard Guide](https://sentry.io/answers/how-do-i-copy-to-the-clipboard-in-javascript/) — execCommand() reliability in 2026 unclear
+### Tertiary (context validation)
+- [Google Veo 3.1 Character Consistency](https://www.financialcontent.com/article/tokenring-2026-1-21-google-launches-veo-31-a-paradigm-shift-in-cinematic-ai-video-and-character-consistency) — emerging 2026 techniques
+- [Multi-Shot Character Consistency Research](https://arxiv.org/html/2412.07750v1) — academic validation
+- [Hume Octave TTS Prompting](https://www.hume.ai/blog/octave-tts-prompting-guide) — TTS emotion handling
 
 ---
-*Research completed: 2026-01-23*
-*Ready for roadmap: yes*
+
+*Research completed: 2026-01-25*
+*Ready for roadmap: YES*
+*Recommended next step: Create roadmap using phase structure above*
