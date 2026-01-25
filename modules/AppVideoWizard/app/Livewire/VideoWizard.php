@@ -24104,13 +24104,17 @@ PROMPT;
     }
 
     /**
-     * Mark internal thought segments as voiceover-only (no visual shot).
-     * Internal thoughts are character thinking - audio only, no lip movement.
+     * Mark shots with internal thought voiceover overlay.
      *
-     * @param int $sceneIndex Scene index
-     * @param array $shots Existing shots
-     * @param array $speechSegments All speech segments for the scene
-     * @return array Shots with internal thought voiceover flags
+     * VOC-03: Uses word-split distribution (same as overlayNarratorSegments)
+     * to distribute internal thought text evenly across all shots.
+     * This ensures every shot receives approximately equal word count
+     * and no shots are left empty when internal thoughts exist.
+     *
+     * @param int $sceneIndex Scene index for logging
+     * @param array $shots Array of shot data
+     * @param array $speechSegments Speech segments including internal thoughts
+     * @return array Modified shots with internal thought overlay
      */
     protected function markInternalThoughtAsVoiceover(int $sceneIndex, array $shots, array $speechSegments): array
     {
@@ -24128,47 +24132,88 @@ PROMPT;
             return $shots;
         }
 
-        // Distribute internal thoughts across shots (similar to narrator)
+        // VOC-03: Word-split distribution (same algorithm as overlayNarratorSegments)
+        // Combine all internal thought text for even distribution
+        $allInternalText = implode(' ', array_column($internalSegments, 'text'));
+        $words = preg_split('/\s+/', trim($allInternalText));
+        $totalWords = count($words);
         $shotCount = count($shots);
-        $internalCount = count($internalSegments);
-        $internalIndex = 0;
-        $internalsPerShot = max(1, ceil($internalCount / $shotCount));
+        $wordsPerShot = max(1, ceil($totalWords / $shotCount));
 
+        // Extract speaker from first segment (internal thoughts typically have one speaker)
+        $speaker = $internalSegments[0]['speaker'] ?? null;
+        $voiceId = $speaker ? $this->getVoiceForCharacterName($speaker) : $this->getNarratorVoice();
+
+        Log::info('Distributing internal thought text across all shots (VOC-03)', [
+            'sceneIndex' => $sceneIndex,
+            'totalWords' => $totalWords,
+            'shotCount' => $shotCount,
+            'wordsPerShot' => $wordsPerShot,
+            'speaker' => $speaker,
+        ]);
+
+        $wordIndex = 0;
         foreach ($shots as $shotIdx => $shot) {
-            $shotInternals = [];
+            $shotWords = array_slice($words, $wordIndex, $wordsPerShot);
+            $wordIndex += $wordsPerShot;
 
-            for ($i = 0; $i < $internalsPerShot && $internalIndex < $internalCount; $i++, $internalIndex++) {
-                $shotInternals[] = $internalSegments[$internalIndex];
+            // Last shot gets remaining words
+            if ($shotIdx === $shotCount - 1 && $wordIndex < $totalWords) {
+                $shotWords = array_merge($shotWords, array_slice($words, $wordIndex));
             }
 
-            if (!empty($shotInternals)) {
+            $shotInternalText = implode(' ', $shotWords);
+
+            if (!empty($shotInternalText)) {
+                // Create internal thought segment for this shot
+                $shotInternals = [[
+                    'id' => 'seg-internal-shot-' . $shotIdx . '-' . uniqid(),
+                    'type' => SpeechSegment::TYPE_INTERNAL,
+                    'text' => $shotInternalText,
+                    'speaker' => $speaker,
+                    'needsLipSync' => false,
+                    'order' => $shotIdx,
+                ]];
+
                 $shots[$shotIdx]['internalThoughtOverlay'] = $shotInternals;
                 $shots[$shotIdx]['hasInternalVoiceover'] = true;
+                $shots[$shotIdx]['internalThoughtText'] = $shotInternalText;
+                $shots[$shotIdx]['internalVoiceId'] = $voiceId;
 
-                // Combine internal thought text for voiceover (separate track from dialogue)
-                $internalText = implode(' ', array_column($shotInternals, 'text'));
-                $shots[$shotIdx]['internalThoughtText'] = $internalText;
-
-                // Get speaker for voice selection
-                $speaker = $shotInternals[0]['speaker'] ?? null;
                 if ($speaker) {
                     $shots[$shotIdx]['internalThoughtSpeaker'] = $speaker;
-                    $shots[$shotIdx]['internalVoiceId'] = $this->getVoiceForCharacterName($speaker);
                 }
 
-                Log::debug('Added internal thought voiceover to shot', [
+                Log::debug('Added internal thought voiceover to shot (VOC-03)', [
                     'sceneIndex' => $sceneIndex,
                     'shotIndex' => $shotIdx,
-                    'internalCount' => count($shotInternals),
+                    'wordCount' => count($shotWords),
                     'speaker' => $speaker,
                 ]);
             }
         }
 
-        Log::info('Distributed internal thought segments as voiceover', [
+        // VOC-03: Verify distribution completeness
+        $shotsWithInternal = 0;
+        foreach ($shots as $shot) {
+            if (!empty($shot['hasInternalVoiceover'])) {
+                $shotsWithInternal++;
+            }
+        }
+
+        if ($shotsWithInternal < $shotCount && $totalWords >= $shotCount) {
+            Log::warning('Internal thought distribution incomplete (VOC-03)', [
+                'sceneIndex' => $sceneIndex,
+                'totalShots' => $shotCount,
+                'shotsWithInternal' => $shotsWithInternal,
+                'totalWords' => $totalWords,
+            ]);
+        }
+
+        Log::info('Distributed internal thought text as voiceover (VOC-03)', [
             'sceneIndex' => $sceneIndex,
-            'internalSegments' => $internalCount,
-            'shotsWithInternal' => count(array_filter($shots, fn($s) => !empty($s['internalThoughtOverlay']))),
+            'totalWords' => $totalWords,
+            'shotsWithInternal' => $shotsWithInternal,
             'voiceoverOnly' => true,
         ]);
 
