@@ -10,88 +10,63 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Automatic, effortless, Hollywood-quality output from button clicks
-**Current focus:** Milestone 11 - Hollywood-Quality Prompt Pipeline
+**Current focus:** Phase 22 - Foundation & Model Adapters
 
 ---
 
 ## Current Position
 
 **Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
-**Phase:** Not started (defining requirements)
-**Plan:** —
-**Status:** Researching domain
+**Phase:** 22 of 27 (Foundation & Model Adapters)
+**Plan:** Not started
+**Status:** Ready to plan
 
 ```
 Phase 22: ░░░░░░░░░░ 0%
 ─────────────────────
-Overall:  ░░░░░░░░░░ 0%
+M11:      ░░░░░░░░░░ 0% (0/25 requirements)
 ```
 
-**Last activity:** 2026-01-25 — Milestone v11 started
+**Last activity:** 2026-01-25 — Roadmap created for M11 (Phases 22-27)
 
 ---
 
-## Current Focus
+## Performance Metrics
 
-**Milestone 11: Hollywood-Quality Prompt Pipeline**
+**Velocity:**
+- Total plans completed: 0 (M11)
+- Average duration: —
+- Total execution time: —
 
-Goal: Transform prompt generation to produce 600-1000 word Hollywood screenplay-level prompts
+**By Phase:**
 
-Target prompt depth:
-- Image prompts: 600-1000 words (from 50-80)
-- Video prompts: 600-1000 words (from ~100)
-- Voice prompts: Full emotional direction (from type only)
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 22 | — | — | — |
 
-Key gaps to close:
-- Micro-expressions, detailed body language
-- Temporal progression in video prompts
-- Emotional direction and pacing markers in voice
-- Physical continuity across shots
+**Recent Trend:**
+- Last 5 plans: —
+- Trend: —
+
+*Updated after each plan completion*
 
 ---
 
 ## Accumulated Context
 
-### Decisions Made
+### Decisions
 
-| Date | Area | Decision | Rationale |
-|------|------|----------|-----------|
-| 2026-01-25 | Milestone | Pivot from M10 to M11 | Prompt quality is more critical than performance |
-| 2026-01-25 | Scope | All three together | Image, video, voice prompts enhanced in parallel |
-| 2026-01-25 | Approach | Research first | Study Hollywood screenplay/cinematography patterns |
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-### Research Insights
+- [M11 Start]: Pivot from M10 to M11 — prompt quality higher priority than performance
+- [M11 Start]: Research first — study Hollywood cinematography patterns before coding
 
-From codebase exploration (2026-01-25):
-- Current image prompts: 50-80 words (capped in buildShotPrompt)
-- Current video prompts: ~100 words
-- Existing infrastructure: StructuredPromptBuilderService, VideoPromptBuilderService
-- Gap: 10-15x expansion needed in prompt detail
-- Key methods: buildStoryVisualContent, buildActionComponent, buildSubjectFromSceneDNA
+### Pending Todos
 
----
+None yet.
 
-## Previous Milestones
-
-### Milestone 10: Livewire Performance (PAUSED)
-- Phase 19: Quick Wins — COMPLETE
-- Phase 20: Component Splitting — DEFERRED
-- Phase 21: Data Normalization — DEFERRED
-
-### Milestone 9: Voice Production Excellence - COMPLETE
-### Milestone 8: Cinematic Shot Architecture - COMPLETE
-### Milestone 7: Scene Text Inspector - COMPLETE
-### Milestone 6: UI/UX Polish - COMPLETE
-### Milestone 5: Emotional Arc System - COMPLETE
-### Milestone 4: Dialogue Scene Excellence - COMPLETE
-### Milestone 3: Hollywood Production System - COMPLETE
-### Milestone 2: Narrative Intelligence - COMPLETE
-### Milestone 1.5: Automatic Speech Flow - COMPLETE
-### Milestone 1: Stability & Bug Fixes - COMPLETE
-
----
-
-## Blockers
+### Blockers/Concerns
 
 None currently.
 
@@ -99,11 +74,7 @@ None currently.
 
 ## Session Continuity
 
-**Last session:** 2026-01-25
-**Stopped at:** Starting Milestone 11 - researching domain
-**Next step:** Complete research, define requirements, create roadmap
-
----
-
-*Session: Milestone 11 - Hollywood-Quality Prompt Pipeline*
-*Milestone started: 2026-01-25*
+Last session: 2026-01-25
+Stopped at: Roadmap created for Milestone 11
+Resume file: None
+Next step: `/gsd:plan-phase 22`

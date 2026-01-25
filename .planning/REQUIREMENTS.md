@@ -94,40 +94,41 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INF-01 | TBD | Pending |
-| INF-02 | TBD | Pending |
-| INF-03 | TBD | Pending |
-| IMG-01 | TBD | Pending |
-| IMG-02 | TBD | Pending |
-| IMG-03 | TBD | Pending |
-| IMG-04 | TBD | Pending |
-| IMG-05 | TBD | Pending |
-| IMG-06 | TBD | Pending |
-| IMG-07 | TBD | Pending |
-| IMG-08 | TBD | Pending |
-| IMG-09 | TBD | Pending |
-| VID-01 | TBD | Pending |
-| VID-02 | TBD | Pending |
-| VID-03 | TBD | Pending |
-| VID-04 | TBD | Pending |
-| VID-05 | TBD | Pending |
-| VID-06 | TBD | Pending |
-| VID-07 | TBD | Pending |
-| VOC-01 | TBD | Pending |
-| VOC-02 | TBD | Pending |
-| VOC-03 | TBD | Pending |
-| VOC-04 | TBD | Pending |
-| VOC-05 | TBD | Pending |
-| VOC-06 | TBD | Pending |
-| INF-04 | TBD | Pending |
-| INF-05 | TBD | Pending |
-| INF-06 | TBD | Pending |
+| INF-01 | Phase 22 | Pending |
+| INF-02 | Phase 23 | Pending |
+| INF-03 | Phase 22 | Pending |
+| INF-04 | Phase 26 | Pending |
+| INF-05 | Phase 27 | Pending |
+| INF-06 | Phase 27 | Pending |
+| IMG-01 | Phase 22 | Pending |
+| IMG-02 | Phase 22 | Pending |
+| IMG-03 | Phase 22 | Pending |
+| IMG-04 | Phase 23 | Pending |
+| IMG-05 | Phase 23 | Pending |
+| IMG-06 | Phase 23 | Pending |
+| IMG-07 | Phase 23 | Pending |
+| IMG-08 | Phase 23 | Pending |
+| IMG-09 | Phase 23 | Pending |
+| VID-01 | Phase 24 | Pending |
+| VID-02 | Phase 24 | Pending |
+| VID-03 | Phase 24 | Pending |
+| VID-04 | Phase 24 | Pending |
+| VID-05 | Phase 24 | Pending |
+| VID-06 | Phase 24 | Pending |
+| VID-07 | Phase 24 | Pending |
+| VOC-01 | Phase 25 | Pending |
+| VOC-02 | Phase 25 | Pending |
+| VOC-03 | Phase 25 | Pending |
+| VOC-04 | Phase 25 | Pending |
+| VOC-05 | Phase 25 | Pending |
+| VOC-06 | Phase 25 | Pending |
 
 **Coverage:**
 - v11 requirements: 25 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 25
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-25*
+*Roadmap created: 2026-01-25*
 *Source: Research .planning/research/SUMMARY.md*
