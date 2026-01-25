@@ -24738,6 +24738,13 @@ PROMPT;
         $decomposed = 0;
 
         try {
+            // Phase 17: Initialize voice registry from Character Bible
+            $this->voiceRegistry = new VoiceRegistryService();
+            $this->voiceRegistry->initializeFromCharacterBible(
+                $this->sceneMemory['characterBible'] ?? [],
+                $this->getNarratorVoice()
+            );
+
             foreach ($this->script['scenes'] as $index => $scene) {
                 // Skip already decomposed scenes
                 if (isset($this->multiShotMode['decomposedScenes'][$index])) {
