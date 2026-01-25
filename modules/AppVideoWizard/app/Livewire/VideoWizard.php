@@ -1508,7 +1508,384 @@ class VideoWizard extends Component
         if ($project instanceof WizardProject && $project->exists) {
             $this->loadProject($project);
             $this->recoverPendingJobs($project);
+        } else {
+            // CRITICAL: Reset all properties to defaults for new project
+            // This prevents state leaking from previously loaded projects
+            $this->resetToDefaults();
         }
+    }
+
+    /**
+     * Reset all project-specific properties to their default values.
+     * Called when starting a new project to ensure clean slate.
+     * Prevents state leaking from previously loaded projects.
+     */
+    protected function resetToDefaults(): void
+    {
+        // Project identification
+        $this->projectId = null;
+        $this->projectName = 'Untitled Video';
+        $this->currentStep = 1;
+        $this->maxReachedStep = 1;
+
+        // Step 1: Platform & Format
+        $this->platform = null;
+        $this->aspectRatio = '16:9';
+        $this->targetDuration = 60;
+        $this->format = null;
+        $this->productionType = null;
+        $this->productionSubtype = null;
+        $this->suggestedSettings = [];
+
+        // Production Intelligence
+        $this->productionIntelligence = [
+            'mainCharScenePercent' => 70,
+            'supportingCharScenePercent' => 40,
+            'characterTracking' => 'narrative',
+            'singlePersonPortrait' => true,
+        ];
+
+        // Cinematic Analysis
+        $this->cinematicAnalysis = [
+            'enabled' => true,
+            'analyzed' => false,
+            'characterStates' => [],
+            'storyBeats' => [],
+            'sceneTypes' => [],
+            'relationships' => [],
+            'imageChain' => [],
+            'locationInferences' => [],
+            'consistencyScore' => null,
+        ];
+
+        // Production & Content Configuration
+        $this->production = [
+            'type' => 'standard',
+            'subType' => null,
+            'targetDuration' => 60,
+        ];
+
+        $this->content = [
+            'pacing' => 'balanced',
+            'productionMode' => 'standard',
+            'genre' => null,
+            'visualMode' => 'cinematic-realistic',
+            'aiModelTier' => 'economy',
+            'language' => 'en',
+            'videoModel' => [
+                'model' => 'hailuo-2.3',
+                'duration' => '10s',
+                'resolution' => '768p',
+            ],
+        ];
+
+        // Step 2: Concept
+        $this->concept = [
+            'rawInput' => '',
+            'refinedConcept' => '',
+            'keywords' => [],
+            'keyElements' => [],
+            'logline' => '',
+            'suggestedMood' => null,
+            'suggestedTone' => null,
+            'styleReference' => '',
+            'avoidElements' => '',
+            'targetAudience' => '',
+        ];
+
+        // Character Intelligence (legacy)
+        $this->characterIntelligence = [
+            'enabled' => true,
+            'narrationStyle' => 'voiceover',
+            'characterCount' => 4,
+            'suggestedCount' => 4,
+            'characters' => [],
+            'migrated' => false,
+        ];
+
+        // Step 3: Script
+        $this->script = [
+            'title' => '',
+            'hook' => '',
+            'scenes' => [],
+            'cta' => '',
+            'totalDuration' => 0,
+            'totalNarrationTime' => 0,
+            'timing' => [
+                'sceneDuration' => 35,
+                'clipDuration' => 10,
+                'pacing' => 'balanced',
+            ],
+        ];
+
+        // Script Generation State
+        $this->scriptGeneration = [
+            'status' => 'idle',
+            'targetSceneCount' => 0,
+            'generatedSceneCount' => 0,
+            'batchSize' => 5,
+            'currentBatch' => 0,
+            'totalBatches' => 0,
+            'batches' => [],
+            'autoGenerate' => false,
+            'maxRetries' => 3,
+            'retryDelayMs' => 1000,
+        ];
+
+        // Voice Status
+        $this->voiceStatus = [
+            'dialogueLines' => 0,
+            'speakers' => 0,
+            'voicesMapped' => 0,
+            'scenesWithDialogue' => 0,
+            'scenesWithVoiceover' => 0,
+            'pendingVoices' => 0,
+        ];
+
+        // Step 4: Storyboard
+        $this->storyboard = [
+            'scenes' => [],
+            'styleBible' => null,
+            'imageModel' => 'nanobanana',
+            'visualStyle' => [
+                'mood' => '',
+                'lighting' => '',
+                'colorPalette' => '',
+                'composition' => '',
+            ],
+            'technicalSpecs' => [
+                'enabled' => true,
+                'quality' => '4k',
+                'positive' => 'high quality, detailed, professional, 8K resolution, sharp focus',
+                'negative' => 'blurry, low quality, ugly, distorted, watermark, nsfw, text, logo',
+            ],
+            'promptChain' => [
+                'enabled' => true,
+                'status' => 'pending',
+                'processedAt' => null,
+                'scenes' => [],
+            ],
+        ];
+
+        // Step 5: Animation
+        $this->animation = [
+            'scenes' => [],
+            'selectedSceneIndex' => 0,
+            'narrator' => [
+                'voice' => 'nova',
+                'speed' => 1.0,
+                'style' => 'storytelling',
+                'enabled' => true,
+            ],
+            'voiceover' => [
+                'voice' => 'nova',
+                'speed' => 1.0,
+            ],
+        ];
+
+        // Step 6: Assembly
+        $this->assembly = [
+            'transitions' => [],
+            'defaultTransition' => 'fade',
+            'music' => ['enabled' => false, 'trackId' => null, 'volume' => 30],
+            'captions' => [
+                'enabled' => true,
+                'style' => 'karaoke',
+                'position' => 'bottom',
+                'size' => 1,
+            ],
+            'shotBased' => false,
+            'collectedVideos' => [],
+            'sceneClips' => [],
+            'totalDuration' => 0,
+            'assemblyStatus' => 'pending',
+            'renderProgress' => 0,
+            'finalVideoUrl' => null,
+        ];
+
+        // Scene Memory (Bibles)
+        $this->sceneMemory = [
+            'styleBible' => [
+                'enabled' => false,
+                'style' => '',
+                'colorGrade' => '',
+                'atmosphere' => '',
+                'camera' => '',
+                'visualDNA' => '',
+                'negativePrompt' => '',
+                'lighting' => [
+                    'setup' => '',
+                    'intensity' => '',
+                    'type' => '',
+                    'mood' => '',
+                ],
+                'referenceImage' => '',
+                'referenceImageSource' => '',
+                'referenceImageBase64' => null,
+                'referenceImageMimeType' => null,
+                'referenceImageStatus' => 'none',
+            ],
+            'characterBible' => [
+                'enabled' => false,
+                'characters' => [],
+            ],
+            'locationBible' => [
+                'enabled' => false,
+                'locations' => [],
+            ],
+            'sceneDNA' => [
+                'enabled' => true,
+                'autoSync' => true,
+                'scenes' => [],
+                'continuityIssues' => [],
+                'characterAffinities' => [],
+                'lastSyncedAt' => null,
+            ],
+        ];
+
+        // Story Bible
+        $this->storyBible = [
+            'enabled' => false,
+            'status' => 'pending',
+            'generatedAt' => null,
+            'structureTemplate' => 'three-act',
+            'title' => '',
+            'logline' => '',
+            'theme' => '',
+            'tone' => '',
+            'genre' => '',
+            'acts' => [],
+            'characters' => [],
+            'locations' => [],
+            'visualStyle' => [
+                'mode' => 'cinematic-realistic',
+                'colorPalette' => '',
+                'lighting' => '',
+                'cameraLanguage' => '',
+                'references' => '',
+            ],
+            'pacing' => [
+                'overall' => 'balanced',
+                'tensionCurve' => [],
+                'emotionalBeats' => [],
+            ],
+            'cinematography' => [
+                'enabled' => true,
+                'autoDetect' => true,
+                'genreDefaults' => [],
+                'activePatterns' => [],
+                'scenePatterns' => [],
+                'globalRules' => [
+                    'maxSimilarityThreshold' => 0.7,
+                    'enforceEyeline' => true,
+                    'enforce180Rule' => true,
+                    'enforceMatchCuts' => true,
+                    'minShotVariety' => 3,
+                ],
+                'dialogueSettings' => [
+                    'defaultPattern' => 'shot_reverse_shot',
+                    'insertReactions' => true,
+                    'matchEyelines' => true,
+                ],
+                'actionSettings' => [
+                    'defaultPattern' => 'action_reaction',
+                    'useInsertShots' => true,
+                    'matchAction' => true,
+                ],
+                'suspenseSettings' => [
+                    'defaultPattern' => 'bomb_under_table',
+                    'buildTension' => true,
+                    'useTimeCuts' => true,
+                ],
+            ],
+        ];
+
+        // Multi-Shot Mode
+        $this->multiShotMode = [
+            'enabled' => false,
+            'defaultShotCount' => 3,
+            'autoDecompose' => false,
+            'decomposedScenes' => [],
+            'batchStatus' => null,
+            'globalVisualProfile' => null,
+        ];
+
+        // Reset UI state
+        $this->pendingJobs = [];
+        $this->generationProgress = 0;
+        $this->generationTotal = 0;
+        $this->generationCurrentScene = null;
+        $this->conceptVariations = [];
+        $this->selectedConceptIndex = 0;
+        $this->sceneCollages = [];
+        $this->detectionSummary = [
+            'characters' => [],
+            'speechTypes' => [],
+            'totalSegments' => 0,
+            'needsLipSync' => 0,
+            'voiceoverOnly' => 0,
+            'estimatedDuration' => 0,
+        ];
+
+        // Reset script generation options
+        $this->scriptTone = 'engaging';
+        $this->contentDepth = 'detailed';
+        $this->additionalInstructions = '';
+        $this->narrativePreset = null;
+        $this->storyArc = null;
+        $this->tensionCurve = null;
+        $this->emotionalJourney = null;
+        $this->showNarrativeAdvanced = false;
+        $this->contentFormatOverride = null;
+
+        // Reset voice continuity validation
+        $this->voiceContinuityValidation = [];
+
+        // Reset async job tracking
+        $this->activeAsyncJobs = [];
+
+        // Reset UI flags
+        $this->isLoading = false;
+        $this->isSaving = false;
+        $this->isBatchUpdating = false;
+        $this->isDirty = false;
+        $this->isTransitioning = false;
+        $this->transitionMessage = null;
+        $this->error = null;
+
+        // Reset all modal states
+        $this->showStockBrowser = false;
+        $this->showEditPromptModal = false;
+        $this->showProjectManager = false;
+        $this->showCharacterBibleModal = false;
+        $this->showLocationBibleModal = false;
+        $this->showSceneTextInspectorModal = false;
+        $this->showSceneOverwriteModal = false;
+        $this->showSceneDNAModal = false;
+        $this->showStoryBibleModal = false;
+        $this->showWritersRoom = false;
+        $this->showMultiShotModal = false;
+        $this->showShotPreviewModal = false;
+        $this->showFrameCaptureModal = false;
+        $this->showFaceCorrectionPanel = false;
+        $this->showShotFaceCorrectionModal = false;
+        $this->showVideoModelSelector = false;
+        $this->showUpscaleModal = false;
+        $this->showAIEditModal = false;
+
+        // Reset export enhancement
+        $this->exportEnhancement = [
+            'config' => null,
+            'voiceMapping' => [],
+            'colorGrading' => null,
+            'transitions' => null,
+            'configGenerated' => false,
+        ];
+
+        // Reset auto-proceed
+        $this->autoProceedEnabled = false;
+
+        Log::info('VideoWizard: Reset to defaults for new project');
     }
 
     /**
