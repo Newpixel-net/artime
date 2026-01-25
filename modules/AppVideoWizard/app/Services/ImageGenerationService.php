@@ -12,6 +12,7 @@ use Modules\AppVideoWizard\Models\WizardProject;
 use Modules\AppVideoWizard\Models\WizardAsset;
 use Modules\AppVideoWizard\Models\WizardProcessingJob;
 use Modules\AppVideoWizard\Services\StructuredPromptBuilderService;
+use Modules\AppVideoWizard\Services\ReferenceImageStorageService;
 
 class ImageGenerationService
 {
@@ -23,6 +24,11 @@ class ImageGenerationService
      * VisualConsistencyService for Story Bible-enhanced prompts (Phase 4).
      */
     protected ?VisualConsistencyService $consistencyService = null;
+
+    /**
+     * ReferenceImageStorageService for file-based image storage (Phase 19).
+     */
+    protected ?ReferenceImageStorageService $imageStorageService = null;
 
     /**
      * Model configurations with token costs matching reference implementation.
@@ -71,6 +77,72 @@ class ImageGenerationService
         $this->runPodService = $runPodService;
         $this->structuredPromptBuilder = $structuredPromptBuilder;
         $this->consistencyService = new VisualConsistencyService();
+        $this->imageStorageService = new ReferenceImageStorageService();
+    }
+
+    /**
+     * Load base64 image data from a reference item (character, location, or style).
+     *
+     * Supports both:
+     * - New storage key format (Phase 19): referenceImageStorageKey -> loads from file
+     * - Legacy format: referenceImageBase64 -> uses directly
+     *
+     * @param array $item The item containing reference image data
+     * @return string|null The base64 data or null if not available
+     */
+    protected function loadReferenceBase64(array $item): ?string
+    {
+        // First try the new storage key format (Phase 19)
+        $storageKey = $item['referenceImageStorageKey'] ?? null;
+        if (!empty($storageKey) && $this->imageStorageService) {
+            $base64 = $this->imageStorageService->loadBase64($storageKey);
+            if ($base64) {
+                Log::debug('[loadReferenceBase64] Loaded from storage key', [
+                    'storageKey' => $storageKey,
+                    'base64Length' => strlen($base64),
+                ]);
+                return $base64;
+            }
+        }
+
+        // Fallback to legacy base64 field (backward compatibility)
+        $legacyBase64 = $item['referenceImageBase64'] ?? null;
+        if (!empty($legacyBase64)) {
+            Log::debug('[loadReferenceBase64] Using legacy base64 field', [
+                'base64Length' => strlen($legacyBase64),
+            ]);
+            return $legacyBase64;
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a reference item has a ready reference image.
+     *
+     * Supports both storage key (new) and base64 (legacy) formats.
+     *
+     * @param array $item The item to check
+     * @return bool True if has a loadable reference image
+     */
+    protected function hasReferenceImage(array $item): bool
+    {
+        $isReady = ($item['referenceImageStatus'] ?? '') === 'ready';
+        if (!$isReady) {
+            return false;
+        }
+
+        // Check new storage key format
+        if (!empty($item['referenceImageStorageKey'])) {
+            return true;
+        }
+
+        // Check legacy base64 format
+        if (!empty($item['referenceImageBase64'])) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -681,34 +753,35 @@ class ImageGenerationService
             'sceneCharacters' => count($sceneCharacters),
         ]);
 
-        // Find the first character with a ready reference image (base64)
+        // Find the first character with a ready reference image (storage key or legacy base64)
         foreach ($sceneCharacters as $character) {
-            $hasBase64 = !empty($character['referenceImageBase64']);
-            $isReady = ($character['referenceImageStatus'] ?? '') === 'ready';
+            if ($this->hasReferenceImage($character)) {
+                $base64 = $this->loadReferenceBase64($character);
+                if ($base64) {
+                    Log::info('[getCharacterReferenceForScene] Using character reference', [
+                        'characterName' => $character['name'] ?? 'Unknown',
+                        'base64Length' => strlen($base64),
+                        'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
+                        'hasLookSystem' => !empty($character['hair']) || !empty($character['wardrobe']),
+                        'storageKey' => $character['referenceImageStorageKey'] ?? 'legacy',
+                    ]);
 
-            if ($hasBase64 && $isReady) {
-                Log::info('[getCharacterReferenceForScene] Using character reference', [
-                    'characterName' => $character['name'] ?? 'Unknown',
-                    'base64Length' => strlen($character['referenceImageBase64']),
-                    'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
-                    'hasLookSystem' => !empty($character['hair']) || !empty($character['wardrobe']),
-                ]);
-
-                return [
-                    'base64' => $character['referenceImageBase64'],
-                    'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
-                    'characterName' => $character['name'] ?? 'Character',
-                    'characterDescription' => $character['description'] ?? '',
-                    // Character Look System fields for Hollywood consistency
-                    'hair' => $character['hair'] ?? [],
-                    'wardrobe' => $character['wardrobe'] ?? [],
-                    'makeup' => $character['makeup'] ?? [],
-                    'accessories' => $character['accessories'] ?? [],
-                ];
+                    return [
+                        'base64' => $base64,
+                        'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
+                        'characterName' => $character['name'] ?? 'Character',
+                        'characterDescription' => $character['description'] ?? '',
+                        // Character Look System fields for Hollywood consistency
+                        'hair' => $character['hair'] ?? [],
+                        'wardrobe' => $character['wardrobe'] ?? [],
+                        'makeup' => $character['makeup'] ?? [],
+                        'accessories' => $character['accessories'] ?? [],
+                    ];
+                }
             }
         }
 
-        Log::debug('[getCharacterReferenceForScene] No character with base64 portrait found');
+        Log::debug('[getCharacterReferenceForScene] No character with ready portrait found');
         return null;
     }
 
@@ -747,30 +820,31 @@ class ImageGenerationService
             return null;
         }
 
-        // Check if location has a ready reference image (base64)
-        $hasBase64 = !empty($sceneLocation['referenceImageBase64']);
-        $isReady = ($sceneLocation['referenceImageStatus'] ?? '') === 'ready';
+        // Check if location has a ready reference image (storage key or legacy base64)
+        if ($this->hasReferenceImage($sceneLocation)) {
+            $base64 = $this->loadReferenceBase64($sceneLocation);
+            if ($base64) {
+                Log::info('[getLocationReferenceForScene] Using location reference', [
+                    'locationName' => $sceneLocation['name'] ?? 'Unknown',
+                    'base64Length' => strlen($base64),
+                    'mimeType' => $sceneLocation['referenceImageMimeType'] ?? 'image/png',
+                    'storageKey' => $sceneLocation['referenceImageStorageKey'] ?? 'legacy',
+                ]);
 
-        if ($hasBase64 && $isReady) {
-            Log::info('[getLocationReferenceForScene] Using location reference', [
-                'locationName' => $sceneLocation['name'] ?? 'Unknown',
-                'base64Length' => strlen($sceneLocation['referenceImageBase64']),
-                'mimeType' => $sceneLocation['referenceImageMimeType'] ?? 'image/png',
-            ]);
-
-            return [
-                'base64' => $sceneLocation['referenceImageBase64'],
-                'mimeType' => $sceneLocation['referenceImageMimeType'] ?? 'image/png',
-                'locationName' => $sceneLocation['name'] ?? 'Location',
-                'locationDescription' => $sceneLocation['description'] ?? '',
-                'type' => $sceneLocation['type'] ?? 'exterior',
-                'timeOfDay' => $sceneLocation['timeOfDay'] ?? 'day',
-                'weather' => $sceneLocation['weather'] ?? 'clear',
-                'atmosphere' => $sceneLocation['atmosphere'] ?? '',
-            ];
+                return [
+                    'base64' => $base64,
+                    'mimeType' => $sceneLocation['referenceImageMimeType'] ?? 'image/png',
+                    'locationName' => $sceneLocation['name'] ?? 'Location',
+                    'locationDescription' => $sceneLocation['description'] ?? '',
+                    'type' => $sceneLocation['type'] ?? 'exterior',
+                    'timeOfDay' => $sceneLocation['timeOfDay'] ?? 'day',
+                    'weather' => $sceneLocation['weather'] ?? 'clear',
+                    'atmosphere' => $sceneLocation['atmosphere'] ?? '',
+                ];
+            }
         }
 
-        Log::debug('[getLocationReferenceForScene] No location with base64 reference found');
+        Log::debug('[getLocationReferenceForScene] No location with ready reference found');
         return null;
     }
 
@@ -797,55 +871,56 @@ class ImageGenerationService
             return null;
         }
 
-        // Check if style bible has a ready reference image (base64)
-        $hasBase64 = !empty($styleBible['referenceImageBase64']);
-        $isReady = ($styleBible['referenceImageStatus'] ?? '') === 'ready';
+        // Check if style bible has a ready reference image (storage key or legacy base64)
+        if ($this->hasReferenceImage($styleBible)) {
+            $base64 = $this->loadReferenceBase64($styleBible);
+            if ($base64) {
+                // Build comprehensive style description using 6-element anchoring
+                $styleElements = [];
 
-        if ($hasBase64 && $isReady) {
-            // Build comprehensive style description using 6-element anchoring
-            $styleElements = [];
+                // 1. Visual style (medium, aesthetic)
+                if (!empty($styleBible['style'])) {
+                    $styleElements['style'] = $styleBible['style'];
+                }
 
-            // 1. Visual style (medium, aesthetic)
-            if (!empty($styleBible['style'])) {
-                $styleElements['style'] = $styleBible['style'];
+                // 2. Color grading
+                if (!empty($styleBible['colorGrade'])) {
+                    $styleElements['colorGrade'] = $styleBible['colorGrade'];
+                }
+
+                // 3. Atmosphere/mood
+                if (!empty($styleBible['atmosphere'])) {
+                    $styleElements['atmosphere'] = $styleBible['atmosphere'];
+                }
+
+                // 4. Camera/lens characteristics
+                if (!empty($styleBible['camera'])) {
+                    $styleElements['camera'] = $styleBible['camera'];
+                }
+
+                // Build style description string for the prompt
+                $styleDescription = $this->buildComprehensiveStyleDescription($styleElements);
+
+                Log::info('[getStyleReference] Using style reference with 6-element anchoring', [
+                    'base64Length' => strlen($base64),
+                    'mimeType' => $styleBible['referenceImageMimeType'] ?? 'image/png',
+                    'hasStyleDescription' => !empty($styleDescription),
+                    'styleElements' => array_keys($styleElements),
+                    'storageKey' => $styleBible['referenceImageStorageKey'] ?? 'legacy',
+                ]);
+
+                return [
+                    'base64' => $base64,
+                    'mimeType' => $styleBible['referenceImageMimeType'] ?? 'image/png',
+                    'styleDescription' => $styleDescription,
+                    'visualDNA' => $styleBible['visualDNA'] ?? '',
+                    // Include raw elements for potential future use
+                    'styleElements' => $styleElements,
+                ];
             }
-
-            // 2. Color grading
-            if (!empty($styleBible['colorGrade'])) {
-                $styleElements['colorGrade'] = $styleBible['colorGrade'];
-            }
-
-            // 3. Atmosphere/mood
-            if (!empty($styleBible['atmosphere'])) {
-                $styleElements['atmosphere'] = $styleBible['atmosphere'];
-            }
-
-            // 4. Camera/lens characteristics
-            if (!empty($styleBible['camera'])) {
-                $styleElements['camera'] = $styleBible['camera'];
-            }
-
-            // Build style description string for the prompt
-            $styleDescription = $this->buildComprehensiveStyleDescription($styleElements);
-
-            Log::info('[getStyleReference] Using style reference with 6-element anchoring', [
-                'base64Length' => strlen($styleBible['referenceImageBase64']),
-                'mimeType' => $styleBible['referenceImageMimeType'] ?? 'image/png',
-                'hasStyleDescription' => !empty($styleDescription),
-                'styleElements' => array_keys($styleElements),
-            ]);
-
-            return [
-                'base64' => $styleBible['referenceImageBase64'],
-                'mimeType' => $styleBible['referenceImageMimeType'] ?? 'image/png',
-                'styleDescription' => $styleDescription,
-                'visualDNA' => $styleBible['visualDNA'] ?? '',
-                // Include raw elements for potential future use
-                'styleElements' => $styleElements,
-            ];
         }
 
-        Log::debug('[getStyleReference] No style with base64 reference found');
+        Log::debug('[getStyleReference] No style with ready reference found');
         return null;
     }
 
@@ -1049,27 +1124,27 @@ class ImageGenerationService
                 continue;
             }
 
-            // Check if character has a ready reference image
-            $hasBase64 = !empty($character['referenceImageBase64']);
-            $isReady = ($character['referenceImageStatus'] ?? '') === 'ready';
+            // Check if character has a ready reference image (storage key or legacy base64)
+            if ($this->hasReferenceImage($character)) {
+                $base64 = $this->loadReferenceBase64($character);
+                if ($base64) {
+                    $sceneCharacters[] = [
+                        'index' => $idx,
+                        'base64' => $base64,
+                        'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
+                        'characterName' => $character['name'] ?? 'Character',
+                        'characterDescription' => $character['description'] ?? '',
+                        'hair' => $character['hair'] ?? [],
+                        'wardrobe' => $character['wardrobe'] ?? [],
+                        'makeup' => $character['makeup'] ?? [],
+                        'accessories' => $character['accessories'] ?? [],
+                        'role' => $character['role'] ?? 'Supporting',
+                    ];
 
-            if ($hasBase64 && $isReady) {
-                $sceneCharacters[] = [
-                    'index' => $idx,
-                    'base64' => $character['referenceImageBase64'],
-                    'mimeType' => $character['referenceImageMimeType'] ?? 'image/png',
-                    'characterName' => $character['name'] ?? 'Character',
-                    'characterDescription' => $character['description'] ?? '',
-                    'hair' => $character['hair'] ?? [],
-                    'wardrobe' => $character['wardrobe'] ?? [],
-                    'makeup' => $character['makeup'] ?? [],
-                    'accessories' => $character['accessories'] ?? [],
-                    'role' => $character['role'] ?? 'Supporting',
-                ];
-
-                // Limit to max characters
-                if (count($sceneCharacters) >= $maxCharacterRefs) {
-                    break;
+                    // Limit to max characters
+                    if (count($sceneCharacters) >= $maxCharacterRefs) {
+                        break;
+                    }
                 }
             }
         }
