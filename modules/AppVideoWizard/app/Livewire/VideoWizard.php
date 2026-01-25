@@ -8604,6 +8604,164 @@ PROMPT;
     }
 
     /**
+     * VOC-04: Validate voice continuity across scenes.
+     * Same character must maintain same voice throughout the video.
+     * Non-blocking validation: logs warnings but doesn't halt generation.
+     *
+     * Integration: Call this method after all scenes are decomposed with voice assignments,
+     * before TTS generation begins. Example:
+     *
+     * $result = $this->validateVoiceContinuity($this->multiShotMode['decomposedScenes'] ?? []);
+     *
+     * The validation is non-blocking - generation continues regardless of result.
+     *
+     * @param array $scenes All decomposed scenes
+     * @return array Validation result with warnings
+     */
+    protected function validateVoiceContinuity(array $scenes): array
+    {
+        $characterVoices = [];  // Track: character => first assigned voice
+        $mismatches = [];
+        $validated = 0;
+
+        foreach ($scenes as $sceneIndex => $scene) {
+            $shots = $scene['shots'] ?? [];
+
+            foreach ($shots as $shotIndex => $shot) {
+                // Check dialogue/monologue speaker
+                $speaker = $shot['speakingCharacter'] ?? $shot['character'] ?? null;
+                $voiceId = $shot['voiceId'] ?? null;
+
+                if ($speaker && $voiceId) {
+                    $speakerKey = strtoupper(trim($speaker));
+
+                    if (!isset($characterVoices[$speakerKey])) {
+                        // First occurrence - register this voice
+                        $characterVoices[$speakerKey] = [
+                            'voiceId' => $voiceId,
+                            'firstScene' => $sceneIndex,
+                            'firstShot' => $shotIndex,
+                        ];
+                    } else {
+                        // Check for mismatch
+                        $expected = $characterVoices[$speakerKey]['voiceId'];
+                        if ($voiceId !== $expected) {
+                            $mismatches[] = [
+                                'character' => $speaker,
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $voiceId,
+                                'firstAssigned' => $characterVoices[$speakerKey],
+                            ];
+
+                            Log::warning('Voice continuity mismatch detected (VOC-04)', [
+                                'character' => $speaker,
+                                'scene' => $sceneIndex,
+                                'shot' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $voiceId,
+                            ]);
+                        }
+                    }
+                    $validated++;
+                }
+
+                // Check internal thought speaker
+                $internalSpeaker = $shot['internalThoughtSpeaker'] ?? null;
+                $internalVoice = $shot['internalVoiceId'] ?? null;
+
+                if ($internalSpeaker && $internalVoice) {
+                    $speakerKey = strtoupper(trim($internalSpeaker));
+
+                    if (!isset($characterVoices[$speakerKey])) {
+                        $characterVoices[$speakerKey] = [
+                            'voiceId' => $internalVoice,
+                            'firstScene' => $sceneIndex,
+                            'firstShot' => $shotIndex,
+                            'type' => 'internal',
+                        ];
+                    } else {
+                        $expected = $characterVoices[$speakerKey]['voiceId'];
+                        if ($internalVoice !== $expected) {
+                            $mismatches[] = [
+                                'character' => $internalSpeaker,
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $internalVoice,
+                                'type' => 'internal',
+                            ];
+
+                            Log::warning('Voice continuity mismatch in internal thought (VOC-04)', [
+                                'character' => $internalSpeaker,
+                                'scene' => $sceneIndex,
+                                'shot' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $internalVoice,
+                            ]);
+                        }
+                    }
+                    $validated++;
+                }
+
+                // Also check narrator voice if present (VOC-01 narrator voice assignment)
+                $narratorVoice = $shot['narratorVoiceId'] ?? null;
+                if ($narratorVoice) {
+                    $speakerKey = 'NARRATOR';
+
+                    if (!isset($characterVoices[$speakerKey])) {
+                        $characterVoices[$speakerKey] = [
+                            'voiceId' => $narratorVoice,
+                            'firstScene' => $sceneIndex,
+                            'firstShot' => $shotIndex,
+                            'type' => 'narrator',
+                        ];
+                    } else {
+                        $expected = $characterVoices[$speakerKey]['voiceId'];
+                        if ($narratorVoice !== $expected) {
+                            $mismatches[] = [
+                                'character' => 'NARRATOR',
+                                'sceneIndex' => $sceneIndex,
+                                'shotIndex' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $narratorVoice,
+                                'type' => 'narrator',
+                            ];
+
+                            Log::warning('Narrator voice inconsistency detected (VOC-04)', [
+                                'scene' => $sceneIndex,
+                                'shot' => $shotIndex,
+                                'expected' => $expected,
+                                'actual' => $narratorVoice,
+                            ]);
+                        }
+                    }
+                    $validated++;
+                }
+            }
+        }
+
+        // Log summary (same as M8 pattern)
+        Log::info('Voice continuity validation complete (VOC-04)', [
+            'charactersTracked' => count($characterVoices),
+            'assignmentsValidated' => $validated,
+            'mismatchesFound' => count($mismatches),
+        ]);
+
+        return [
+            'valid' => empty($mismatches),
+            'characterVoices' => $characterVoices,
+            'mismatches' => $mismatches,
+            'statistics' => [
+                'characters' => count($characterVoices),
+                'validated' => $validated,
+                'mismatches' => count($mismatches),
+            ],
+        ];
+    }
+
+    /**
      * Apply a voice preset to a character based on archetype.
      */
     public function applyCharacterVoicePreset(int $characterIndex, string $preset): void
