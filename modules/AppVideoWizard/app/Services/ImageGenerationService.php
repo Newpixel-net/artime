@@ -13,6 +13,7 @@ use Modules\AppVideoWizard\Models\WizardAsset;
 use Modules\AppVideoWizard\Models\WizardProcessingJob;
 use Modules\AppVideoWizard\Services\StructuredPromptBuilderService;
 use Modules\AppVideoWizard\Services\ReferenceImageStorageService;
+use Modules\AppVideoWizard\Services\ModelPromptAdapterService;
 
 class ImageGenerationService
 {
@@ -29,6 +30,12 @@ class ImageGenerationService
      * ReferenceImageStorageService for file-based image storage (Phase 19).
      */
     protected ?ReferenceImageStorageService $imageStorageService = null;
+
+    /**
+     * ModelPromptAdapterService for model-aware prompt compression (Phase 22).
+     * Compresses prompts for CLIP-based models while passing Gemini prompts through.
+     */
+    protected ?ModelPromptAdapterService $promptAdapter = null;
 
     /**
      * Model configurations with token costs matching reference implementation.
@@ -78,6 +85,7 @@ class ImageGenerationService
         $this->structuredPromptBuilder = $structuredPromptBuilder;
         $this->consistencyService = new VisualConsistencyService();
         $this->imageStorageService = new ReferenceImageStorageService();
+        $this->promptAdapter = app(ModelPromptAdapterService::class);
     }
 
     /**
@@ -316,6 +324,21 @@ class ImageGenerationService
                 );
 
                 if ($shouldUseCascade && $modelConfig['provider'] !== 'runpod') {
+                    // Phase 22: Apply prompt adaptation for cascade path (Gemini passes through unchanged)
+                    $cascadeShotType = $shotContext['shot_type'] ?? 'medium';
+                    $cascadeAdaptedPrompt = $this->promptAdapter->adaptPrompt($prompt, $modelId, [
+                        'shotType' => $cascadeShotType,
+                        'preserveCharacterDNA' => true,
+                    ]);
+                    $cascadeAdaptationStats = $this->promptAdapter->getAdaptationStats($prompt, $cascadeAdaptedPrompt, $modelId);
+                    Log::info('[ImageGeneration] Prompt adapted for cascade model', [
+                        'modelId' => $modelId,
+                        'originalTokens' => $cascadeAdaptationStats['originalTokens'],
+                        'adaptedTokens' => $cascadeAdaptationStats['adaptedTokens'],
+                        'wasCompressed' => $cascadeAdaptationStats['wasCompressed'],
+                        'shotType' => $cascadeShotType,
+                    ]);
+
                     Log::info('[generateSceneImage] Using Reference Cascade system', [
                         'sceneIndex' => $sceneIndex,
                         'totalImages' => $references['totalImages'],
@@ -328,7 +351,7 @@ class ImageGenerationService
                     return $this->generateWithReferenceCascade(
                         $project,
                         $scene,
-                        $prompt,
+                        $cascadeAdaptedPrompt,
                         $resolution,
                         $modelId,
                         $modelConfig,
@@ -354,6 +377,33 @@ class ImageGenerationService
             $styleReference = $this->getStyleReference($sceneMemory);
         }
         // Location references: no references needed (pure environment)
+
+        // =========================================================================
+        // PHASE 22: Model-aware prompt adaptation
+        // =========================================================================
+        // Compresses prompts for CLIP-based models (HiDream) to 77 tokens max,
+        // while passing Gemini model prompts through unchanged.
+        // This ensures optimal token usage for each model's capabilities.
+        // =========================================================================
+        $shotType = $shotContext['shot_type'] ?? 'medium';
+        $adaptedPrompt = $this->promptAdapter->adaptPrompt($prompt, $modelId, [
+            'shotType' => $shotType,
+            'preserveCharacterDNA' => true,
+        ]);
+
+        // Log adaptation details for debugging and monitoring
+        $adaptationStats = $this->promptAdapter->getAdaptationStats($prompt, $adaptedPrompt, $modelId);
+        Log::info('[ImageGeneration] Prompt adapted for model', [
+            'modelId' => $modelId,
+            'originalTokens' => $adaptationStats['originalTokens'],
+            'adaptedTokens' => $adaptationStats['adaptedTokens'],
+            'wasCompressed' => $adaptationStats['wasCompressed'],
+            'shotType' => $shotType,
+            'underLimit' => $adaptationStats['underLimit'],
+        ]);
+
+        // Use adapted prompt for generation
+        $prompt = $adaptedPrompt;
 
         // Route to appropriate provider
         if ($modelConfig['provider'] === 'runpod') {
