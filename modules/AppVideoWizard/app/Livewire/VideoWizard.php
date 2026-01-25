@@ -38,6 +38,7 @@ use Modules\AppVideoWizard\Services\BibleOrderingService;
 use Modules\AppVideoWizard\Services\SpeechSegment;
 use Modules\AppVideoWizard\Services\NarrativeMomentService;
 use Modules\AppVideoWizard\Services\VoiceRegistryService;
+use Modules\AppVideoWizard\Services\ReferenceImageStorageService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -119,6 +120,14 @@ class VideoWizard extends Component
         'locationInferences' => [],
         'consistencyScore' => null,
     ];
+
+    /**
+     * Runtime cache for loaded base64 images.
+     * NOT serialized to Livewire state - populated on-demand when API calls need images.
+     * Keys are storage paths, values are base64-encoded image data.
+     */
+    #[Locked]
+    protected array $loadedBase64Cache = [];
 
     // Step 1: Production Configuration (matches original wizard)
     public array $production = [
@@ -1790,7 +1799,7 @@ class VideoWizard extends Component
                 ],
                 'referenceImage' => '',
                 'referenceImageSource' => '',
-                'referenceImageBase64' => null,
+                'referenceImageStorageKey' => null, // File storage path instead of base64
                 'referenceImageMimeType' => null,
                 'referenceImageStatus' => 'none',
             ],
@@ -8336,9 +8345,15 @@ PROMPT;
                     $ref['referenceImageUrl'] = $character['referenceImage'];
                 }
 
-                // Add portrait/reference image base64 if available
-                if (!empty($character['referenceImageBase64'])) {
-                    $ref['referenceImageBase64'] = $character['referenceImageBase64'];
+                // Add portrait/reference image base64 using lazy loading
+                // First check new file storage, then fallback to legacy base64
+                $charIndex = array_search($character, $characters);
+                $base64 = null;
+                if ($charIndex !== false) {
+                    $base64 = $this->getCharacterPortraitBase64($charIndex);
+                }
+                if ($base64) {
+                    $ref['referenceImageBase64'] = $base64;
                     $ref['referenceImageMimeType'] = $character['referenceImageMimeType'] ?? 'image/png';
                 }
 
@@ -9575,17 +9590,18 @@ PROMPT;
 
         $character = $this->sceneMemory['characterBible']['characters'][$characterIndex];
 
-        // Check if character has a reference portrait
-        $portraitBase64 = $character['referenceImageBase64'] ?? null;
+        // Check if character has a reference portrait using lazy loading
+        $portraitBase64 = $this->getCharacterPortraitBase64($characterIndex);
+
+        // Fallback: fetch from URL if storage failed
         if (!$portraitBase64 && !empty($character['referenceImage'])) {
-            // Try to fetch the image using cURL (works when allow_url_fopen=0)
             try {
                 $imageContent = $this->fetchUrlContent($character['referenceImage']);
                 if ($imageContent !== false) {
                     $portraitBase64 = base64_encode($imageContent);
                 }
             } catch (\Exception $e) {
-                Log::warning('[ExtractDNA] Failed to fetch reference image', ['error' => $e->getMessage()]);
+                Log::warning('[ExtractDNA] Failed to fetch reference image from URL', ['error' => $e->getMessage()]);
             }
         }
 
@@ -10116,9 +10132,9 @@ PROMPT;
 
         $toGenerate = [];
         foreach ($characters as $index => $char) {
-            // Skip if already has portrait
-            if (!empty($char['referenceImageBase64']) &&
-                ($char['referenceImageStatus'] ?? '') === 'ready') {
+            // Skip if already has portrait (check both new storage key and legacy base64)
+            $hasPortrait = !empty($char['referenceImageStorageKey']) || !empty($char['referenceImageBase64']);
+            if ($hasPortrait && ($char['referenceImageStatus'] ?? '') === 'ready') {
                 continue;
             }
 
@@ -10232,9 +10248,9 @@ PROMPT;
 
         $toGenerate = [];
         foreach ($locations as $index => $loc) {
-            // Skip if already has reference
-            if (!empty($loc['referenceImageBase64']) &&
-                ($loc['referenceImageStatus'] ?? '') === 'ready') {
+            // Skip if already has reference (check both new storage key and legacy base64)
+            $hasReference = !empty($loc['referenceImageStorageKey']) || !empty($loc['referenceImageBase64']);
+            if ($hasReference && ($loc['referenceImageStatus'] ?? '') === 'ready') {
                 continue;
             }
 
@@ -15943,12 +15959,311 @@ PROMPT;
      */
     public function removeCharacterPortrait(int $index): void
     {
+        // Delete stored file if using file-based storage
+        $storageKey = $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] ?? null;
+        if ($storageKey) {
+            $this->deleteStoredReferenceImage($storageKey);
+        }
+
         $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = null;
-        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64'] = null;
+        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] = null;
         $this->sceneMemory['characterBible']['characters'][$index]['referenceImageMimeType'] = null;
         $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'none';
+        // Clear legacy base64 field if present
+        unset($this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64']);
         // Don't save here - let modal close handle batched saves for better performance
     }
+
+    // =========================================================================
+    // REFERENCE IMAGE FILE STORAGE HELPERS (Phase 19-03)
+    // =========================================================================
+
+    /**
+     * Store a base64 image to file storage and return the storage key.
+     * Removes base64 from component state to reduce serialization payload.
+     *
+     * @param string $type Type of reference: 'character', 'location', 'style'
+     * @param string|int $identifier Character/location index or 'main' for style
+     * @param string $base64Data The base64 encoded image data
+     * @param string|null $mimeType The MIME type (e.g., 'image/png')
+     * @return string|null The storage key (path) for retrieval, or null on failure
+     */
+    protected function storeReferenceImage(string $type, string|int $identifier, string $base64Data, ?string $mimeType = null): ?string
+    {
+        if (empty($base64Data) || empty($this->projectId)) {
+            return null;
+        }
+
+        try {
+            $service = app(ReferenceImageStorageService::class);
+            return $service->storeBase64($this->projectId, $type, $identifier, $base64Data, $mimeType);
+        } catch (\Exception $e) {
+            Log::warning('ReferenceImage: Failed to store image', [
+                'type' => $type,
+                'identifier' => $identifier,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Load base64 image from storage key (lazy loading with runtime caching).
+     * Uses the #[Locked] $loadedBase64Cache to avoid repeated disk reads during request.
+     *
+     * @param string|null $storageKey The path returned from storeReferenceImage
+     * @return string|null Base64 encoded data, or null if not found
+     */
+    protected function loadReferenceImage(?string $storageKey): ?string
+    {
+        if (empty($storageKey)) {
+            return null;
+        }
+
+        // Check runtime cache first (avoids disk read during same request)
+        if (isset($this->loadedBase64Cache[$storageKey])) {
+            return $this->loadedBase64Cache[$storageKey];
+        }
+
+        try {
+            $service = app(ReferenceImageStorageService::class);
+            $base64 = $service->loadBase64($storageKey);
+
+            if ($base64) {
+                $this->loadedBase64Cache[$storageKey] = $base64;
+            }
+
+            return $base64;
+        } catch (\Exception $e) {
+            Log::warning('ReferenceImage: Failed to load image', [
+                'storageKey' => $storageKey,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Delete a stored reference image.
+     *
+     * @param string|null $storageKey The storage key to delete
+     * @return bool True if deleted
+     */
+    protected function deleteStoredReferenceImage(?string $storageKey): bool
+    {
+        if (empty($storageKey)) {
+            return false;
+        }
+
+        try {
+            $service = app(ReferenceImageStorageService::class);
+            $deleted = $service->deleteBase64($storageKey);
+
+            // Remove from runtime cache
+            unset($this->loadedBase64Cache[$storageKey]);
+
+            return $deleted;
+        } catch (\Exception $e) {
+            Log::warning('ReferenceImage: Failed to delete image', [
+                'storageKey' => $storageKey,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Get character portrait base64 for API calls (lazy loaded).
+     * This is the primary method for retrieving character reference images.
+     *
+     * @param int $index Character index in Character Bible
+     * @return string|null Base64 encoded image data
+     */
+    public function getCharacterPortraitBase64(int $index): ?string
+    {
+        $character = $this->sceneMemory['characterBible']['characters'][$index] ?? null;
+        if (!$character) {
+            return null;
+        }
+
+        // First check for file-based storage key (new system)
+        $storageKey = $character['referenceImageStorageKey'] ?? null;
+        if ($storageKey) {
+            return $this->loadReferenceImage($storageKey);
+        }
+
+        // Backward compatibility: check for legacy inline base64
+        // If found, migrate to file storage
+        $legacyBase64 = $character['referenceImageBase64'] ?? null;
+        if ($legacyBase64 && $this->projectId) {
+            $mimeType = $character['referenceImageMimeType'] ?? null;
+            $newStorageKey = $this->storeReferenceImage('character', $index, $legacyBase64, $mimeType);
+            if ($newStorageKey) {
+                // Update to use new storage and clear legacy field
+                $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] = $newStorageKey;
+                unset($this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64']);
+                Log::info('ReferenceImage: Migrated character portrait to file storage', [
+                    'index' => $index,
+                    'storageKey' => $newStorageKey,
+                ]);
+                // Cache the base64 we just migrated
+                $this->loadedBase64Cache[$newStorageKey] = $legacyBase64;
+                return $legacyBase64;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get location reference base64 for API calls (lazy loaded).
+     * This is the primary method for retrieving location reference images.
+     *
+     * @param int $index Location index in Location Bible
+     * @return string|null Base64 encoded image data
+     */
+    public function getLocationReferenceBase64(int $index): ?string
+    {
+        $location = $this->sceneMemory['locationBible']['locations'][$index] ?? null;
+        if (!$location) {
+            return null;
+        }
+
+        // First check for file-based storage key (new system)
+        $storageKey = $location['referenceImageStorageKey'] ?? null;
+        if ($storageKey) {
+            return $this->loadReferenceImage($storageKey);
+        }
+
+        // Backward compatibility: check for legacy inline base64
+        $legacyBase64 = $location['referenceImageBase64'] ?? null;
+        if ($legacyBase64 && $this->projectId) {
+            $mimeType = $location['referenceImageMimeType'] ?? null;
+            $newStorageKey = $this->storeReferenceImage('location', $index, $legacyBase64, $mimeType);
+            if ($newStorageKey) {
+                $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] = $newStorageKey;
+                unset($this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64']);
+                Log::info('ReferenceImage: Migrated location reference to file storage', [
+                    'index' => $index,
+                    'storageKey' => $newStorageKey,
+                ]);
+                $this->loadedBase64Cache[$newStorageKey] = $legacyBase64;
+                return $legacyBase64;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get style reference base64 for API calls (lazy loaded).
+     * This is the primary method for retrieving style reference images.
+     *
+     * @return string|null Base64 encoded image data
+     */
+    public function getStyleReferenceBase64(): ?string
+    {
+        $styleBible = $this->sceneMemory['styleBible'] ?? [];
+
+        // First check for file-based storage key (new system)
+        $storageKey = $styleBible['referenceImageStorageKey'] ?? null;
+        if ($storageKey) {
+            return $this->loadReferenceImage($storageKey);
+        }
+
+        // Backward compatibility: check for legacy inline base64
+        $legacyBase64 = $styleBible['referenceImageBase64'] ?? null;
+        if ($legacyBase64 && $this->projectId) {
+            $mimeType = $styleBible['referenceImageMimeType'] ?? null;
+            $newStorageKey = $this->storeReferenceImage('style', 'main', $legacyBase64, $mimeType);
+            if ($newStorageKey) {
+                $this->sceneMemory['styleBible']['referenceImageStorageKey'] = $newStorageKey;
+                unset($this->sceneMemory['styleBible']['referenceImageBase64']);
+                Log::info('ReferenceImage: Migrated style reference to file storage', [
+                    'storageKey' => $newStorageKey,
+                ]);
+                $this->loadedBase64Cache[$newStorageKey] = $legacyBase64;
+                return $legacyBase64;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Migrate all existing base64 images to file storage.
+     * Called during project load or on-demand to batch migrate legacy data.
+     */
+    protected function migrateBase64ToStorage(): void
+    {
+        if (empty($this->projectId)) {
+            return;
+        }
+
+        $migrated = 0;
+
+        // Migrate character portraits
+        foreach ($this->sceneMemory['characterBible']['characters'] ?? [] as $index => $char) {
+            if (!empty($char['referenceImageBase64']) && empty($char['referenceImageStorageKey'])) {
+                $storageKey = $this->storeReferenceImage(
+                    'character',
+                    $index,
+                    $char['referenceImageBase64'],
+                    $char['referenceImageMimeType'] ?? null
+                );
+                if ($storageKey) {
+                    $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] = $storageKey;
+                    unset($this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64']);
+                    $migrated++;
+                }
+            }
+        }
+
+        // Migrate location references
+        foreach ($this->sceneMemory['locationBible']['locations'] ?? [] as $index => $loc) {
+            if (!empty($loc['referenceImageBase64']) && empty($loc['referenceImageStorageKey'])) {
+                $storageKey = $this->storeReferenceImage(
+                    'location',
+                    $index,
+                    $loc['referenceImageBase64'],
+                    $loc['referenceImageMimeType'] ?? null
+                );
+                if ($storageKey) {
+                    $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] = $storageKey;
+                    unset($this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64']);
+                    $migrated++;
+                }
+            }
+        }
+
+        // Migrate style reference
+        $styleBible = $this->sceneMemory['styleBible'] ?? [];
+        if (!empty($styleBible['referenceImageBase64']) && empty($styleBible['referenceImageStorageKey'])) {
+            $storageKey = $this->storeReferenceImage(
+                'style',
+                'main',
+                $styleBible['referenceImageBase64'],
+                $styleBible['referenceImageMimeType'] ?? null
+            );
+            if ($storageKey) {
+                $this->sceneMemory['styleBible']['referenceImageStorageKey'] = $storageKey;
+                unset($this->sceneMemory['styleBible']['referenceImageBase64']);
+                $migrated++;
+            }
+        }
+
+        if ($migrated > 0) {
+            Log::info('ReferenceImage: Batch migrated images to file storage', [
+                'projectId' => $this->projectId,
+                'migratedCount' => $migrated,
+            ]);
+            $this->saveProject();
+        }
+    }
+
+    // =========================================================================
+    // CHARACTER PORTRAIT METHODS (continued)
+    // =========================================================================
 
     /**
      * Upload a reference image for a character.
@@ -15973,16 +16288,27 @@ PROMPT;
             // Use /files/ route which bypasses nginx blocking of /storage/ symlink
             $url = url('/files/' . $path);
 
-            // Read file as base64 for API calls (character face consistency)
+            // Read file as base64 and store to file system (not component state)
             $base64Data = base64_encode(file_get_contents($this->characterImageUpload->getRealPath()));
             $mimeType = $this->characterImageUpload->getMimeType() ?? 'image/png';
 
-            // Update character with the uploaded image
+            // Store base64 to file storage instead of component state
+            $storageKey = $this->storeReferenceImage('character', $index, $base64Data, $mimeType);
+
+            // Delete old storage key if exists
+            $oldStorageKey = $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] ?? null;
+            if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                $this->deleteStoredReferenceImage($oldStorageKey);
+            }
+
+            // Update character with URL and storage key (NOT base64)
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = $url;
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImageSource'] = 'upload';
-            $this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64'] = $base64Data;
+            $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] = $storageKey;
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImageMimeType'] = $mimeType;
             $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
+            // Clear legacy base64 field if present
+            unset($this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64']);
 
             // Clear the upload
             $this->characterImageUpload = null;
@@ -15994,7 +16320,7 @@ PROMPT;
                 'type' => 'character_image_upload',
                 'characterIndex' => $index,
                 'filename' => $filename,
-                'hasBase64' => true,
+                'hasStorageKey' => !empty($storageKey),
             ]);
 
         } catch (\Exception $e) {
@@ -16164,7 +16490,7 @@ PROMPT;
                 $this->sceneMemory['characterBible']['characters'][$index]['referenceImage'] = $imageUrl;
                 $this->sceneMemory['characterBible']['characters'][$index]['referenceImageSource'] = 'ai';
 
-                // Fetch image as base64 for face consistency in scene generation
+                // Fetch image and store to file system (not component state)
                 try {
                     $imageContent = $this->fetchUrlContent($imageUrl);
                     if ($imageContent !== false) {
@@ -16173,19 +16499,30 @@ PROMPT;
                         $finfo = new \finfo(FILEINFO_MIME_TYPE);
                         $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64'] = $base64Data;
+                        // Store to file storage instead of component state
+                        $storageKey = $this->storeReferenceImage('character', $index, $base64Data, $mimeType);
+
+                        // Delete old storage key if exists
+                        $oldStorageKey = $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] ?? null;
+                        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                            $this->deleteStoredReferenceImage($oldStorageKey);
+                        }
+
+                        $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStorageKey'] = $storageKey;
                         $this->sceneMemory['characterBible']['characters'][$index]['referenceImageMimeType'] = $mimeType;
                         $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
+                        // Clear legacy base64 field if present
+                        unset($this->sceneMemory['characterBible']['characters'][$index]['referenceImageBase64']);
 
-                        Log::info('Character portrait generated with base64', [
+                        Log::info('Character portrait generated with file storage', [
                             'characterIndex' => $index,
-                            'base64Length' => strlen($base64Data),
+                            'storageKey' => $storageKey,
                             'mimeType' => $mimeType,
                         ]);
                     }
                 } catch (\Exception $fetchError) {
-                    Log::warning('Could not fetch image as base64', ['error' => $fetchError->getMessage()]);
-                    // Still mark as ready even if base64 fetch failed
+                    Log::warning('Could not fetch image for storage', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if storage failed - URL is available
                     $this->sceneMemory['characterBible']['characters'][$index]['referenceImageStatus'] = 'ready';
                 }
 
@@ -16235,7 +16572,8 @@ PROMPT;
 
         // Check if any characters need reference images
         foreach ($characters as $char) {
-            $hasReference = !empty($char['referenceImageBase64']);
+            // Check for both new storage key and legacy base64
+            $hasReference = !empty($char['referenceImageStorageKey']) || !empty($char['referenceImageBase64']);
             $isReady = ($char['referenceImageStatus'] ?? '') === 'ready';
 
             if (!$hasReference || !$isReady) {
@@ -16530,18 +16868,30 @@ PROMPT;
         }
 
         $locationName = $this->sceneMemory['locationBible']['locations'][$locationIndex]['name'] ?? 'Unknown';
+        $mimeType = $referenceData['mimeType'] ?? 'image/png';
 
-        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageBase64'] = $referenceData['base64'];
-        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageMimeType'] = $referenceData['mimeType'] ?? 'image/png';
+        // Store to file storage instead of component state
+        $storageKey = $this->storeReferenceImage('location', $locationIndex, $referenceData['base64'], $mimeType);
+
+        // Delete old storage key if exists
+        $oldStorageKey = $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageStorageKey'] ?? null;
+        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+            $this->deleteStoredReferenceImage($oldStorageKey);
+        }
+
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageStorageKey'] = $storageKey;
+        $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageMimeType'] = $mimeType;
         $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageStatus'] = 'ready';
         $this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageSource'] = 'hero-extraction';
+        // Clear legacy base64 field if present
+        unset($this->sceneMemory['locationBible']['locations'][$locationIndex]['referenceImageBase64']);
 
         $this->saveProject();
 
         Log::info('SmartReference: Location reference updated from hero frame', [
             'locationIndex' => $locationIndex,
             'locationName' => $locationName,
-            'base64Length' => strlen($referenceData['base64']),
+            'storageKey' => $storageKey,
         ]);
     }
 
@@ -16558,18 +16908,30 @@ PROMPT;
         }
 
         $charName = $this->sceneMemory['characterBible']['characters'][$characterIndex]['name'] ?? 'Unknown';
+        $mimeType = $portraitData['mimeType'] ?? 'image/png';
 
-        $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageBase64'] = $portraitData['base64'];
-        $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageMimeType'] = $portraitData['mimeType'] ?? 'image/png';
+        // Store to file storage instead of component state
+        $storageKey = $this->storeReferenceImage('character', $characterIndex, $portraitData['base64'], $mimeType);
+
+        // Delete old storage key if exists
+        $oldStorageKey = $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageStorageKey'] ?? null;
+        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+            $this->deleteStoredReferenceImage($oldStorageKey);
+        }
+
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageStorageKey'] = $storageKey;
+        $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageMimeType'] = $mimeType;
         $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageStatus'] = 'ready';
         $this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageSource'] = 'hero-extraction';
+        // Clear legacy base64 field if present
+        unset($this->sceneMemory['characterBible']['characters'][$characterIndex]['referenceImageBase64']);
 
         $this->saveProject();
 
         Log::info('SmartReference: Character reference updated from hero frame', [
             'characterIndex' => $characterIndex,
             'characterName' => $charName,
-            'base64Length' => strlen($portraitData['base64']),
+            'storageKey' => $storageKey,
         ]);
     }
 
@@ -16633,24 +16995,35 @@ PROMPT;
             // Use /files/ route which bypasses nginx blocking of /storage/ symlink
             $url = url('/files/' . $path);
 
-            // Read file as base64 for API calls (style consistency)
+            // Read file as base64 and store to file system (not component state)
             $base64Data = base64_encode(file_get_contents($this->styleImageUpload->getRealPath()));
             $mimeType = $this->styleImageUpload->getMimeType() ?? 'image/png';
 
-            // Update Style Bible with the uploaded image
+            // Store to file storage instead of component state
+            $storageKey = $this->storeReferenceImage('style', 'main', $base64Data, $mimeType);
+
+            // Delete old storage key if exists
+            $oldStorageKey = $this->sceneMemory['styleBible']['referenceImageStorageKey'] ?? null;
+            if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                $this->deleteStoredReferenceImage($oldStorageKey);
+            }
+
+            // Update Style Bible with URL and storage key (NOT base64)
             $this->sceneMemory['styleBible']['referenceImage'] = $url;
             $this->sceneMemory['styleBible']['referenceImageSource'] = 'upload';
-            $this->sceneMemory['styleBible']['referenceImageBase64'] = $base64Data;
+            $this->sceneMemory['styleBible']['referenceImageStorageKey'] = $storageKey;
             $this->sceneMemory['styleBible']['referenceImageMimeType'] = $mimeType;
             $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
+            // Clear legacy base64 field if present
+            unset($this->sceneMemory['styleBible']['referenceImageBase64']);
 
             // Clear the upload
             $this->styleImageUpload = null;
 
             $this->saveProject();
 
-            Log::info('Style Bible reference uploaded with base64', [
-                'base64Length' => strlen($base64Data),
+            Log::info('Style Bible reference uploaded with file storage', [
+                'storageKey' => $storageKey,
                 'mimeType' => $mimeType,
             ]);
         } catch (\Exception $e) {
@@ -16721,7 +17094,7 @@ PROMPT;
                 $this->sceneMemory['styleBible']['referenceImage'] = $imageUrl;
                 $this->sceneMemory['styleBible']['referenceImageSource'] = 'ai';
 
-                // Fetch image as base64 for style consistency in scene generation
+                // Fetch image and store to file system (not component state)
                 try {
                     $imageContent = $this->fetchUrlContent($imageUrl);
                     if ($imageContent !== false) {
@@ -16730,24 +17103,35 @@ PROMPT;
                         $finfo = new \finfo(FILEINFO_MIME_TYPE);
                         $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                        $this->sceneMemory['styleBible']['referenceImageBase64'] = $base64Data;
-                        $this->sceneMemory['styleBible']['referenceImageMimeType'] = $mimeType;
+                        // Store to file storage instead of component state
+                        $storageKey = $this->storeReferenceImage('style', 'main', $base64Data, $mimeType);
 
-                        Log::info('Style Bible reference generated with base64', [
-                            'base64Length' => strlen($base64Data),
+                        // Delete old storage key if exists
+                        $oldStorageKey = $this->sceneMemory['styleBible']['referenceImageStorageKey'] ?? null;
+                        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                            $this->deleteStoredReferenceImage($oldStorageKey);
+                        }
+
+                        $this->sceneMemory['styleBible']['referenceImageStorageKey'] = $storageKey;
+                        $this->sceneMemory['styleBible']['referenceImageMimeType'] = $mimeType;
+                        // Clear legacy base64 field if present
+                        unset($this->sceneMemory['styleBible']['referenceImageBase64']);
+
+                        Log::info('Style Bible reference generated with file storage', [
+                            'storageKey' => $storageKey,
                             'mimeType' => $mimeType,
                         ]);
                     } else {
-                        // BUG FIX: Log when base64 fetch fails silently (returns false)
-                        Log::warning('Base64 fetch returned false for style reference - URL exists but could not fetch content', [
+                        // BUG FIX: Log when fetch fails silently (returns false)
+                        Log::warning('Image fetch returned false for style reference - URL exists but could not fetch content', [
                             'imageUrl' => $imageUrl,
                         ]);
                     }
                     // CRITICAL: Always mark as ready once we have a valid URL
                     $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
                 } catch (\Exception $fetchError) {
-                    Log::warning('Could not fetch style reference as base64', ['error' => $fetchError->getMessage()]);
-                    // Still mark as ready even if base64 fetch failed
+                    Log::warning('Could not fetch style reference for storage', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if storage failed - URL is available
                     $this->sceneMemory['styleBible']['referenceImageStatus'] = 'ready';
                 }
 
@@ -16770,11 +17154,19 @@ PROMPT;
      */
     public function removeStyleReference(): void
     {
+        // Delete stored file if using file-based storage
+        $storageKey = $this->sceneMemory['styleBible']['referenceImageStorageKey'] ?? null;
+        if ($storageKey) {
+            $this->deleteStoredReferenceImage($storageKey);
+        }
+
         $this->sceneMemory['styleBible']['referenceImage'] = '';
         $this->sceneMemory['styleBible']['referenceImageSource'] = '';
-        $this->sceneMemory['styleBible']['referenceImageBase64'] = null;
+        $this->sceneMemory['styleBible']['referenceImageStorageKey'] = null;
         $this->sceneMemory['styleBible']['referenceImageMimeType'] = null;
         $this->sceneMemory['styleBible']['referenceImageStatus'] = 'none';
+        // Clear legacy base64 field if present
+        unset($this->sceneMemory['styleBible']['referenceImageBase64']);
         $this->saveProject();
     }
 
@@ -17375,10 +17767,18 @@ EOT;
     public function removeLocationReference(int $index): void
     {
         if (isset($this->sceneMemory['locationBible']['locations'][$index])) {
+            // Delete stored file if using file-based storage
+            $storageKey = $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] ?? null;
+            if ($storageKey) {
+                $this->deleteStoredReferenceImage($storageKey);
+            }
+
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = null;
-            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64'] = null;
+            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] = null;
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = null;
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'none';
+            // Clear legacy base64 field if present
+            unset($this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64']);
             // Don't save here - let modal close handle batched saves for better performance
         }
     }
@@ -17406,16 +17806,27 @@ EOT;
             // Use /files/ route which bypasses nginx blocking of /storage/ symlink
             $url = url('/files/' . $path);
 
-            // Read file as base64 for API calls (location visual consistency)
+            // Read file as base64 and store to file system (not component state)
             $base64Data = base64_encode(file_get_contents($this->locationImageUpload->getRealPath()));
             $mimeType = $this->locationImageUpload->getMimeType() ?? 'image/png';
 
-            // Update location with the uploaded image
+            // Store to file storage instead of component state
+            $storageKey = $this->storeReferenceImage('location', $index, $base64Data, $mimeType);
+
+            // Delete old storage key if exists
+            $oldStorageKey = $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] ?? null;
+            if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                $this->deleteStoredReferenceImage($oldStorageKey);
+            }
+
+            // Update location with URL and storage key (NOT base64)
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = $url;
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageSource'] = 'upload';
-            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64'] = $base64Data;
+            $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] = $storageKey;
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = $mimeType;
             $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
+            // Clear legacy base64 field if present
+            unset($this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64']);
 
             // Clear the upload
             $this->locationImageUpload = null;
@@ -17427,7 +17838,7 @@ EOT;
                 'type' => 'location_image_upload',
                 'locationIndex' => $index,
                 'filename' => $filename,
-                'hasBase64' => true,
+                'hasStorageKey' => !empty($storageKey),
             ]);
 
         } catch (\Exception $e) {
@@ -17569,7 +17980,7 @@ EOT;
                 $this->sceneMemory['locationBible']['locations'][$index]['referenceImage'] = $imageUrl;
                 $this->sceneMemory['locationBible']['locations'][$index]['referenceImageSource'] = 'ai';
 
-                // Fetch image as base64 for location consistency in scene generation
+                // Fetch image and store to file system (not component state)
                 try {
                     $imageContent = $this->fetchUrlContent($imageUrl);
                     if ($imageContent !== false) {
@@ -17578,17 +17989,28 @@ EOT;
                         $finfo = new \finfo(FILEINFO_MIME_TYPE);
                         $mimeType = $finfo->buffer($imageContent) ?: 'image/png';
 
-                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64'] = $base64Data;
-                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = $mimeType;
+                        // Store to file storage instead of component state
+                        $storageKey = $this->storeReferenceImage('location', $index, $base64Data, $mimeType);
 
-                        Log::info('Location reference generated with base64', [
+                        // Delete old storage key if exists
+                        $oldStorageKey = $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] ?? null;
+                        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                            $this->deleteStoredReferenceImage($oldStorageKey);
+                        }
+
+                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStorageKey'] = $storageKey;
+                        $this->sceneMemory['locationBible']['locations'][$index]['referenceImageMimeType'] = $mimeType;
+                        // Clear legacy base64 field if present
+                        unset($this->sceneMemory['locationBible']['locations'][$index]['referenceImageBase64']);
+
+                        Log::info('Location reference generated with file storage', [
                             'locationIndex' => $index,
-                            'base64Length' => strlen($base64Data),
+                            'storageKey' => $storageKey,
                             'mimeType' => $mimeType,
                         ]);
                     } else {
-                        // BUG FIX: Log when base64 fetch fails silently (returns false)
-                        Log::warning('Base64 fetch returned false for location - URL exists but could not fetch content', [
+                        // BUG FIX: Log when fetch fails silently (returns false)
+                        Log::warning('Image fetch returned false for location - URL exists but could not fetch content', [
                             'locationIndex' => $index,
                             'imageUrl' => $imageUrl,
                         ]);
@@ -17596,8 +18018,8 @@ EOT;
                     // CRITICAL: Always mark as ready once we have a valid URL
                     $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
                 } catch (\Exception $fetchError) {
-                    Log::warning('Could not fetch location image as base64', ['error' => $fetchError->getMessage()]);
-                    // Still mark as ready even if base64 fetch failed
+                    Log::warning('Could not fetch location image for storage', ['error' => $fetchError->getMessage()]);
+                    // Still mark as ready even if storage failed - URL is available
                     $this->sceneMemory['locationBible']['locations'][$index]['referenceImageStatus'] = 'ready';
                 }
 
@@ -27565,8 +27987,9 @@ PROMPT;
 
                 // Skip if character already has a high-quality portrait
                 $existingPortrait = $this->sceneMemory['characterBible']['characters'][$bibleCharIndex] ?? [];
-                if (!empty($existingPortrait['referenceImageBase64']) &&
-                    ($existingPortrait['referenceImageStatus'] ?? '') === 'ready') {
+                // Check for both new storage key and legacy base64
+                $hasPortrait = !empty($existingPortrait['referenceImageStorageKey']) || !empty($existingPortrait['referenceImageBase64']);
+                if ($hasPortrait && ($existingPortrait['referenceImageStatus'] ?? '') === 'ready') {
                     Log::debug('VideoWizard: Character already has portrait, skipping', [
                         'characterName' => $charData['name'] ?? 'Unknown',
                     ]);
@@ -27589,12 +28012,24 @@ PROMPT;
                     );
 
                     if ($portrait['success']) {
-                        // Update Character Bible with reference
-                        $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageBase64'] = $portrait['base64'];
-                        $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageMimeType'] = $portrait['mimeType'] ?? 'image/png';
+                        // Store to file storage instead of component state
+                        $mimeType = $portrait['mimeType'] ?? 'image/png';
+                        $storageKey = $this->storeReferenceImage('character', $bibleCharIndex, $portrait['base64'], $mimeType);
+
+                        // Delete old storage key if exists
+                        $oldStorageKey = $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageStorageKey'] ?? null;
+                        if ($oldStorageKey && $oldStorageKey !== $storageKey) {
+                            $this->deleteStoredReferenceImage($oldStorageKey);
+                        }
+
+                        // Update Character Bible with storage key (NOT base64)
+                        $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageStorageKey'] = $storageKey;
+                        $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageMimeType'] = $mimeType;
                         $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageStatus'] = 'ready';
                         $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceFromCollage'] = true;
                         $this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceCollageScene'] = $sceneIndex;
+                        // Clear legacy base64 field if present
+                        unset($this->sceneMemory['characterBible']['characters'][$bibleCharIndex]['referenceImageBase64']);
 
                         $portraitsExtracted++;
 
@@ -28217,16 +28652,17 @@ PROMPT;
             foreach ($this->selectedFaceCorrectionCharacters as $index) {
                 if (isset($characters[$index])) {
                     $char = $characters[$index];
-                    if (!empty($char['referenceImage'])) {
-                        // Get base64 for reference image
-                        $refBase64 = $char['referenceImageBase64'] ?? null;
+                    if (!empty($char['referenceImage']) || !empty($char['referenceImageStorageKey'])) {
+                        // Get base64 using lazy loading (handles both file storage and legacy)
+                        $refBase64 = $this->getCharacterPortraitBase64($index);
+
+                        // Fallback: download from URL if storage failed
                         if (!$refBase64 && !empty($char['referenceImage'])) {
-                            // Download and convert to base64
                             try {
                                 $imageContent = file_get_contents($char['referenceImage']);
                                 $refBase64 = base64_encode($imageContent);
                             } catch (\Exception $e) {
-                                Log::warning('[FaceCorrection] Failed to load reference image', [
+                                Log::warning('[FaceCorrection] Failed to load reference image from URL', [
                                     'character' => $char['name'] ?? 'Unknown',
                                     'error' => $e->getMessage()
                                 ]);
@@ -28571,10 +29007,11 @@ PROMPT;
             foreach ($data['selectedCharacters'] as $charIdx) {
                 $char = $this->sceneMemory['characterBible']['characters'][$charIdx] ?? null;
                 if ($char) {
-                    // Get base64 for reference image
-                    $refBase64 = $char['referenceImageBase64'] ?? null;
+                    // Get base64 using lazy loading (handles both file storage and legacy)
+                    $refBase64 = $this->getCharacterPortraitBase64($charIdx);
+
+                    // Fallback: download from URL if storage failed
                     if (!$refBase64 && !empty($char['referenceImage'])) {
-                        // Download and convert to base64
                         try {
                             $refUrl = $char['referenceImage'];
                             $imgContent = null;
@@ -28596,7 +29033,7 @@ PROMPT;
                                 $refBase64 = base64_encode($imgContent);
                             }
                         } catch (\Exception $e) {
-                            Log::warning('[ShotFaceCorrection] Failed to load reference image', [
+                            Log::warning('[ShotFaceCorrection] Failed to load reference image from URL', [
                                 'character' => $char['name'] ?? 'Unknown',
                                 'error' => $e->getMessage()
                             ]);
