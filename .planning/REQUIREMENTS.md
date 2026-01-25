@@ -1,49 +1,80 @@
-# Requirements: Video Wizard - Livewire Performance Architecture
+# Requirements: Video Wizard - Hollywood-Quality Prompt Pipeline
 
 **Defined:** 2026-01-25
 **Core Value:** Automatic, effortless, Hollywood-quality output from button clicks
 
-## v10 Requirements
+## v11 Requirements
 
-Requirements for Milestone 10. Each maps to roadmap phases.
+Requirements for Milestone 11. Each maps to roadmap phases.
 
-### Quick Wins (P0) ✓
+### Image Prompts (IMG)
 
-- [x] **PERF-01**: Livewire 3 attributes — #[Locked] for constants, #[Computed] for derived values
-- [x] **PERF-02**: Debounced bindings — wire:model.blur and .debounce instead of .live for text inputs
-- [x] **PERF-03**: Base64 storage migration — images stored in files, lazy-loaded only for API calls
-- [x] **PERF-08**: Updated hook optimization — efficient property change handling
+**Table Stakes:**
+- [ ] **IMG-01**: Image prompts include camera specs with psychological reasoning (lens choice affects viewer perception)
+- [ ] **IMG-02**: Image prompts include quantified framing (percentage of frame, compositional geometry)
+- [ ] **IMG-03**: Image prompts include lighting with specific ratios (key/fill/back, color temperatures in Kelvin)
+- [ ] **IMG-04**: Image prompts include micro-expressions using FACS terminology (action units, specific muscle movements)
+- [ ] **IMG-05**: Image prompts include body language with specific posture/gesture descriptions
+- [ ] **IMG-06**: Image prompts include emotional state visible in physicality (not labels like "sad" but physical manifestations)
 
-### Component Architecture (P1)
+**Differentiators:**
+- [ ] **IMG-07**: Image prompts include subtext layer (what character hides vs reveals through body language)
+- [ ] **IMG-08**: Image prompts include mise-en-scene integration (environment reflects/contrasts emotional state)
+- [ ] **IMG-09**: Image prompts include continuity anchors (exact details that must persist across shots)
 
-- [ ] **PERF-04**: Child components — separate Livewire components per wizard step
-- [ ] **PERF-05**: Modal components — separate components for Character Bible, Location Bible, Shot Preview
+### Video Prompts (VID)
 
-### Data Normalization (P2)
+**Table Stakes:**
+- [ ] **VID-01**: Video prompts include all image prompt features
+- [ ] **VID-02**: Video prompts include temporal progression with beat-by-beat timing (0-2s: action, 2-4s: reaction)
+- [ ] **VID-03**: Video prompts include camera movement with duration and psychological purpose
+- [ ] **VID-04**: Video prompts include character movement paths within frame
 
-- [ ] **PERF-06**: Database models — WizardScene, WizardShot models instead of nested arrays
-- [ ] **PERF-07**: Lazy loading — scene data loaded on-demand, not all at once
+**Differentiators:**
+- [ ] **VID-05**: Video prompts include inter-character dynamics (mirroring, spatial power relationships)
+- [ ] **VID-06**: Video prompts include breath and micro-movements for realism
+- [ ] **VID-07**: Video prompts include transition suggestions to next shot
 
-## Previous Milestones (Complete)
+### Voice Prompts (VOC)
 
-### Milestone 9: Voice Production Excellence
+**Table Stakes:**
+- [ ] **VOC-01**: Voice prompts include emotional direction tags (trembling, whisper, cracking)
+- [ ] **VOC-02**: Voice prompts include pacing markers with timing ([PAUSE 2.5s])
+- [ ] **VOC-03**: Voice prompts include vocal quality descriptions (gravelly, exhausted, breathless)
 
-- [x] **VOC-01**: Narrator voice assigned to shots
-- [x] **VOC-02**: Empty text validation before TTS
-- [x] **VOC-03**: Unified distribution strategy
-- [x] **VOC-04**: Voice continuity validation
-- [x] **VOC-05**: Voice Registry centralization
-- [x] **VOC-06**: Multi-speaker shot support
+**Differentiators:**
+- [ ] **VOC-04**: Voice prompts include ambient audio cues for scene atmosphere
+- [ ] **VOC-05**: Voice prompts include breath and non-verbal sounds
+- [ ] **VOC-06**: Voice prompts include emotional arc direction across dialogue sequence
+
+### Infrastructure (INF)
+
+**Table Stakes:**
+- [ ] **INF-01**: Model adapters handle token limits (77-token CLIP limit for image models)
+- [ ] **INF-02**: Bible integration preserves character/location/style data in expanded prompts
+- [ ] **INF-03**: Template library organized by shot type (close-up needs face detail, wide needs environment)
+
+**Differentiators:**
+- [ ] **INF-04**: LLM-powered expansion for complex shots that exceed template capability
+- [ ] **INF-05**: Prompt caching for performance (avoid re-expanding identical contexts)
+- [ ] **INF-06**: Prompt comparison view in UI (before/after expansion, word count)
 
 ## Future Requirements
 
 Deferred to later milestones.
 
-### SSML Integration (P3)
+### Advanced Continuity (v12+)
 
-- **SSML-01**: SSML-style speech markup for better TTS control
-- **SSML-02**: Voice switching with speaker tags
-- **SSML-03**: Style control with express-as elements for emotional consistency
+- **CONT-01**: Wardrobe tracking across scenes (same clothing details)
+- **CONT-02**: Prop continuity (same items in consistent positions)
+- **CONT-03**: Time-of-day consistency (matching shadows, light quality)
+- **CONT-04**: Character aging/progression over timeline
+
+### Multi-Model Optimization (v12+)
+
+- **OPT-01**: Model-specific prompt variants (Midjourney vs Stable Diffusion vs Flux)
+- **OPT-02**: A/B testing of prompt variations for quality scoring
+- **OPT-03**: Automatic prompt tuning based on generation results
 
 ## Out of Scope
 
@@ -51,11 +82,11 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Complete rewrite | Incremental improvements while maintaining functionality |
-| Real-time collaboration | Complexity, not core to video creation |
-| Mobile app | Web-first approach |
-| Video editing timeline | Use external tools for post-production |
-| Custom voice training | Requires external service integration |
+| Real-time prompt editing | Complexity, prompts are auto-generated |
+| User-written custom prompts | Against "effortless" core value |
+| Prompt marketplace/sharing | Not core to video creation |
+| Training custom models | Requires ML infrastructure beyond scope |
+| Multi-language prompts | English-first, internationalization later |
 
 ## Traceability
 
@@ -63,35 +94,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERF-01 | Phase 19 | Complete |
-| PERF-02 | Phase 19 | Complete |
-| PERF-03 | Phase 19 | Complete |
-| PERF-08 | Phase 19 | Complete |
-| PERF-04 | Phase 20 | Pending |
-| PERF-05 | Phase 20 | Pending |
-| PERF-06 | Phase 21 | Pending |
-| PERF-07 | Phase 21 | Pending |
+| INF-01 | TBD | Pending |
+| INF-02 | TBD | Pending |
+| INF-03 | TBD | Pending |
+| IMG-01 | TBD | Pending |
+| IMG-02 | TBD | Pending |
+| IMG-03 | TBD | Pending |
+| IMG-04 | TBD | Pending |
+| IMG-05 | TBD | Pending |
+| IMG-06 | TBD | Pending |
+| IMG-07 | TBD | Pending |
+| IMG-08 | TBD | Pending |
+| IMG-09 | TBD | Pending |
+| VID-01 | TBD | Pending |
+| VID-02 | TBD | Pending |
+| VID-03 | TBD | Pending |
+| VID-04 | TBD | Pending |
+| VID-05 | TBD | Pending |
+| VID-06 | TBD | Pending |
+| VID-07 | TBD | Pending |
+| VOC-01 | TBD | Pending |
+| VOC-02 | TBD | Pending |
+| VOC-03 | TBD | Pending |
+| VOC-04 | TBD | Pending |
+| VOC-05 | TBD | Pending |
+| VOC-06 | TBD | Pending |
+| INF-04 | TBD | Pending |
+| INF-05 | TBD | Pending |
+| INF-06 | TBD | Pending |
 
 **Coverage:**
-- v10 requirements: 8 total
-- Mapped to phases: 8 (100%)
-- Unmapped: 0 ✓
-
-**Phase distribution:**
-- Phase 19 (Quick Wins): 4 requirements (PERF-01, PERF-02, PERF-03, PERF-08)
-- Phase 20 (Component Splitting): 2 requirements (PERF-04, PERF-05)
-- Phase 21 (Data Normalization): 2 requirements (PERF-06, PERF-07)
-
-## Success Metrics
-
-| Metric | Current | Target |
-|--------|---------|--------|
-| Payload size | 500KB-2MB | <50KB |
-| Interaction latency | 2-5 seconds | <500ms |
-| Component lines | 31,489 | <2,000 per component |
-| wire:model.live bindings | 154+ | <20 |
-| Base64 in state | Multiple images | 0 |
+- v11 requirements: 25 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 25
 
 ---
 *Requirements defined: 2026-01-25*
-*Source: Debug analysis .planning/debug/livewire-performance.md*
+*Source: Research .planning/research/SUMMARY.md*
