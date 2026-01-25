@@ -25069,8 +25069,17 @@ PROMPT;
         $shots = $decomposed['shots'] ?? [];
         $createdDefaultShots = false;
 
-        // If no decomposed shots, create default shot structure from scene's visual prompt
+        // If no decomposed shots, use the proper speech-driven shot creation path
+        // This ensures dialogue/monologue/narrator segments are properly distributed
         if (empty($shots)) {
+            // CRITICAL: Parse speech segments BEFORE creating shots (same as decomposeScene())
+            // This ensures narrator/dialogue/monologue segments are properly created
+            if (empty($scene['speechSegments'])) {
+                $this->parseSceneNarrationForDecomposition($sceneIndex);
+                // Re-read scene after parsing
+                $scene = $this->script['scenes'][$sceneIndex];
+            }
+
             $sceneDescription = $scene['visualDescription'] ?? $scene['narration'] ?? '';
             // Use consistent scene duration default (35s matches script timing default)
             $sceneDuration = $scene['duration'] ?? ($this->script['timing']['sceneDuration'] ?? 35);
@@ -25115,135 +25124,59 @@ PROMPT;
                 $context['characters'] = $sceneCharacters;
             }
 
-            $analysis = $engine->generateHollywoodShotSequence($scene, $context);
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // USE PROPER SPEECH-DRIVEN SHOT CREATION (same as decomposeScene())
+            // This ensures dialogue/monologue creates proper Multitalk shots (1:1 mapping)
+            // and narrator segments are properly distributed as voiceover overlays.
+            // ═══════════════════════════════════════════════════════════════════════════════
+            $shots = $this->decomposeSceneWithDynamicEngine($scene, $sceneIndex, $sceneDescription);
 
-            // Get shot count from DynamicShotEngine analysis
-            $calculatedShotCount = $analysis['shotCount'] ?? 5;
+            // Calculate total duration for all shots
+            $totalDuration = array_sum(array_column($shots, 'duration'));
 
-            // Allow manual override with pacing adjustment
-            $shotCount = $this->multiShotCount > 0
-                ? $this->multiShotCount
-                : $calculatedShotCount;
-
-            // Get target shot duration based on scene type
-            $sceneType = $analysis['sceneType'] ?? 'default';
-            $baseShotDuration = max(3, (int) ceil($sceneDuration / $shotCount));
-
-            // Check if per-shot duration variation is enabled
-            $useVariableDurations = $this->isPerShotDurationEnabled();
-
-            // Shot types progression for cinematic variety
-            // ANIMATABILITY-AWARE: Removed detail/insert from cycling as they require special handling
-            $shotTypes = ['establishing', 'wide', 'medium', 'medium-close', 'close-up', 'reaction'];
-
-            $shots = [];
-            for ($i = 0; $i < $shotCount; $i++) {
-                // Cycle through shot types for variety
-                $typeIndex = $i % count($shotTypes);
-                $shotType = $shotTypes[$typeIndex];
-
-                // For first shot, always use establishing
-                if ($i === 0) $shotType = 'establishing';
-                // ANIMATABILITY FIX: For last shot, use close-up (character face visible)
-                // NEVER use 'detail' for final shot - it's not animatable
-                if ($i === $shotCount - 1 && $shotCount > 2) $shotType = 'close-up';
-
-                // Use variable duration based on shot type when enabled
-                $shotDuration = $useVariableDurations
-                    ? $this->getDurationForShotType($shotType)
-                    : $baseShotDuration;
-
-                // Get camera movement for this shot type
-                $cameraMovement = $this->getCameraMovementForShot($shotType, $i);
-
-                // Get dialogue for this specific shot
-                $shotDialogue = $this->getDialogueForShot($scene, $i, $shotCount);
-
-                // Build shot context - includes ALL story elements
-                $shotContext = [
-                    'index' => $i,
-                    'purpose' => $this->getShotPurpose($shotType),
-                    'isChained' => $i > 0,
-                    'description' => $sceneDescription,
-                    'narration' => $scene['narration'] ?? '',
-                    'emotionalBeat' => $scene['emotionalBeat'] ?? $scene['mood'] ?? '',
-                    'sceneTitle' => $scene['title'] ?? '',
-                    'dialogue' => $shotDialogue,
-                    'characters' => $scene['characters'] ?? [],
-                    'mood' => $scene['mood'] ?? '',
-                ];
-
-                // Generate Hollywood-quality video prompt
-                $videoPrompt = $this->getMotionDescriptionForShot($shotType, $cameraMovement, $sceneDescription, $shotContext);
-
-                // Determine video model
-                $selectedVideoModel = $this->storyboard['videoModel'] ?? 'wan';
-
-                // Get dialogue content for this shot
-                $shotDialogue = $this->getDialogueForShot($scene, $i, $shotCount);
-
-                $shots[$i] = [
-                    'id' => "shot-scene{$sceneIndex}-{$i}",
-                    'index' => $i,
-                    'sceneIndex' => $sceneIndex,
-                    'sceneId' => $scene['id'] ?? "scene_{$sceneIndex}",
-                    'type' => $shotType,
-                    'shotType' => $shotType,
-                    'description' => $sceneDescription,
-                    'purpose' => $this->getShotPurpose($shotType),
-                    'lens' => $this->getLensForShotType($shotType),
-                    'imagePrompt' => $sceneDescription,
-                    'prompt' => $sceneDescription,
-                    // CRITICAL: Hollywood-quality video prompts
-                    'videoPrompt' => $videoPrompt,
-                    'narrativeBeat' => [
-                        'motionDescription' => $videoPrompt,
-                    ],
-                    'cameraMovement' => $cameraMovement,
-                    'duration' => $shotDuration,
-                    'selectedDuration' => $shotDuration,
-                    'durationClass' => $this->getDurationClass($shotDuration),
-                    'status' => 'pending',
-                    'imageStatus' => 'pending',
-                    'videoStatus' => 'pending',
-                    'imageUrl' => null,
-                    'videoUrl' => null,
-                    'selectedVideoModel' => $selectedVideoModel,
-                    'fromSceneImage' => $i === 0,
-                    'fromFrameCapture' => $i > 0,
-
-                    // Audio layer for voiceover/lip-sync
-                    'needsLipSync' => !empty($shotDialogue),
-                    'dialogue' => $shotDialogue,
-                    'speakingCharacters' => [],
-                    'monologue' => null,           // Will be populated by enrichShotsWithMonologueStored
-                    'audioUrl' => null,
-                    'audioDuration' => null,
-                    'voiceId' => null,
-                ];
-            }
-
-            // IMPORTANT: Save the default shots to decomposedScenes so the UI shows them
+            // Store decomposed scene with Hollywood-style structure
+            $sceneId = $scene['id'] ?? 'scene_' . $sceneIndex;
             $this->multiShotMode['decomposedScenes'][$sceneIndex] = [
+                'sceneId' => $sceneId,
+                'sceneIndex' => $sceneIndex,
                 'shots' => $shots,
-                'totalDuration' => $sceneDuration,
+                'shotCount' => count($shots),
+                'totalDuration' => $totalDuration,
                 'selectedShot' => 0,
+                'status' => 'ready',
                 'consistencyAnchors' => [
                     'style' => $this->sceneMemory['styleBible']['style'] ?? 'cinematic',
+                    'characters' => $this->getCharactersForScene($sceneIndex),
+                    'location' => $this->getLocationForScene($sceneIndex),
                 ],
                 'createdFromCollage' => true,
+                'sceneTitle' => $scene['title'] ?? '',
+                'sceneNarration' => $scene['narration'] ?? '',
             ];
+
+            // Enrich shots with monologue for lip-sync (same as decomposeScene())
+            $this->enrichShotsWithMonologueStored($sceneIndex);
+
+            // Re-read shots after enrichment
+            $shots = $this->multiShotMode['decomposedScenes'][$sceneIndex]['shots'] ?? $shots;
+
             $createdDefaultShots = true;
 
-            Log::info('VideoWizard: Created DynamicShotEngine-based shots for collage', [
+            // Count speech segment types for logging
+            $speechSegments = $scene['speechSegments'] ?? [];
+            $dialogueCount = count(array_filter($speechSegments, fn($s) => strtolower($s['type'] ?? '') === 'dialogue'));
+            $monologueCount = count(array_filter($speechSegments, fn($s) => strtolower($s['type'] ?? '') === 'monologue'));
+            $narratorCount = count(array_filter($speechSegments, fn($s) => strtolower($s['type'] ?? '') === 'narrator'));
+
+            Log::info('VideoWizard: Created speech-driven shots for collage', [
                 'sceneIndex' => $sceneIndex,
-                'shotCount' => $shotCount,
-                'calculatedCount' => $calculatedShotCount,
-                'multiShotCount' => $this->multiShotCount,
-                'sceneDuration' => $sceneDuration,
-                'sceneType' => $sceneType,
-                'analysis' => $analysis,
-                'useVariableDurations' => $useVariableDurations,
+                'shotCount' => count($shots),
+                'speechSegments' => count($speechSegments),
+                'dialogueSegments' => $dialogueCount,
+                'monologueSegments' => $monologueCount,
+                'narratorSegments' => $narratorCount,
+                'totalDuration' => $totalDuration,
+                'path' => 'decomposeSceneWithDynamicEngine',
             ]);
         }
 
