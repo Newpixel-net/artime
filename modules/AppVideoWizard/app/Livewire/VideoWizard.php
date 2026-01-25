@@ -35,6 +35,7 @@ use Modules\AppVideoWizard\Services\CharacterLookService;
 use Modules\AppVideoWizard\Services\BibleOrderingService;
 use Modules\AppVideoWizard\Services\SpeechSegment;
 use Modules\AppVideoWizard\Services\NarrativeMomentService;
+use Modules\AppVideoWizard\Services\VoiceRegistryService;
 use Modules\AppVideoWizard\Services as Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -944,6 +945,12 @@ class VideoWizard extends Component
     // VOC-04: Voice continuity validation results (non-blocking)
     // Stores the result of validateVoiceContinuity() after scene decomposition
     public array $voiceContinuityValidation = [];
+
+    /**
+     * Voice registry service for centralized voice assignment tracking (Phase 17).
+     * Initialized at start of decomposeAllScenes().
+     */
+    protected ?VoiceRegistryService $voiceRegistry = null;
 
     public bool $showMultiShotModal = false;
     public int $multiShotSceneIndex = 0;
