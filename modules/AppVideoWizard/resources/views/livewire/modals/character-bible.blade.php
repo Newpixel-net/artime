@@ -543,7 +543,7 @@
                                             <span style="color: rgba(255,255,255,0.5); font-size: 0.5rem;">{{ number_format($voiceSettings['speed'] ?? 1.0, 2) }}x</span>
                                         </div>
                                         <input type="range"
-                                               wire:model.live="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.speed"
+                                               wire:model.change="sceneMemory.characterBible.characters.{{ $editIndex }}.voice.speed"
                                                min="0.5" max="2.0" step="0.05"
                                                style="width: 100%; height: 4px; accent-color: #10b981;">
                                     </div>

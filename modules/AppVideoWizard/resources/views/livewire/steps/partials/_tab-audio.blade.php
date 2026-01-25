@@ -141,7 +141,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.audioMix.voiceVolume"
+                    wire:model.change="assembly.audioMix.voiceVolume"
                     min="0" max="100"
                     class="vw-channel-slider voice"
                 >
@@ -159,7 +159,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.music.volume"
+                    wire:model.change="assembly.music.volume"
                     x-on:input="updateMusicSetting('volume', parseInt($event.target.value))"
                     min="0" max="100" step="5"
                     class="vw-channel-slider music"
@@ -206,7 +206,7 @@
                     </div>
                     <input
                         type="range"
-                        wire:model.live="assembly.audioMix.duckAmount"
+                        wire:model.change="assembly.audioMix.duckAmount"
                         min="20" max="80" step="5"
                         class="vw-range-slider"
                     >
@@ -230,7 +230,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.audioMix.voiceVolume"
+                    wire:model.change="assembly.audioMix.voiceVolume"
                     min="0" max="100"
                     class="vw-range-slider voice"
                 >
@@ -361,7 +361,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.music.volume"
+                    wire:model.change="assembly.music.volume"
                     x-on:input="updateMusicSetting('volume', parseInt($event.target.value))"
                     min="0" max="100" step="5"
                     class="vw-range-slider music"

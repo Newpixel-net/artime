@@ -2150,7 +2150,7 @@
                                     {{-- Speed Slider --}}
                                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
                                         <span style="font-size: 0.7rem; color: rgba(255,255,255,0.5);">⚡</span>
-                                        <input type="range" wire:model.live="animation.voiceover.speed" min="0.5" max="2.0" step="0.1"
+                                        <input type="range" wire:model.change="animation.voiceover.speed" min="0.5" max="2.0" step="0.1"
                                                style="flex: 1; height: 4px; accent-color: #8b5cf6;">
                                         <span style="font-size: 0.7rem; color: #a78bfa; font-weight: 600; min-width: 35px;">{{ number_format($voiceSpeed, 1) }}x</span>
                                     </div>
@@ -2366,7 +2366,7 @@
                                             </span>
                                         </label>
                                     </div>
-                                    <input type="range" wire:model.live="assembly.music.volume" min="0" max="100"
+                                    <input type="range" wire:model.change="assembly.music.volume" min="0" max="100"
                                            style="width: 100%; height: 4px; cursor: pointer; accent-color: #8b5cf6;" {{ !$musicEnabled ? 'disabled' : '' }}>
                                     <div style="font-size: 0.55rem; color: rgba(255,255,255,0.4); text-align: right; margin-top: 0.2rem;">{{ $musicVolume }}%</div>
                                 </div>
@@ -2377,7 +2377,7 @@
                                         <span style="font-size: 0.7rem; color: rgba(255,255,255,0.7);">🎙️ {{ __('Voice') }}</span>
                                         <span style="font-size: 0.6rem; color: #06b6d4;">{{ $voiceVolume }}%</span>
                                     </div>
-                                    <input type="range" wire:model.live="assembly.audioMix.voiceVolume" min="0" max="100"
+                                    <input type="range" wire:model.change="assembly.audioMix.voiceVolume" min="0" max="100"
                                            style="width: 100%; height: 4px; cursor: pointer; accent-color: #06b6d4;">
                                 </div>
                             </div>

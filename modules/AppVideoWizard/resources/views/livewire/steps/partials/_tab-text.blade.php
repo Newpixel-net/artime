@@ -228,7 +228,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.captions.size"
+                    wire:model.change="assembly.captions.size"
                     x-on:input="updateCaptionSetting('size', parseFloat($event.target.value))"
                     min="0.5" max="2" step="0.1"
                     class="vw-range-slider"
@@ -282,7 +282,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.captions.letterSpacing"
+                    wire:model.change="assembly.captions.letterSpacing"
                     x-on:input="updateCaptionSetting('letterSpacing', parseInt($event.target.value))"
                     min="-2" max="10" step="1"
                     class="vw-range-slider"
@@ -297,7 +297,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.captions.lineHeight"
+                    wire:model.change="assembly.captions.lineHeight"
                     x-on:input="updateCaptionSetting('lineHeight', parseFloat($event.target.value))"
                     min="1" max="2.5" step="0.1"
                     class="vw-range-slider"
@@ -356,7 +356,7 @@
                 </div>
                 <input
                     type="range"
-                    wire:model.live="assembly.captions.strokeWidth"
+                    wire:model.change="assembly.captions.strokeWidth"
                     x-on:input="updateCaptionSetting('strokeWidth', parseFloat($event.target.value))"
                     min="0" max="8" step="0.5"
                     class="vw-range-slider"
@@ -426,7 +426,7 @@
                         </div>
                         <input
                             type="range"
-                            wire:model.live="assembly.captions.backgroundOpacity"
+                            wire:model.change="assembly.captions.backgroundOpacity"
                             x-on:input="updateCaptionSetting('backgroundOpacity', parseFloat($event.target.value))"
                             min="0.1" max="1" step="0.1"
                             class="vw-range-slider"
@@ -489,7 +489,7 @@
                         </div>
                         <input
                             type="range"
-                            wire:model.live="assembly.captions.shadowBlur"
+                            wire:model.change="assembly.captions.shadowBlur"
                             x-on:input="updateCaptionSetting('shadowBlur', parseInt($event.target.value))"
                             min="0" max="20" step="1"
                             class="vw-range-slider"
@@ -500,7 +500,7 @@
                         </div>
                         <input
                             type="range"
-                            wire:model.live="assembly.captions.shadowOffset"
+                            wire:model.change="assembly.captions.shadowOffset"
                             x-on:input="updateCaptionSetting('shadowOffset', parseInt($event.target.value))"
                             min="0" max="10" step="1"
                             class="vw-range-slider"
@@ -541,7 +541,7 @@
                         </div>
                         <input
                             type="range"
-                            wire:model.live="assembly.captions.glowIntensity"
+                            wire:model.change="assembly.captions.glowIntensity"
                             x-on:input="updateCaptionSetting('glowIntensity', parseInt($event.target.value))"
                             min="5" max="30" step="1"
                             class="vw-range-slider"
@@ -560,7 +560,7 @@
                     </div>
                     <input
                         type="range"
-                        wire:model.live="assembly.captions.wordDuration"
+                        wire:model.change="assembly.captions.wordDuration"
                         x-on:input="updateCaptionSetting('wordDuration', parseFloat($event.target.value))"
                         min="0.1" max="1" step="0.1"
                         class="vw-range-slider"

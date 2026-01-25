@@ -348,7 +348,7 @@
                             @endforeach
                         </div>
                         <div style="margin-top: 0.75rem;">
-                            <input type="range" min="1" max="30" wire:model.live="editSceneDuration"
+                            <input type="range" min="1" max="30" wire:model.change="editSceneDuration"
                                    style="width: 100%; accent-color: #06b6d4;">
                             <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: rgba(255,255,255,0.4);">
                                 <span>1s</span>

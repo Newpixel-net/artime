@@ -197,7 +197,7 @@ if (typeof window.aiEditCanvas === 'undefined') {
                                    min="10"
                                    max="100"
                                    x-model="brushSize"
-                                   wire:model.live="aiEditBrushSize"
+                                   wire:model.change="aiEditBrushSize"
                                    style="width: 100px; accent-color: #ec4899;">
                             <span style="color: white; font-size: 0.75rem; min-width: 35px;" x-text="brushSize + 'px'"></span>
                         </div>
@@ -218,7 +218,7 @@ if (typeof window.aiEditCanvas === 'undefined') {
                     {{-- Edit Prompt --}}
                     <div>
                         <label style="display: block; color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 0.5rem;">{{ __('What do you want to change?') }}</label>
-                        <textarea wire:model.live="aiEditPrompt"
+                        <textarea wire:model.blur="aiEditPrompt"
                                   placeholder="{{ __('Describe your desired changes...') }}"
                                   style="width: 100%; height: 100px; padding: 0.75rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; color: white; font-size: 0.85rem; resize: none;"></textarea>
                     </div>
