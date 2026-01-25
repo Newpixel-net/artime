@@ -149,7 +149,13 @@ class VoiceRegistry {
 
 **Goal:** Track multiple speakers per shot for complex dialogue scenes
 
-**Status:** Planned (2026-01-24)
+**Status:** Planned (2026-01-25)
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — Shot data structure expansion (speakers array in VideoWizard.php)
+- [ ] 18-02-PLAN.md — Downstream integration (DialogueSceneDecomposerService + VoiceoverService)
 
 **Dependencies:** Phase 17 (requires registry working)
 
@@ -280,4 +286,5 @@ Voice Production Excellence ensures users get professional-quality audio automat
 *Milestone 9 roadmap created: 2026-01-24*
 *Phases 15-18 defined*
 *Phase 17 planned: 2026-01-25*
+*Phase 18 planned: 2026-01-25*
 *Source: Comprehensive TTS/Lip-Sync audit*
