@@ -20,7 +20,7 @@ Requirements for Milestone 9. Each maps to roadmap phases.
 ### Voice Architecture (P2)
 
 - [x] **VOC-05**: Voice Registry centralization (single source of truth for narrator, internal, character voices)
-- [ ] **VOC-06**: Multi-speaker shot support (multiple speakers tracked per shot for dialogue scenes)
+- [x] **VOC-06**: Multi-speaker shot support (multiple speakers tracked per shot for dialogue scenes)
 
 ## Future Requirements
 
@@ -54,7 +54,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOC-03 | Phase 16 | Complete |
 | VOC-04 | Phase 16 | Complete |
 | VOC-05 | Phase 17 | Complete |
-| VOC-06 | Phase 18 | Pending |
+| VOC-06 | Phase 18 | Complete |
 
 **Coverage:**
 - v1 requirements: 6 total

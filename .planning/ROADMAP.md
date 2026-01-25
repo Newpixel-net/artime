@@ -149,13 +149,13 @@ class VoiceRegistry {
 
 **Goal:** Track multiple speakers per shot for complex dialogue scenes
 
-**Status:** Planned (2026-01-25)
+**Status:** Complete (2026-01-25)
 
 **Plans:** 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — Shot data structure expansion (speakers array in VideoWizard.php)
-- [ ] 18-02-PLAN.md — Downstream integration (DialogueSceneDecomposerService + VoiceoverService)
+- [x] 18-01-PLAN.md — Shot data structure expansion (speakers array in VideoWizard.php)
+- [x] 18-02-PLAN.md — Downstream integration (DialogueSceneDecomposerService + VoiceoverService)
 
 **Dependencies:** Phase 17 (requires registry working)
 
@@ -212,7 +212,7 @@ Sequential execution required.
 | Phase 15: Critical Fixes | Complete | VOC-01, VOC-02 (2) | 4/4 |
 | Phase 16: Consistency Layer | Complete | VOC-03, VOC-04 (2) | 5/5 |
 | Phase 17: Voice Registry | Complete | VOC-05 (1) | 5/5 |
-| Phase 18: Multi-Speaker | Planned | VOC-06 (1) | 0/5 |
+| Phase 18: Multi-Speaker | Complete | VOC-06 (1) | 5/5 |
 
 **Overall Progress:**
 
@@ -220,9 +220,9 @@ Sequential execution required.
 Phase 15: ██████████ 100%
 Phase 16: ██████████ 100%
 Phase 17: ██████████ 100%
-Phase 18: ░░░░░░░░░░ 0%
+Phase 18: ██████████ 100%
 ─────────────────────
-Overall:  ████████░░ 83% (5/6 requirements)
+Overall:  ██████████ 100% (6/6 requirements)
 ```
 
 **Coverage:** 6/6 requirements mapped (100%)
