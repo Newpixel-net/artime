@@ -18,36 +18,36 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
 **Phase:** 23 of 27 (Character Psychology Bible)
-**Plan:** 3 of 4 complete
+**Plan:** 4 of 4 (Phase 23 nearing completion)
 **Status:** In progress
 
 ```
-Phase 23: ███████░░░ 75%
+Phase 23: ██████████ 75% (3/4 plans complete)
 ─────────────────────
-M11:      ████░░░░░░ 24% (6/25 requirements)
+M11:      █████░░░░░ 28% (7/25 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 23-01-PLAN.md (CharacterPsychologyService)
+**Last activity:** 2026-01-27 - Completed 23-03-PLAN.md (ContinuityAnchorService + Expression Presets)
 
 ---
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (M11)
-- Average duration: 10.3 min
-- Total execution time: 62 min
+- Total plans completed: 7 (M11)
+- Average duration: 9.7 min
+- Total execution time: 68 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 22 | 3/3 | 34 min | 11.3 min |
-| 23 | 3/4 | 28 min | 9.3 min |
+| 23 | 3/4 | 34 min | 11.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 22-02 (7m), 22-03 (15m), 23-01 (10m), 23-02 (8m), 23-01 (10m)
-- Trend: Steady/improving
+- Last 5 plans: 22-03 (15m), 23-01 (10m), 23-02 (8m), 23-01 (10m), 23-03 (6m)
+- Trend: Improving (23-03 fastest at 6min)
 
 *Updated after each plan completion*
 
@@ -80,6 +80,10 @@ Recent decisions affecting current work:
 - [23-02]: Emotion aliases map 30+ casual terms to core emotions
 - [23-02]: Tension scale uses 10 levels with thresholds at 1,3,5,7,10
 - [23-02]: Blending intensity 0.0-1.0 allows gradual emotional overlay
+- [23-03]: Expression presets use physical descriptions (face/eyes), not FACS AU codes
+- [23-03]: ANCHOR_PRIORITY has three levels: primary (identity), secondary (continuity), tertiary (scene)
+- [23-03]: Bridge method allows progressive enhancement from presets to full psychology
+- [23-03]: Anchor conflict detection uses 70% similarity threshold with severity levels
 
 ### Phase 23 Progress
 
@@ -88,9 +92,9 @@ Recent decisions affecting current work:
 Delivered so far:
 1. 23-01: CharacterPsychologyService - Emotion-to-physical-manifestation mapping with 8 emotions
 2. 23-02: MiseEnSceneService - Environment-emotion mappings with 8 Hollywood mise-en-scene states
+3. 23-03: ContinuityAnchorService + Expression Presets - Cross-shot visual persistence and expression preset bridge
 
 Remaining:
-3. 23-03: CharacterBibleService (or remaining plan)
 4. 23-04: Integration
 
 ### Pending Todos
@@ -106,9 +110,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 23-01-PLAN.md (CharacterPsychologyService)
+Stopped at: Completed 23-03-PLAN.md (ContinuityAnchorService + Expression Presets)
 Resume file: None
-Next step: Continue with 23-02-PLAN.md or next plan
+Next step: Continue with 23-04-PLAN.md (Integration)
 
 ---
 
@@ -120,16 +124,22 @@ Next step: Continue with 23-02-PLAN.md or next plan
 - `.planning/phases/23-character-psychology-bible/23-01-SUMMARY.md`
 - `.planning/phases/23-character-psychology-bible/23-02-PLAN.md` (MiseEnSceneService) - COMPLETE
 - `.planning/phases/23-character-psychology-bible/23-02-SUMMARY.md`
-- `.planning/phases/23-character-psychology-bible/23-03-PLAN.md`
+- `.planning/phases/23-character-psychology-bible/23-03-PLAN.md` (ContinuityAnchorService) - COMPLETE
+- `.planning/phases/23-character-psychology-bible/23-03-SUMMARY.md`
 - `.planning/phases/23-character-psychology-bible/23-04-PLAN.md`
 
 Key Files Created (Phase 23):
 - `modules/AppVideoWizard/app/Services/CharacterPsychologyService.php`
 - `modules/AppVideoWizard/app/Services/MiseEnSceneService.php`
+- `modules/AppVideoWizard/app/Services/ContinuityAnchorService.php`
+
+Key Files Modified (Phase 23):
+- `modules/AppVideoWizard/app/Services/CharacterLookService.php` (added EXPRESSION_PRESETS)
 
 Tests (Phase 23):
 - `tests/Unit/VideoWizard/CharacterPsychologyServiceTest.php`
 - `tests/Unit/VideoWizard/MiseEnSceneServiceTest.php`
+- `tests/Unit/VideoWizard/ContinuityAnchorServiceTest.php`
 
 ---
 
