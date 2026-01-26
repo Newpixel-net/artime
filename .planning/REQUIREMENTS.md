@@ -13,14 +13,14 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 - [ ] **IMG-01**: Image prompts include camera specs with psychological reasoning (lens choice affects viewer perception)
 - [ ] **IMG-02**: Image prompts include quantified framing (percentage of frame, compositional geometry)
 - [ ] **IMG-03**: Image prompts include lighting with specific ratios (key/fill/back, color temperatures in Kelvin)
-- [ ] **IMG-04**: Image prompts include micro-expressions using FACS terminology (action units, specific muscle movements)
-- [ ] **IMG-05**: Image prompts include body language with specific posture/gesture descriptions
-- [ ] **IMG-06**: Image prompts include emotional state visible in physicality (not labels like "sad" but physical manifestations)
+- [x] **IMG-04**: Image prompts include micro-expressions using physical manifestations (research: FACS AU codes don't work for image models)
+- [x] **IMG-05**: Image prompts include body language with specific posture/gesture descriptions
+- [x] **IMG-06**: Image prompts include emotional state visible in physicality (not labels like "sad" but physical manifestations)
 
 **Differentiators:**
-- [ ] **IMG-07**: Image prompts include subtext layer (what character hides vs reveals through body language)
-- [ ] **IMG-08**: Image prompts include mise-en-scene integration (environment reflects/contrasts emotional state)
-- [ ] **IMG-09**: Image prompts include continuity anchors (exact details that must persist across shots)
+- [x] **IMG-07**: Image prompts include subtext layer (what character hides vs reveals through body language)
+- [x] **IMG-08**: Image prompts include mise-en-scene integration (environment reflects/contrasts emotional state)
+- [x] **IMG-09**: Image prompts include continuity anchors (exact details that must persist across shots)
 
 ### Video Prompts (VID)
 
@@ -51,7 +51,7 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 
 **Table Stakes:**
 - [ ] **INF-01**: Model adapters handle token limits (77-token CLIP limit for image models)
-- [ ] **INF-02**: Bible integration preserves character/location/style data in expanded prompts
+- [x] **INF-02**: Bible integration preserves character/location/style data in expanded prompts
 - [ ] **INF-03**: Template library organized by shot type (close-up needs face detail, wide needs environment)
 
 **Differentiators:**
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INF-01 | Phase 22 | Complete |
-| INF-02 | Phase 23 | Pending |
+| INF-02 | Phase 23 | Complete |
 | INF-03 | Phase 22 | Complete |
 | INF-04 | Phase 26 | Pending |
 | INF-05 | Phase 27 | Pending |
@@ -103,12 +103,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IMG-01 | Phase 22 | Complete |
 | IMG-02 | Phase 22 | Complete |
 | IMG-03 | Phase 22 | Complete |
-| IMG-04 | Phase 23 | Pending |
-| IMG-05 | Phase 23 | Pending |
-| IMG-06 | Phase 23 | Pending |
-| IMG-07 | Phase 23 | Pending |
-| IMG-08 | Phase 23 | Pending |
-| IMG-09 | Phase 23 | Pending |
+| IMG-04 | Phase 23 | Complete |
+| IMG-05 | Phase 23 | Complete |
+| IMG-06 | Phase 23 | Complete |
+| IMG-07 | Phase 23 | Complete |
+| IMG-08 | Phase 23 | Complete |
+| IMG-09 | Phase 23 | Complete |
 | VID-01 | Phase 24 | Pending |
 | VID-02 | Phase 24 | Pending |
 | VID-03 | Phase 24 | Pending |
