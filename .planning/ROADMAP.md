@@ -65,18 +65,21 @@ Plans:
 
 **Goal:** Users see prompts that capture nuanced human behavior and maintain Story Bible consistency
 
-**Status:** Not started
+**Status:** Planned (2026-01-27)
 
-**Plans:** TBD
+**Plans:** 4 plans in 3 waves
 
 Plans:
-- [ ] 23-01: TBD
+- [ ] 23-01-PLAN.md — CharacterPsychologyService with emotion-to-physical mappings (Wave 1)
+- [ ] 23-02-PLAN.md — MiseEnSceneService for environment-emotion integration (Wave 1)
+- [ ] 23-03-PLAN.md — ContinuityAnchorService and CharacterLookService expression presets (Wave 2)
+- [ ] 23-04-PLAN.md — StructuredPromptBuilderService integration (Wave 3)
 
 **Dependencies:** Phase 22 (templates and adapters must exist)
 
 **Requirements:**
 - INF-02: Bible integration preserves character/location/style data in expanded prompts
-- IMG-04: Image prompts include micro-expressions using FACS terminology
+- IMG-04: Image prompts include micro-expressions using physical manifestations (NOT FACS AU codes per research)
 - IMG-05: Image prompts include body language with specific posture/gesture descriptions
 - IMG-06: Image prompts include emotional state visible in physicality (not labels)
 - IMG-07: Image prompts include subtext layer (what character hides vs reveals)
@@ -84,7 +87,7 @@ Plans:
 - IMG-09: Image prompts include continuity anchors (exact details that persist across shots)
 
 **Success Criteria** (what must be TRUE):
-1. Generated prompts include FACS action unit terminology — "AU4 brow lowerer with AU7 lid tightener indicates suppressed anger" instead of "angry expression"
+1. Generated prompts include physical manifestations — "jaw muscles visibly tensed, brow lowered creating vertical crease" instead of "angry expression" (research showed FACS AU codes don't work for image models)
 2. Character Bible data appears in prompts — character name, defining features, wardrobe details from Bible entries flow into every shot of that character
 3. Emotional states expressed through physical manifestations — "shoulders hunched forward, fingers gripping armrest, jaw muscles visibly clenched" not "she is anxious"
 4. Continuity anchors persist across related shots — if character wears a red scarf in shot 1, prompt explicitly includes "red wool scarf loosely draped" in shots 2-5
@@ -225,7 +228,7 @@ Phase 27 is final polish after all prompt systems work.
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 22: Foundation & Model Adapters | Complete ✓ | INF-01, INF-03, IMG-01, IMG-02, IMG-03 (5) | 5/5 |
-| Phase 23: Character Psychology & Bible | Not started | INF-02, IMG-04, IMG-05, IMG-06, IMG-07, IMG-08, IMG-09 (7) | 0/4 |
+| Phase 23: Character Psychology & Bible | Planned | INF-02, IMG-04, IMG-05, IMG-06, IMG-07, IMG-08, IMG-09 (7) | 0/4 |
 | Phase 24: Video Temporal Expansion | Not started | VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07 (7) | 0/4 |
 | Phase 25: Voice Prompt Enhancement | Not started | VOC-01, VOC-02, VOC-03, VOC-04, VOC-05, VOC-06 (6) | 0/3 |
 | Phase 26: LLM-Powered Expansion | Not started | INF-04 (1) | 0/2 |
@@ -309,5 +312,6 @@ Hollywood-Quality Prompt Pipeline delivers on the "Hollywood-quality" promise. U
 
 *Milestone 11 roadmap created: 2026-01-25*
 *Phase 22 planned: 2026-01-26*
+*Phase 23 planned: 2026-01-27*
 *Phases 22-27 defined*
 *Source: Research .planning/research/SUMMARY.md*
