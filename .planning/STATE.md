@@ -10,7 +10,7 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Automatic, effortless, Hollywood-quality output from button clicks
-**Current focus:** Phase 24 - Video Temporal Expansion (IN PROGRESS)
+**Current focus:** Phase 24 - Video Temporal Expansion (COMPLETE)
 
 ---
 
@@ -18,25 +18,25 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
 **Phase:** 24 of 28 (Video Temporal Expansion)
-**Plan:** 3 of 4
-**Status:** In progress
+**Plan:** 4 of 4
+**Status:** Phase complete
 
 ```
-Phase 24: ███████████████░░░░░░░ 75% (3/4 plans complete)
+Phase 24: ████████████████████████ 100% (4/4 plans complete)
 ─────────────────────
-M11:      ███████░░░░ 44% (11/25 requirements)
+M11:      ████████░░░░ 48% (12/25 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 24-01-PLAN.md (VideoTemporalService + MicroMovementService - final task)
+**Last activity:** 2026-01-27 - Completed 24-04-PLAN.md (Video Temporal Integration)
 
 ---
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (M11)
-- Average duration: 9.3 min
-- Total execution time: 102 min
+- Total plans completed: 12 (M11)
+- Average duration: 9.2 min
+- Total execution time: 110 min
 
 **By Phase:**
 
@@ -44,10 +44,10 @@ M11:      ███████░░░░ 44% (11/25 requirements)
 |-------|-------|-------|----------|
 | 22 | 3/3 | 34 min | 11.3 min |
 | 23 | 4/4 | 42 min | 10.5 min |
-| 24 | 3/4 | 26 min | 8.7 min |
+| 24 | 4/4 | 34 min | 8.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 23-03 (6m), 23-04 (8m), 24-01 (9m), 24-02 (9m), 24-03 (8m)
+- Last 5 plans: 23-04 (8m), 24-01 (9m), 24-02 (9m), 24-03 (8m), 24-04 (8m)
 - Trend: Consistent (~8min average for Phase 24)
 
 *Updated after each plan completion*
@@ -89,6 +89,10 @@ Recent decisions affecting current work:
 - [23-04]: Shot-type emphasis: close-up=face, wide=body, medium=both
 - [23-04]: Scene DNA path extracts emotion from sceneDNAEntry first, then falls back to options
 - [23-04]: Bible defining_features woven into psychology expressions (INF-02)
+- [24-01]: Simple actions 2-3s, complex motions 4-5s for natural video pacing
+- [24-01]: MAX_ACTIONS_PER_DURATION prevents overpacked clips (5s=2, 10s=4, 15s=5)
+- [24-01]: Shot type determines visible micro-movements (close-up=face, wide=none)
+- [24-01]: Emotion-to-variant mapping for micro-movements (tense=held breath, anxious=rapid breath)
 - [24-02]: Edward Hall's 4 proxemic zones for spatial vocabulary (intimate 0-18in, personal 18in-4ft, social 4-12ft, public 12+ft)
 - [24-02]: Power positioning uses frame position (higher=dominant, lower=subordinate)
 - [24-02]: 5 character path categories: approach, retreat, stationary_motion, crossing, gestural
@@ -98,22 +102,30 @@ Recent decisions affecting current work:
 - [24-03]: Duration clamped to typical_duration_min/max from VwCameraMovement model
 - [24-03]: Psychology appended with comma separator for natural reading
 - [24-03]: 80% rule - movement duration max 80% of clip duration
-- [24-01]: Simple actions 2-3s, complex motions 4-5s for natural video pacing
-- [24-01]: MAX_ACTIONS_PER_DURATION prevents overpacked clips (5s=2, 10s=4, 15s=5)
-- [24-01]: Shot type determines visible micro-movements (close-up=face, wide=none)
-- [24-01]: Emotion-to-variant mapping for micro-movements (tense=held breath, anxious=rapid breath)
+- [24-04]: buildTemporalVideoPrompt builds on buildHollywoodPrompt (inherits all image features)
+- [24-04]: Auto-generate temporal beats when none provided, using action classification
+- [24-04]: Emotion maps to psychology key for camera movement purpose
+- [24-04]: Transition setup stored in metadata (editorial info), not in main prompt
+- [24-04]: Prompt assembly: Camera -> Subject+Dynamics -> Beats -> Micro-movements -> Base
 
 ### Phase 24 Progress
 
-**Phase 24: Video Temporal Expansion is IN PROGRESS (3/4 plans complete).**
+**Phase 24: Video Temporal Expansion is COMPLETE (4/4 plans).**
 
 Delivered:
 1. 24-01: VideoTemporalService + MicroMovementService - Temporal beats with timing markers and micro-movement vocabulary
-2. 24-02: CharacterDynamicsService - Character path, blocking, and transition vocabulary
+2. 24-02: CharacterDynamicsService + CharacterPathService - Character path, blocking, and spatial dynamics
 3. 24-03: TransitionVocabulary + CameraMovementService - Shot ending states and temporal movement prompts
+4. 24-04: Integration - buildTemporalVideoPrompt integrating all temporal services
 
-Remaining:
-4. 24-04: Integration - Temporal services integrated into video generation pipeline
+**VID Requirements Complete:**
+- VID-01: Video prompts contain all image features (camera, lighting, psychology)
+- VID-02: Temporal beat structure with timing [00:00-00:02] format
+- VID-03: Camera movement with "over X seconds" duration and psychology phrase
+- VID-04: Character movement paths when movement_intent provided
+- VID-05: Multi-character spatial dynamics with proxemic zones
+- VID-06: Close-up micro-movements (breathing, eyes); wide shots omit them
+- VID-07: Transition setup with ending_state and next_shot_suggestion
 
 ### Pending Todos
 
@@ -132,13 +144,13 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 24-01-PLAN.md final task (MicroMovementService)
+Stopped at: Completed 24-04-PLAN.md (Video Temporal Integration)
 Resume file: None
-Next step: Continue with 24-04-PLAN.md (Integration) or verify Wave 1 completion
+Next step: Begin Phase 25 (Voice Production Excellence) or other M11 work
 
 ---
 
-## Phase 24 Artifacts (IN PROGRESS)
+## Phase 24 Artifacts (COMPLETE)
 
 - `.planning/phases/24-video-temporal-expansion/24-RESEARCH.md`
 - `.planning/phases/24-video-temporal-expansion/24-01-PLAN.md` (VideoTemporalService) - COMPLETE
@@ -147,7 +159,8 @@ Next step: Continue with 24-04-PLAN.md (Integration) or verify Wave 1 completion
 - `.planning/phases/24-video-temporal-expansion/24-02-SUMMARY.md`
 - `.planning/phases/24-video-temporal-expansion/24-03-PLAN.md` (Transition Vocabulary + Temporal Movement) - COMPLETE
 - `.planning/phases/24-video-temporal-expansion/24-03-SUMMARY.md`
-- `.planning/phases/24-video-temporal-expansion/24-04-PLAN.md` (Integration) - PENDING
+- `.planning/phases/24-video-temporal-expansion/24-04-PLAN.md` (Integration) - COMPLETE
+- `.planning/phases/24-video-temporal-expansion/24-04-SUMMARY.md`
 
 Key Files Created (Phase 24):
 - `modules/AppVideoWizard/app/Services/VideoTemporalService.php`
@@ -161,9 +174,11 @@ Key Files Created (Phase 24):
 - `tests/Unit/VideoWizard/CharacterPathServiceTest.php`
 - `tests/Unit/VideoWizard/TransitionVocabularyTest.php`
 - `tests/Unit/VideoWizard/CameraMovementServiceTemporalTest.php`
+- `tests/Feature/VideoWizard/VideoTemporalIntegrationTest.php`
 
 Key Files Modified (Phase 24):
 - `modules/AppVideoWizard/app/Services/CameraMovementService.php` (MOVEMENT_PSYCHOLOGY, buildTemporalMovementPrompt)
+- `modules/AppVideoWizard/app/Services/VideoPromptBuilderService.php` (buildTemporalVideoPrompt integration)
 
 Tests (Phase 24):
 - `tests/Unit/VideoWizard/VideoTemporalServiceTest.php`
@@ -172,6 +187,7 @@ Tests (Phase 24):
 - `tests/Unit/VideoWizard/CharacterPathServiceTest.php`
 - `tests/Unit/VideoWizard/TransitionVocabularyTest.php`
 - `tests/Unit/VideoWizard/CameraMovementServiceTemporalTest.php`
+- `tests/Feature/VideoWizard/VideoTemporalIntegrationTest.php`
 
 ---
 
