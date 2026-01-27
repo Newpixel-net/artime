@@ -2,7 +2,9 @@
 
 namespace Modules\AppVideoWizard\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Services\CinematographyVocabulary;
 use Modules\AppVideoWizard\Services\PromptTemplateLibrary;
 use Modules\AppVideoWizard\Services\CharacterPsychologyService;
@@ -564,6 +566,11 @@ class StructuredPromptBuilderService
      */
     protected function shouldUseLLMExpansion(array $options): bool
     {
+        // Check global toggle first
+        if (!VwSetting::getValue('hollywood_expansion_enabled', true)) {
+            return false;
+        }
+
         // Check if LLM expansion is explicitly disabled
         $llmEnabled = $options['llm_expansion'] ?? true;
         if (!$llmEnabled) {
@@ -685,8 +692,19 @@ class StructuredPromptBuilderService
      */
     public function buildHollywoodPrompt(array $options = []): array
     {
-        // Check if this shot is complex and should use LLM
+        // Generate cache key from shot data
+        $cacheKey = $this->generatePromptCacheKey($options);
+
+        // Check cache first (only for LLM-eligible shots)
         if ($this->shouldUseLLMExpansion($options)) {
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                Log::debug('StructuredPromptBuilder: Cache hit for prompt', [
+                    'cache_key' => $cacheKey,
+                ]);
+                return $cached;
+            }
+
             $shotData = $this->buildShotDataFromOptions($options);
 
             Log::debug('StructuredPromptBuilder: Attempting LLM expansion for complex shot', [
@@ -703,7 +721,16 @@ class StructuredPromptBuilderService
                     'provider' => $llmResult['provider'],
                     'word_count' => $llmResult['word_count'] ?? 'unknown',
                 ]);
-                return $this->wrapLLMResult($llmResult, $options);
+                $result = $this->wrapLLMResult($llmResult, $options);
+
+                // Cache the LLM result for 24 hours
+                Cache::put($cacheKey, $result, now()->addHours(24));
+                Log::debug('StructuredPromptBuilder: Cached LLM-expanded prompt', [
+                    'cache_key' => $cacheKey,
+                    'ttl_hours' => 24,
+                ]);
+
+                return $result;
             }
 
             // LLM failed, falling through to template expansion
@@ -724,6 +751,30 @@ class StructuredPromptBuilderService
         ];
 
         return $result;
+    }
+
+    /**
+     * Generate cache key for prompt based on shot data and Bible context.
+     *
+     * @param array $options Shot configuration options
+     * @return string Cache key
+     */
+    private function generatePromptCacheKey(array $options): string
+    {
+        // Include all data that affects prompt generation
+        $keyData = [
+            'shot_type' => $options['shot_type'] ?? 'medium',
+            'character' => $options['character'] ?? null,
+            'emotion' => $options['emotion'] ?? null,
+            'subtext' => $options['subtext'] ?? null,
+            'environment' => $options['environment'] ?? null,
+            'visual_mode' => $options['visual_mode'] ?? 'cinematic-realistic',
+            'scene_description' => $options['scene_description'] ?? null,
+            'character_bible' => $options['character_bible'] ?? null,
+            'location_bible' => $options['location_bible'] ?? null,
+        ];
+
+        return 'prompt_cache:' . md5(json_encode($keyData));
     }
 
     /**
