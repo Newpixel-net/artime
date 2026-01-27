@@ -27,7 +27,7 @@ Phase 24: ███████████████░░░░░░░ 75%
 M11:      ███████░░░░ 44% (11/25 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 24-03-PLAN.md (Transition Vocabulary + Temporal Movement)
+**Last activity:** 2026-01-27 - Completed 24-01-PLAN.md (VideoTemporalService + MicroMovementService - final task)
 
 ---
 
@@ -98,13 +98,17 @@ Recent decisions affecting current work:
 - [24-03]: Duration clamped to typical_duration_min/max from VwCameraMovement model
 - [24-03]: Psychology appended with comma separator for natural reading
 - [24-03]: 80% rule - movement duration max 80% of clip duration
+- [24-01]: Simple actions 2-3s, complex motions 4-5s for natural video pacing
+- [24-01]: MAX_ACTIONS_PER_DURATION prevents overpacked clips (5s=2, 10s=4, 15s=5)
+- [24-01]: Shot type determines visible micro-movements (close-up=face, wide=none)
+- [24-01]: Emotion-to-variant mapping for micro-movements (tense=held breath, anxious=rapid breath)
 
 ### Phase 24 Progress
 
 **Phase 24: Video Temporal Expansion is IN PROGRESS (3/4 plans complete).**
 
 Delivered:
-1. 24-01: VideoTemporalService - Clip duration calculation and temporal pacing patterns
+1. 24-01: VideoTemporalService + MicroMovementService - Temporal beats with timing markers and micro-movement vocabulary
 2. 24-02: CharacterDynamicsService - Character path, blocking, and transition vocabulary
 3. 24-03: TransitionVocabulary + CameraMovementService - Shot ending states and temporal movement prompts
 
@@ -128,9 +132,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 24-03-PLAN.md (Transition Vocabulary + Temporal Movement)
+Stopped at: Completed 24-01-PLAN.md final task (MicroMovementService)
 Resume file: None
-Next step: Continue with 24-04-PLAN.md (Integration)
+Next step: Continue with 24-04-PLAN.md (Integration) or verify Wave 1 completion
 
 ---
 
@@ -147,10 +151,12 @@ Next step: Continue with 24-04-PLAN.md (Integration)
 
 Key Files Created (Phase 24):
 - `modules/AppVideoWizard/app/Services/VideoTemporalService.php`
+- `modules/AppVideoWizard/app/Services/MicroMovementService.php`
 - `modules/AppVideoWizard/app/Services/CharacterDynamicsService.php`
 - `modules/AppVideoWizard/app/Services/CharacterPathService.php`
 - `modules/AppVideoWizard/app/Services/TransitionVocabulary.php`
 - `tests/Unit/VideoWizard/VideoTemporalServiceTest.php`
+- `tests/Unit/VideoWizard/MicroMovementServiceTest.php`
 - `tests/Unit/VideoWizard/CharacterDynamicsServiceTest.php`
 - `tests/Unit/VideoWizard/CharacterPathServiceTest.php`
 - `tests/Unit/VideoWizard/TransitionVocabularyTest.php`
@@ -161,6 +167,7 @@ Key Files Modified (Phase 24):
 
 Tests (Phase 24):
 - `tests/Unit/VideoWizard/VideoTemporalServiceTest.php`
+- `tests/Unit/VideoWizard/MicroMovementServiceTest.php`
 - `tests/Unit/VideoWizard/CharacterDynamicsServiceTest.php`
 - `tests/Unit/VideoWizard/CharacterPathServiceTest.php`
 - `tests/Unit/VideoWizard/TransitionVocabularyTest.php`
