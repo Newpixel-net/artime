@@ -18,32 +18,37 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Milestone:** v10 (Livewire Performance Architecture) — In Progress
 **Phase:** 20 (Component Splitting) — In progress
-**Plan:** 1 of 3 complete
+**Plan:** 2 of 3 complete
 **Status:** Executing Phase 20
 
 ```
-Phase 19:   ██████████ 100% (4/4 plans complete)
-Phase 20:   ███░░░░░░░ 33% (1/3 plans complete)
-Phase 21:   ░░░░░░░░░░ 0% (not started)
+Phase 19:   xxxxxxxxxx 100% (4/4 plans complete)
+Phase 20:   xxxxxxx... 67% (2/3 plans complete)
+Phase 21:   .......... 0% (not started)
 ---------------------
-v10:        █████░░░░░ 55% (5/9 requirements)
+v10:        xxxxxx.... 67% (6/9 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 20-01 Bible Trait Extraction
+**Last activity:** 2026-01-27 - Completed 20-03 Location Bible Modal Extraction
 
 ---
 
-## What Shipped (v10 Phase 20 Plan 01)
+## What Shipped (v10 Phase 20 Plan 03)
 
-**Bible Trait Extraction:**
+**Location Bible Modal Extraction:**
 
-- WithCharacterBible trait (1195 lines)
-- WithLocationBible trait (442 lines)
-- VideoWizard.php reduced from ~32,331 to 30,708 lines
+- LocationBibleModal.php child component (717 lines)
+- location-bible-modal.blade.php view (470 lines)
+- Event-based parent-child communication
+- Scene-location one-to-one enforcement in child
 
 **Files created:**
-- modules/AppVideoWizard/app/Livewire/Traits/WithCharacterBible.php
-- modules/AppVideoWizard/app/Livewire/Traits/WithLocationBible.php
+- modules/AppVideoWizard/app/Livewire/Modals/LocationBibleModal.php
+- modules/AppVideoWizard/resources/views/livewire/modals/location-bible-modal.blade.php
+
+**Files modified:**
+- modules/AppVideoWizard/app/Livewire/VideoWizard.php (added event listeners)
+- modules/AppVideoWizard/resources/views/livewire/steps/storyboard.blade.php (replaced @include)
 
 ---
 
@@ -63,18 +68,21 @@ v10:        █████░░░░░ 55% (5/9 requirements)
 | 2026-01-27 | 20-01 | Helper methods shared across bibles stay in VideoWizard.php |
 | 2026-01-27 | 20-01 | Traits access parent properties via $this->          |
 | 2026-01-27 | 20-01 | Keep generateAllMissingReferences() in VideoWizard   |
+| 2026-01-27 | 20-03 | Reference generation stays in parent (needs ImageGenerationService) |
+| 2026-01-27 | 20-03 | Child dispatches events, parent handles heavy operations |
+| 2026-01-27 | 20-03 | Scene data passed as prop, not modelable             |
 
 ### Architecture Context
 
-**VideoWizard.php stats (after 20-01):**
-- ~30,708 lines (reduced from ~32,331)
+**VideoWizard.php stats (after 20-03):**
+- ~30,800 lines (added event listeners, simplified openLocationBibleModal)
 - 7 wizard steps in single component
 - Character/Location Bible methods now in traits
+- LocationBibleModal extracted as child component
 - Nested arrays for scenes/shots
 
 **Phase 20 remaining targets:**
-- Plan 02: Style DNA trait extraction
-- Plan 03: Scene Memory trait extraction
+- Plan 02: Character Bible Modal extraction (same pattern as 20-03)
 
 **Phase 21 targets:**
 - PERF-06: WizardScene, WizardShot database models
@@ -96,9 +104,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 20-01-PLAN.md (Bible Trait Extraction)
+Stopped at: Completed 20-03-PLAN.md (Location Bible Modal Extraction)
 Resume file: None
-Next step: Continue with 20-02-PLAN.md (Style DNA trait) or /gsd:execute-phase 20
+Next step: Continue with 20-02-PLAN.md (Character Bible Modal) or /gsd:execute-phase 20
 
 ---
 
