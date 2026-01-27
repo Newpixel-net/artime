@@ -38,14 +38,14 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 ### Voice Prompts (VOC)
 
 **Table Stakes:**
-- [ ] **VOC-01**: Voice prompts include emotional direction tags (trembling, whisper, cracking)
-- [ ] **VOC-02**: Voice prompts include pacing markers with timing ([PAUSE 2.5s])
-- [ ] **VOC-03**: Voice prompts include vocal quality descriptions (gravelly, exhausted, breathless)
+- [x] **VOC-01**: Voice prompts include emotional direction tags (trembling, whisper, cracking)
+- [x] **VOC-02**: Voice prompts include pacing markers with timing ([PAUSE 2.5s])
+- [x] **VOC-03**: Voice prompts include vocal quality descriptions (gravelly, exhausted, breathless)
 
 **Differentiators:**
-- [ ] **VOC-04**: Voice prompts include ambient audio cues for scene atmosphere
-- [ ] **VOC-05**: Voice prompts include breath and non-verbal sounds
-- [ ] **VOC-06**: Voice prompts include emotional arc direction across dialogue sequence
+- [x] **VOC-04**: Voice prompts include ambient audio cues for scene atmosphere
+- [x] **VOC-05**: Voice prompts include breath and non-verbal sounds
+- [x] **VOC-06**: Voice prompts include emotional arc direction across dialogue sequence
 
 ### Infrastructure (INF)
 
@@ -116,12 +116,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VID-05 | Phase 24 | Complete |
 | VID-06 | Phase 24 | Complete |
 | VID-07 | Phase 24 | Complete |
-| VOC-01 | Phase 25 | Pending |
-| VOC-02 | Phase 25 | Pending |
-| VOC-03 | Phase 25 | Pending |
-| VOC-04 | Phase 25 | Pending |
-| VOC-05 | Phase 25 | Pending |
-| VOC-06 | Phase 25 | Pending |
+| VOC-01 | Phase 25 | Complete |
+| VOC-02 | Phase 25 | Complete |
+| VOC-03 | Phase 25 | Complete |
+| VOC-04 | Phase 25 | Complete |
+| VOC-05 | Phase 25 | Complete |
+| VOC-06 | Phase 25 | Complete |
 
 **Coverage:**
 - v11 requirements: 25 total
