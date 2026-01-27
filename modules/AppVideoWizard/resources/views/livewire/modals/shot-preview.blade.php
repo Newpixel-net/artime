@@ -360,15 +360,30 @@
                     {{-- Voice Prompt --}}
                     <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 0.4rem; padding: 0.4rem;">
                         <div style="font-size: 0.6rem; color: rgba(139, 92, 246, 0.9); margin-bottom: 0.2rem; font-weight: 600;">🎤 {{ __('VOICE PROMPT') }}</div>
-                        <div style="font-size: 0.7rem; color: rgba(196, 181, 253, 0.95); line-height: 1.3; max-height: 50px; overflow-y: auto;">
+                        <div style="font-size: 0.7rem; color: rgba(196, 181, 253, 0.95); line-height: 1.3; max-height: 60px; overflow-y: auto;">
                             @php
                                 $voiceText = $shot['dialogue'] ?? $shot['monologue'] ?? $shot['narration'] ?? null;
                                 $emotion = $shot['emotion'] ?? $shot['emotionalTone'] ?? null;
+                                $enhancedPrompt = null;
+                                if ($voiceText) {
+                                    $enhancedPrompt = \Modules\AppVideoWizard\Services\VoicePromptBuilderService::buildSimpleEnhancedPrompt(
+                                        $voiceText,
+                                        $emotion,
+                                        'elevenlabs'
+                                    );
+                                }
                             @endphp
-                            @if($voiceText)
+                            @if($voiceText && $enhancedPrompt)
                                 @if($emotion)
-                                    <span style="color: rgba(236, 72, 153, 0.9); font-size: 0.6rem;">[{{ $emotion }}]</span>
+                                    <span style="color: rgba(236, 72, 153, 0.9); font-size: 0.6rem; font-weight: 500;">[{{ $emotion }}]</span>
                                 @endif
+                                @if(!empty($enhancedPrompt['direction']))
+                                    <span style="color: rgba(251, 191, 36, 0.9); font-size: 0.55rem; font-style: italic; display: block; margin: 0.15rem 0;">
+                                        ↳ {{ $enhancedPrompt['direction'] }}
+                                    </span>
+                                @endif
+                                <span style="color: rgba(196, 181, 253, 0.95);">{{ $enhancedPrompt['enhanced'] }}</span>
+                            @elseif($voiceText)
                                 {{ $voiceText }}
                             @else
                                 {{ __('Silent shot') }}
