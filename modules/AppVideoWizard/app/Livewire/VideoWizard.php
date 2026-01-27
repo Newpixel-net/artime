@@ -1074,6 +1074,7 @@ class VideoWizard extends Component
     public int $editingCharacterIndex = 0;
     public bool $isGeneratingPortrait = false;
     public bool $isSyncingCharacterBible = false;
+    public ?string $previewEmotion = null;  // VOC-12: Emotion for voice preview
 
     // Location Bible Modal state
     public bool $showLocationBibleModal = false;
@@ -2508,6 +2509,13 @@ class VideoWizard extends Component
 
             if (isset($config['sceneMemory'])) {
                 $this->sceneMemory = array_merge($this->sceneMemory, $config['sceneMemory']);
+
+                // VOC-07: Restore voice registry from Scene DNA
+                if (!empty($this->sceneMemory['sceneDNA']['voiceRegistry'])) {
+                    $registry = app(\Modules\AppVideoWizard\Services\VoiceRegistryService::class);
+                    $registry->fromArray($this->sceneMemory['sceneDNA']['voiceRegistry']);
+                    Log::debug('VideoWizard: Voice registry restored from Scene DNA (VOC-07)');
+                }
             }
             if (isset($config['multiShotMode'])) {
                 $this->multiShotMode = array_merge($this->multiShotMode, $config['multiShotMode']);
@@ -18170,6 +18178,9 @@ EOT;
         $this->sceneMemory['sceneDNA']['enabled'] = true;
         $this->sceneMemory['sceneDNA']['lastSyncedAt'] = now()->toIso8601String();
 
+        // VOC-07: Persist voice registry to Scene DNA
+        $this->sceneMemory['sceneDNA']['voiceRegistry'] = $this->buildVoiceRegistryForDNA();
+
         // =====================================================================
         // PHASE 1 FIX: Sync Scene DNA back to script.scenes for image generation
         // This populates charactersInScene and locationRef for each scene
@@ -18362,6 +18373,22 @@ EOT;
         }
 
         return $currentState;
+    }
+
+    /**
+     * Build voice registry snapshot for Scene DNA persistence (VOC-07).
+     *
+     * Initializes a VoiceRegistryService from the current Character Bible
+     * and serializes it for storage in Scene DNA.
+     *
+     * @return array Voice registry state for persistence
+     */
+    protected function buildVoiceRegistryForDNA(): array
+    {
+        $characterBible = $this->sceneMemory['characterBible'] ?? [];
+        $registry = app(\Modules\AppVideoWizard\Services\VoiceRegistryService::class);
+        $registry->initializeFromCharacterBible($characterBible, $this->getNarratorVoice());
+        return $registry->toArray();
     }
 
     /**
