@@ -1346,8 +1346,11 @@ class VideoWizard extends Component
     #[Computed(persist: true, seconds: 300)]
     public function sceneIds(): array
     {
-        if ($this->project && $this->project->usesNormalizedData()) {
-            return $this->project->scenes()->pluck('id')->toArray();
+        if ($this->projectId) {
+            $project = WizardProject::find($this->projectId);
+            if ($project && $project->usesNormalizedData()) {
+                return $project->scenes()->pluck('id')->toArray();
+            }
         }
 
         // Fallback to JSON indices
@@ -1362,8 +1365,11 @@ class VideoWizard extends Component
     #[Computed]
     public function normalizedSceneCount(): int
     {
-        if ($this->project && $this->project->usesNormalizedData()) {
-            return $this->project->scenes()->count();
+        if ($this->projectId) {
+            $project = WizardProject::find($this->projectId);
+            if ($project && $project->usesNormalizedData()) {
+                return $project->scenes()->count();
+            }
         }
         return count($this->script['scenes'] ?? []);
     }
@@ -1375,7 +1381,11 @@ class VideoWizard extends Component
      */
     public function usesNormalizedData(): bool
     {
-        return $this->project && $this->project->usesNormalizedData();
+        if (!$this->projectId) {
+            return false;
+        }
+        $project = WizardProject::find($this->projectId);
+        return $project && $project->usesNormalizedData();
     }
 
     /**
@@ -1387,18 +1397,21 @@ class VideoWizard extends Component
      */
     public function getSceneData(int $index): ?array
     {
-        if ($this->project && $this->project->usesNormalizedData()) {
-            $scene = $this->project->scenes()
-                ->where('order', $index)
-                ->with(['shots', 'speechSegments'])
-                ->first();
+        if ($this->projectId) {
+            $project = WizardProject::find($this->projectId);
+            if ($project && $project->usesNormalizedData()) {
+                $scene = $project->scenes()
+                    ->where('order', $index)
+                    ->with(['shots', 'speechSegments'])
+                    ->first();
 
-            if (!$scene) {
-                return null;
+                if (!$scene) {
+                    return null;
+                }
+
+                // Transform to array format for backward compatibility
+                return $this->normalizedSceneToArray($scene);
             }
-
-            // Transform to array format for backward compatibility
-            return $this->normalizedSceneToArray($scene);
         }
 
         // JSON fallback
