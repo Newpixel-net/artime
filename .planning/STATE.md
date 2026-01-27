@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 ```
 Phase 27: ████████████████████████ 100% (3/3 plans complete)
 ─────────────────────
-M11:      ████████████████████ 88% (22/25 requirements)
+M11:      ████████████████████████ 100% (25/25 requirements)
 ```
 
 **Last activity:** 2026-01-27 - Completed 27-03-PLAN.md (Hollywood Expansion Toggle UI)

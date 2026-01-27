@@ -55,9 +55,9 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 - [ ] **INF-03**: Template library organized by shot type (close-up needs face detail, wide needs environment)
 
 **Differentiators:**
-- [ ] **INF-04**: LLM-powered expansion for complex shots that exceed template capability
-- [ ] **INF-05**: Prompt caching for performance (avoid re-expanding identical contexts)
-- [ ] **INF-06**: Prompt comparison view in UI (before/after expansion, word count)
+- [x] **INF-04**: LLM-powered expansion for complex shots that exceed template capability
+- [x] **INF-05**: Prompt caching for performance (avoid re-expanding identical contexts)
+- [x] **INF-06**: Prompt comparison view in UI (before/after expansion, word count)
 
 ## Future Requirements
 
@@ -97,9 +97,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INF-01 | Phase 22 | Complete |
 | INF-02 | Phase 23 | Complete |
 | INF-03 | Phase 22 | Complete |
-| INF-04 | Phase 26 | Pending |
-| INF-05 | Phase 27 | Pending |
-| INF-06 | Phase 27 | Pending |
+| INF-04 | Phase 26 | Complete |
+| INF-05 | Phase 27 | Complete |
+| INF-06 | Phase 27 | Complete |
 | IMG-01 | Phase 22 | Complete |
 | IMG-02 | Phase 22 | Complete |
 | IMG-03 | Phase 22 | Complete |
