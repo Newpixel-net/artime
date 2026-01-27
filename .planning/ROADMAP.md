@@ -162,7 +162,7 @@ Plans:
 
 **Goal:** Users get AI-enhanced prompts for complex shots that exceed template capability
 
-**Status:** Gap closure in progress (2026-01-27)
+**Status:** Complete ✓ (2026-01-27)
 
 **Plans:** 4 plans in 4 waves
 
@@ -170,7 +170,7 @@ Plans:
 - [x] 26-01-PLAN.md — ComplexityDetectorService: multi-dimensional complexity scoring (Wave 1)
 - [x] 26-02-PLAN.md — LLMExpansionService: vocabulary-constrained LLM expansion with fallback cascade (Wave 2)
 - [x] 26-03-PLAN.md — StructuredPromptBuilderService integration (Wave 3)
-- [ ] 26-04-PLAN.md — Gap closure: build() delegation to buildHollywoodPrompt() (Wave 4)
+- [x] 26-04-PLAN.md — Gap closure: build() delegation to buildHollywoodPrompt() (Wave 4)
 
 **Dependencies:** Phases 22-25 (templates and model adapters must exist first)
 
@@ -180,9 +180,6 @@ Plans:
 **Success Criteria** (what must be TRUE):
 1. Complex shots trigger LLM expansion — shots with multiple characters, unusual settings, or high emotional complexity automatically route to AI expansion
 2. LLM-expanded prompts maintain template structure and vocabulary — AI expansion produces same professional terminology (physical manifestations, camera psychology, lighting ratios) as templates
-
-**Gap Found (Verification 2026-01-27):**
-Plans 01-03 complete but existing callers (e.g., ImageGenerationService) use build() not buildHollywoodPrompt(). Plan 04 closes this gap by making build() delegate to buildHollywoodPrompt() for automatic LLM routing.
 
 ---
 
@@ -273,7 +270,7 @@ Phase 28 enhances voice production with registry and multi-speaker capabilities.
 | Phase 23: Character Psychology & Bible | Complete ✓ | INF-02, IMG-04, IMG-05, IMG-06, IMG-07, IMG-08, IMG-09 (7) | 4/4 |
 | Phase 24: Video Temporal Expansion | Complete ✓ | VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07 (7) | 4/4 |
 | Phase 25: Voice Prompt Enhancement | Complete ✓ | VOC-01, VOC-02, VOC-03, VOC-04, VOC-05, VOC-06 (6) | 3/3 |
-| Phase 26: LLM-Powered Expansion | Gap closure | INF-04 (1) | 1/2 (partial) |
+| Phase 26: LLM-Powered Expansion | Complete ✓ | INF-04 (1) | 2/2 |
 | Phase 27: UI & Performance Polish | Not started | INF-05, INF-06 (2) | 0/3 |
 | Phase 28: Voice Production Excellence | Not started | TBD | 0/TBD |
 
@@ -284,7 +281,7 @@ Phase 22: ██████████ 100% ✓
 Phase 23: ██████████ 100% ✓
 Phase 24: ██████████ 100% ✓
 Phase 25: ██████████ 100% ✓
-Phase 26: ████████░░ 75% (gap closure)
+Phase 26: ██████████ 100% ✓
 Phase 27: ░░░░░░░░░░ 0%
 Phase 28: ░░░░░░░░░░ 0%
 ─────────────────────
