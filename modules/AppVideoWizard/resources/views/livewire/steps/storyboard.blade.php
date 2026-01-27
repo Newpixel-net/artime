@@ -6614,8 +6614,17 @@ function getCameraMovementIcon($movement) {
     {{-- Style Bible Modal --}}
     @include('appvideowizard::livewire.modals.style-bible')
 
-    {{-- Character Bible Modal --}}
-    @include('appvideowizard::livewire.modals.character-bible')
+    {{-- Character Bible Modal (Child Component) --}}
+    <livewire:app-video-wizard::modals.character-bible-modal
+        wire:model="sceneMemory.characterBible"
+        :project-id="$projectId"
+        :visual-mode="$content['visualMode'] ?? 'cinematic-realistic'"
+        :content-language="$content['language'] ?? 'en'"
+        :script-scenes="$script['scenes'] ?? []"
+        :story-bible-characters="$storyBible['characters'] ?? []"
+        :story-bible-status="$storyBible['status'] ?? ''"
+        wire:key="character-bible-modal-{{ $projectId }}"
+    />
 
     {{-- Location Bible Modal (Child Component) --}}
     <livewire:app-video-wizard::modals.location-bible-modal

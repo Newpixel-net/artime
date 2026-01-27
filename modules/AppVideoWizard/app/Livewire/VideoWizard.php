@@ -14301,20 +14301,16 @@ PROMPT;
 
     /**
      * Open Character Bible modal.
-     * Auto-syncs from Story Bible if available.
+     * Dispatches event to CharacterBibleModal child component.
      */
     public function openCharacterBibleModal(): void
     {
-        // Show modal immediately
+        // Show modal flag (for backwards compatibility)
         $this->showCharacterBibleModal = true;
         $this->editingCharacterIndex = 0;
 
-        // Auto-sync from Story Bible if it has characters
-        if (!empty($this->storyBible['characters']) && $this->storyBible['status'] === 'ready') {
-            $this->isSyncingCharacterBible = true;
-            $this->syncStoryBibleToCharacterBible();
-            $this->isSyncingCharacterBible = false;
-        }
+        // Dispatch event to child component to open modal
+        $this->dispatch('open-character-bible');
     }
 
     /**
@@ -14352,6 +14348,128 @@ PROMPT;
         $this->buildSceneDNA();
         $this->saveProject();
     }
+
+    // =========================================================================
+    // CHARACTER BIBLE CHILD COMPONENT EVENT HANDLERS
+    // =========================================================================
+
+    /**
+     * Handle character bible updates from child component.
+     * Syncs the characterBible data back to parent sceneMemory.
+     */
+    #[On('character-bible-updated')]
+    public function handleCharacterBibleUpdated(array $characterBible): void
+    {
+        $this->sceneMemory['characterBible'] = $characterBible;
+        $this->debouncedBuildSceneDNA();
+        $this->saveProject();
+
+        Log::debug('VideoWizard: Character Bible updated from child component', [
+            'characterCount' => count($characterBible['characters'] ?? []),
+        ]);
+    }
+
+    /**
+     * Handle portrait generation request from child component.
+     * Portrait generation stays in parent due to complex service orchestration.
+     */
+    #[On('generate-character-portrait')]
+    public function handleGenerateCharacterPortraitFromChild(int $characterIndex): void
+    {
+        // Use existing portrait generation logic
+        $this->generateCharacterPortrait($characterIndex);
+    }
+
+    /**
+     * Handle batch portrait generation request from child component.
+     */
+    #[On('generate-all-character-portraits')]
+    public function handleGenerateAllCharacterPortraitsFromChild(array $characterIndices): void
+    {
+        // Queue each portrait for generation
+        foreach ($characterIndices as $index) {
+            $this->generateCharacterPortrait($index);
+            usleep(500000); // 0.5s delay between requests
+        }
+    }
+
+    /**
+     * Handle character bible closed event from child component.
+     * Performs validation and cleanup.
+     */
+    #[On('character-bible-closed')]
+    public function handleCharacterBibleClosed(): void
+    {
+        $this->showCharacterBibleModal = false;
+
+        // PHASE 3: Use SceneSyncService to validate character assignments
+        $syncService = app(SceneSyncService::class);
+        $totalScenes = count($this->script['scenes'] ?? []);
+
+        $validation = $syncService->validateCharacterBible($this->sceneMemory['characterBible'] ?? [], $totalScenes);
+        if (!$validation['valid']) {
+            Log::warning('CharacterBibleModal: Validation issues on close', [
+                'issues' => $validation['issues'],
+            ]);
+            // Auto-fix invalid scene indices by removing them
+            foreach ($this->sceneMemory['characterBible']['characters'] as &$character) {
+                $currentScenes = $character['scenes'] ?? $character['appliedScenes'] ?? [];
+                $character['scenes'] = array_values(array_filter(
+                    $currentScenes,
+                    fn($s) => $s >= 0 && $s < $totalScenes
+                ));
+                unset($character['appliedScenes']);
+            }
+            unset($character);
+        }
+
+        // Rebuild Scene DNA with validated data
+        $this->buildSceneDNA();
+        $this->saveProject();
+    }
+
+    /**
+     * Handle DNA extraction request from child component.
+     */
+    #[On('extract-character-dna')]
+    public function handleExtractCharacterDNA(int $characterIndex): void
+    {
+        $this->extractDNAFromPortrait($characterIndex);
+    }
+
+    /**
+     * Handle voice preview request from child component.
+     */
+    #[On('preview-character-voice')]
+    public function handlePreviewCharacterVoice(int $characterIndex, ?string $emotion): void
+    {
+        $this->previewVoiceWithEmotion($characterIndex, $emotion);
+    }
+
+    /**
+     * Handle auto-detect characters request from child component.
+     */
+    #[On('auto-detect-characters')]
+    public function handleAutoDetectCharacters(): void
+    {
+        $this->autoDetectCharacters();
+    }
+
+    /**
+     * Handle sync from story bible request from child component.
+     */
+    #[On('sync-story-bible-to-character-bible')]
+    public function handleSyncStoryBibleToCharacterBible(): void
+    {
+        $this->syncStoryBibleToCharacterBible();
+
+        // Notify child component of updated data
+        $this->dispatch('story-bible-synced', characterBible: $this->sceneMemory['characterBible']);
+    }
+
+    // =========================================================================
+    // END CHARACTER BIBLE CHILD COMPONENT EVENT HANDLERS
+    // =========================================================================
 
     /**
      * Open Scene Text Inspector modal for specific scene.
