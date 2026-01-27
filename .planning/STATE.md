@@ -10,33 +10,33 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Automatic, effortless, Hollywood-quality output from button clicks
-**Current focus:** Phase 25 - Voice Prompt Enhancement (COMPLETE)
+**Current focus:** Phase 26 - LLM-Powered Expansion (In Progress)
 
 ---
 
 ## Current Position
 
 **Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
-**Phase:** 25 of 28 (Voice Prompt Enhancement)
-**Plan:** 3 of 3
-**Status:** Phase complete
+**Phase:** 26 of 28 (LLM-Powered Expansion)
+**Plan:** 1 of 3
+**Status:** In progress
 
 ```
-Phase 25: ████████████████████████ 100% (3/3 plans complete)
+Phase 26: ████████░░░░░░░░░░░░░░░░ 33% (1/3 plans complete)
 ─────────────────────
-M11:      ██████████░░ 60% (15/25 requirements)
+M11:      ██████████░░ 64% (16/25 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 25-03-PLAN.md (VoicePromptBuilderService Integration)
+**Last activity:** 2026-01-27 - Completed 26-01-PLAN.md (ComplexityDetectorService)
 
 ---
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15 (M11)
-- Average duration: 8.5 min
-- Total execution time: 130 min
+- Total plans completed: 16 (M11)
+- Average duration: 8.3 min
+- Total execution time: 136 min
 
 **By Phase:**
 
@@ -46,10 +46,11 @@ M11:      ██████████░░ 60% (15/25 requirements)
 | 23 | 4/4 | 42 min | 10.5 min |
 | 24 | 4/4 | 34 min | 8.5 min |
 | 25 | 3/3 | 20 min | 6.7 min |
+| 26 | 1/3 | 6 min | 6.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 24-03 (8m), 24-04 (8m), 25-01 (4m), 25-02 (8m), 25-03 (8m)
-- Trend: Consistent execution (Phase 25 averaging ~6.7 min)
+- Last 5 plans: 24-04 (8m), 25-01 (4m), 25-02 (8m), 25-03 (8m), 26-01 (6m)
+- Trend: Fast execution continuing (Phase 26 at 6 min)
 
 *Updated after each plan completion*
 
@@ -121,6 +122,23 @@ Recent decisions affecting current work:
 - [25-03]: Arc distribution: 4 stages distributed proportionally across any segment count
 - [25-03]: Provider output: ElevenLabs=inline tags, OpenAI=separate instructions, Kokoro=descriptive text
 - [25-03]: Unknown scene types fall back to 'intimate' ambient cue
+- [26-01]: Five complexity dimensions: multi_character, emotional_complexity, environment_novelty, combination_novelty, token_budget_risk
+- [26-01]: Weighted scoring: multi_character 30%, emotional 25%, environment 20%, combination 15%, token_budget 10%
+- [26-01]: Single dimension >= 0.7 triggers complexity
+- [26-01]: Total weighted score >= 0.6 triggers complexity
+- [26-01]: 3+ characters ALWAYS triggers complexity regardless of other scores
+
+### Phase 26 Progress
+
+**Phase 26: LLM-Powered Expansion is IN PROGRESS (1/3 plans).**
+
+Delivered:
+1. 26-01: ComplexityDetectorService - Multi-dimensional complexity scoring for LLM routing
+
+**LLM Requirements Progress:**
+- LLM-01: Complexity detection for LLM routing - COMPLETE
+- LLM-02: Prompt expansion for complex shots - PENDING (Plan 02)
+- LLM-03: Integration with existing prompt pipeline - PENDING (Plan 03)
 
 ### Phase 25 Progress
 
@@ -175,9 +193,23 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 25-03-PLAN.md (VoicePromptBuilderService Integration)
+Stopped at: Completed 26-01-PLAN.md (ComplexityDetectorService)
 Resume file: None
-Next step: Plan Phase 26 or start Phase 28 (Voice Production Excellence)
+Next step: Execute 26-02-PLAN.md (PromptExpanderService)
+
+---
+
+## Phase 26 Artifacts (In Progress)
+
+- `.planning/phases/26-llm-powered-expansion/26-RESEARCH.md`
+- `.planning/phases/26-llm-powered-expansion/26-01-PLAN.md` (ComplexityDetectorService) - COMPLETE
+- `.planning/phases/26-llm-powered-expansion/26-01-SUMMARY.md`
+- `.planning/phases/26-llm-powered-expansion/26-02-PLAN.md` (PromptExpanderService) - PENDING
+- `.planning/phases/26-llm-powered-expansion/26-03-PLAN.md` (Integration) - PENDING
+
+Key Files Created (Phase 26):
+- `modules/AppVideoWizard/app/Services/ComplexityDetectorService.php`
+- `tests/Unit/VideoWizard/ComplexityDetectorServiceTest.php`
 
 ---
 
