@@ -7,6 +7,11 @@ use Modules\AppVideoWizard\Models\VwCameraMovement;
 use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Models\VwShotType;
 use Modules\AppVideoWizard\Models\VwGenrePreset;
+use Modules\AppVideoWizard\Services\VideoTemporalService;
+use Modules\AppVideoWizard\Services\MicroMovementService;
+use Modules\AppVideoWizard\Services\CharacterDynamicsService;
+use Modules\AppVideoWizard\Services\CharacterPathService;
+use Modules\AppVideoWizard\Services\TransitionVocabulary;
 
 /**
  * VideoPromptBuilderService - Builds Hollywood-quality video animation prompts.
@@ -29,6 +34,11 @@ use Modules\AppVideoWizard\Models\VwGenrePreset;
 class VideoPromptBuilderService
 {
     protected CameraMovementService $cameraMovementService;
+    protected VideoTemporalService $videoTemporalService;
+    protected MicroMovementService $microMovementService;
+    protected CharacterDynamicsService $characterDynamicsService;
+    protected CharacterPathService $characterPathService;
+    protected TransitionVocabulary $transitionVocabulary;
 
     /**
      * Video prompt formula components (Hollywood formula order).
@@ -110,9 +120,20 @@ class VideoPromptBuilderService
         'natural' => 'true-to-life colors, balanced exposure, naturalistic grade',
     ];
 
-    public function __construct(CameraMovementService $cameraMovementService)
-    {
+    public function __construct(
+        CameraMovementService $cameraMovementService,
+        VideoTemporalService $videoTemporalService,
+        MicroMovementService $microMovementService,
+        CharacterDynamicsService $characterDynamicsService,
+        CharacterPathService $characterPathService,
+        TransitionVocabulary $transitionVocabulary
+    ) {
         $this->cameraMovementService = $cameraMovementService;
+        $this->videoTemporalService = $videoTemporalService;
+        $this->microMovementService = $microMovementService;
+        $this->characterDynamicsService = $characterDynamicsService;
+        $this->characterPathService = $characterPathService;
+        $this->transitionVocabulary = $transitionVocabulary;
     }
 
     /**
