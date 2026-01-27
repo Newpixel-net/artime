@@ -1015,10 +1015,25 @@ class VoiceoverService
                 // Determine voice for this segment
                 $voice = $this->getVoiceForSegment($segment, $characterBible, $narratorVoice);
 
+                // Apply emotional direction if segment has emotion (VOC-11)
+                $textToSpeak = $segment->text;
+                $instructions = '';
+
+                if (!empty($segment->emotion)) {
+                    $provider = $this->getProvider();
+                    $enhanced = $this->enhanceTextWithVoiceDirection($segment->text, $segment->emotion, $provider);
+                    $textToSpeak = $enhanced['text'];
+                    $instructions = $enhanced['instructions'];
+                }
+
+                // Build speech options with instructions if available
+                $speechOptions = ['voice' => $voice];
+                if (!empty($instructions)) {
+                    $speechOptions['instructions'] = $instructions;
+                }
+
                 // Generate audio
-                $audioResult = AI::process($segment->text, 'speech', [
-                    'voice' => $voice,
-                ], $teamId);
+                $audioResult = AI::process($textToSpeak, 'speech', $speechOptions, $teamId);
 
                 if (!empty($audioResult['error'])) {
                     Log::warning('VoiceoverService: Segment audio generation failed', [
@@ -1064,6 +1079,8 @@ class VoiceoverService
                     'needsLipSync' => $segment->needsLipSync,
                     'characterId' => $segment->characterId,
                     'order' => $segment->order,
+                    'emotionApplied' => !empty($segment->emotion),
+                    'emotion' => $segment->emotion,
                 ];
             } catch (\Exception $e) {
                 Log::error('VoiceoverService: Failed to generate segment audio', [
