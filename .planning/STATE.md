@@ -1,7 +1,7 @@
 # Video Wizard - Current State
 
 > Last Updated: 2026-01-27
-> Session: v10 Phase 20 Execution
+> Session: v10 Phase 20 Complete
 
 ---
 
@@ -17,38 +17,50 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 **Milestone:** v10 (Livewire Performance Architecture) — In Progress
-**Phase:** 20 (Component Splitting) — In progress
-**Plan:** 2 of 3 complete
-**Status:** Executing Phase 20
+**Phase:** 20 (Component Splitting) — COMPLETE
+**Plan:** 3 of 3 complete
+**Status:** Ready for Phase 21
 
 ```
 Phase 19:   xxxxxxxxxx 100% (4/4 plans complete)
-Phase 20:   xxxxxxx... 67% (2/3 plans complete)
+Phase 20:   xxxxxxxxxx 100% (3/3 plans complete)
 Phase 21:   .......... 0% (not started)
 ---------------------
-v10:        xxxxxx.... 67% (6/9 requirements)
+v10:        xxxxxxx... 78% (7/9 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 20-03 Location Bible Modal Extraction
+**Last activity:** 2026-01-27 - Completed 20-02 Character Bible Modal Extraction
 
 ---
 
-## What Shipped (v10 Phase 20 Plan 03)
+## What Shipped (v10 Phase 20 Complete)
 
-**Location Bible Modal Extraction:**
+**Plan 01 - Bible Trait Extraction:**
+- WithCharacterBible trait (1195 lines)
+- WithLocationBible trait (442 lines)
+- VideoWizard.php reduced from ~32,331 to 30,708 lines
 
+**Plan 02 - Character Bible Modal Extraction:**
+- CharacterBibleModal.php child component (861 lines)
+- character-bible-modal.blade.php view (692 lines)
+- Event-based parent-child communication for CRUD, portrait generation
+
+**Plan 03 - Location Bible Modal Extraction:**
 - LocationBibleModal.php child component (717 lines)
 - location-bible-modal.blade.php view (470 lines)
-- Event-based parent-child communication
 - Scene-location one-to-one enforcement in child
 
 **Files created:**
+- modules/AppVideoWizard/app/Livewire/Traits/WithCharacterBible.php
+- modules/AppVideoWizard/app/Livewire/Traits/WithLocationBible.php
+- modules/AppVideoWizard/app/Livewire/Modals/CharacterBibleModal.php
 - modules/AppVideoWizard/app/Livewire/Modals/LocationBibleModal.php
+- modules/AppVideoWizard/resources/views/livewire/modals/character-bible-modal.blade.php
 - modules/AppVideoWizard/resources/views/livewire/modals/location-bible-modal.blade.php
 
 **Files modified:**
-- modules/AppVideoWizard/app/Livewire/VideoWizard.php (added event listeners)
-- modules/AppVideoWizard/resources/views/livewire/steps/storyboard.blade.php (replaced @include)
+- modules/AppVideoWizard/app/Livewire/VideoWizard.php (traits, event listeners)
+- modules/AppVideoWizard/resources/views/livewire/steps/storyboard.blade.php (livewire components)
 
 ---
 
@@ -68,21 +80,25 @@ v10:        xxxxxx.... 67% (6/9 requirements)
 | 2026-01-27 | 20-01 | Helper methods shared across bibles stay in VideoWizard.php |
 | 2026-01-27 | 20-01 | Traits access parent properties via $this->          |
 | 2026-01-27 | 20-01 | Keep generateAllMissingReferences() in VideoWizard   |
+| 2026-01-27 | 20-02 | Portrait generation stays in parent (complex service orchestration) |
+| 2026-01-27 | 20-02 | Use event dispatch for heavy operations to maintain separation |
 | 2026-01-27 | 20-03 | Reference generation stays in parent (needs ImageGenerationService) |
 | 2026-01-27 | 20-03 | Child dispatches events, parent handles heavy operations |
 | 2026-01-27 | 20-03 | Scene data passed as prop, not modelable             |
 
 ### Architecture Context
 
-**VideoWizard.php stats (after 20-03):**
-- ~30,800 lines (added event listeners, simplified openLocationBibleModal)
+**VideoWizard.php stats (after Phase 20):**
+- ~30,900 lines (added event listeners for both modals)
 - 7 wizard steps in single component
 - Character/Location Bible methods now in traits
-- LocationBibleModal extracted as child component
+- Both CharacterBibleModal and LocationBibleModal extracted as child components
 - Nested arrays for scenes/shots
 
-**Phase 20 remaining targets:**
-- Plan 02: Character Bible Modal extraction (same pattern as 20-03)
+**Phase 20 complete:**
+- Plan 01: Bible trait extraction (DONE)
+- Plan 02: Character Bible Modal extraction (DONE)
+- Plan 03: Location Bible Modal extraction (DONE)
 
 **Phase 21 targets:**
 - PERF-06: WizardScene, WizardShot database models
@@ -104,9 +120,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 20-03-PLAN.md (Location Bible Modal Extraction)
+Stopped at: Completed Phase 20 (Component Splitting) - All 3 plans
 Resume file: None
-Next step: Continue with 20-02-PLAN.md (Character Bible Modal) or /gsd:execute-phase 20
+Next step: Begin Phase 21 (Database Models) or /gsd:execute-phase 21
 
 ---
 
