@@ -21403,6 +21403,23 @@ PROMPT;
     }
 
     /**
+     * Get anti-portrait negative prompts to prevent AI models from generating
+     * portrait-style images with characters looking at the camera.
+     *
+     * These terms counteract training data bias that causes models to default
+     * to front-facing portraits. Applied to ALL shot generation.
+     *
+     * @see 22-RESEARCH.md Section 3.5 for research background
+     */
+    protected function getAntiPortraitNegativePrompts(): string
+    {
+        return 'looking at camera, looking at viewer, staring at viewer, ' .
+            'eye contact, direct gaze, front-facing portrait, posed, static, ' .
+            'stock photo, headshot, passport photo, selfie, studio portrait, ' .
+            'formal portrait, ID photo';
+    }
+
+    /**
      * Enhance lighting description with Hollywood terminology.
      */
     protected function enhanceLightingDescription(string $lighting): string
