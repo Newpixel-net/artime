@@ -11,6 +11,7 @@ use Modules\AppVideoWizard\Models\WizardAsset;
 use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Services\SpeechSegment;
 use Modules\AppVideoWizard\Services\SpeechSegmentParser;
+use Modules\AppVideoWizard\Services\VoicePromptBuilderService;
 
 class VoiceoverService
 {
@@ -48,6 +49,54 @@ class VoiceoverService
     {
         $setting = VwSetting::where('slug', 'ai_voiceover_provider')->first();
         return $setting?->value ?? 'openai';
+    }
+
+    /**
+     * Enhance text with emotional direction using VoicePromptBuilderService (VOC-09/VOC-11).
+     *
+     * @param string $text Text to enhance
+     * @param string|null $emotion Emotion to apply
+     * @param string $provider TTS provider (openai, kokoro, elevenlabs)
+     * @return array{text: string, instructions: string}
+     */
+    protected function enhanceTextWithVoiceDirection(string $text, ?string $emotion, string $provider): array
+    {
+        // Skip if no emotion specified
+        if (empty($emotion)) {
+            return ['text' => $text, 'instructions' => ''];
+        }
+
+        try {
+            $segment = new SpeechSegment([
+                'text' => $text,
+                'emotion' => $emotion,
+                'type' => SpeechSegment::TYPE_DIALOGUE,
+            ]);
+
+            $promptBuilder = app(VoicePromptBuilderService::class);
+            $enhanced = $promptBuilder->buildEnhancedVoicePrompt($segment, [
+                'provider' => $provider,
+                'includeAmbient' => false,
+            ]);
+
+            Log::debug('VoiceoverService: Applied emotional direction (VOC-11)', [
+                'emotion' => $emotion,
+                'provider' => $provider,
+                'hasInstructions' => !empty($enhanced['instructions']),
+            ]);
+
+            return [
+                'text' => $enhanced['text'],
+                'instructions' => $enhanced['instructions'] ?? '',
+            ];
+
+        } catch (\Exception $e) {
+            Log::warning('VoiceoverService: Failed to apply emotional direction', [
+                'emotion' => $emotion,
+                'error' => $e->getMessage(),
+            ]);
+            return ['text' => $text, 'instructions' => ''];
+        }
     }
 
     /**
