@@ -10,8 +10,8 @@ Phase 19 (Quick Wins) shipped. These requirements remain for Phases 20-21.
 ### Component Architecture (PERF-04, PERF-05)
 
 **Component Splitting:**
-- [ ] **PERF-04**: Child components — separate Livewire components per wizard step
-- [ ] **PERF-05**: Modal components — separate components for Character Bible, Location Bible, etc.
+- [~] **PERF-04**: Child components — PHP traits complete; wizard step components deferred to Phase 22+
+- [x] **PERF-05**: Modal components — Character Bible and Location Bible extracted as child components
 
 ### Data Architecture (PERF-06, PERF-07)
 
@@ -33,16 +33,17 @@ Phase 19 (Quick Wins) shipped. These requirements remain for Phases 20-21.
 | PERF-01 | Phase 19 | Complete |
 | PERF-02 | Phase 19 | Complete |
 | PERF-03 | Phase 19 | Complete |
-| PERF-04 | Phase 20 | Pending |
-| PERF-05 | Phase 20 | Pending |
+| PERF-04 | Phase 20 | Partial (traits only, step components deferred) |
+| PERF-05 | Phase 20 | Complete |
 | PERF-06 | Phase 21 | Pending |
 | PERF-07 | Phase 21 | Pending |
 | PERF-08 | Phase 19 | Complete |
 
 **Coverage:**
 - v10 requirements: 8 total
-- Completed: 4 (Phase 19)
-- Remaining: 4 (Phases 20-21)
+- Completed: 5 (Phase 19: 4, Phase 20: 1)
+- Partial: 1 (PERF-04 traits done, step components deferred)
+- Remaining: 2 (Phase 21)
 
 ---
 *Requirements resumed: 2026-01-27*
