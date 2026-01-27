@@ -10,7 +10,7 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Automatic, effortless, Hollywood-quality output from button clicks
-**Current focus:** Phase 25 - Voice Prompt Enhancement (IN PROGRESS)
+**Current focus:** Phase 25 - Voice Prompt Enhancement (COMPLETE)
 
 ---
 
@@ -18,25 +18,25 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Milestone:** 11 (Hollywood-Quality Prompt Pipeline)
 **Phase:** 25 of 28 (Voice Prompt Enhancement)
-**Plan:** 2 of 3
-**Status:** In progress
+**Plan:** 3 of 3
+**Status:** Phase complete
 
 ```
-Phase 25: ████████████████░░░░░░░░ 67% (2/3 plans complete)
+Phase 25: ████████████████████████ 100% (3/3 plans complete)
 ─────────────────────
-M11:      █████████░░░ 56% (14/25 requirements)
+M11:      ██████████░░ 60% (15/25 requirements)
 ```
 
-**Last activity:** 2026-01-27 - Completed 25-02-PLAN.md (VoicePacingService)
+**Last activity:** 2026-01-27 - Completed 25-03-PLAN.md (VoicePromptBuilderService Integration)
 
 ---
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14 (M11)
-- Average duration: 8.7 min
-- Total execution time: 122 min
+- Total plans completed: 15 (M11)
+- Average duration: 8.5 min
+- Total execution time: 130 min
 
 **By Phase:**
 
@@ -45,11 +45,11 @@ M11:      █████████░░░ 56% (14/25 requirements)
 | 22 | 3/3 | 34 min | 11.3 min |
 | 23 | 4/4 | 42 min | 10.5 min |
 | 24 | 4/4 | 34 min | 8.5 min |
-| 25 | 2/3 | 12 min | 6.0 min |
+| 25 | 3/3 | 20 min | 6.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 24-02 (9m), 24-03 (8m), 24-04 (8m), 25-01 (4m), 25-02 (8m)
-- Trend: Consistent execution (Phase 25 averaging ~6 min)
+- Last 5 plans: 24-03 (8m), 24-04 (8m), 25-01 (4m), 25-02 (8m), 25-03 (8m)
+- Trend: Consistent execution (Phase 25 averaging ~6.7 min)
 
 *Updated after each plan completion*
 
@@ -116,23 +116,28 @@ Recent decisions affecting current work:
 - [25-02]: Five rate modifiers: slow (0.85x), measured (0.9x), normal (1.0x), urgent (1.1x), rushed (1.2x)
 - [25-02]: SSML uses milliseconds for sub-second precision, seconds for whole numbers
 - [25-02]: toSSML converts both custom [PAUSE Xs] and named [beat] markers
+- [25-03]: 8 ambient audio cues: intimate, outdoor, crowded, tense, storm, night, office, vehicle
+- [25-03]: 6 emotional arc patterns: building, crashing, recovering, masking, revealing, confronting
+- [25-03]: Arc distribution: 4 stages distributed proportionally across any segment count
+- [25-03]: Provider output: ElevenLabs=inline tags, OpenAI=separate instructions, Kokoro=descriptive text
+- [25-03]: Unknown scene types fall back to 'intimate' ambient cue
 
 ### Phase 25 Progress
 
-**Phase 25: Voice Prompt Enhancement is IN PROGRESS (2/3 plans).**
+**Phase 25: Voice Prompt Enhancement is COMPLETE (3/3 plans).**
 
 Delivered:
 1. 25-01: VoiceDirectionVocabulary - Emotional direction tags, vocal qualities, non-verbal sounds
 2. 25-02: VoicePacingService - Timing markers, pause notation, SSML conversion
+3. 25-03: VoicePromptBuilderService - Integration with ambient cues and emotional arcs
 
-**VOC Requirements In Progress:**
+**VOC Requirements Complete:**
 - VOC-01: Emotional direction tags [trembling], [whisper], [voice cracks] - COMPLETE
 - VOC-02: Pacing markers with specific timing [PAUSE 2.5s] - COMPLETE
 - VOC-03: Vocal quality descriptions (gravelly, exhausted, breathless) - COMPLETE
+- VOC-04: Ambient audio cues for scene atmosphere - COMPLETE
 - VOC-05: Breath and non-verbal sound markers [sighs], [gasps], [stammers] - COMPLETE
-
-Remaining plans:
-- 25-03: VoicePromptBuilder integration
+- VOC-06: Emotional arc direction across dialogue sequences - COMPLETE
 
 ### Phase 24 Progress
 
@@ -170,26 +175,30 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 25-02-PLAN.md (VoicePacingService)
+Stopped at: Completed 25-03-PLAN.md (VoicePromptBuilderService Integration)
 Resume file: None
-Next step: Execute 25-03-PLAN.md (Voice Prompt Integration)
+Next step: Plan Phase 26 or start Phase 28 (Voice Production Excellence)
 
 ---
 
-## Phase 25 Artifacts (IN PROGRESS)
+## Phase 25 Artifacts (COMPLETE)
 
 - `.planning/phases/25-voice-prompt-enhancement/25-RESEARCH.md`
 - `.planning/phases/25-voice-prompt-enhancement/25-01-PLAN.md` (VoiceDirectionVocabulary) - COMPLETE
 - `.planning/phases/25-voice-prompt-enhancement/25-01-SUMMARY.md`
 - `.planning/phases/25-voice-prompt-enhancement/25-02-PLAN.md` (VoicePacingService) - COMPLETE
 - `.planning/phases/25-voice-prompt-enhancement/25-02-SUMMARY.md`
-- `.planning/phases/25-voice-prompt-enhancement/25-03-PLAN.md` (VoicePromptBuilder Integration) - PENDING
+- `.planning/phases/25-voice-prompt-enhancement/25-03-PLAN.md` (VoicePromptBuilder Integration) - COMPLETE
+- `.planning/phases/25-voice-prompt-enhancement/25-03-SUMMARY.md`
 
 Key Files Created (Phase 25):
 - `modules/AppVideoWizard/app/Services/VoiceDirectionVocabulary.php`
 - `modules/AppVideoWizard/app/Services/VoicePacingService.php`
+- `modules/AppVideoWizard/app/Services/VoicePromptBuilderService.php`
 - `tests/Unit/VideoWizard/VoiceDirectionVocabularyTest.php`
 - `tests/Unit/VideoWizard/VoicePacingServiceTest.php`
+- `tests/Unit/VideoWizard/VoicePromptBuilderServiceTest.php`
+- `tests/Feature/VideoWizard/VoicePromptIntegrationTest.php`
 
 ---
 
