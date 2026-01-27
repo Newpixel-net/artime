@@ -16,7 +16,7 @@ Resume v10 performance work after Phase 19 (Quick Wins) shipped. Phases 20-21 ta
 | Phase | Name | Goal | Requirements | Success Criteria |
 |-------|------|------|--------------|------------------|
 | 19 | Quick Wins | Low-risk performance improvements | PERF-01, PERF-02, PERF-03, PERF-08 | Complete |
-| 20 | Component Splitting | Extract wizard steps and modals into child components | PERF-04, PERF-05 | 4 |
+| 20 | Component Splitting | PHP traits and modal child components | PERF-05 (partial PERF-04) | 4 |
 | 21 | Data Normalization | Database models and lazy loading for scenes/shots | PERF-06, PERF-07 | 4 |
 
 **Total:** 2 remaining phases | 4 requirements | 8 success criteria
@@ -47,29 +47,39 @@ Plans:
 
 ## Phase 20: Component Splitting
 
-**Goal:** Extract wizard steps and modals into separate Livewire components to reduce main component size
+**Goal:** Organize VideoWizard code with PHP traits and extract Bible modals into Livewire child components
 
-**Status:** Not started
+**Status:** Planned (2026-01-27)
 
-**Plans:** TBD (planning needed)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — PHP traits for code organization (WithCharacterBible, WithLocationBible)
+- [ ] 20-02-PLAN.md — CharacterBibleModal child component extraction
+- [ ] 20-03-PLAN.md — LocationBibleModal child component extraction
 
 **Dependencies:** Phase 19 complete
 
 **Requirements:**
-- PERF-04: Child components — separate Livewire components per wizard step
-- PERF-05: Modal components — separate components for Character Bible, Location Bible, etc.
+- PERF-04 (partial): PHP traits for code organization — step components deferred to future phase
+- PERF-05: Modal components — Character Bible and Location Bible as child components
 
 **Success Criteria** (what must be TRUE):
-1. Each wizard step (Concept, Characters, Script, Storyboard, Animation, Audio, Export) has its own Livewire component
-2. Character Bible modal is a separate Livewire component
-3. Location Bible modal is a separate Livewire component
-4. Parent VideoWizard component coordinates child components via events
+1. Character Bible methods organized in WithCharacterBible trait
+2. Location Bible methods organized in WithLocationBible trait
+3. Character Bible modal is a separate Livewire child component
+4. Location Bible modal is a separate Livewire child component
 
-**Architectural Considerations:**
-- VideoWizard.php is ~31k lines — significant refactoring
-- State sharing between parent/child components
-- Event-based communication patterns
-- Backward compatibility with existing functionality
+**Scope Adjustment (from research):**
+- Wizard step extraction (PERF-04 full) deferred — HIGH RISK due to deep state interdependencies
+- Focus on LOW/MEDIUM risk: traits (zero-risk code organization) + modal components (isolated state)
+- Full step extraction recommended for Phase 22+ after data normalization stabilizes
+
+**Architectural Pattern:**
+- Traits: Code organization without state changes
+- Modal components: Event-based parent-child communication
+- Parent dispatches events, child responds
+- Child updates via #[Modelable] wire:model binding
 
 ---
 
@@ -101,12 +111,29 @@ Plans:
 
 ---
 
+## Future: Phase 22+ (Deferred)
+
+**Goal:** Extract wizard steps into child components (PERF-04 full)
+
+**Why deferred:**
+1. Deep state interdependencies ($script, $storyboard, $sceneMemory all interconnected)
+2. Complex service orchestration spans multiple steps
+3. Progressive generation state machine spans steps
+4. Phase 21 data normalization will simplify step extraction
+5. Research rated wizard step extraction as HIGH RISK
+
+**Prerequisites:**
+- Phase 20 complete (traits + modal components establish patterns)
+- Phase 21 complete (data normalization reduces state coupling)
+
+---
+
 ## Progress Tracking
 
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 19: Quick Wins | Complete | PERF-01, PERF-02, PERF-03, PERF-08 | 8/8 |
-| Phase 20: Component Splitting | Not started | PERF-04, PERF-05 | 0/4 |
+| Phase 20: Component Splitting | Planned | PERF-05, PERF-04 (partial) | 0/4 |
 | Phase 21: Data Normalization | Not started | PERF-06, PERF-07 | 0/4 |
 
 **Overall Progress:**
@@ -129,17 +156,24 @@ Phase 19 (Quick Wins) [COMPLETE]
     v
 Phase 20 (Component Splitting)
     |
-    +-- PERF-04: Wizard step components
-    +-- PERF-05: Modal components
+    +-- Plan 01: PHP Traits (LOW RISK)
+    +-- Plan 02: CharacterBibleModal (MEDIUM RISK)
+    +-- Plan 03: LocationBibleModal (MEDIUM RISK)
     |
     v
 Phase 21 (Data Normalization)
     |
     +-- PERF-06: Database models
     +-- PERF-07: Lazy loading
+    |
+    v
+Phase 22+ (Deferred)
+    |
+    +-- PERF-04 full: Wizard step components
 ```
 
 ---
 
 *v10 resumed: 2026-01-27*
+*Phase 20 planned: 2026-01-27*
 *Phase 19 context: .planning/phases/19-quick-wins/19-VERIFICATION.md*
