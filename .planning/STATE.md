@@ -27,7 +27,7 @@ Phase 28: ████████████████░░░░░░░�
 M11.1:    ████████████████░░░░░░░░ 67% (4/6 plans)
 ```
 
-**Last activity:** 2026-01-27 - Completed 28-04-PLAN.md (Emotional TTS Integration)
+**Last activity:** 2026-01-27 - Completed 28-03-PLAN.md (Voice Continuity Validator)
 
 ---
 
@@ -70,8 +70,10 @@ Major decisions logged in PROJECT.md. Highlights:
 | 2026-01-27 | 28-01 | Restoration in loadProject after sceneMemory merge |
 | 2026-01-27 | 28-02 | VoicePromptBuilderService for emotion preview      |
 | 2026-01-27 | 28-02 | Emotions from VoiceDirectionVocabulary constants   |
-| 2026-01-27 | 28-04 | Enhancement applied before TTS in scene/segment flows |
-| 2026-01-27 | 28-04 | Instructions via options for backward compatibility |
+| 2026-01-27 | 28-03 | Named validateVoiceContinuityForUI to avoid method collision |
+| 2026-01-27 | 28-03 | Only ISSUE_VOICE_DRIFT shown in UI (not info-level issues)   |
+| 2026-01-27 | 28-04 | Enhancement applied before TTS in scene/segment flows        |
+| 2026-01-27 | 28-04 | Instructions via options for backward compatibility          |
 
 ### Roadmap Evolution
 
@@ -91,9 +93,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 28-04-PLAN.md
+Stopped at: Completed 28-03-PLAN.md
 Resume file: None
-Next step: Execute 28-05-PLAN.md
+Next step: Execute 28-05-PLAN.md (Wave 2 complete: 28-03, 28-04 done)
 
 ---
 
