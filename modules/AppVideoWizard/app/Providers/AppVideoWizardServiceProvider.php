@@ -254,7 +254,9 @@ class AppVideoWizardServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            \Modules\AppVideoWizard\Console\Commands\NormalizeProjectData::class,
+        ]);
     }
 
     /**
