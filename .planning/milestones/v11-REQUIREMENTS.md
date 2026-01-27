@@ -1,7 +1,12 @@
-# Requirements: Video Wizard - Hollywood-Quality Prompt Pipeline
+# Requirements Archive: v11 Hollywood-Quality Prompt Pipeline
 
-**Defined:** 2026-01-25
-**Core Value:** Automatic, effortless, Hollywood-quality output from button clicks
+**Archived:** 2026-01-27
+**Status:** SHIPPED
+
+This is the archived requirements specification for v11.
+For current requirements, see `.planning/REQUIREMENTS.md` (created for next milestone).
+
+---
 
 ## v11 Requirements
 
@@ -10,9 +15,9 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 ### Image Prompts (IMG)
 
 **Table Stakes:**
-- [ ] **IMG-01**: Image prompts include camera specs with psychological reasoning (lens choice affects viewer perception)
-- [ ] **IMG-02**: Image prompts include quantified framing (percentage of frame, compositional geometry)
-- [ ] **IMG-03**: Image prompts include lighting with specific ratios (key/fill/back, color temperatures in Kelvin)
+- [x] **IMG-01**: Image prompts include camera specs with psychological reasoning (lens choice affects viewer perception)
+- [x] **IMG-02**: Image prompts include quantified framing (percentage of frame, compositional geometry)
+- [x] **IMG-03**: Image prompts include lighting with specific ratios (key/fill/back, color temperatures in Kelvin)
 - [x] **IMG-04**: Image prompts include micro-expressions using physical manifestations (research: FACS AU codes don't work for image models)
 - [x] **IMG-05**: Image prompts include body language with specific posture/gesture descriptions
 - [x] **IMG-06**: Image prompts include emotional state visible in physicality (not labels like "sad" but physical manifestations)
@@ -50,47 +55,16 @@ Requirements for Milestone 11. Each maps to roadmap phases.
 ### Infrastructure (INF)
 
 **Table Stakes:**
-- [ ] **INF-01**: Model adapters handle token limits (77-token CLIP limit for image models)
+- [x] **INF-01**: Model adapters handle token limits (77-token CLIP limit for image models)
 - [x] **INF-02**: Bible integration preserves character/location/style data in expanded prompts
-- [ ] **INF-03**: Template library organized by shot type (close-up needs face detail, wide needs environment)
+- [x] **INF-03**: Template library organized by shot type (close-up needs face detail, wide needs environment)
 
 **Differentiators:**
 - [x] **INF-04**: LLM-powered expansion for complex shots that exceed template capability
 - [x] **INF-05**: Prompt caching for performance (avoid re-expanding identical contexts)
 - [x] **INF-06**: Prompt comparison view in UI (before/after expansion, word count)
 
-## Future Requirements
-
-Deferred to later milestones.
-
-### Advanced Continuity (v12+)
-
-- **CONT-01**: Wardrobe tracking across scenes (same clothing details)
-- **CONT-02**: Prop continuity (same items in consistent positions)
-- **CONT-03**: Time-of-day consistency (matching shadows, light quality)
-- **CONT-04**: Character aging/progression over timeline
-
-### Multi-Model Optimization (v12+)
-
-- **OPT-01**: Model-specific prompt variants (Midjourney vs Stable Diffusion vs Flux)
-- **OPT-02**: A/B testing of prompt variations for quality scoring
-- **OPT-03**: Automatic prompt tuning based on generation results
-
-## Out of Scope
-
-Explicitly excluded. Documented to prevent scope creep.
-
-| Feature | Reason |
-|---------|--------|
-| Real-time prompt editing | Complexity, prompts are auto-generated |
-| User-written custom prompts | Against "effortless" core value |
-| Prompt marketplace/sharing | Not core to video creation |
-| Training custom models | Requires ML infrastructure beyond scope |
-| Multi-language prompts | English-first, internationalization later |
-
 ## Traceability
-
-Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -123,12 +97,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOC-05 | Phase 25 | Complete |
 | VOC-06 | Phase 25 | Complete |
 
-**Coverage:**
-- v11 requirements: 25 total
-- Mapped to phases: 25
-- Unmapped: 0
+---
+
+## Milestone Summary
+
+**Shipped:** 25 of 25 v11 requirements
+**Adjusted:** None
+**Dropped:** None
 
 ---
-*Requirements defined: 2026-01-25*
-*Roadmap created: 2026-01-25*
-*Source: Research .planning/research/SUMMARY.md*
+*Archived: 2026-01-27 as part of v11 milestone completion*
