@@ -1,5 +1,5 @@
-{{-- Location Bible Modal (Child Component) --}}
 <div>
+{{-- Location Bible Modal (Child Component) --}}
 @if($show)
 <div class="vw-modal-overlay"
      wire:key="location-bible-modal-child"
@@ -461,10 +461,10 @@
     </div>
 </div>
 @endif
-</div>
 
 <style>
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
 </style>
+</div>

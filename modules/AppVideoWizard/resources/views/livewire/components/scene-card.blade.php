@@ -1,15 +1,3 @@
-{{--
-    Scene Card Component - Lazy-loaded scene display
-
-    This component displays a single scene card with:
-    - Scene image (or placeholder/generating state)
-    - Status badges (scene number, source type, multi-shot indicator)
-    - Narration/dialogue info
-    - Action buttons (dispatched to parent VideoWizard)
-
-    All editing operations dispatch events to the parent component.
---}}
-
 @php
     $scene = $this->scene;
     $imageUrl = $this->imageUrl;

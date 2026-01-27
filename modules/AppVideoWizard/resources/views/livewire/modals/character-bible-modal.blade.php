@@ -1,5 +1,5 @@
-{{-- Character Bible Modal - Child Component View --}}
 <div>
+{{-- Character Bible Modal - Child Component View --}}
 @if($show)
 <div class="vw-modal-overlay"
      wire:key="character-bible-modal-{{ $editingCharacterIndex ?? 'main' }}"
