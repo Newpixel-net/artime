@@ -12,6 +12,7 @@ use Modules\AppVideoWizard\Models\VwSetting;
 use Modules\AppVideoWizard\Services\SpeechSegment;
 use Modules\AppVideoWizard\Services\SpeechSegmentParser;
 use Modules\AppVideoWizard\Services\VoicePromptBuilderService;
+use Modules\AppVideoWizard\Services\Voice\MultiSpeakerDialogueBuilder;
 
 class VoiceoverService
 {
@@ -1245,5 +1246,241 @@ class VoiceoverService
     {
         $parser = new SpeechSegmentParser();
         return $parser->validateSpeakers($segments, $characterBible);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MULTI-SPEAKER DIALOGUE GENERATION (VOC-10)
+    // Handles conversations with 2+ characters in single unified audio generation
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Generate unified multi-speaker dialogue audio (VOC-10).
+     *
+     * Builds dialogue structure from segments, generates TTS for each turn
+     * with correct voice from registry, applies emotional direction, and
+     * produces combined audio with timing offsets.
+     *
+     * @param WizardProject $project The project
+     * @param array $segments Dialogue segments (arrays or SpeechSegment objects)
+     * @param array $options {
+     *     characterBible: array, Character Bible for voice lookup
+     *     narratorVoice: string, Default narrator voice (default 'fable')
+     *     speed: float, TTS speed multiplier (default 1.0)
+     *     teamId: int, Team ID for API billing
+     *     includeEmotions: bool, Apply emotional direction (default true)
+     * }
+     * @return array{
+     *     success: bool,
+     *     combinedUrl: string,
+     *     assetId: int,
+     *     turns: array,
+     *     totalDuration: float,
+     *     statistics: array
+     * }
+     */
+    public function generateMultiSpeakerDialogue(WizardProject $project, array $segments, array $options = []): array
+    {
+        $characterBible = $options['characterBible'] ?? [];
+        $narratorVoice = $options['narratorVoice'] ?? 'fable';
+        $speed = $options['speed'] ?? 1.0;
+        $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
+        $includeEmotions = $options['includeEmotions'] ?? true;
+        $provider = $options['provider'] ?? $this->getProvider();
+
+        if (empty($segments)) {
+            throw new \Exception('No dialogue segments provided');
+        }
+
+        Log::info('VoiceoverService: Starting multi-speaker dialogue generation (VOC-10)', [
+            'project_id' => $project->id,
+            'segmentCount' => count($segments),
+            'provider' => $provider,
+        ]);
+
+        // Build dialogue structure using MultiSpeakerDialogueBuilder
+        $dialogueBuilder = app(MultiSpeakerDialogueBuilder::class);
+        $dialogue = $dialogueBuilder->buildDialogue($segments, $characterBible, $narratorVoice);
+
+        if (empty($dialogue['turns'])) {
+            throw new \Exception('No valid dialogue turns after building');
+        }
+
+        // Generate audio for each turn
+        $turnResults = [];
+        $audioContents = [];
+        $currentTime = 0;
+        $basePath = "wizard-projects/{$project->id}/audio";
+        $timestamp = time();
+        $dialogueId = 'dialogue-' . Str::random(8);
+
+        foreach ($dialogue['turns'] as $index => $turn) {
+            try {
+                // Apply emotional direction if enabled and emotion exists (VOC-11)
+                $textToSpeak = $turn['text'];
+                $instructions = '';
+
+                if ($includeEmotions && !empty($turn['emotion'])) {
+                    $enhanced = $this->enhanceTextWithVoiceDirection($textToSpeak, $turn['emotion'], $provider);
+                    $textToSpeak = $enhanced['text'];
+                    $instructions = $enhanced['instructions'];
+                }
+
+                // Build speech options
+                $speechOptions = ['voice' => $turn['voiceId']];
+                if (!empty($instructions)) {
+                    $speechOptions['instructions'] = $instructions;
+                }
+
+                // Generate TTS
+                $audioResult = AI::process($textToSpeak, 'speech', $speechOptions, $teamId);
+
+                if (!empty($audioResult['error'])) {
+                    Log::warning('VoiceoverService: Turn TTS failed (VOC-10)', [
+                        'turnIndex' => $index,
+                        'speaker' => $turn['speaker'],
+                        'error' => $audioResult['error'],
+                    ]);
+                    continue;
+                }
+
+                $audioContent = $audioResult['data'][0] ?? null;
+                if (!$audioContent) {
+                    continue;
+                }
+
+                // Store individual turn audio
+                $turnFilename = "{$dialogueId}-turn-{$index}-{$timestamp}.mp3";
+                $turnPath = "{$basePath}/{$turnFilename}";
+                Storage::disk('public')->put($turnPath, $audioContent);
+
+                // Calculate actual duration (estimate if not provided)
+                $wordCount = str_word_count($turn['text']);
+                $duration = ($wordCount / 150) * 60 / $speed;
+
+                $turnResult = [
+                    'id' => $turn['id'],
+                    'order' => $index,
+                    'speaker' => $turn['speaker'],
+                    'text' => $turn['text'],
+                    'voiceId' => $turn['voiceId'],
+                    'emotion' => $turn['emotion'],
+                    'emotionApplied' => $includeEmotions && !empty($turn['emotion']),
+                    'audioUrl' => url('/files/' . $turnPath),
+                    'startTime' => $currentTime,
+                    'duration' => $duration,
+                    'endTime' => $currentTime + $duration,
+                    'needsLipSync' => $turn['needsLipSync'],
+                ];
+
+                $turnResults[] = $turnResult;
+                $audioContents[] = $audioContent;
+
+                // Advance time with small pause between speakers
+                $currentTime += $duration + 0.3;
+
+            } catch (\Exception $e) {
+                Log::error('VoiceoverService: Turn generation failed (VOC-10)', [
+                    'turnIndex' => $index,
+                    'speaker' => $turn['speaker'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (empty($turnResults)) {
+            throw new \Exception('No turns successfully generated');
+        }
+
+        // Create combined audio
+        $combinedContent = implode('', $audioContents);
+        $combinedFilename = "{$dialogueId}-combined-{$timestamp}.mp3";
+        $combinedPath = "{$basePath}/{$combinedFilename}";
+        Storage::disk('public')->put($combinedPath, $combinedContent);
+
+        $combinedUrl = url('/files/' . $combinedPath);
+        $totalDuration = end($turnResults)['endTime'];
+
+        // Create asset record
+        $asset = WizardAsset::create([
+            'project_id' => $project->id,
+            'user_id' => $project->user_id,
+            'type' => WizardAsset::TYPE_VOICEOVER,
+            'name' => 'Multi-Speaker Dialogue - ' . date('Y-m-d H:i'),
+            'path' => $combinedPath,
+            'url' => $combinedUrl,
+            'mime_type' => 'audio/mpeg',
+            'scene_index' => $options['sceneIndex'] ?? null,
+            'scene_id' => $options['sceneId'] ?? null,
+            'metadata' => [
+                'type' => 'multi_speaker_dialogue',
+                'dialogueId' => $dialogueId,
+                'turns' => $turnResults,
+                'speakers' => $dialogue['speakers'],
+                'narratorVoice' => $narratorVoice,
+                'totalDuration' => $totalDuration,
+                'turnCount' => count($turnResults),
+                'provider' => $provider,
+            ],
+        ]);
+
+        Log::info('VoiceoverService: Multi-speaker dialogue complete (VOC-10)', [
+            'project_id' => $project->id,
+            'assetId' => $asset->id,
+            'turnCount' => count($turnResults),
+            'totalDuration' => $totalDuration,
+            'speakerCount' => count($dialogue['speakers']),
+        ]);
+
+        return [
+            'success' => true,
+            'combinedUrl' => $combinedUrl,
+            'assetId' => $asset->id,
+            'turns' => $turnResults,
+            'totalDuration' => $totalDuration,
+            'statistics' => [
+                'turnCount' => count($turnResults),
+                'speakerCount' => count($dialogue['speakers']),
+                'speakers' => array_keys($dialogue['speakers']),
+                'lipSyncTurns' => count(array_filter($turnResults, fn($t) => $t['needsLipSync'])),
+                'voiceoverTurns' => count(array_filter($turnResults, fn($t) => !$t['needsLipSync'])),
+                'emotionsApplied' => count(array_filter($turnResults, fn($t) => $t['emotionApplied'])),
+            ],
+        ];
+    }
+
+    /**
+     * Generate multi-speaker dialogue for a scene.
+     *
+     * Convenience method that extracts segments from scene data
+     * and generates unified dialogue audio.
+     *
+     * @param WizardProject $project The project
+     * @param array $scene Scene data with speechSegments or narration
+     * @param array $options Additional options
+     * @return array Generation result
+     */
+    public function generateSceneDialogue(WizardProject $project, array $scene, array $options = []): array
+    {
+        // Extract segments from scene
+        $segments = $scene['speechSegments'] ?? [];
+
+        // If no segments, try to parse from narration
+        if (empty($segments)) {
+            $narration = $scene['narration'] ?? $scene['voiceover']['text'] ?? '';
+            if (!empty($narration)) {
+                $characterBible = $options['characterBible'] ?? [];
+                $segments = $this->parseNarrationToSegments($narration, $characterBible);
+            }
+        }
+
+        if (empty($segments)) {
+            throw new \Exception('No dialogue segments found in scene');
+        }
+
+        // Add scene context to options
+        $options['sceneId'] = $scene['id'] ?? null;
+        $options['sceneIndex'] = $options['sceneIndex'] ?? null;
+
+        return $this->generateMultiSpeakerDialogue($project, $segments, $options);
     }
 }
