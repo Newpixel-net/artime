@@ -18,17 +18,17 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Milestone:** 11.2 (Prompt Pipeline Integration) — Gap Closure
 **Phase:** 29.1 (Integration Consistency Fixes) — Complete
-**Plan:** 01 of 01 complete
+**Plan:** 02 of 02 complete
 **Status:** Phase complete
 
 ```
 Phase 29:   ██████████ 100% (3/3 plans complete)
-Phase 29.1: ██████████ 100% (1/1 plans complete)
+Phase 29.1: ██████████ 100% (2/2 plans complete)
 ---------------------
-M11.2:      ██████████ 100% (4/4 requirements + 2/2 debt)
+M11.2:      ██████████ 100% (4/4 requirements + 3/3 debt)
 ```
 
-**Last activity:** 2026-01-27 - Completed 29.1-01-PLAN.md (DEBT-01, DEBT-02 resolved)
+**Last activity:** 2026-01-27 - Completed 29.1-02-PLAN.md (DEBT-03 resolved)
 
 ---
 
@@ -90,6 +90,8 @@ Major decisions logged in PROJECT.md. Highlights:
 | 2026-01-27 | 29-03 | Emotion tag in pink to differentiate from voice text        |
 | 2026-01-27 | 29.1-01 | Emotion field placed after monologue in shot array         |
 | 2026-01-27 | 29.1-01 | replace_all used for batch hidream->nanobanana-pro update  |
+| 2026-01-27 | 29.1-02 | Static buildSimpleEnhancedPrompt for blade template usage  |
+| 2026-01-27 | 29.1-02 | Direction description amber/gold, emotion tag pink         |
 
 ### Roadmap Evolution
 
@@ -111,7 +113,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 29.1-01-PLAN.md
+Stopped at: Completed 29.1-02-PLAN.md (all tech debt resolved)
 Resume file: None
 Next step: M11.2 milestone complete - ready for next milestone
 
