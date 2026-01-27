@@ -21173,6 +21173,13 @@ PROMPT;
         // Story content is ALWAYS first
         $promptParts[] = $storyContent;
 
+        // Gaze direction - explicit instruction for where character looks
+        // This prevents AI from defaulting to "looking at camera"
+        $gazeDirection = $this->getGazeDirectionForShot($shotType['type'], $shotContext);
+        if (!empty($gazeDirection)) {
+            $promptParts[] = ucfirst($gazeDirection);
+        }
+
         // Add dialogue if present
         if (!empty($dialogueContent)) {
             $promptParts[] = $dialogueContent;
