@@ -1,11 +1,11 @@
 # Video Wizard Development Roadmap
 
-## Milestone 11.2: Prompt Pipeline Integration (COMPLETE)
+## Milestone 11.2: Prompt Pipeline Integration (IN PROGRESS)
 
 **Target:** Wire comprehensive prompts to shot generation, add voice prompt display, fix default model
-**Status:** Complete (2026-01-27)
-**Total requirements:** 4 (PPL-01 through PPL-04)
-**Phases:** 29
+**Status:** Gap closure in progress
+**Total requirements:** 4 (PPL-01 through PPL-04) + tech debt closure
+**Phases:** 29, 29.1
 
 ---
 
@@ -29,8 +29,9 @@ Voice Production Excellence completes the Hollywood-Quality Prompt Pipeline by a
 | Phase | Name | Goal | Requirements | Success Criteria |
 |-------|------|------|--------------|------------------|
 | 29 | Prompt Pipeline Integration | Shot prompts include full Character/Location DNA, voice prompts displayed, quality defaults | PPL-01, PPL-02, PPL-03, PPL-04 | 4 |
+| 29.1 | Integration Consistency Fixes | Close tech debt from M11.2 audit: consistent fallbacks, emotion data flow, voice prompt enhancement | DEBT-01, DEBT-02, DEBT-03 | 3 |
 
-**Total:** 1 phase | 4 requirements | 4 success criteria
+**Total:** 2 phases | 4 requirements + 3 debt items | 7 success criteria
 
 ---
 
@@ -65,6 +66,30 @@ Plans:
 2. Shot Preview has VOICE PROMPT section showing narration/dialogue and emotional direction
 3. New projects default to nanobanana-pro model
 4. Images generated are visually richer and story-specific
+
+---
+
+## Phase 29.1: Integration Consistency Fixes
+
+**Goal:** Close tech debt from M11.2 audit — consistent imageModel fallbacks, emotion data inheritance, voice prompt enhancement in UI
+
+**Status:** Planned
+
+**Plans:** TBD (to be created via /gsd:plan-phase 29.1)
+
+**Gap Closure:** Closes tech debt from M11.2-MILESTONE-AUDIT.md
+
+**Dependencies:** Phase 29 complete
+
+**Tech Debt Addressed:**
+- DEBT-01: Update 3 remaining imageModel fallbacks from 'hidream' to 'nanobanana-pro' (lines 26503, 26918, 27255)
+- DEBT-02: Add emotion field to shot creation in createShotsFromSpeechSegments (line 25244)
+- DEBT-03: Wire VoicePromptBuilderService to Shot Preview for enhanced voice prompts
+
+**Success Criteria** (what must be TRUE):
+1. All imageModel fallbacks use 'nanobanana-pro' consistently
+2. Shots created from speech segments include emotion data
+3. Shot Preview VOICE PROMPT shows enhanced prompts with emotional direction and pacing markers
 
 ---
 
@@ -123,17 +148,19 @@ Plans:
 | Phase | Status | Requirements | Success Criteria |
 |-------|--------|--------------|------------------|
 | Phase 29: Prompt Pipeline Integration | Complete | PPL-01 through PPL-04 (4) | 4/4 |
+| Phase 29.1: Integration Consistency Fixes | Planned | DEBT-01, DEBT-02, DEBT-03 (3) | 0/3 |
 | Phase 28: Voice Production Excellence | Complete | VOC-07 through VOC-12 (6) | 4/4 |
 
 **Overall Progress:**
 
 ```
-Phase 29: ██████████ 100%
-─────────────────────
-M11.2:    ██████████ 100% (4/4 requirements)
+Phase 29:   ██████████ 100%
+Phase 29.1: ░░░░░░░░░░ 0%
+─────────────────────────
+M11.2:      █████████░ 90% (4/4 requirements + 0/3 debt)
 ```
 
-**Coverage:** 4/4 requirements mapped (100%)
+**Coverage:** 4/4 requirements mapped + 3 debt items (100%)
 
 ---
 
@@ -146,15 +173,23 @@ Phase 25 (Voice Prompt Enhancement) [v11 - SHIPPED]
 Phase 28 (Voice Production Excellence) [M11.1 - COMPLETE]
     |
     v
-Phase 29 (Prompt Pipeline Integration) [M11.2 - IN PROGRESS]
+Phase 29 (Prompt Pipeline Integration) [M11.2 - COMPLETE]
     |
-    +-- PPL-01: Character DNA in shot prompts
-    +-- PPL-02: Location DNA in shot prompts
-    +-- PPL-03: Voice prompt display in Shot Preview
-    +-- PPL-04: Default to nanobanana-pro
+    +-- PPL-01: Character DNA in shot prompts ✓
+    +-- PPL-02: Location DNA in shot prompts ✓
+    +-- PPL-03: Voice prompt display in Shot Preview ✓
+    +-- PPL-04: Default to nanobanana-pro ✓
+    |
+    v
+Phase 29.1 (Integration Consistency Fixes) [M11.2 - PLANNED]
+    |
+    +-- DEBT-01: Consistent imageModel fallbacks
+    +-- DEBT-02: Emotion data inheritance
+    +-- DEBT-03: VoicePromptBuilder in Shot Preview
 ```
 
 Phase 29 wires existing services to UI display and fixes defaults.
+Phase 29.1 closes tech debt identified during M11.2 audit.
 
 ---
 
