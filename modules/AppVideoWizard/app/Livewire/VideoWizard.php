@@ -21344,10 +21344,43 @@ PROMPT;
     {
         $enhanced = $action;
 
-        // Add mood if available
+        // Check if action already has strong dynamic verbs
+        $dynamicVerbs = [
+            'running', 'reaching', 'turning', 'striking', 'leaping', 'dodging',
+            'speaking', 'gesturing', 'examining', 'searching', 'fleeing', 'chasing',
+            'breaking', 'confronting', 'recoiling', 'embracing', 'fighting',
+        ];
+
+        $hasStrongVerb = false;
+        foreach ($dynamicVerbs as $verb) {
+            if (stripos($enhanced, $verb) !== false) {
+                $hasStrongVerb = true;
+                break;
+            }
+        }
+
+        // If no strong verb, inject an action verb from the library
+        if (!$hasStrongVerb) {
+            // Get variation index from shot position if available
+            $variationIndex = $shotContext['shotIndex'] ?? 0;
+            $actionVerb = $this->getActionVerbForScene($shotContext, $variationIndex);
+
+            // Inject action verb naturally into the description
+            // "Character in location" becomes "Character [action verb] in location"
+            if (preg_match('/^(.+?)\s+(in|at|near|by|on|inside|outside)\s+/i', $enhanced, $matches)) {
+                $subject = $matches[1];
+                $preposition = $matches[2];
+                $remainder = substr($enhanced, strlen($matches[0]));
+                $enhanced = "{$subject}, {$actionVerb}, {$preposition} {$remainder}";
+            } else {
+                // Append action verb if can't inject
+                $enhanced .= ", {$actionVerb}";
+            }
+        }
+
+        // Add mood if available (existing behavior)
         $mood = $shotContext['mood'] ?? $shotContext['emotionalBeat'] ?? '';
-        if (!empty($mood) && !stripos($enhanced, $mood)) {
-            // Only add mood if not already in the action
+        if (!empty($mood) && stripos($enhanced, $mood) === false) {
             $moodDescriptors = [
                 'tense' => 'with visible tension',
                 'dramatic' => 'dramatically',
