@@ -848,6 +848,21 @@ Return ONLY valid JSON (no markdown, no explanation):
                 'is_system' => true,
                 'sort_order' => 9,
             ],
+            // Hollywood Expansion Toggle
+            [
+                'slug' => 'hollywood_expansion_enabled',
+                'name' => 'Hollywood Prompt Expansion',
+                'category' => 'production_intelligence',
+                'description' => 'Enable AI-enhanced prompts for complex shots. When enabled, shots with multiple characters, unusual settings, or high emotional complexity automatically route to LLM expansion for Hollywood-quality prompts.',
+                'value_type' => 'boolean',
+                'value' => 'true',
+                'default_value' => 'true',
+                'input_type' => 'checkbox',
+                'input_help' => 'Disable for faster generation with template-only prompts',
+                'icon' => 'fa-solid fa-wand-magic-sparkles',
+                'is_system' => false,
+                'sort_order' => 10,
+            ],
 
             // =============================================
             // CINEMATIC INTELLIGENCE SETTINGS
