@@ -548,6 +548,36 @@
                                                style="width: 100%; height: 4px; accent-color: #10b981;">
                                     </div>
 
+                                    {{-- Emotion Preview (VOC-12) --}}
+                                    <div style="margin-bottom: 0.35rem; padding-top: 0.3rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                                        <label style="display: block; color: rgba(255,255,255,0.6); font-size: 0.5rem; margin-bottom: 0.15rem;">{{ __('Emotion Preview') }}</label>
+                                        <div style="display: flex; gap: 0.3rem; align-items: center;">
+                                            <select wire:model="previewEmotion"
+                                                    style="flex: 1; padding: 0.25rem 0.35rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.25rem; color: white; font-size: 0.55rem;">
+                                                <option value="">{{ __('Neutral') }}</option>
+                                                <option value="trembling">{{ __('Trembling') }}</option>
+                                                <option value="whisper">{{ __('Whisper') }}</option>
+                                                <option value="cracking">{{ __('Cracking') }}</option>
+                                                <option value="grief">{{ __('Grief') }}</option>
+                                                <option value="anxiety">{{ __('Anxiety') }}</option>
+                                                <option value="fear">{{ __('Fear') }}</option>
+                                                <option value="contempt">{{ __('Contempt') }}</option>
+                                                <option value="joy">{{ __('Joy') }}</option>
+                                            </select>
+                                            <button type="button"
+                                                    wire:click="previewVoiceWithEmotion({{ $editIndex }}, $wire.previewEmotion)"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="previewVoiceWithEmotion"
+                                                    style="padding: 0.25rem 0.5rem; background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(16,185,129,0.3)); border: 1px solid rgba(139,92,246,0.4); border-radius: 0.25rem; color: #c4b5fd; font-size: 0.55rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 0.2rem;">
+                                                <span wire:loading.remove wire:target="previewVoiceWithEmotion">{{ __('Preview') }}</span>
+                                                <span wire:loading wire:target="previewVoiceWithEmotion">...</span>
+                                            </button>
+                                        </div>
+                                        <p style="color: rgba(255,255,255,0.4); font-size: 0.4rem; margin-top: 0.15rem;">
+                                            {{ __('Hear how this voice sounds with emotional direction') }}
+                                        </p>
+                                    </div>
+
                                     {{-- Speaking Role & Narrator (side by side) --}}
                                     <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding-top: 0.3rem; border-top: 1px solid rgba(255,255,255,0.1);">
                                         {{-- Speaking Role --}}
