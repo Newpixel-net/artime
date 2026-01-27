@@ -10,14 +10,14 @@ Requirements for Milestone 11.1. Continues Voice Prompt work from Phase 25.
 ### Voice Production (VOC)
 
 **Table Stakes (P0-P1):**
-- [ ] **VOC-07**: Voice Registry persists character-voice mappings across scenes
-- [ ] **VOC-08**: Voice Continuity Validation ensures settings match across scenes
-- [ ] **VOC-09**: Enhanced SSML Markup with full emotional direction support
-- [ ] **VOC-10**: Multi-Speaker Dialogue handles conversations in single generation
+- [x] **VOC-07**: Voice Registry persists character-voice mappings across scenes
+- [x] **VOC-08**: Voice Continuity Validation ensures settings match across scenes
+- [x] **VOC-09**: Enhanced SSML Markup with full emotional direction support
+- [x] **VOC-10**: Multi-Speaker Dialogue handles conversations in single generation
 
 **Differentiators (Integration):**
-- [ ] **VOC-11**: VoicePromptBuilderService integration into wizard UI
-- [ ] **VOC-12**: Voice selection UI in Character Bible modal
+- [x] **VOC-11**: VoicePromptBuilderService integration into wizard UI
+- [x] **VOC-12**: Voice selection UI in Character Bible modal
 
 ## Future Requirements
 
@@ -47,12 +47,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VOC-07 | Phase 28 | Pending |
-| VOC-08 | Phase 28 | Pending |
-| VOC-09 | Phase 28 | Pending |
-| VOC-10 | Phase 28 | Pending |
-| VOC-11 | Phase 28 | Pending |
-| VOC-12 | Phase 28 | Pending |
+| VOC-07 | Phase 28 | Complete |
+| VOC-08 | Phase 28 | Complete |
+| VOC-09 | Phase 28 | Complete |
+| VOC-10 | Phase 28 | Complete |
+| VOC-11 | Phase 28 | Complete |
+| VOC-12 | Phase 28 | Complete |
 
 **Coverage:**
 - v11.1 requirements: 6 total
