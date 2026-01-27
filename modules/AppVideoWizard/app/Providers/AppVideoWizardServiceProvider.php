@@ -227,6 +227,12 @@ class AppVideoWizardServiceProvider extends ServiceProvider
             \Modules\AppVideoWizard\Services\QueuedJobsManager::class,
             fn () => new \Modules\AppVideoWizard\Services\QueuedJobsManager()
         );
+
+        // Phase 28: Voice Continuity Validator (VOC-08)
+        $this->app->singleton(
+            \Modules\AppVideoWizard\Services\Voice\VoiceContinuityValidator::class,
+            fn () => new \Modules\AppVideoWizard\Services\Voice\VoiceContinuityValidator()
+        );
     }
 
     /**
