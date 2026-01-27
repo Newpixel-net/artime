@@ -128,6 +128,7 @@ class VoiceoverService
         $speed = $options['speed'] ?? 1.0;
         $teamId = $options['teamId'] ?? $project->team_id ?? session('current_team_id', 0);
         $forceProvider = $options['provider'] ?? null; // Allow forcing a specific provider
+        $emotion = $options['emotion'] ?? null;
 
         if (empty($narration)) {
             throw new \Exception('No narration text provided');
@@ -136,20 +137,29 @@ class VoiceoverService
         // Determine which provider to use
         $provider = $forceProvider ?? $this->getProvider();
 
+        // Apply emotional direction if specified (VOC-11)
+        $instructions = '';
+        if ($emotion) {
+            $enhanced = $this->enhanceTextWithVoiceDirection($narration, $emotion, $provider);
+            $narration = $enhanced['text'];
+            $instructions = $enhanced['instructions'];
+        }
+
         Log::info('VoiceoverService: Generating voiceover', [
             'project_id' => $project->id,
             'scene_id' => $scene['id'] ?? 'unknown',
             'provider' => $provider,
             'voice' => $voice,
+            'emotion' => $emotion,
         ]);
 
         // Use Kokoro TTS if configured and selected
         if ($provider === 'kokoro' && $this->getKokoroService()->isConfigured()) {
-            return $this->generateWithKokoro($project, $scene, $narration, $voice, $speed, $options);
+            return $this->generateWithKokoro($project, $scene, $narration, $voice, $speed, array_merge($options, ['instructions' => $instructions]));
         }
 
         // Fallback to OpenAI TTS
-        return $this->generateWithOpenAI($project, $scene, $narration, $voice, $speed, $teamId, $options);
+        return $this->generateWithOpenAI($project, $scene, $narration, $voice, $speed, $teamId, array_merge($options, ['instructions' => $instructions]));
     }
 
     /**
@@ -327,10 +337,14 @@ class VoiceoverService
      */
     protected function generateWithOpenAI(WizardProject $project, array $scene, string $narration, string $voice, float $speed, $teamId, array $options = []): array
     {
+        // Build speech options
+        $speechOptions = ['voice' => $voice];
+        if (!empty($options['instructions'])) {
+            $speechOptions['instructions'] = $options['instructions'];
+        }
+
         // Generate audio using OpenAI TTS
-        $result = AI::process($narration, 'speech', [
-            'voice' => $voice,
-        ], $teamId);
+        $result = AI::process($narration, 'speech', $speechOptions, $teamId);
 
         if (!empty($result['error'])) {
             throw new \Exception($result['error']);
