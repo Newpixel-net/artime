@@ -394,4 +394,28 @@ class LLMExpansionIntegrationTest extends TestCase
         // With 3 characters from Scene DNA, should attempt LLM
         $this->assertContains($result['llm_metadata']['method'], ['llm', 'template']);
     }
+
+    /**
+     * @test
+     * Test that build() delegates to buildHollywoodPrompt() for automatic LLM routing.
+     * This ensures backward compatibility - existing callers get LLM expansion without code changes.
+     */
+    public function test_build_delegates_to_hollywood_prompt()
+    {
+        $options = [
+            'visual_mode' => 'cinematic-realistic',
+            'shot_type' => 'close-up',
+            'emotion' => 'grief',
+            'scene_description' => 'A woman looks out the window',
+        ];
+
+        // Both methods should produce identical output
+        $buildResult = $this->builder->build($options);
+        $hollywoodResult = $this->builder->buildHollywoodPrompt($options);
+
+        // Verify identical structure
+        $this->assertEquals($buildResult['meta_data'], $hollywoodResult['meta_data']);
+        $this->assertEquals($buildResult['creative_prompt'], $hollywoodResult['creative_prompt']);
+        $this->assertEquals($buildResult['llm_metadata'], $hollywoodResult['llm_metadata']);
+    }
 }
