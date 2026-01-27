@@ -689,6 +689,154 @@ class VideoWizard extends Component
         'high-angle' => 'looking down or at ground, vulnerable or thoughtful',
     ];
 
+    /**
+     * Action verb library mapped to scene mood/type.
+     *
+     * When narration lacks specific action verbs, these provide dynamic alternatives
+     * to static descriptions. Verbs create narrative ("running", "reaching");
+     * adjectives create portraits ("wearing", "standing").
+     *
+     * @see 22-RESEARCH.md Section 5.5 for research background
+     */
+    protected const ACTION_VERBS = [
+        // Conversation/dialogue scenes
+        'dialogue' => [
+            'speaking with intensity',
+            'gesturing emphatically',
+            'leaning forward intently',
+            'responding with visible emotion',
+            'emphasizing a point',
+        ],
+
+        // Tense/suspenseful scenes
+        'tension' => [
+            'recoiling in shock',
+            'backing away slowly',
+            'clenching fists',
+            'freezing in place',
+            'tensing with apprehension',
+        ],
+        'tense' => [
+            'recoiling in shock',
+            'backing away slowly',
+            'clenching fists',
+            'freezing in place',
+            'tensing with apprehension',
+        ],
+        'suspense' => [
+            'freezing in anticipation',
+            'holding breath',
+            'watching intently',
+            'sensing danger',
+        ],
+
+        // Discovery/investigation scenes
+        'discovery' => [
+            'examining closely',
+            'reaching toward evidence',
+            'reacting to revelation',
+            'uncovering truth',
+            'piecing together clues',
+        ],
+        'investigation' => [
+            'scrutinizing details',
+            'searching methodically',
+            'investigating the scene',
+            'analyzing evidence',
+        ],
+        'mystery' => [
+            'studying intently',
+            'noticing something odd',
+            'connecting dots',
+            'realizing the truth',
+        ],
+
+        // Action/pursuit scenes
+        'action' => [
+            'sprinting forward',
+            'dodging obstacles',
+            'leaping into action',
+            'striking with force',
+            'moving with urgency',
+        ],
+        'pursuit' => [
+            'running at full speed',
+            'chasing relentlessly',
+            'fleeing desperately',
+            'dodging through obstacles',
+        ],
+
+        // Emotional scenes
+        'emotion' => [
+            'breaking down',
+            'composing themselves',
+            'fighting back tears',
+            'overwhelmed with feeling',
+        ],
+        'emotional' => [
+            'breaking down',
+            'composing themselves',
+            'fighting back tears',
+            'overwhelmed with feeling',
+        ],
+        'dramatic' => [
+            'confronting the situation',
+            'making a stand',
+            'facing consequences',
+            'accepting reality',
+        ],
+        'romantic' => [
+            'gazing with affection',
+            'reaching for connection',
+            'leaning closer',
+            'sharing an intimate moment',
+        ],
+
+        // Horror/fear scenes
+        'horror' => [
+            'recoiling in terror',
+            'backing into corner',
+            'trembling with fear',
+            'frozen in horror',
+        ],
+        'fear' => [
+            'shrinking back',
+            'eyes widening in panic',
+            'desperately seeking escape',
+            'paralyzed by dread',
+        ],
+
+        // Comedy scenes
+        'comedy' => [
+            'reacting with exaggerated surprise',
+            'gesturing wildly',
+            'double-taking',
+            'expressing disbelief',
+        ],
+
+        // Contemplative/quiet scenes
+        'contemplative' => [
+            'lost in thought',
+            'considering deeply',
+            'reflecting quietly',
+            'weighing options',
+        ],
+        'melancholic' => [
+            'staring into distance',
+            'remembering the past',
+            'accepting loss',
+            'finding peace',
+        ],
+
+        // Default fallback
+        'default' => [
+            'engaged in the moment',
+            'responding to the situation',
+            'present in the scene',
+            'moving with purpose',
+        ],
+    ];
+
     // Step 2: Concept
     public array $concept = [
         'rawInput' => '',
@@ -21471,6 +21619,41 @@ PROMPT;
         $parts[] = $this->getAntiPortraitNegativePrompts();
 
         return implode(', ', array_filter($parts));
+    }
+
+    /**
+     * Get gaze direction instruction for a specific shot type.
+     *
+     * Returns explicit gaze direction to prevent AI models from defaulting
+     * to "looking at camera". Empty string for shots where gaze doesn't apply
+     * (establishing, POV, detail shots).
+     *
+     * @param string $shotType The shot type (e.g., 'close-up', 'medium', 'pov')
+     * @param array $shotContext Optional context for dynamic gaze targets
+     * @return string Gaze direction instruction or empty string
+     */
+    protected function getGazeDirectionForShot(string $shotType, array $shotContext = []): string
+    {
+        $template = self::GAZE_TEMPLATES[$shotType] ?? '';
+
+        // If no template or empty, return empty string (no gaze instruction)
+        if (empty($template)) {
+            return '';
+        }
+
+        // Enhance template with specific context if available
+        $characters = $shotContext['characters'] ?? [];
+        $hasMultipleCharacters = count($characters) > 1;
+
+        // For conversation shots, specify the other character if known
+        if ($hasMultipleCharacters && in_array($shotType, ['medium', 'medium-close', 'over-shoulder', 'two-shot'])) {
+            // Second character is typically who the first is looking at
+            $otherCharacter = $characters[1] ?? 'the other character';
+            $template = str_replace('other character', $otherCharacter, $template);
+            $template = str_replace('conversation partner', $otherCharacter, $template);
+        }
+
+        return $template;
     }
 
     /**
