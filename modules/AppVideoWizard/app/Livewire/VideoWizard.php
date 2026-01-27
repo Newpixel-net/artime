@@ -21420,6 +21420,29 @@ PROMPT;
     }
 
     /**
+     * Build the complete negative prompt by combining user's negative prompts
+     * with mandatory anti-portrait prompts.
+     *
+     * User prompts come first (they specified them explicitly), followed by
+     * anti-portrait prompts that apply to all cinematic generation.
+     */
+    protected function buildNegativePrompt(): string
+    {
+        $parts = [];
+
+        // User's negative prompts first (if enabled and present)
+        $techSpecsEnabled = $this->storyboard['technicalSpecs']['enabled'] ?? true;
+        if ($techSpecsEnabled && !empty($this->storyboard['technicalSpecs']['negative'])) {
+            $parts[] = $this->storyboard['technicalSpecs']['negative'];
+        }
+
+        // Always add anti-portrait prompts for cinematic generation
+        $parts[] = $this->getAntiPortraitNegativePrompts();
+
+        return implode(', ', array_filter($parts));
+    }
+
+    /**
      * Enhance lighting description with Hollywood terminology.
      */
     protected function enhanceLightingDescription(string $lighting): string
