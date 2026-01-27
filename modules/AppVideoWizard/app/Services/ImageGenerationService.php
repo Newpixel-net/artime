@@ -2597,6 +2597,11 @@ EOT;
         // Store negative prompt for HiDream/RunPod which supports it natively
         $project->setAttribute('_lastNegativePrompt', $negativePromptString);
 
+        // Store expansion metadata for UI display (Phase 27: Prompt Comparison)
+        $expansionMethod = $structuredPrompt['llm_metadata']['method'] ?? 'template';
+        $project->setAttribute('_lastExpansionMethod', $expansionMethod);
+        $project->setAttribute('_lastExpandedPrompt', $promptString);
+
         Log::info('ImageGenerationService: Built STRUCTURED prompt', [
             'visualMode' => $visualMode,
             'sceneIndex' => $sceneIndex,

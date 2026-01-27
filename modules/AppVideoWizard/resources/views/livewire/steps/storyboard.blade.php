@@ -6307,23 +6307,21 @@ function getCameraMovementIcon($movement) {
                         </div>
                     @endif
 
-                    {{-- Prompt Section - Compact --}}
-                    <div style="padding: 0.5rem 0.75rem; border-top: 1px solid rgba(255,255,255,0.05);">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.5px;">{{ __('PROMPT') }}</span>
-                            <div style="display: flex; align-items: center; gap: 0.4rem;">
-                                <span style="font-size: 0.65rem; padding: 0.15rem 0.35rem; background: rgba(6,182,212,0.15); color: #67e8f9; border-radius: 0.2rem;">
-                                    ⏱️ {{ $scene['duration'] ?? 8 }}s
-                                </span>
-                                <span style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">
-                                    {{ $scene['transition'] ?? 'cut' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div style="font-size: 0.8rem; color: rgba(255,255,255,0.65); line-height: 1.4; max-height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                            {{ Str::limit($prompt, 120) }}
-                        </div>
-                    </div>
+                    {{-- Prompt Comparison Section --}}
+                    @php
+                        // Get prompt data for comparison
+                        // Original comes from scene's visual description (brief)
+                        $originalPrompt = $scene['visualDescription'] ?? $scene['visual'] ?? $scene['narration'] ?? '';
+                        // Expanded comes from storyboard scene data (Hollywood-quality)
+                        $expandedPrompt = $storyboardScene['expandedPrompt'] ?? $storyboardScene['prompt'] ?? $prompt ?? '';
+                        // Expansion method: 'llm' for AI-expanded, 'template' for rule-based
+                        $expansionMethod = $storyboardScene['expansionMethod'] ?? 'template';
+                    @endphp
+                    @include('appvideowizard::livewire.partials.prompt-comparison', [
+                        'originalPrompt' => $originalPrompt,
+                        'expandedPrompt' => $expandedPrompt,
+                        'expansionMethod' => $expansionMethod,
+                    ])
                 </div>
             @endforeach
             </div>

@@ -7024,12 +7024,17 @@ PROMPT;
                 ]);
             } else {
                 // Sync generation - image is ready
+                // Phase 27: Store prompt comparison metadata for UI
                 $this->storyboard['scenes'][$sceneIndex] = [
                     'sceneId' => $sceneId,
                     'imageUrl' => $result['imageUrl'],
                     'assetId' => $result['assetId'] ?? null,
                     'source' => 'ai',
                     'status' => 'ready',
+                    // Store prompt and expansion metadata for comparison UI
+                    'prompt' => $result['prompt'] ?? null,
+                    'expandedPrompt' => $project->getAttribute('_lastExpandedPrompt') ?? $result['prompt'] ?? null,
+                    'expansionMethod' => $project->getAttribute('_lastExpansionMethod') ?? 'template',
                 ];
 
                 $this->saveProject();
