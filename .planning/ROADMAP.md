@@ -54,9 +54,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — PHP traits for code organization (WithCharacterBible, WithLocationBible)
-- [ ] 20-02-PLAN.md — CharacterBibleModal child component extraction
-- [ ] 20-03-PLAN.md — LocationBibleModal child component extraction
+- [x] 20-01-PLAN.md — PHP traits for code organization (WithCharacterBible, WithLocationBible)
+- [x] 20-02-PLAN.md — CharacterBibleModal child component extraction
+- [x] 20-03-PLAN.md — LocationBibleModal child component extraction
 
 **Dependencies:** Phase 19 complete
 
@@ -87,9 +87,14 @@ Plans:
 
 **Goal:** Replace nested arrays with database models and implement lazy loading
 
-**Status:** Not started
+**Status:** Planned (2026-01-27)
 
-**Plans:** TBD (planning needed)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 21-01-PLAN.md — Database schema and Eloquent models (WizardScene, WizardShot, WizardSpeechSegment)
+- [ ] 21-02-PLAN.md — Data migration command and VideoWizard dual-mode support
+- [ ] 21-03-PLAN.md — Lazy-loaded SceneCard component for on-demand loading
 
 **Dependencies:** Phase 20 complete (components need stable data interface)
 
@@ -103,11 +108,16 @@ Plans:
 3. Scene data is loaded on-demand when scene is viewed
 4. Shot data is loaded on-demand when shot is expanded
 
-**Architectural Considerations:**
-- Migration strategy for existing project data
-- Relationships: Project → Scenes → Shots → SpeechSegments
-- JSON fields vs. normalized columns
-- Performance benchmarking before/after
+**Wave Structure:**
+- Wave 1: Plan 01 (database foundation)
+- Wave 2: Plan 02 (migration infrastructure, depends on 01)
+- Wave 3: Plan 03 (lazy loading UI, depends on 02)
+
+**Architectural Pattern:**
+- Normalized tables with foreign keys (cascade delete)
+- Dual-mode support: normalized tables preferred, JSON fallback for non-migrated
+- Livewire #[Lazy] components for viewport-based loading
+- #[Computed] properties to avoid serializing scene arrays
 
 ---
 
@@ -134,7 +144,7 @@ Plans:
 |-------|--------|--------------|------------------|
 | Phase 19: Quick Wins | Complete | PERF-01, PERF-02, PERF-03, PERF-08 | 8/8 |
 | Phase 20: Component Splitting | Complete | PERF-05, PERF-04 (partial) | 4/4 |
-| Phase 21: Data Normalization | Not started | PERF-06, PERF-07 | 0/4 |
+| Phase 21: Data Normalization | Planned | PERF-06, PERF-07 | 0/4 |
 
 **Overall Progress:**
 
@@ -154,17 +164,18 @@ v10:        ███████░░░ 75% (6/8 requirements)
 Phase 19 (Quick Wins) [COMPLETE]
     |
     v
-Phase 20 (Component Splitting)
+Phase 20 (Component Splitting) [COMPLETE]
     |
     +-- Plan 01: PHP Traits (LOW RISK)
     +-- Plan 02: CharacterBibleModal (MEDIUM RISK)
     +-- Plan 03: LocationBibleModal (MEDIUM RISK)
     |
     v
-Phase 21 (Data Normalization)
+Phase 21 (Data Normalization) [PLANNED]
     |
-    +-- PERF-06: Database models
-    +-- PERF-07: Lazy loading
+    +-- Wave 1: Plan 01 - Database models (MEDIUM RISK)
+    +-- Wave 2: Plan 02 - Migration command (MEDIUM RISK)
+    +-- Wave 3: Plan 03 - Lazy SceneCard (MEDIUM RISK)
     |
     v
 Phase 22+ (Deferred)
@@ -175,5 +186,6 @@ Phase 22+ (Deferred)
 ---
 
 *v10 resumed: 2026-01-27*
-*Phase 20 planned: 2026-01-27*
+*Phase 20 completed: 2026-01-27*
+*Phase 21 planned: 2026-01-27*
 *Phase 19 context: .planning/phases/19-quick-wins/19-VERIFICATION.md*
