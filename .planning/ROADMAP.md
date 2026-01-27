@@ -98,12 +98,15 @@ Plans:
 
 **Goal:** Users see video prompts that choreograph motion, timing, and multi-character dynamics
 
-**Status:** Not started
+**Status:** Planned (2026-01-27)
 
-**Plans:** TBD
+**Plans:** 4 plans in 2 waves
 
 Plans:
-- [ ] 24-01: TBD
+- [ ] 24-01-PLAN.md — VideoTemporalService and MicroMovementService (Wave 1)
+- [ ] 24-02-PLAN.md — CharacterDynamicsService and CharacterPathService (Wave 1)
+- [ ] 24-03-PLAN.md — TransitionVocabulary and CameraMovementService temporal extension (Wave 1)
+- [ ] 24-04-PLAN.md — VideoPromptBuilderService integration (Wave 2)
 
 **Dependencies:** Phase 23 (image prompt features are inherited by video)
 
@@ -117,9 +120,9 @@ Plans:
 - VID-07: Video prompts include transition suggestions to next shot
 
 **Success Criteria** (what must be TRUE):
-1. Video prompts contain all image prompt elements plus temporal structure — camera specs, FACS expressions, lighting all present alongside motion timing
-2. Temporal beats appear with specific timing — "0-2s: character turns head left, 2-3s: eyes widen in recognition, 3-5s: slow smile spreads"
-3. Camera movement includes duration and psychological framing — "dolly in over 4 seconds, closing from medium to close-up as intimacy increases"
+1. Video prompts contain all image prompt elements plus temporal structure — camera specs, physical expressions, lighting all present alongside motion timing
+2. Temporal beats appear with specific timing — "[00:00-00:02] character turns head left, [00:02-00:04] eyes widen in recognition, [00:04-00:07] slow smile spreads"
+3. Camera movement includes duration and psychological framing — "dolly in over 4 seconds, closing distance as emotional connection deepens"
 4. Multi-character shots describe spatial power dynamics — "dominant character positioned higher in frame, subordinate character's eyeline directed upward"
 
 ---
@@ -229,7 +232,7 @@ Phase 27 is final polish after all prompt systems work.
 |-------|--------|--------------|------------------|
 | Phase 22: Foundation & Model Adapters | Complete ✓ | INF-01, INF-03, IMG-01, IMG-02, IMG-03 (5) | 5/5 |
 | Phase 23: Character Psychology & Bible | Complete ✓ | INF-02, IMG-04, IMG-05, IMG-06, IMG-07, IMG-08, IMG-09 (7) | 4/4 |
-| Phase 24: Video Temporal Expansion | Not started | VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07 (7) | 0/4 |
+| Phase 24: Video Temporal Expansion | Planned | VID-01, VID-02, VID-03, VID-04, VID-05, VID-06, VID-07 (7) | 0/4 |
 | Phase 25: Voice Prompt Enhancement | Not started | VOC-01, VOC-02, VOC-03, VOC-04, VOC-05, VOC-06 (6) | 0/3 |
 | Phase 26: LLM-Powered Expansion | Not started | INF-04 (1) | 0/2 |
 | Phase 27: UI & Performance Polish | Not started | INF-05, INF-06 (2) | 0/3 |
@@ -313,5 +316,6 @@ Hollywood-Quality Prompt Pipeline delivers on the "Hollywood-quality" promise. U
 *Milestone 11 roadmap created: 2026-01-25*
 *Phase 22 planned: 2026-01-26*
 *Phase 23 planned: 2026-01-27*
+*Phase 24 planned: 2026-01-27*
 *Phases 22-27 defined*
 *Source: Research .planning/research/SUMMARY.md*
