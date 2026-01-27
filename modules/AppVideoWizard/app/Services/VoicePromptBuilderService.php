@@ -376,4 +376,58 @@ class VoicePromptBuilderService
     {
         return $this->pacingService;
     }
+
+    /**
+     * Build a simple enhanced voice prompt from array data.
+     *
+     * Static helper for blade templates that don't have SpeechSegment objects.
+     * Returns enhanced text with emotional direction tag and description.
+     *
+     * @param string $text The dialogue/monologue text
+     * @param string|null $emotion The emotion key (grief, anxiety, fear, contempt, joy, etc.)
+     * @param string $provider TTS provider (elevenlabs, openai, kokoro)
+     * @return array{enhanced: string, direction: string, original: string}
+     */
+    public static function buildSimpleEnhancedPrompt(string $text, ?string $emotion = null, string $provider = 'elevenlabs'): array
+    {
+        $result = [
+            'enhanced' => $text,
+            'direction' => '',
+            'original' => $text,
+        ];
+
+        if (empty($emotion)) {
+            return $result;
+        }
+
+        $emotion = strtolower(trim($emotion));
+        $directions = VoiceDirectionVocabulary::EMOTIONAL_DIRECTION;
+
+        if (!isset($directions[$emotion])) {
+            // Unknown emotion - still show it as direction hint
+            $result['direction'] = ucfirst($emotion);
+            return $result;
+        }
+
+        $emotionData = $directions[$emotion];
+        $provider = strtolower($provider);
+
+        // Build enhanced text based on provider
+        if ($provider === 'openai') {
+            // OpenAI uses separate instructions, return description as direction
+            $result['direction'] = $emotionData['description'] ?? '';
+        } elseif ($provider === 'kokoro') {
+            // Kokoro uses descriptive style
+            $result['direction'] = $emotionData['description'] ?? '';
+        } else {
+            // ElevenLabs and default: use inline tags
+            $tag = $emotionData['elevenlabs_tag'] ?? $emotionData['tag'] ?? '';
+            if (!empty($tag)) {
+                $result['enhanced'] = $tag . ' ' . $text;
+            }
+            $result['direction'] = $emotionData['description'] ?? '';
+        }
+
+        return $result;
+    }
 }
