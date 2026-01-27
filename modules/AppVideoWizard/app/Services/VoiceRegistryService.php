@@ -270,6 +270,50 @@ class VoiceRegistryService
     }
 
     /**
+     * Export registry state for persistence (VOC-07).
+     *
+     * Serializes the voice registry state so it can be stored in Scene DNA
+     * and restored across browser refreshes.
+     *
+     * @return array{
+     *     characterVoices: array<string, array{voiceId: string, source: string}>,
+     *     narratorVoiceId: string|null,
+     *     internalVoiceId: string|null,
+     *     lastValidatedAt: string
+     * }
+     */
+    public function toArray(): array
+    {
+        return [
+            'characterVoices' => $this->characterVoices,
+            'narratorVoiceId' => $this->narratorVoiceId,
+            'internalVoiceId' => $this->internalVoiceId,
+            'lastValidatedAt' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Restore registry state from persisted data (VOC-07).
+     *
+     * Hydrates the voice registry from previously serialized state,
+     * typically loaded from Scene DNA.
+     *
+     * @param array $data Previously serialized state from toArray()
+     * @return void
+     */
+    public function fromArray(array $data): void
+    {
+        $this->characterVoices = $data['characterVoices'] ?? [];
+        $this->narratorVoiceId = $data['narratorVoiceId'] ?? null;
+        $this->internalVoiceId = $data['internalVoiceId'] ?? null;
+
+        Log::debug('VoiceRegistry restored from persisted data (VOC-07)', [
+            'charactersRestored' => count($this->characterVoices),
+            'narratorVoice' => $this->narratorVoiceId,
+        ]);
+    }
+
+    /**
      * Test Scenarios (VOC-05)
      *
      * 1. Initialization from Character Bible (new format):
