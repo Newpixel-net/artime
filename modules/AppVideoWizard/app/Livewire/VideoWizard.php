@@ -25243,6 +25243,7 @@ PROMPT;
                 'needsLipSync' => true,
                 'dialogue' => $text,
                 'monologue' => $text,
+                'emotion' => $segment['emotion'] ?? null,
                 'speakingCharacter' => $speaker,
                 'speakingCharacters' => [$speaker],
                 'selectedVideoModel' => self::VIDEO_MODEL_MULTITALK,
