@@ -21657,6 +21657,59 @@ PROMPT;
     }
 
     /**
+     * Get an action verb appropriate for the scene mood/type.
+     *
+     * Called when extractActualStoryAction() doesn't find a strong verb in the
+     * narration. Provides a dynamic fallback instead of static description.
+     *
+     * @param array $shotContext Scene context including mood, emotional beat
+     * @param int $variationIndex Optional index for deterministic variation within a scene
+     * @return string An action verb phrase
+     */
+    protected function getActionVerbForScene(array $shotContext, int $variationIndex = 0): string
+    {
+        // Determine scene mood from context
+        $mood = strtolower($shotContext['mood'] ?? $shotContext['emotionalBeat'] ?? 'default');
+
+        // Try exact mood match first
+        if (isset(self::ACTION_VERBS[$mood])) {
+            $verbs = self::ACTION_VERBS[$mood];
+            return $verbs[$variationIndex % count($verbs)];
+        }
+
+        // Try partial mood matching (e.g., "tense_confrontation" -> "tense")
+        foreach (self::ACTION_VERBS as $category => $verbs) {
+            if (str_contains($mood, $category) || str_contains($category, $mood)) {
+                return $verbs[$variationIndex % count($verbs)];
+            }
+        }
+
+        // Check for emotional keywords in mood
+        $emotionalKeywords = [
+            'sad' => 'emotion',
+            'happy' => 'emotion',
+            'angry' => 'tension',
+            'scared' => 'fear',
+            'love' => 'romantic',
+            'funny' => 'comedy',
+            'dark' => 'horror',
+            'quiet' => 'contemplative',
+            'intense' => 'dramatic',
+        ];
+
+        foreach ($emotionalKeywords as $keyword => $category) {
+            if (str_contains($mood, $keyword)) {
+                $verbs = self::ACTION_VERBS[$category] ?? self::ACTION_VERBS['default'];
+                return $verbs[$variationIndex % count($verbs)];
+            }
+        }
+
+        // Default fallback
+        $verbs = self::ACTION_VERBS['default'];
+        return $verbs[$variationIndex % count($verbs)];
+    }
+
+    /**
      * Enhance lighting description with Hollywood terminology.
      */
     protected function enhanceLightingDescription(string $lighting): string
