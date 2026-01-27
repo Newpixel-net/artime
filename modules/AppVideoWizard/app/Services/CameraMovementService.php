@@ -18,6 +18,23 @@ class CameraMovementService
     protected const CACHE_PREFIX = 'camera_movement_';
 
     /**
+     * Psychological purposes for camera movements.
+     * VID-03: Camera movements include psychological purpose.
+     */
+    public const MOVEMENT_PSYCHOLOGY = [
+        'intimacy' => 'closing distance as emotional connection deepens',
+        'tension' => 'building suspense through deliberate approach',
+        'reveal' => 'gradually exposing the full scope of the scene',
+        'isolation' => 'emphasizing loneliness through widening space',
+        'power' => 'asserting dominance through elevated perspective',
+        'vulnerability' => 'exposing fragility through descending motion',
+        'urgency' => 'conveying time pressure through accelerating movement',
+        'contemplation' => 'allowing space for thought through measured pacing',
+        'discovery' => 'following curiosity through exploratory motion',
+        'departure' => 'marking farewell through receding distance',
+    ];
+
+    /**
      * Get a movement by slug.
      */
     public function getMovement(string $slug): ?array
@@ -293,6 +310,121 @@ class CameraMovementService
         });
 
         return array_values($filtered);
+    }
+
+    /**
+     * Build movement prompt with explicit duration and psychological purpose.
+     * VID-03: Camera movement includes duration and psychological purpose.
+     *
+     * @param string $movementSlug Movement type slug
+     * @param int $durationSeconds Duration in seconds
+     * @param string $emotionalPurpose Psychology key from MOVEMENT_PSYCHOLOGY
+     * @param string $intensity Optional intensity override
+     * @return string Full movement prompt with duration and psychology
+     */
+    public function buildTemporalMovementPrompt(
+        string $movementSlug,
+        int $durationSeconds,
+        string $emotionalPurpose,
+        string $intensity = 'moderate'
+    ): string {
+        $movement = VwCameraMovement::where('slug', $movementSlug)->first();
+
+        if (!$movement) {
+            return 'camera remains static';
+        }
+
+        // Get duration bounds and clamp
+        $minDuration = $movement->typical_duration_min ?? 2;
+        $maxDuration = $movement->typical_duration_max ?? 6;
+        $clampedDuration = max($minDuration, min($maxDuration, $durationSeconds));
+
+        // Start with base prompt syntax
+        $prompt = $movement->prompt_syntax;
+
+        // Replace "smoothly" or insert duration after "camera"
+        if (stripos($prompt, 'smoothly') !== false) {
+            $prompt = str_ireplace('smoothly', "over {$clampedDuration} seconds", $prompt);
+        } elseif (stripos($prompt, 'camera ') === 0) {
+            $prompt = preg_replace('/^camera /i', "camera over {$clampedDuration} seconds ", $prompt);
+        } else {
+            // Append duration at the end if no camera prefix
+            $prompt .= " over {$clampedDuration} seconds";
+        }
+
+        // Add intensity modifier if not moderate
+        if ($intensity !== 'moderate') {
+            $intensityModifiers = [
+                'subtle' => 'gently',
+                'dynamic' => 'dynamically',
+                'intense' => 'dramatically',
+            ];
+            $modifier = $intensityModifiers[$intensity] ?? '';
+            if ($modifier) {
+                // Insert modifier after "camera"
+                if (stripos($prompt, 'camera ') === 0) {
+                    $prompt = preg_replace('/^camera /i', "camera {$modifier} ", $prompt);
+                }
+            }
+        }
+
+        // Append psychological purpose
+        $psychology = self::MOVEMENT_PSYCHOLOGY[$emotionalPurpose] ?? '';
+        if ($psychology) {
+            $prompt .= ', ' . $psychology;
+        }
+
+        return $prompt;
+    }
+
+    /**
+     * Get recommended duration for movement type and clip length.
+     *
+     * @param string $movementSlug Movement type slug
+     * @param int $clipDurationSeconds Total clip duration in seconds
+     * @return int Recommended movement duration in seconds
+     */
+    public function getRecommendedDuration(string $movementSlug, int $clipDurationSeconds): int
+    {
+        $movement = VwCameraMovement::where('slug', $movementSlug)->first();
+
+        if (!$movement) {
+            // Default to 80% of clip or 4 seconds, whichever is smaller
+            return min(4, (int) ($clipDurationSeconds * 0.8));
+        }
+
+        $minDuration = $movement->typical_duration_min ?? 2;
+        $maxDuration = $movement->typical_duration_max ?? 6;
+
+        // Movement shouldn't exceed 80% of clip
+        $maxAllowed = (int) ($clipDurationSeconds * 0.8);
+
+        // Scale between min and max based on clip duration
+        $targetDuration = $maxAllowed;
+
+        // Clamp to movement's typical duration range
+        return max($minDuration, min($maxDuration, $targetDuration));
+    }
+
+    /**
+     * Get available psychological purposes.
+     *
+     * @return array List of psychology keys
+     */
+    public function getAvailablePsychology(): array
+    {
+        return array_keys(self::MOVEMENT_PSYCHOLOGY);
+    }
+
+    /**
+     * Get psychology description by key.
+     *
+     * @param string $key Psychology key
+     * @return string Psychology description, or empty string if not found
+     */
+    public function getPsychologyDescription(string $key): string
+    {
+        return self::MOVEMENT_PSYCHOLOGY[$key] ?? '';
     }
 
     /**
