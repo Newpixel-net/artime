@@ -1,7 +1,7 @@
 # Video Wizard - Current State
 
 > Last Updated: 2026-01-28
-> Session: Phase 23 Plan 01 Complete
+> Session: Phase 23 Plan 03 Complete
 
 ---
 
@@ -18,20 +18,36 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Milestone:** v10 (Livewire Performance Architecture) — In Progress
 **Phase:** 23 (Scene-Level Shot Continuity) — In Progress
-**Plan:** 1 of ? complete
-**Status:** Plan 01 complete, Hollywood continuity integration implemented
+**Plan:** 3 of ? complete
+**Status:** Plan 03 complete, enforcement-aware Hollywood continuity analysis
 
 ```
 Phase 19:   xxxxxxxxxx 100% (4/4 plans complete)
 Phase 20:   xxxxxxxxxx 100% (3/3 plans complete)
 Phase 21:   xx........ 20% (2/? plans complete)
 Phase 22:   xxxxxxxxxx 100% (3/3 plans complete)
-Phase 23:   x......... 10% (1/? plans complete)
+Phase 23:   xxx....... 30% (3/? plans complete)
 ---------------------
 v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 ```
 
-**Last activity:** 2026-01-28 - Completed 23-01-PLAN.md (spatial enrichment + Hollywood continuity)
+**Last activity:** 2026-01-28 - Completed 23-03-PLAN.md (enforcement options for Hollywood continuity)
+
+---
+
+## What Shipped (Phase 23 Plan 03)
+
+**Plan 03 - Enforcement Options for Hollywood Continuity:**
+- analyzeHollywoodContinuity() now extracts enforce180Rule, enforceEyeline, enforceMatchCuts options
+- All three Hollywood checks (180-degree, eyeline, match-on-action) wrapped in conditionals
+- Skipped rules produce null scores (not penalized)
+- Overall score calculated from weighted average of enforced rules only
+- rulesEnforced metadata included in result for transparency
+
+**Files modified:**
+- modules/AppVideoWizard/app/Services/ShotContinuityService.php
+
+**Key outcome:** Users can selectively enable/disable Hollywood continuity rules without false penalties
 
 ---
 
@@ -92,6 +108,10 @@ v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 | 2026-01-28 | 23-01 | Map eyeline to screenDirection (left_to_right/right_to_left/center) for check180DegreeRule() |
 | 2026-01-28 | 23-01 | Preserve enriched shots when auto-optimization doesn't trigger |
 | 2026-01-28 | 23-01 | Use analyzeHollywoodContinuity() instead of analyzeSequence() |
+| 2026-01-28 | 23-03 | Default all enforcement flags (enforce180Rule, enforceEyeline, enforceMatchCuts) to true |
+| 2026-01-28 | 23-03 | Skipped rules get null scores rather than 0 or 100 |
+| 2026-01-28 | 23-03 | Overall score uses weighted average normalized by actual weights used |
+| 2026-01-28 | 23-03 | Include rulesEnforced metadata in result for UI transparency |
 
 ### Architecture Context
 
@@ -130,6 +150,7 @@ v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 
 **Phase 23 in progress:**
 - Plan 01: Spatial enrichment + Hollywood continuity integration (DONE)
+- Plan 03: Enforcement options for Hollywood continuity (DONE)
 
 ### Pending Todos
 
@@ -163,7 +184,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 23-01-PLAN.md
+Stopped at: Completed 23-03-PLAN.md
 Resume file: None
 Next step: Continue Phase 23 (additional continuity plans if any)
 
