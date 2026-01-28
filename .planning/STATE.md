@@ -1,7 +1,7 @@
 # Video Wizard - Current State
 
 > Last Updated: 2026-01-28
-> Session: Phase 23 Plan 02 Complete
+> Session: Phase 23 Plan 04 Complete
 
 ---
 
@@ -18,20 +18,36 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Milestone:** v10 (Livewire Performance Architecture) — In Progress
 **Phase:** 23 (Scene-Level Shot Continuity) — In Progress
-**Plan:** 3 of ? complete (01, 02, 03 done)
-**Status:** Plan 02 complete, globalRules flow from storyBible to continuity analysis
+**Plan:** 4 of ? complete (01, 02, 03, 04 done)
+**Status:** Plan 04 complete, DynamicShotEngine shots wired to Hollywood continuity analysis
 
 ```
 Phase 19:   xxxxxxxxxx 100% (4/4 plans complete)
 Phase 20:   xxxxxxxxxx 100% (3/3 plans complete)
 Phase 21:   xx........ 20% (2/? plans complete)
 Phase 22:   xxxxxxxxxx 100% (3/3 plans complete)
-Phase 23:   xxx....... 30% (3/? plans complete)
+Phase 23:   xxxx...... 40% (4/? plans complete)
 ---------------------
 v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 ```
 
-**Last activity:** 2026-01-28 - Completed 23-02-PLAN.md (globalRules wired to shot generation context)
+**Last activity:** 2026-01-28 - Completed 23-04-PLAN.md (gap closure wiring DynamicShotEngine to continuity)
+
+---
+
+## What Shipped (Phase 23 Plan 04)
+
+**Plan 04 - Gap Closure: Wire DynamicShotEngine to Continuity Analysis:**
+- Added public applyContinuityAnalysis() wrapper method to ShotIntelligenceService
+- Wired decomposeSceneWithDynamicEngine() to call continuity analysis after shots built
+- Complete data flow: storyBible cinematography -> globalRules -> enforcement flags -> Hollywood checks
+- Graceful fallback if continuity analysis fails
+
+**Files modified:**
+- modules/AppVideoWizard/app/Services/ShotIntelligenceService.php (67 lines added)
+- modules/AppVideoWizard/app/Livewire/VideoWizard.php (29 lines added)
+
+**Key outcome:** DynamicShotEngine shots now receive Hollywood continuity analysis with full enforcement control
 
 ---
 
@@ -132,6 +148,9 @@ v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 | 2026-01-28 | 23-03 | Skipped rules get null scores rather than 0 or 100 |
 | 2026-01-28 | 23-03 | Overall score uses weighted average normalized by actual weights used |
 | 2026-01-28 | 23-03 | Include rulesEnforced metadata in result for UI transparency |
+| 2026-01-28 | 23-04 | Public wrapper pattern for applyContinuityAnalysis() for external callers |
+| 2026-01-28 | 23-04 | Graceful fallback if continuity analysis fails - shots still work |
+| 2026-01-28 | 23-04 | Context passthrough for enforcement flag propagation |
 
 ### Architecture Context
 
@@ -146,10 +165,11 @@ v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
   - Gaze direction templates
   - Action verb injection
 
-**ShotIntelligenceService.php (after Phase 23 Plan 01):**
-- ~1995 lines
+**ShotIntelligenceService.php (after Phase 23 Plan 04):**
+- ~2100 lines (added applyContinuityAnalysis wrapper)
 - enrichShotsWithSpatialData() for field mapping
 - Hollywood continuity analysis integration
+- Public applyContinuityAnalysis() for external callers (DynamicShotEngine path)
 - Spatial data preserved for downstream processing
 
 **Phase 20 complete:**
@@ -172,6 +192,7 @@ v10:        xxxxxxxx.. 85% (PERF-06 complete, PERF-07 pending)
 - Plan 01: Spatial enrichment + Hollywood continuity integration (DONE)
 - Plan 02: Wire globalRules to shot generation context (DONE)
 - Plan 03: Enforcement options for Hollywood continuity (DONE)
+- Plan 04: Gap closure - wire DynamicShotEngine to continuity (DONE)
 
 ### Pending Todos
 
@@ -198,16 +219,19 @@ None.
 
 - Phase 23 Scene-Level Shot Continuity IN PROGRESS
   - Plan 01: Spatial enrichment + Hollywood continuity integration (COMPLETE)
-  - Next: Additional plans for enhanced continuity features
+  - Plan 02: Wire globalRules to shot generation context (COMPLETE)
+  - Plan 03: Enforcement options for Hollywood continuity (COMPLETE)
+  - Plan 04: Gap closure - wire DynamicShotEngine to continuity (COMPLETE)
+  - Next: Verification or additional plans for enhanced continuity features
 
 ---
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 23-02-PLAN.md
+Stopped at: Completed 23-04-PLAN.md
 Resume file: None
-Next step: Continue Phase 23 (Plans 01, 02, 03 complete)
+Next step: Phase 23 verification or additional plans (Plans 01, 02, 03, 04 complete)
 
 ---
 
