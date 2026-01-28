@@ -139,6 +139,73 @@ class ShotIntelligenceService
     }
 
     /**
+     * PHASE 23: Apply Hollywood continuity analysis to pre-built shots.
+     * Public wrapper for external callers (VideoWizard's DynamicShotEngine path).
+     *
+     * @param array $shots Array of shot data (from DynamicShotEngine)
+     * @param array $context Context including globalRules enforcement flags
+     * @return array ['shots' => enriched shots, 'continuity' => analysis result]
+     */
+    public function applyContinuityAnalysis(array $shots, array $context = []): array
+    {
+        // Initialize continuity service if not set
+        if (!$this->continuityService) {
+            $this->continuityService = app(ShotContinuityService::class);
+        }
+
+        // Check if continuity is enabled
+        if (!$this->continuityService || !$this->continuityService->isContinuityEnabled()) {
+            return [
+                'shots' => $shots,
+                'continuity' => [
+                    'enabled' => false,
+                    'score' => null,
+                    'issues' => [],
+                    'suggestions' => [],
+                ],
+            ];
+        }
+
+        // PHASE 23: Enrich shots with spatial data (lookDirection, screenDirection)
+        $enrichedShots = $this->enrichShotsWithSpatialData($shots);
+
+        // Extract enforcement flags from context (Phase 23-02)
+        $globalRules = $context['globalRules'] ?? [];
+        $enforce180Rule = $globalRules['enforce180Rule'] ?? true;
+        $enforceEyeline = $globalRules['enforceEyeline'] ?? true;
+        $enforceMatchCuts = $globalRules['enforceMatchCuts'] ?? true;
+
+        // Get scene context for Hollywood analysis
+        $sceneType = $context['sceneType'] ?? VwSetting::getValue('shot_continuity_default_scene_type', 'dialogue');
+        $progressionType = $context['progressionType'] ?? 'building';
+
+        // Run Hollywood continuity analysis (Phase 23-03 respects enforcement flags)
+        $continuityResult = $this->continuityService->analyzeHollywoodContinuity($enrichedShots, [
+            'sceneType' => $sceneType,
+            'progressionType' => $progressionType,
+            'enforce180Rule' => $enforce180Rule,
+            'enforceEyeline' => $enforceEyeline,
+            'enforceMatchCuts' => $enforceMatchCuts,
+        ]);
+
+        Log::debug('ShotIntelligenceService: Applied continuity analysis to external shots', [
+            'shot_count' => count($enrichedShots),
+            'overall_score' => $continuityResult['overall'] ?? null,
+            'issues_count' => count($continuityResult['issues'] ?? []),
+            'enforcement' => [
+                'enforce180Rule' => $enforce180Rule,
+                'enforceEyeline' => $enforceEyeline,
+                'enforceMatchCuts' => $enforceMatchCuts,
+            ],
+        ]);
+
+        return [
+            'shots' => $enrichedShots,
+            'continuity' => $continuityResult,
+        ];
+    }
+
+    /**
      * Analyze a scene and determine optimal shot breakdown.
      *
      * PHASE 5 INTEGRATION: This method now integrates all phases:
