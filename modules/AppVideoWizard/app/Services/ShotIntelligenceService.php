@@ -1471,6 +1471,51 @@ Return ONLY valid JSON (no markdown, no explanation):
     }
 
     // =====================================
+    // SPATIAL DATA ENRICHMENT (Phase 23)
+    // =====================================
+
+    /**
+     * Enrich shots with spatial data fields for Hollywood continuity analysis.
+     *
+     * Maps existing eyeline data to the fields expected by ShotContinuityService:
+     * - lookDirection: What checkEyelineMatch() expects (same values as eyeline)
+     * - screenDirection: What check180DegreeRule() expects (left_to_right, right_to_left, center)
+     * - gaze_direction: Alternative field name for compatibility
+     *
+     * @param array $shots Array of shot data
+     * @return array Shots with spatial data fields added
+     */
+    protected function enrichShotsWithSpatialData(array $shots): array
+    {
+        // Map eyeline values to screenDirection values
+        // eyeline is character's gaze direction relative to screen
+        // screenDirection is motion/facing direction for 180-degree rule
+        $directionMapping = [
+            'screen-left' => 'left_to_right',   // Looking left implies moving/facing right
+            'screen-right' => 'right_to_left',  // Looking right implies moving/facing left
+            'camera' => 'center',               // Looking at camera = center position
+        ];
+
+        foreach ($shots as &$shot) {
+            // Map eyeline to lookDirection (what checkEyelineMatch expects)
+            if (isset($shot['eyeline']) && !isset($shot['lookDirection'])) {
+                $shot['lookDirection'] = $shot['eyeline'];
+                $shot['gaze_direction'] = $shot['eyeline'];
+            }
+
+            // Map eyeline to screenDirection (what check180DegreeRule expects)
+            if (isset($shot['eyeline'])) {
+                $shot['screenDirection'] = $directionMapping[$shot['eyeline']] ?? 'center';
+            } else {
+                // Preserve existing screenDirection or default to center
+                $shot['screenDirection'] = $shot['screenDirection'] ?? 'center';
+            }
+        }
+
+        return $shots;
+    }
+
+    // =====================================
     // CONTINUITY INTEGRATION (Phase 3)
     // =====================================
 
