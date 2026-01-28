@@ -19,8 +19,9 @@ Resume v10 performance work after Phase 19 (Quick Wins) shipped. Phases 20-21 ta
 | 20 | Component Splitting | PHP traits and modal child components | PERF-05 (partial PERF-04) | 4 |
 | 21 | Data Normalization | Database models and lazy loading for scenes/shots | PERF-06, PERF-07 | 4 |
 | 22 | Cinematic Storytelling Research | Fix prompt pipeline for Hollywood-quality frames | QUAL-01 | 4 |
+| 23 | Scene-Level Shot Continuity | Hollywood film grammar for shot sequences | QUAL-02 | 4 |
 
-**Total:** 3 remaining phases | 5 requirements | 12 success criteria
+**Total:** 4 remaining phases | 6 requirements | 16 success criteria
 
 ---
 
@@ -165,7 +166,53 @@ Plans:
 
 ---
 
-## Future: Phase 23+ (Deferred)
+## Phase 23: Scene-Level Shot Continuity
+
+**Goal:** Connect existing ShotContinuityService Hollywood methods to shot generation pipeline by enriching shots with spatial metadata and wiring globalRules enforcement flags
+
+**Status:** Planned (2026-01-28)
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — Shot data enrichment + Hollywood continuity integration
+- [ ] 23-02-PLAN.md — GlobalRules wiring from VideoWizard to ShotIntelligenceService
+- [ ] 23-03-PLAN.md — Enforcement-aware Hollywood analysis in ShotContinuityService
+
+**Dependencies:** Phase 22 complete (individual shot quality must work before scene-level continuity)
+
+**Requirements:**
+- QUAL-02: Scene-level shot continuity — Sequential shots connect logically with Hollywood film grammar
+
+**Research Complete (23-RESEARCH.md):**
+1. Comprehensive infrastructure already exists (ShotContinuityService has 1,400+ lines)
+2. `analyzeHollywoodContinuity()` never called — basic `analyzeSequence()` used instead
+3. Critical data gap: shots have `eyeline` but methods expect `lookDirection`, `screenDirection`
+4. GlobalRules flags (enforce180Rule, enforceEyeline, enforceMatchCuts) defined but never read
+5. Solution is INTEGRATION, not new algorithms
+
+**Success Criteria** (what must be TRUE):
+1. Sequential shots maintain spatial consistency (180-degree rule)
+2. Eyelines match across cuts in dialogue scenes
+3. Shot progression follows intentional rhythm (wide→medium→close for tension build)
+4. Action started in one shot continues logically in the next
+
+**Wave Structure:**
+- Wave 1: Plan 01 (data enrichment + Hollywood method call - foundation)
+- Wave 2: Plans 02, 03 (globalRules wiring + enforcement options - parallel, both depend on 01)
+
+**Implementation Pattern:**
+- Add `enrichShotsWithSpatialData()` method to map eyeline → lookDirection/screenDirection
+- Change `addContinuityAnalysis()` to call `analyzeHollywoodContinuity()` instead of `analyzeSequence()`
+- Pass globalRules from VideoWizard storyBible through to continuity analysis
+- Make Hollywood checks conditional based on enforcement flags
+
+**Key Insight:**
+No new algorithms needed. Over 1,400 lines of continuity logic already exists in ShotContinuityService. The work is connecting data flow and calling the right methods.
+
+---
+
+## Future: Phase 24+ (Deferred)
 
 **Goal:** Extract wizard steps into child components (PERF-04 full)
 
@@ -180,6 +227,7 @@ Plans:
 - Phase 20 complete (traits + modal components establish patterns)
 - Phase 21 complete (data normalization reduces state coupling)
 - Phase 22 complete (cinematic quality research informs prompt changes)
+- Phase 23 complete (shot continuity ensures scene-level quality)
 
 ---
 
@@ -191,6 +239,7 @@ Plans:
 | Phase 20: Component Splitting | Complete | PERF-05, PERF-04 (partial) | 4/4 |
 | Phase 21: Data Normalization | Planned | PERF-06, PERF-07 | 0/4 |
 | Phase 22: Cinematic Storytelling | Complete | QUAL-01 | 4/4 |
+| Phase 23: Shot Continuity | Planned | QUAL-02 | 0/4 |
 
 **Overall Progress:**
 
@@ -199,8 +248,9 @@ Phase 19:   ██████████ 100%
 Phase 20:   ██████████ 100%
 Phase 21:   ░░░░░░░░░░ 0%
 Phase 22:   ██████████ 100%
+Phase 23:   ░░░░░░░░░░ 0%
 ─────────────────────────
-v10:        ████████░░ 80% (7/9 requirements)
+v10:        ███████░░░ 70% (7/10 requirements)
 ```
 
 ---
@@ -231,7 +281,14 @@ Phase 22 (Cinematic Storytelling) [COMPLETE] -- Independent track
     +-- Wave 2: Plan 03 - Action verbs (LOW RISK) ✓
     |
     v
-Phase 23+ (Deferred)
+Phase 23 (Shot Continuity) [PLANNED] -- Builds on Phase 22
+    |
+    +-- Wave 1: Plan 01 - Data enrichment + Hollywood integration (LOW RISK)
+    +-- Wave 2: Plan 02 - GlobalRules wiring (LOW RISK)
+    +-- Wave 2: Plan 03 - Enforcement options (LOW RISK)
+    |
+    v
+Phase 24+ (Deferred)
     |
     +-- PERF-04 full: Wizard step components
 ```
@@ -242,4 +299,5 @@ Phase 23+ (Deferred)
 *Phase 20 completed: 2026-01-27*
 *Phase 21 planned: 2026-01-27*
 *Phase 22 completed: 2026-01-28*
+*Phase 23 planned: 2026-01-28*
 *Phase 19 context: .planning/phases/19-quick-wins/19-VERIFICATION.md*
