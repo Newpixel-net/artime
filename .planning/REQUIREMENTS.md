@@ -19,6 +19,11 @@ Phase 19 (Quick Wins) shipped. These requirements remain for Phases 20-21.
 - [ ] **PERF-06**: Database models — WizardScene, WizardShot models instead of nested arrays
 - [ ] **PERF-07**: Lazy loading — scene data loaded on-demand, not all at once
 
+### Quality (QUAL-01)
+
+**Cinematic Storytelling:**
+- [x] **QUAL-01**: Cinematic prompt pipeline — Prompts produce storytelling frames, not portraits
+
 ## Completed (Phase 19)
 
 - [x] **PERF-01**: Livewire 3 attributes — #[Locked] for constants, #[Computed] for derived values
@@ -38,10 +43,11 @@ Phase 19 (Quick Wins) shipped. These requirements remain for Phases 20-21.
 | PERF-06 | Phase 21 | Pending |
 | PERF-07 | Phase 21 | Pending |
 | PERF-08 | Phase 19 | Complete |
+| QUAL-01 | Phase 22 | Complete |
 
 **Coverage:**
-- v10 requirements: 8 total
-- Completed: 5 (Phase 19: 4, Phase 20: 1)
+- v10 requirements: 9 total
+- Completed: 6 (Phase 19: 4, Phase 20: 1, Phase 22: 1)
 - Partial: 1 (PERF-04 traits done, step components deferred)
 - Remaining: 2 (Phase 21)
 
